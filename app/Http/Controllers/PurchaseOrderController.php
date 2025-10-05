@@ -1,0 +1,453 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
+use App\Models\Supplier;
+use App\Models\Product;
+use App\Models\User;
+use App\Models\PurchaseOrderItemDiscount;
+use App\Services\PurchaseOrderCalculator;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\PurchaseOrderExport;
+use Illuminate\Support\Facades\Gate;
+
+class PurchaseOrderController extends Controller
+{
+
+    public function __construct()
+    {
+        $this->middleware('can:manage-purchases');
+    }
+    
+    public function index(Request $request): View
+{
+    $query = PurchaseOrder::with(['supplier', 'requester'])->latest('order_date');
+
+    // Logika untuk Pencarian Umum (No. PO / Supplier)
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function($q) use ($search) {
+            $q->where('po_number', 'like', "%{$search}%")
+              ->orWhereHas('supplier', function($q) use ($search) {
+                  $q->where('supplier_name', 'like', "%{$search}%");
+              });
+        });
+    }
+
+    // LOGIKA BARU: Pencarian berdasarkan No. Faktur Supplier
+    if ($request->filled('supplier_invoice_number')) {
+        $query->where('supplier_invoice_number', 'like', '%' . $request->supplier_invoice_number . '%');
+    }
+
+    // LOGIKA BARU: Filter berdasarkan Tanggal Pesanan (spesifik)
+    if ($request->filled('order_date')) {
+        $query->whereDate('order_date', $request->order_date);
+    }
+
+    // LOGIKA BARU: Filter berdasarkan Tanggal Jatuh Tempo (spesifik)
+    if ($request->filled('due_date')) {
+        $query->whereDate('due_date', $request->due_date);
+    }
+
+    // Logika untuk filter status pembayaran (tetap sama)
+    if ($request->filled('payment_status')) {
+        $query->where('payment_status', $request->payment_status);
+    }
+
+    // Logika untuk Pengurutan (tetap sama)
+    $sort = $request->get('sort', 'terbaru');
+    switch ($sort) {
+        case 'terlama':
+            $query->orderBy('order_date', 'asc');
+            break;
+        case 'supplier_az':
+            $query->join('suppliers', 'purchase_orders.supplier_id', '=', 'suppliers.supplier_id')
+                  ->orderBy('suppliers.supplier_name', 'asc')->select('purchase_orders.*');
+            break;
+        case 'supplier_za':
+            $query->join('suppliers', 'purchase_orders.supplier_id', '=', 'suppliers.supplier_id')
+                  ->orderBy('suppliers.supplier_name', 'desc')->select('purchase_orders.*');
+            break;
+        default:
+             $query->orderBy('order_date', 'desc')->orderBy('po_id', 'desc');
+        break;
+    }
+
+    // Ambil data dengan paginasi
+    $purchaseOrders = $query->paginate(15)->appends($request->query());
+
+    return view('purchase_orders.index', compact('purchaseOrders'));
+}
+
+    public function create()
+    {
+        $suppliers = Supplier::all();
+        $products = Product::all();
+        $users = User::all();
+        return view('purchase_orders.create', compact('suppliers', 'products','users'));
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'supplier_id' => 'required|exists:suppliers,supplier_id',
+            'order_date' => 'required|date',
+            'due_date' => 'nullable|date|after_or_equal:order_date',
+            'requester_user_id' => 'nullable|exists:users,user_id',
+            'notes' => 'nullable|string',
+            'products' => 'required|array|min:1',
+            'products.*.product_id' => 'required|exists:products,product_id',
+            'products.*.quantity' => 'required|numeric|min:0.01',
+            'products.*.price_per_unit' => 'required|numeric|min:0',
+            'products.*.discounts' => 'nullable|array',
+            'products.*.discounts.*' => 'nullable|numeric|min:0|max:100',
+            'products.*.update_master_price' => 'nullable|boolean',
+            'apply_disc_fee' => 'sometimes|boolean',
+            'disc_fee_percent' => 'nullable|numeric|min:0|max:100',
+            'disc_fee_amount' => 'nullable|numeric|min:0',
+            'apply_rounding_discount' => 'sometimes|boolean',
+            'rounding_discount_amount' => 'nullable|numeric|min:0',
+            'use_custom_dpp_factor' => 'sometimes|boolean',
+            'custom_dpp_factor' => 'nullable|numeric|min:0',
+            'tax_id' => 'nullable|exists:taxes,id',
+            'shipping_amount' => 'nullable|numeric|min:0',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // LANGKAH 1: Lakukan semua kalkulasi di backend sebagai sumber kebenaran
+            $itemSubtotal = 0;
+            foreach ($validated['products'] as $p) {
+                $finalPrice = floatval($p['price_per_unit']);
+                if (!empty($p['discounts']) && is_array($p['discounts'])) {
+                    foreach ($p['discounts'] as $d) {
+                        if (is_numeric($d)) $finalPrice *= (1 - (floatval($d) / 100));
+                    }
+                }
+                $itemSubtotal += (floatval($p['quantity']) * $finalPrice);
+            }
+
+            // LANGKAH 2: Panggil service kalkulator dengan data yang sudah bersih
+            $options = $request->all();
+            $options['subtotal'] = $itemSubtotal;
+            $calc = PurchaseOrderCalculator::calculate($options);
+
+            // LANGKAH 3: Buat Purchase Order dengan SEMUA data yang sudah dihitung dalam satu perintah
+            $po = PurchaseOrder::create([
+                'po_number'           => PurchaseOrder::generatePoNumber(), // Pastikan Anda punya fungsi ini di Model
+                'supplier_id'         => $validated['supplier_id'],
+                'order_date'          => $validated['order_date'],
+                'due_date'            => $request->input('due_date'),
+                'requester_user_id'   => $request->input('requester_user_id'),
+                'user_id_admin'       => Auth::id(),
+                'notes'               => $request->input('notes'),
+                'status'              => 'draft',
+                'payment_status'      => 'unpaid',
+                // Mengisi semua kolom kalkulasi dari hasil service kalkulator
+                'subtotal'                  => $calc['subtotal'],
+                'tax_id'                    => $request->input('tax_id'),
+                'apply_disc_fee'            => $request->boolean('apply_disc_fee'),
+                'disc_fee_percent'          => $request->input('disc_fee_percent'),
+                'disc_fee_amount'           => $calc['disc_fee_amount'],
+                'apply_rounding_discount'   => $request->boolean('apply_rounding_discount'),
+                'rounding_discount_amount'  => $calc['rounding_discount_amount'],
+                'use_custom_dpp_factor'     => $request->boolean('use_custom_dpp_factor'),
+                'custom_dpp_factor'         => $request->input('custom_dpp_factor'),
+                'shipping_amount'           => $calc['shipping_amount'],
+                'taxable_amount'            => $calc['taxable_base'],
+                'dpp'                       => $calc['dpp'],
+                'ppn'                       => $calc['ppn'],
+                'total_amount'              => $calc['grand_total'],
+                'grand_total'               => $calc['grand_total'], // Mengisi kedua kolom agar konsisten
+            ]);
+
+            // LANGKAH 4: Simpan item-item yang dibeli
+            foreach ($validated['products'] as $p) {
+                $finalPrice = floatval($p['price_per_unit']);
+                if (!empty($p['discounts']) && is_array($p['discounts'])) {
+                    foreach ($p['discounts'] as $d) {
+                        if (is_numeric($d)) $finalPrice *= (1 - (floatval($d) / 100));
+                    }
+                }
+                $subtotal_item = floatval($p['quantity']) * $finalPrice;
+
+                $item = $po->items()->create([
+                    'product_id' => $p['product_id'],
+                    'quantity' => $p['quantity'],
+                    'price_per_unit' => $p['price_per_unit'],
+                    'subtotal' => $subtotal_item,
+                ]);
+
+                if (!empty($p['discounts']) && is_array($p['discounts'])) {
+                    foreach ($p['discounts'] as $d) {
+                        if (is_numeric($d)) $item->discounts()->create(['percentage' => floatval($d)]);
+                    }
+                }
+
+                if (isset($p['update_master_price']) && $p['update_master_price']) {
+        $product = Product::find($p['product_id']);
+        if ($product) {
+            $product->update(['purchase_price' => $p['price_per_unit']]);
+        }
+    }
+            }
+
+            DB::commit();
+            return redirect()->route('purchase-orders.show', $po->po_id)->with('success', 'Pesanan berhasil dibuat: ' . $po->po_number);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withInput()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+        }
+    }
+    
+    public function show(PurchaseOrder $purchaseOrder)
+{
+    $this->authorize('view', $purchaseOrder); // Bisa kita aktifkan nanti
+    $purchaseOrder->load(['supplier', 'requester', 'items.product.unit']);
+    return view('purchase_orders.show', compact('purchaseOrder'));
+}
+
+public function edit(PurchaseOrder $purchaseOrder)
+{
+    $this->authorize('update', $purchaseOrder);
+
+    $purchaseOrder->load('items.product');
+    $suppliers = Supplier::all();
+    $products = Product::all();
+    $users = User::all();
+
+    return view('purchase_orders.edit', compact('purchaseOrder', 'suppliers', 'products', 'users'));
+}
+
+public function update(Request $request, PurchaseOrder $purchaseOrder): RedirectResponse
+{
+    // Otorisasi, pastikan user boleh mengupdate PO ini
+    $this->authorize('update', $purchaseOrder);
+
+    // Validasi input, sama seperti di method store
+    $validated = $request->validate([
+        'supplier_id' => 'required|exists:suppliers,supplier_id',
+        'order_date' => 'required|date',
+        'due_date' => 'nullable|date|after_or_equal:order_date',
+        'requester_user_id' => 'nullable|exists:users,user_id',
+        'notes' => 'nullable|string',
+        'products' => 'required|array|min:1',
+        'products.*.product_id' => 'required|exists:products,product_id',
+        'products.*.quantity' => 'required|numeric|min:0.01',
+        'products.*.price_per_unit' => 'required|numeric|min:0',
+        'products.*.discounts' => 'nullable|array',
+        'products.*.discounts.*' => 'nullable|numeric|min:0|max:100',
+        'products.*.update_master_price' => 'nullable|boolean',
+        'apply_disc_fee' => 'sometimes|boolean',
+        'disc_fee_percent' => 'nullable|numeric|min:0|max:100',
+        'disc_fee_amount' => 'nullable|numeric|min:0',
+        'apply_rounding_discount' => 'sometimes|boolean',
+        'rounding_discount_amount' => 'nullable|numeric|min:0',
+        'use_custom_dpp_factor' => 'sometimes|boolean',
+        'custom_dpp_factor' => 'nullable|numeric|min:0',
+        'tax_id' => 'nullable|exists:taxes,id',
+        'shipping_amount' => 'nullable|numeric|min:0',
+    ]);
+
+    DB::beginTransaction();
+    try {
+        // LANGKAH 1: Kalkulasi ulang subtotal barang di server
+        $itemSubtotal = 0;
+        foreach ($validated['products'] as $p) {
+            $finalPrice = floatval($p['price_per_unit']);
+            if (!empty($p['discounts']) && is_array($p['discounts'])) {
+                foreach ($p['discounts'] as $d) {
+                    if (is_numeric($d)) $finalPrice *= (1 - (floatval($d) / 100));
+                }
+            }
+            $itemSubtotal += (floatval($p['quantity']) * $finalPrice);
+        }
+
+        // LANGKAH 2: Panggil service kalkulator Anda
+        $options = $request->all();
+        $options['subtotal'] = $itemSubtotal;
+        $calc = PurchaseOrderCalculator::calculate($options);
+
+        // LANGKAH 3: Update data utama Purchase Order dengan hasil kalkulasi yang benar
+        $purchaseOrder->update([
+            'supplier_id'         => $validated['supplier_id'],
+            'order_date'          => $validated['order_date'],
+            'due_date'            => $request->input('due_date'),
+            'requester_user_id'   => $request->input('requester_user_id'),
+            'notes'               => $request->input('notes'),
+            'tax_id'              => $request->input('tax_id'),
+            
+            // Mengupdate semua kolom kalkulasi dari hasil service
+            'subtotal'                  => $calc['subtotal'],
+            'apply_disc_fee'            => $request->boolean('apply_disc_fee'),
+            'disc_fee_percent'          => $request->input('disc_fee_percent'),
+            'disc_fee_amount'           => $calc['disc_fee_amount'],
+            'apply_rounding_discount'   => $request->boolean('apply_rounding_discount'),
+            'rounding_discount_amount'  => $calc['rounding_discount_amount'],
+            'use_custom_dpp_factor'     => $request->boolean('use_custom_dpp_factor'),
+            'custom_dpp_factor'         => $request->input('custom_dpp_factor'),
+            'shipping_amount'           => $calc['shipping_amount'],
+            'taxable_amount'            => $calc['taxable_base'],
+            'dpp'                       => $calc['dpp'],
+            'ppn'                       => $calc['ppn'],
+            'total_amount'              => $calc['grand_total'],
+            'grand_total'               => $calc['grand_total'],
+        ]);
+
+        // LANGKAH 4: Hapus item-item lama beserta diskonnya
+        $purchaseOrder->items()->each(function ($item) {
+            $item->discounts()->delete(); // Hapus relasi diskon dulu
+            $item->delete();
+        });
+
+        // LANGKAH 5: Buat ulang item-item berdasarkan data baru dari form
+        foreach ($validated['products'] as $p) {
+            $finalPrice = floatval($p['price_per_unit']);
+            if (!empty($p['discounts']) && is_array($p['discounts'])) {
+                foreach ($p['discounts'] as $d) {
+                    if (is_numeric($d)) $finalPrice *= (1 - (floatval($d) / 100));
+                }
+            }
+            $subtotal_item = floatval($p['quantity']) * $finalPrice;
+
+            $item = $purchaseOrder->items()->create([
+                'product_id' => $p['product_id'],
+                'quantity' => $p['quantity'],
+                'price_per_unit' => $p['price_per_unit'],
+                'subtotal' => $subtotal_item,
+            ]);
+
+            if (!empty($p['discounts']) && is_array($p['discounts'])) {
+                foreach ($p['discounts'] as $d) {
+                    if (is_numeric($d)) $item->discounts()->create(['percentage' => floatval($d)]);
+                }
+            }
+
+            if (isset($p['update_master_price']) && $p['update_master_price']) {
+        $product = Product::find($p['product_id']);
+        if ($product) {
+            $product->update(['purchase_price' => $p['price_per_unit']]);
+        }
+    }
+        }
+
+        DB::commit();
+
+        return redirect()->route('purchase-orders.show', $purchaseOrder->po_id)->with('success', 'Pesanan Pembelian berhasil diupdate.');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->withInput()->with('error', 'Gagal mengupdate Pesanan Pembelian: ' . $e->getMessage());
+    }
+}
+
+
+public function receive(PurchaseOrder $purchaseOrder)
+{
+    // Pastikan pesanan belum pernah diterima sebelumnya
+    if ($purchaseOrder->status !== 'draft' && $purchaseOrder->status !== 'ordered') {
+        return back()->with('error', 'Pesanan ini sudah diproses sebelumnya.');
+    }
+
+    try {
+        DB::beginTransaction();
+
+        // Loop melalui setiap item di dalam pesanan pembelian
+        foreach ($purchaseOrder->items as $item) {
+            $product = Product::find($item->product_id);
+            if ($product) {
+                // Tambah stok produk
+                $product->stock_quantity += $item->quantity;
+                $product->save();
+            }
+        }
+
+        // Ubah status pesanan pembelian menjadi 'completed'
+        $purchaseOrder->status = 'completed';
+        $purchaseOrder->save();
+
+        DB::commit();
+        return redirect()->route('purchase-orders.index')
+                 ->with('success', 'Barang untuk pesanan #' . ($purchaseOrder->po_number ?? $purchaseOrder->po_id) . ' telah diterima dan stok diperbarui.');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->with('error', 'Gagal memproses penerimaan barang: ' . $e->getMessage());
+    }
+}
+
+public function cancel(PurchaseOrder $purchaseOrder): RedirectResponse
+    {
+        $this->authorize('cancel', $purchaseOrder); // Menggunakan method cancel dari Policy
+
+        $purchaseOrder->status = 'cancelled';
+        $purchaseOrder->save();
+
+        return redirect()->route('purchase-orders.index')->with('success', 'Pesanan Pembelian berhasil dibatalkan.');
+    }
+
+    public function markAsPaid(PurchaseOrder $purchaseOrder): RedirectResponse
+{
+    if ($purchaseOrder->payment_status === 'paid') {
+        return back()->with('info', 'Pesanan ini sudah ditandai lunas sebelumnya.');
+    }
+
+    $purchaseOrder->update(['payment_status' => 'paid']);
+
+    return redirect()->route('purchase-orders.show', $purchaseOrder->po_id)
+                     ->with('success', 'Pesanan berhasil ditandai LUNAS.');
+}
+public function downloadPDF(PurchaseOrder $purchaseOrder)
+{
+    $purchaseOrder->load(['supplier', 'items.product.unit', 'tax']);
+
+    // ✅ PERBARUI UKURAN KERTAS DI SINI
+    // Ukuran kertas faktur kustom (setengah halaman)
+    $paperSize = [0, 0, 684, 396]; // Lebar 9.5", Tinggi 5.5"
+
+    $pdf = Pdf::loadView('purchase_orders.pdf_template', compact('purchaseOrder'));
+    
+    $pdf->setPaper($paperSize);
+
+    $fileName = 'PO_' . str_replace('/', '-', $purchaseOrder->po_number) . '.pdf';
+    return $pdf->download($fileName);
+}
+
+public function addSupplierInvoice(Request $request, PurchaseOrder $purchaseOrder)
+{
+    $request->validate([
+        'supplier_invoice_number' => 'required|string|max:255',
+    ]);
+
+    $purchaseOrder->update([
+        'supplier_invoice_number' => $request->supplier_invoice_number,
+    ]);
+
+    return back()->with('success', 'Nomor Faktur Supplier berhasil disimpan.');
+}
+
+public function exportExcel($id)
+{
+    $purchaseOrder = PurchaseOrder::with(['supplier', 'items.product', 'items.discounts', 'tax'])
+        ->findOrFail($id);
+    
+    // Prioritaskan nomor faktur supplier, fallback ke PO number
+    $invoiceNumber = $purchaseOrder->supplier_invoice_number ?? $purchaseOrder->po_number;
+    
+    // Bersihkan karakter yang tidak diizinkan
+    $cleanInvoiceNumber = preg_replace('/[\/\\\:*?"<>|]/', '-', $invoiceNumber);
+    
+    $fileName = "faktur-{$cleanInvoiceNumber}.xlsx";
+    
+    return Excel::download(new PurchaseOrderExport($purchaseOrder), $fileName);
+}
+}

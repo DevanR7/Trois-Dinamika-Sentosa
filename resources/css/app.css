@@ -1,0 +1,79 @@
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: #f8f9fa;
+}
+
+/* --- Wrapper Konten Utama --- */
+.main-wrapper {
+    padding-top: 56px; /* jaga jarak dari navbar di mobile */
+}
+
+/* --- Aturan untuk DESKTOP (Layar >= 992px) --- */
+@media (min-width: 992px) {
+    .main-wrapper {
+        margin-left: 250px;
+        padding-top: 0; /* hilangkan padding-top di desktop */
+    }
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: 250px;
+        display: flex !important;
+        transform: none !important;
+        visibility: visible !important;
+    }
+    .sidebar .offcanvas-header {
+        display: none;
+    }
+}
+
+/* --- Style Floating Menu (Mobile) --- */
+.floating-menu-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    z-index: 1040;
+}
+
+/* --- Style Sidebar --- */
+.sidebar {
+    background: #111827 !important; 
+    color: white;
+    overflow-y: auto;
+}
+.sidebar .nav-link { 
+    color: #adb5bd; 
+}
+.sidebar .nav-link:hover { 
+    background-color: #374151; 
+    color: #ffffff; 
+}
+.sidebar .nav-link.active { 
+    background-color: #4f46e5; 
+    color: #ffffff; 
+    font-weight: 500; 
+}
+
+/* --- Style Section Header di Sidebar --- */
+.nav-heading {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    padding: 1rem 1.25rem 0.5rem;
+    margin-top: 0.75rem;
+}
+.nav-heading:first-of-type {
+    margin-top: 0;
+}
+
+/* --- Style Umum --- */
+.main-content { padding: 1.5rem; }
+.card { border: none; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border-radius: 12px; }
