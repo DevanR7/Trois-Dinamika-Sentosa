@@ -86,16 +86,16 @@ class SalesOrderController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $this->authorize('create', SalesOrder::class);
+         $this->authorize('create', SalesOrder::class);
 
-        $validated = $request->validate([
-            'client_id' => 'required|exists:clients,client_id',
-            'order_date' => 'required|date',
-            'notes' => 'nullable|string',
-            'products' => 'required|array|min:1',
-            'products.*.product_id' => 'required|exists:products,product_id',
-            'products.*.quantity' => 'required|integer|min:1',
-        ]);
+    $validated = $request->validate([
+        'client_id' => 'required|exists:clients,client_id',
+        'order_date' => 'required|date',
+        'notes' => 'nullable|string',
+        'products' => 'required|array|min:1',
+        'products.*.product_id' => 'required|exists:products,product_id',
+        'products.*.quantity' => 'required|integer|min:1',
+    ]);
 
         /* foreach ($validated['products'] as $productData) {
         $product = Product::find($productData['product_id']);
@@ -108,42 +108,43 @@ class SalesOrderController extends Controller
     }*/
 
         try {
-            DB::beginTransaction();
+        DB::beginTransaction();
 
-            $salesOrder = new SalesOrder();
-            $salesOrder->client_id = $validated['client_id'];
-            $salesOrder->order_date = $validated['order_date'];
-            $salesOrder->notes = $validated['notes'];
-            $salesOrder->user_id_sales = Auth::id();
-            $salesOrder->order_number = 'SO-' . time();
-            
-            $totalAmount = 0;
-            foreach ($validated['products'] as $productData) {
-                $product = Product::find($productData['product_id']);
-                $totalAmount += $productData['quantity'] * $product->selling_price;
-            }
-            $salesOrder->total_amount = $totalAmount;
-            $salesOrder->save();
-
-            foreach ($validated['products'] as $productData) {
-                $product = Product::find($productData['product_id']);
-                SalesOrderItem::create([
-                    'order_id' => $salesOrder->order_id,
-                    'product_id' => $productData['product_id'],
-                    'quantity' => $productData['quantity'],
-                    'price_per_unit' => $product->selling_price,
-                    'subtotal' => $productData['quantity'] * $product->selling_price,
-                ]);
-            }
-
-            DB::commit();
-
-            return redirect()->route('sales-orders.index')->with('success', 'Pesanan Penjualan berhasil dibuat!');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->with('error', 'Gagal membuat pesanan: ' . $e->getMessage())->withInput();
+        $salesOrder = new SalesOrder();
+        $salesOrder->client_id = $validated['client_id'];
+        $salesOrder->order_date = $validated['order_date'];
+        $salesOrder->notes = $validated['notes'];
+        $salesOrder->user_id_sales = Auth::id();
+        $salesOrder->order_number = SalesOrder::generateOrderNumber(); // Anda mungkin ingin menggunakan generator nomor seperti di Invoice
+        
+        $totalAmount = 0;
+        foreach ($validated['products'] as $productData) {
+            $product = Product::find($productData['product_id']);
+            $totalAmount += $productData['quantity'] * $product->purchase_price;
         }
+        $salesOrder->total_amount = $totalAmount;
+        $salesOrder->save();
+
+        foreach ($validated['products'] as $productData) {
+            $product = Product::find($productData['product_id']);
+            SalesOrderItem::create([
+                'order_id' => $salesOrder->order_id,
+                'product_id' => $productData['product_id'],
+                'quantity' => $productData['quantity'],
+                'price_per_unit' => $product->purchase_price,
+                'subtotal' => $productData['quantity'] * $product->purchase_price,
+            ]);
+        }
+
+        DB::commit();
+        
+        // ✅ PERUBAHAN DI SINI
+        return redirect()->route('sales-orders.show', $salesOrder->order_id)->with('success', 'Pesanan Penjualan berhasil dibuat!');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->with('error', 'Gagal membuat pesanan: ' . $e->getMessage())->withInput();
+    }
     }
 
     /**
@@ -197,31 +198,31 @@ class SalesOrderController extends Controller
             $salesOrder->order_date = $validated['order_date'];
             $salesOrder->notes = $validated['notes'];
             
-            $salesOrder->items()->delete();
+             $salesOrder->items()->delete();
 
-            $totalAmount = 0;
-            foreach ($validated['products'] as $productData) {
-                $product = Product::find($productData['product_id']);
-                $subtotal = $productData['quantity'] * $product->selling_price;
-                $totalAmount += $subtotal;
+        $totalAmount = 0;
+        foreach ($validated['products'] as $productData) {
+            $product = Product::find($productData['product_id']);
+            // PERUBAHAN DI SINI
+            $subtotal = $productData['quantity'] * $product->purchase_price; 
+            $totalAmount += $subtotal;
 
-                SalesOrderItem::create([
-                    'order_id' => $salesOrder->order_id,
-                    'product_id' => $productData['product_id'],
-                    'quantity' => $productData['quantity'],
-                    'price_per_unit' => $product->selling_price,
-                    'subtotal' => $subtotal,
-                ]);
-            }
-            
-            $salesOrder->total_amount = $totalAmount;
-            $salesOrder->save();
+            SalesOrderItem::create([
+                'order_id' => $salesOrder->order_id,
+                'product_id' => $productData['product_id'],
+                'quantity' => $productData['quantity'],
+                // PERUBAHAN DI SINI
+                'price_per_unit' => $product->purchase_price,
+                'subtotal' => $subtotal,
+            ]);
+        }
 
-            DB::commit();
+        $salesOrder->total_amount = $totalAmount;
+        $salesOrder->save();
 
-            return redirect()->route('sales-orders.index')->with('success', 'Pesanan Penjualan berhasil diupdate!');
-
-        } catch (\Exception $e) {
+        DB::commit();
+        return redirect()->route('sales-orders.index')->with('success', 'Pesanan Penjualan berhasil diupdate!');
+    } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Gagal mengupdate pesanan: ' . $e->getMessage())->withInput();
         }

@@ -26,7 +26,7 @@ class SalesInvoiceController extends Controller
 {
     $query = SalesInvoice::with('client', 'sales');
 
-    // Filter pencarian
+     // Filter pencarian
     if ($request->filled('search')) {
         $search = $request->search;
         $query->where(function($q) use ($search) {
@@ -37,12 +37,12 @@ class SalesInvoiceController extends Controller
         });
     }
 
-    // Filter tanggal
+    // Filter tanggal (menggunakan order_date)
     if ($request->filled('start_date')) {
-        $query->whereDate('invoice_date', '>=', $request->start_date);
+        $query->whereDate('order_date', '>=', $request->start_date);
     }
     if ($request->filled('end_date')) {
-        $query->whereDate('invoice_date', '<=', $request->end_date);
+        $query->whereDate('order_date', '<=', $request->end_date);
     }
 
     // Filter status
@@ -53,32 +53,38 @@ class SalesInvoiceController extends Controller
     $sort = $request->get('sort', 'terbaru');
     switch ($sort) {
         case 'terlama':
-            $query->orderBy('invoice_date', 'asc');
+            $query->orderBy('order_date', 'asc');
             break;
         case 'klien_az':
             $query->join('clients', 'sales_invoices.client_id', '=', 'clients.client_id')
-                  ->orderBy('clients.client_name', 'asc');
+                  ->orderBy('clients.client_name', 'asc')
+                  ->select('sales_invoices.*'); // [FIX 1] Menghindari 'ambiguous column'
             break;
         case 'klien_za':
             $query->join('clients', 'sales_invoices.client_id', '=', 'clients.client_id')
-                  ->orderBy('clients.client_name', 'desc');
+                  ->orderBy('clients.client_name', 'desc')
+                  ->select('sales_invoices.*'); // [FIX 1] Menghindari 'ambiguous column'
             break;
         default: // 'terbaru'
-            $query->orderBy('invoice_date', 'desc');
+            $query->orderBy('order_date', 'desc')->orderBy('invoice_id', 'desc'); // Ditambah order by ID untuk konsistensi
             break;
     }
 
-    $invoices = $query->latest('invoice_date')->paginate(15)->appends($request->query());
+    // [FIX 2] Hapus ->latest() agar tidak menimpa logika sorting di atas
+    $invoices = $query->paginate(15)->appends($request->query());
 
     return view('invoices.index', ['invoices' => $invoices]);
-}    
-    public function show($id): View
-    {
-        $invoice = SalesInvoice::with(['client', 'items.product' => function ($query) {
-            $query->withTrashed();
-        }])->findOrFail($id);
-        return view('invoices.show', compact('invoice'));
-    }
+} 
+    public function show(SalesInvoice $invoice): View
+{
+    // Laravel sudah otomatis melakukan findOrFail($id) untuk Anda.
+    // Kita hanya perlu me-load relasi yang dibutuhkan.
+    $invoice->load(['client', 'sales', 'payments.receivedBy', 'items.product' => function ($query) {
+        $query->withTrashed();
+    }, 'taxes']);
+
+    return view('invoices.show', compact('invoice'));
+}
 
     public function create(): View
     {
@@ -104,14 +110,16 @@ class SalesInvoiceController extends Controller
     {
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,client_id',
+            'order_date' => 'required|date',
             'due_date' => 'required|date', 
             'sales_order_id' => 'nullable|exists:sales_orders,order_id',
             'products' => 'required|array|min:1',
             'products.*.product_id' => 'required|exists:products,product_id',
             'products.*.quantity' => 'required|integer|min:1',
-            'products.*.price' => 'required|numeric|min:0',
-            'taxes' => 'nullable|array', // Validasi untuk pajak yang dipilih
+            'discount_percentage' => 'nullable|numeric|min:0|max:100', 
+            'taxes' => 'nullable|array',
             'taxes.*' => 'exists:taxes,id',
+            'notes' => 'nullable|string',
         ]);
 
         // --- LOGIKA BARU: PENGECEKAN STOK ---
@@ -126,87 +134,99 @@ class SalesInvoiceController extends Controller
     }*/
 
         try {
-            DB::beginTransaction();
-            
-            // 1. Hitung Subtotal dari Produk
-            $subtotal = 0;
-            foreach ($validated['products'] as $productData) {
-                $subtotal += $productData['quantity'] * $productData['price'];
+        DB::beginTransaction();
+        
+        // 1. Hitung Subtotal dari Produk berdasarkan HARGA BELI
+        $subtotal = 0;
+        $productsToSave = [];
+        foreach ($validated['products'] as $productData) {
+            $product = Product::find($productData['product_id']);
+            if (!$product) {
+                // Handle jika produk tidak ditemukan
+                throw new \Exception("Produk dengan ID {$productData['product_id']} tidak ditemukan.");
             }
+            $price = $product->purchase_price ?? 0; // Menggunakan purchase_price
+            $quantity = $productData['quantity'];
+            $itemSubtotal = $quantity * $price;
+            $subtotal += $itemSubtotal;
 
-            // 2. Hitung Total Pajak dari checkbox yang dipilih
-            $totalTaxAmount = 0;
-            $taxesToAttach = [];
-            if (!empty($validated['taxes'])) {
-                $selectedTaxes = Tax::find($validated['taxes']);
-                foreach ($selectedTaxes as $tax) {
-                    $taxAmountForItem = $subtotal * ($tax->rate / 100);
-                    $totalTaxAmount += $taxAmountForItem;
-                    
-                    // Siapkan data untuk disimpan ke tabel pivot 'invoice_tax'
-                    $taxesToAttach[$tax->id] = [
-                        'name' => $tax->name,
-                        'rate' => $tax->rate,
-                        'amount' => $taxAmountForItem,
-                    ];
-                }
-            }
-            
-            $totalAmount = $subtotal + $totalTaxAmount;
+            // Simpan data untuk disimpan nanti
+            $productsToSave[] = [
+                'product_id' => $product->product_id,
+                'quantity' => $quantity,
+                'price_per_unit' => $price,
+                'subtotal' => $itemSubtotal,
+            ];
 
-            // 3. Simpan data utama ke tabel sales_invoices
-            $invoice = new SalesInvoice();
-            $invoice->client_id = $validated['client_id'];
-            $invoice->invoice_number = 'INV-' . time();
-            $invoice->invoice_date = now();
-            $invoice->due_date = $validated['due_date'];
-            $invoice->subtotal = $subtotal;
-            $invoice->total_amount = $totalAmount; // total_amount baru (subtotal + semua pajak)
-            $invoice->status = 'unpaid';
-            $invoice->user_id_sales = Auth::id() ?? 1;
-            $invoice->amount_paid = 0;
-            $invoice->save();
-
-            // 4. Lampirkan Pajak ke Invoice (Simpan ke tabel pivot 'invoice_tax')
-            if (!empty($taxesToAttach)) {
-                $invoice->taxes()->attach($taxesToAttach);
-            }
-
-            // 5. Simpan setiap item ke tabel invoice_items
-            foreach ($validated['products'] as $productData) {
-                InvoiceItem::create([
-                    'invoice_id' => $invoice->invoice_id,
-                    'product_id' => $productData['product_id'],
-                    'quantity' => $productData['quantity'],
-                    'price_per_unit' => $productData['price'],
-                    'subtotal' => $productData['quantity'] * $productData['price'],
-                ]);
-
-                $product = Product::find($productData['product_id']);
-        if ($product) {
-            $product->stock_quantity -= $productData['quantity'];
-            $product->save();
+            // Kurangi stok
+            $product->decrement('stock_quantity', $quantity);
         }
+
+        // 2. Hitung Diskon Global
+        $discountPercentage = $request->input('discount_percentage', 0);
+        $discountAmount = $subtotal * ($discountPercentage / 100);
+
+        // Subtotal setelah diskon
+        $subtotalAfterDiscount = $subtotal - $discountAmount;
+
+        // 3. Hitung Total Pajak dari subtotal setelah diskon
+        $totalTaxAmount = 0;
+        $taxesToAttach = [];
+        if (!empty($validated['taxes'])) {
+            $selectedTaxes = Tax::find($validated['taxes']);
+            foreach ($selectedTaxes as $tax) {
+                $taxAmountForItem = $subtotalAfterDiscount * ($tax->rate / 100);
+                $totalTaxAmount += $taxAmountForItem;
+                
+                $taxesToAttach[$tax->id] = [
+                    'name' => $tax->name,
+                    'rate' => $tax->rate,
+                    'amount' => $taxAmountForItem,
+                ];
             }
-
-            // 6. Update status Sales Order jika ada
-            if ($request->filled('sales_order_id')) {
-                $salesOrder = SalesOrder::find($request->sales_order_id);
-                if ($salesOrder) {
-                    $salesOrder->status = 'invoiced';
-                    $salesOrder->invoice_id = $invoice->invoice_id;
-                    $salesOrder->save();
-                }
-            }
-
-            DB::commit();
-
-            return redirect()->route('invoices.index')->with('success', 'Invoice berhasil dibuat!');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->with('error', 'Gagal membuat invoice: ' . $e->getMessage());
         }
+        
+        // 4. Hitung Total Akhir
+        $totalAmount = $subtotalAfterDiscount + $totalTaxAmount;
+
+        // 5. Simpan data utama ke tabel sales_invoices
+        $invoice = SalesInvoice::create([
+            'client_id' => $validated['client_id'],
+            'invoice_number' => SalesInvoice::generateInvoiceNumber(),
+            'order_date' => $validated['order_date'],
+            'due_date' => $validated['due_date'],
+            'subtotal' => $subtotal,
+            'discount_percentage' => $discountPercentage,
+            'discount_amount' => $discountAmount,
+            'total_amount' => $totalAmount,
+            'status' => 'unpaid',
+            'payment_status' => 'unpaid',
+            'user_id_sales' => Auth::id(),
+            'amount_paid' => 0,
+            'notes' => $request->input('notes'),
+        ]);
+
+        // 6. Lampirkan Pajak dan Item
+        $invoice->taxes()->attach($taxesToAttach);
+        $invoice->items()->createMany($productsToSave);
+
+        if ($request->filled('sales_order_id')) {
+            $salesOrder = SalesOrder::find($request->sales_order_id);
+            if ($salesOrder) {
+                $salesOrder->status = 'invoiced'; // Ubah status menjadi 'invoiced'
+                $salesOrder->invoice_id = $invoice->invoice_id; // Simpan referensi ID invoice
+                $salesOrder->save();
+            }
+        }
+        
+        DB::commit();
+
+        return redirect()->route('invoices.show', $invoice->invoice_id)->with('success', 'Invoice berhasil dibuat!');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->with('error', 'Gagal membuat invoice: ' . $e->getMessage())->withInput();
+    }
     }
 
     /**
@@ -226,75 +246,109 @@ class SalesInvoiceController extends Controller
      * Mengupdate invoice di database.
      */
     public function update(Request $request, SalesInvoice $invoice): RedirectResponse
-    {
-        $validated = $request->validate([
-            'client_id' => 'required|exists:clients,client_id',
-            'due_date' => 'required|date',
-            'products' => 'required|array|min:1',
-            'products.*.product_id' => 'required|exists:products,product_id',
-            'products.*.quantity' => 'required|integer|min:1',
-            'products.*.price' => 'required|numeric|min:0',
-            'taxes' => 'nullable|array',
-            'taxes.*' => 'exists:taxes,id',
+{
+    // 1. Validasi input (disamakan dengan method store)
+    $validated = $request->validate([
+        'client_id' => 'required|exists:clients,client_id',
+        'order_date' => 'required|date',
+        'due_date' => 'required|date',
+        'products' => 'required|array|min:1',
+        'products.*.product_id' => 'required|exists:products,product_id',
+        'products.*.quantity' => 'required|integer|min:1',
+        'discount_percentage' => 'nullable|numeric|min:0|max:100',
+        'taxes' => 'nullable|array',
+        'taxes.*' => 'exists:taxes,id',
+        'notes' => 'nullable|string',
+    ]);
+
+    // Jangan izinkan edit jika invoice sudah lunas atau dibatalkan
+    if (in_array($invoice->status, ['paid', 'cancelled'])) {
+        return back()->with('error', 'Invoice yang sudah lunas atau dibatalkan tidak bisa di-edit.');
+    }
+
+    try {
+        DB::beginTransaction();
+
+        // 2. Kembalikan stok barang dari item-item lama sebelum dihapus
+        foreach ($invoice->items as $oldItem) {
+            $product = Product::find($oldItem->product_id);
+            if ($product) {
+                $product->increment('stock_quantity', $oldItem->quantity);
+            }
+        }
+
+        // 3. Hitung ulang semua dari awal, sama seperti di method store
+        $subtotal = 0;
+        $productsToSave = [];
+        foreach ($validated['products'] as $productData) {
+            $product = Product::find($productData['product_id']);
+            $price = $product->purchase_price ?? 0;
+            $quantity = $productData['quantity'];
+            $itemSubtotal = $quantity * $price;
+            $subtotal += $itemSubtotal;
+
+            $productsToSave[] = [
+                'product_id' => $product->product_id,
+                'quantity' => $quantity,
+                'price_per_unit' => $price,
+                'subtotal' => $itemSubtotal,
+            ];
+            
+            // Kurangi stok dengan data yang baru
+            $product->decrement('stock_quantity', $quantity);
+        }
+
+        $discountPercentage = $request->input('discount_percentage', 0);
+        $discountAmount = $subtotal * ($discountPercentage / 100);
+        $subtotalAfterDiscount = $subtotal - $discountAmount;
+
+        $totalTaxAmount = 0;
+        $taxesToSync = [];
+        if (!empty($validated['taxes'])) {
+            $selectedTaxes = Tax::find($validated['taxes']);
+            foreach ($selectedTaxes as $tax) {
+                $taxAmountForItem = $subtotalAfterDiscount * ($tax->rate / 100);
+                $totalTaxAmount += $taxAmountForItem;
+                $taxesToSync[$tax->id] = [
+                    'name' => $tax->name,
+                    'rate' => $tax->rate,
+                    'amount' => $taxAmountForItem,
+                ];
+            }
+        }
+        
+        $totalAmount = $subtotalAfterDiscount + $totalTaxAmount;
+
+        // 4. Update data utama Invoice
+        $invoice->update([
+            'client_id' => $validated['client_id'],
+            'order_date' => $validated['order_date'],
+            'due_date' => $validated['due_date'],
+            'subtotal' => $subtotal,
+            'discount_percentage' => $discountPercentage,
+            'discount_amount' => $discountAmount,
+            'total_amount' => $totalAmount,
+            'notes' => $request->input('notes'),
+            // Reset status pembayaran karena total tagihan berubah
+            'amount_paid' => 0, 
+            'status' => 'unpaid',
         ]);
 
-        try {
-            DB::beginTransaction();
+        // 5. Hapus item dan pembayaran lama, lalu buat ulang item baru
+        $invoice->items()->delete();
+        $invoice->payments()->delete(); // Hapus riwayat pembayaran lama
+        $invoice->items()->createMany($productsToSave);
 
-            // 1. Hitung ulang Subtotal dari data form
-            $subtotal = 0;
-            foreach ($validated['products'] as $productData) {
-                $subtotal += $productData['quantity'] * $productData['price'];
-            }
+        // 6. Sinkronkan data pajak di tabel pivot
+        $invoice->taxes()->sync($taxesToSync);
 
-            // 2. Hitung ulang Total Pajak dari data form
-            $totalTaxAmount = 0;
-            $taxesToSync = []; // Menggunakan sync untuk update pivot table
-            if (!empty($validated['taxes'])) {
-                $selectedTaxes = Tax::find($validated['taxes']);
-                foreach ($selectedTaxes as $tax) {
-                    $taxAmountForItem = $subtotal * ($tax->rate / 100);
-                    $totalTaxAmount += $taxAmountForItem;
-                    $taxesToSync[$tax->id] = [
-                        'name' => $tax->name,
-                        'rate' => $tax->rate,
-                        'amount' => $taxAmountForItem,
-                    ];
-                }
-            }
-            
-            $totalAmount = $subtotal + $totalTaxAmount;
+        DB::commit();
 
-            // 3. Update data utama Invoice
-            $invoice->update([
-                'client_id' => $validated['client_id'],
-                'due_date' => $validated['due_date'],
-                'subtotal' => $subtotal,
-                'total_amount' => $totalAmount,
-            ]);
-
-            // 4. Hapus item lama, lalu buat ulang item baru
-            $invoice->items()->delete();
-            foreach ($validated['products'] as $productData) {
-                InvoiceItem::create([
-                    'invoice_id' => $invoice->invoice_id,
-                    'product_id' => $productData['product_id'],
-                    'quantity' => $productData['quantity'],
-                    'price_per_unit' => $productData['price'],
-                    'subtotal' => $productData['quantity'] * $productData['price'],
-                ]);
-            }
-
-            // 5. Sinkronkan data pajak di tabel pivot
-            $invoice->taxes()->sync($taxesToSync);
-
-            DB::commit();
-
-            return redirect()->route('invoices.index')->with('success', 'Invoice berhasil diupdate!');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->with('error', 'Gagal mengupdate invoice: ' . $e->getMessage());
-        }
+        return redirect()->route('invoices.show', $invoice->invoice_id)->with('success', 'Invoice berhasil diupdate!');
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->with('error', 'Gagal mengupdate invoice: ' . $e->getMessage())->withInput();
+    }
     }
 
     /**

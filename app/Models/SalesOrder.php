@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class SalesOrder extends Model
 {
@@ -17,6 +18,27 @@ class SalesOrder extends Model
         'order_date' => 'date',
         'total_amount' => 'float',
     ];
+
+     public static function generateOrderNumber(): string
+    {
+        $yearMonth = now()->format('Ym');
+        $year = now()->format('Y');
+        $month = now()->format('m');
+
+        $counter = DB::table('sales_order_counters')->where('ym', $yearMonth)->lockForUpdate()->first();
+
+        if ($counter) {
+            $nextSequence = $counter->last_sequence + 1;
+            DB::table('sales_order_counters')->where('ym', $yearMonth)->update(['last_sequence' => $nextSequence]);
+        } else {
+            $nextSequence = 1;
+            DB::table('sales_order_counters')->insert(['ym' => $yearMonth, 'last_sequence' => $nextSequence]);
+        }
+
+        $sequencePadded = str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
+
+        return "SO/{$year}/{$month}/{$sequencePadded}";
+    }
 
     public function client(): BelongsTo
     {

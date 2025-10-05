@@ -80,7 +80,10 @@
             <select class="form-select form-select-sm product-select" required>
                 <option></option>
                 @foreach ($products as $product)
-                    <option value="{{ $product->product_id }}" data-price="{{ $product->selling_price }}">{{ $product->product_name }}</option>
+                    {{-- PERUBAHAN DI SINI --}}
+                    <option value="{{ $product->product_id }}" data-price="{{ $product->purchase_price ?? 0 }}">
+                        {{ $product->product_name }}
+                    </option>
                 @endforeach
             </select>
         </td>
@@ -100,6 +103,10 @@
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        $('#client_id').select2({
+        theme: 'bootstrap-5',
+        placeholder: '-- Pilih Klien --'
+    });
         const salesOrderItems = @json($salesOrder->items);
         const productItemsContainer = document.getElementById('product-items');
         const productRowTemplate = document.getElementById('product-row-template');

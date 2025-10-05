@@ -85,25 +85,18 @@
                                         {{ number_format($order->total_amount, 0, ",", ".") }}
                                     </td>
                                     <td class="text-center">
-                                        {{-- Badge dinamis sesuai status --}}
-                                        @if ($order->status == "invoiced")
-                                            <span class="badge bg-success">
-                                                Sudah ditagih
-                                            </span>
-                                        @elseif ($order->status == "approved")
-                                            <span class="badge bg-info">
-                                                Disetujui
-                                            </span>
-                                        @elseif ($order->status == "rejected")
-                                            <span class="badge bg-danger">
-                                                Ditolak
-                                            </span>
-                                        @else
-                                            <span class="badge bg-secondary">
-                                                Pending
-                                            </span>
-                                        @endif
-                                    </td>
+    @php
+        $statusClass = [
+            'pending' => 'bg-secondary',
+            'approved' => 'bg-info text-dark',
+            'rejected' => 'bg-danger',
+            'invoiced' => 'bg-success',
+        ];
+    @endphp
+    <span class="badge {{ $statusClass[$order->status] ?? 'bg-light text-dark' }}">
+        {{ Str::title(str_replace('_', ' ', $order->status)) }}
+    </span>
+</td>
                                     <td class="text-center">
                                         <div
                                             class="d-flex justify-content-center gap-2"

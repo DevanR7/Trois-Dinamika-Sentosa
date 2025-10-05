@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class SalesInvoice extends Model
 {
@@ -21,11 +22,15 @@ class SalesInvoice extends Model
         'client_id',
         'user_id_sales',
         'invoice_number',
-        'invoice_date',
+        'order_date',
         'due_date',
+        'subtotal',
+        'discount_percentage', 
+        'discount_amount',
         'total_amount',
         'amount_paid',
         'status',
+        'notes'
     ];
 
    /**
@@ -34,9 +39,12 @@ class SalesInvoice extends Model
      * @var array
      */
     protected $casts = [
-        'invoice_date' => 'datetime',
-        'due_date' => 'datetime',
+        'order_date' => 'date',
+        'due_date' => 'date', 
         'total_amount' => 'float',
+        'subtotal' => 'float',
+        'discount_percentage' => 'float',
+        'discount_amount' => 'float',
     ];
 
     /**
@@ -69,4 +77,31 @@ class SalesInvoice extends Model
     return $this->belongsToMany(Tax::class, 'invoice_tax', 'invoice_id', 'tax_id')
                 ->withPivot('name', 'rate', 'amount');
 }
+
+public function payments(): HasMany
+{
+    return $this->hasMany(Payment::class, 'invoice_id', 'invoice_id');
+}
+
+public static function generateInvoiceNumber(): string
+    {
+        $yearMonth = now()->format('Ym');
+        $year = now()->format('Y');
+        $month = now()->format('m');
+
+        // Lock baris untuk mencegah duplikasi nomor saat ada >1 user membuat invoice bersamaan
+        $counter = DB::table('invoice_counters')->where('ym', $yearMonth)->lockForUpdate()->first();
+
+        if ($counter) {
+            $nextSequence = $counter->last_sequence + 1;
+            DB::table('invoice_counters')->where('ym', $yearMonth)->update(['last_sequence' => $nextSequence]);
+        } else {
+            $nextSequence = 1;
+            DB::table('invoice_counters')->insert(['ym' => $yearMonth, 'last_sequence' => $nextSequence]);
+        }
+
+        $sequencePadded = str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
+
+        return "INV/{$year}/{$month}/{$sequencePadded}";
+    }
 }

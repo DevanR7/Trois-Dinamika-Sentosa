@@ -1,41 +1,55 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold">Detail Pesanan Pembelian: {{ $purchaseOrder->po_number ?? 'PO-'.$purchaseOrder->po_id }}</h2>
-        <div>
-            @if(in_array($purchaseOrder->status, ['draft', 'ordered']))
-                <form action="{{ route('purchase-orders.receive', $purchaseOrder->po_id) }}" method="POST">
-                    @csrf
-                    <button type="submit" class="btn btn-success">
-                        <i class="bi bi-check-circle me-2"></i>Tandai Telah Diterima & Tambah Stok
-                    </button>
-                </form>
+<div class="container py-4">
+    {{-- HEADER HALAMAN --}}
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h2 class="fw-bold mb-0">Detail Pesanan: {{ $salesOrder->order_number }}</h2>
+        
+        <div class="d-flex flex-wrap justify-content-end gap-2">
+            <a href="{{ route('sales-orders.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Kembali
+            </a>
+
+            {{-- Tombol untuk membuat Invoice dari Sales Order ini --}}
+            @if($salesOrder->status !== 'invoiced' && $salesOrder->status !== 'rejected')
+                <a href="{{ route('invoices.createFromOrder', $salesOrder->order_id) }}" class="btn btn-primary">
+                    <i class="bi bi-receipt-cutoff me-1"></i> Buat Invoice
+                </a>
             @endif
+            
+            {{-- Tombol aksi lainnya jika diperlukan --}}
+            {{-- <a href="{{ route('sales-orders.edit', $salesOrder->order_id) }}" class="btn btn-secondary">Edit</a> --}}
         </div>
     </div>
 
-    <div class="card shadow-sm">
+    {{-- KARTU DETAIL --}}
+    <div class="card shadow-sm border-0">
         <div class="card-body p-4">
+            {{-- Info Klien & Status --}}
             <div class="row mb-4">
                 <div class="col-md-6">
-                    <strong>Supplier:</strong> {{ $purchaseOrder->supplier->supplier_name }} <br>
-                    <strong>Dipesan Oleh:</strong> {{ $purchaseOrder->requester->full_name ?? 'Pembelian Umum' }}
+                    <h5 class="fw-semibold">Klien:</h5>
+                    <p class="mb-0">{{ $salesOrder->client->client_name }}</p>
+                    <p class="text-muted">{{ $salesOrder->client->address ?? 'Alamat tidak tersedia' }}</p>
                 </div>
                 <div class="col-md-6 text-md-end">
-                    <strong>Tanggal Pesanan:</strong> {{ $purchaseOrder->order_date->format('d M Y') }} <br>
-                    <strong>Status:</strong>
-                    @if($purchaseOrder->status == 'completed')
-                        <span class="badge bg-success">Selesai</span>
-                    @elseif($purchaseOrder->status == 'cancelled')
-                        <span class="badge bg-danger">Dibatalkan</span>
-                    @else
-                        <span class="badge bg-secondary">{{ Str::title($purchaseOrder->status) }}</span>
-                    @endif
+                    <p class="mb-1"><strong>Tanggal Pesanan:</strong> {{ optional($salesOrder->order_date)->format('d F Y') }}</p>
+                    <p class="mb-1"><strong>Dibuat oleh (Sales):</strong> {{ $salesOrder->sales->full_name ?? 'N/A' }}</p>
+                    <p class="mb-1"><strong>Status:</strong>
+                        @if($salesOrder->status == 'invoiced')
+                            <span class="badge bg-success">Sudah Dibuat Invoice</span>
+                        @elseif($salesOrder->status == 'rejected')
+                            <span class="badge bg-danger">Ditolak</span>
+                        @else
+                            <span class="badge bg-secondary">{{ Str::title($salesOrder->status) }}</span>
+                        @endif
+                    </p>
                 </div>
             </div>
             <hr>
+
+            {{-- Tabel Rincian Item --}}
             <h5 class="fw-semibold mt-4">Rincian Item Dipesan</h5>
             <div class="table-responsive">
                 <table class="table table-bordered">
@@ -44,41 +58,36 @@
                             <th>#</th>
                             <th>Produk</th>
                             <th class="text-center">Kuantitas</th>
-                            <th class="text-end">Harga Beli Final</th>
+                            <th class="text-end">Harga Satuan</th>
                             <th class="text-end">Subtotal</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($purchaseOrder->items as $item)
+                        @forelse($salesOrder->items as $item)
                         <tr>
                             <td>{{ $loop->iteration }}</td>
-                            <td>
-                                {{ $item->product->product_name ?? 'Produk Dihapus' }}
-                                {{-- Tampilkan rincian diskon --}}
-                                @if($item->discounts->isNotEmpty())
-                                <small class="d-block text-muted">
-                                    Diskon: {{ $item->discounts->pluck('percentage')->join('%, ') }}%
-                                </small>
-                                @endif
-                            </td>
+                            <td>{{ $item->product->product_name ?? 'Produk Dihapus' }}</td>
                             <td class="text-center">{{ $item->quantity }} {{ $item->product->unit->name ?? '' }}</td>
                             <td class="text-end">Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}</td>
                             <td class="text-end">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
                         </tr>
-                        @endforeach
+                        @empty
+                        <tr><td colspan="5" class="text-center">Tidak ada item dalam pesanan ini.</td></tr>
+                        @endforelse
                     </tbody>
                     <tfoot>
                         <tr class="table-light">
                             <td colspan="4" class="text-end fw-bold fs-5">Total Pesanan</td>
-                            <td class="text-end fw-bold fs-5">Rp {{ number_format($purchaseOrder->total_amount, 0, ',', '.') }}</td>
+                            <td class="text-end fw-bold fs-5">Rp {{ number_format($salesOrder->total_amount, 0, ',', '.') }}</td>
                         </tr>
                     </tfoot>
                 </table>
             </div>
-             @if($purchaseOrder->notes)
-            <div class="mt-3">
-                <strong>Catatan:</strong>
-                <p class="text-muted">{{ $purchaseOrder->notes }}</p>
+
+            @if($salesOrder->notes)
+            <div class="mt-4">
+                <h6 class="fw-semibold">Catatan:</h6>
+                <p class="text-muted fst-italic">{{ $salesOrder->notes }}</p>
             </div>
             @endif
         </div>
