@@ -25,16 +25,24 @@
 @endcan
 <li class="nav-item">
     <a class="nav-link {{ request()->routeIs("products.*") ? "active" : "" }}" href="{{ route("products.index") }}">
-        <i class="bi bi-cart-fill me-2"></i> Produk
+        <i class="bi bi-box-seam-fill me-2"></i> Produk
     </a>
 </li>
 <hr class="my-2">
 
 {{-- Section Penjualan --}}
 <li class="nav-heading">Penjualan</li>
+@can('manage-clients') {{-- Anda bisa sesuaikan nama permission ini --}}
+<li class="nav-item">
+    <a class="nav-link {{ request()->routeIs("clients.*") ? "active" : "" }}" href="{{ route("clients.index") }}">
+        <i class="bi bi-person-lines-fill me-2"></i> Klien
+    </a>
+</li>
+@endcan
+
 <li class="nav-item">
     <a class="nav-link {{ request()->routeIs("sales-orders.*") ? "active" : "" }}" href="{{ route("sales-orders.index") }}">
-        <i class="bi bi-box-seam me-2"></i> Pesanan Penjualan
+        <i class="bi bi-journal-text me-2"></i> Pesanan Penjualan
     </a>
 </li>
 @can("manage-invoices")

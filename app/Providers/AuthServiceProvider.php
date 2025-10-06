@@ -52,6 +52,14 @@ class AuthServiceProvider extends ServiceProvider
         // Contoh: Hanya admin dan manajemen yang bisa mengelola pembelian
         return in_array($user->role, ['admin', 'manajemen']);
     });
+
+    Gate::define('manage-clients', function ($user) {
+        // Ganti 'admin' dengan nama role yang Anda inginkan.
+        // Anda bisa menambahkan role lain dengan operator ATAU (||)
+        // contoh: return $user->role === 'admin' || $user->role === 'sales_manager';
+        return $user->role === 'admin'; 
+    });
     
     }  
+    
 }

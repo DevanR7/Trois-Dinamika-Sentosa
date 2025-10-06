@@ -64,10 +64,12 @@
         </p>
     @endif
                             {{-- Harga Produk --}}
-                            <p class="card-text fs-5 text-primary fw-bold mb-2">
-                                Rp
-                                {{ number_format($product->selling_price, 0, ",", ".") }}
-                            </p>
+                            <div>
+    <small class="text-muted">Harga Beli:</small>
+    <p class="card-text fs-5 text-primary fw-bold mb-2">
+        Rp {{ number_format($product->purchase_price ?? 0, 0, ",", ".") }}
+    </p>
+</div>
 
                             {{-- Stok Produk --}}
                             <small class="card-text mb-3">

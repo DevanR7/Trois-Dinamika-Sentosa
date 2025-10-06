@@ -12,6 +12,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchaseOrderPaymentController;
+use App\Http\Controllers\ClientController;
 
 /*
 |--------------------------------------------------------------------------
@@ -56,6 +57,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     // Parameter {id} diganti menjadi {purchaseOrder}
     Route::get('/purchase-orders/{purchaseOrder}/export-excel', [PurchaseOrderController::class, 'exportExcel'])->name('purchase-orders.exportExcel');
+    Route::resource('clients', ClientController::class);
 });
 
 require __DIR__.'/auth.php';
