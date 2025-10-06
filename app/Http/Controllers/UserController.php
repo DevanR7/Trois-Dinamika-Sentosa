@@ -35,6 +35,7 @@ class UserController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', 'unique:'.User::class],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'role' => ['required', 'string', 'in:admin,sales,manajemen,kasir'],
+            'sales_code' => ['nullable', 'string', 'max:10', 'unique:users,sales_code'],
         ]);
 
         User::create([
@@ -43,6 +44,7 @@ class UserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => $request->role,
+            'sales_code' => $request->sales_code,
         ]);
 
         return redirect()->route('users.index')->with('success', 'User baru berhasil dibuat.');
@@ -61,12 +63,14 @@ class UserController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->user_id, 'user_id')],
             'password' => ['nullable', 'string', Rules\Password::defaults()],
             'role' => ['required', 'string', 'in:admin,sales,manajemen'],
+            'sales_code' => ['nullable', 'string', 'max:10', Rule::unique('users')->ignore($user->user_id, 'user_id')],
         ]);
 
         $user->full_name = $request->full_name;
         $user->username = $request->username;
         $user->email = $request->email;
         $user->role = $request->role;
+        $user->sales_code = $request->sales_code;
 
         if ($request->filled('password')) {
             $user->password = Hash::make($request->password);

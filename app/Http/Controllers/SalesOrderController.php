@@ -115,7 +115,7 @@ class SalesOrderController extends Controller
         $salesOrder->order_date = $validated['order_date'];
         $salesOrder->notes = $validated['notes'];
         $salesOrder->user_id_sales = Auth::id();
-        $salesOrder->order_number = SalesOrder::generateOrderNumber(); // Anda mungkin ingin menggunakan generator nomor seperti di Invoice
+        $salesOrder->order_number = SalesOrder::generateOrderNumber(Auth::id()); // Anda mungkin ingin menggunakan generator nomor seperti di Invoice
         
         $totalAmount = 0;
         foreach ($validated['products'] as $productData) {

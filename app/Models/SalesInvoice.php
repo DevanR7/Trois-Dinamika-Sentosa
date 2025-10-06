@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use App\Models\User;
 
 class SalesInvoice extends Model
 {
@@ -83,7 +84,7 @@ public function payments(): HasMany
     return $this->hasMany(Payment::class, 'invoice_id', 'invoice_id');
 }
 
-public static function generateInvoiceNumber(): string
+public static function generateInvoiceNumber($salesUserId = null): string
     {
         $yearMonth = now()->format('Ym');
         $year = now()->format('Y');
@@ -102,6 +103,15 @@ public static function generateInvoiceNumber(): string
 
         $sequencePadded = str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
 
-        return "INV/{$year}/{$month}/{$sequencePadded}";
+        $baseNumber = "INV/{$year}/{$month}/{$sequencePadded}";
+
+    // Logika baru untuk menambahkan kode sales
+    if ($salesUserId) {
+        $sales = User::find($salesUserId);
+        if ($sales && $sales->sales_code) {
+            $baseNumber .= '/' . strtoupper($sales->sales_code);
+        }
+    }
+    return $baseNumber;
     }
 }

@@ -14,6 +14,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\User;
 
 class SalesInvoiceController extends Controller
 {
@@ -91,7 +92,9 @@ class SalesInvoiceController extends Controller
         $clients = Client::all();
         $products = Product::all();
         $taxes = Tax::where('is_active', true)->get();
-        return view('invoices.create', compact('clients', 'products','taxes'));
+        $salesUsers = User::where('role', 'sales')->get(); 
+
+    return view('invoices.create', compact('clients', 'products', 'taxes', 'salesUsers'));
     }
     
     public function createFromOrder(SalesOrder $salesOrder): View
@@ -100,7 +103,8 @@ class SalesInvoiceController extends Controller
         $clients = Client::all();
         $products = Product::all();
         $taxes = Tax::where('is_active', true)->get();
-        return view('invoices.create', compact('clients', 'products', 'salesOrder', 'taxes'));
+        $salesUsers = User::where('role', 'sales')->get();
+        return view('invoices.create', compact('clients', 'products', 'salesOrder', 'taxes', 'salesUsers'));
     }
 
     /**
@@ -120,6 +124,7 @@ class SalesInvoiceController extends Controller
             'taxes' => 'nullable|array',
             'taxes.*' => 'exists:taxes,id',
             'notes' => 'nullable|string',
+            'user_id_sales' => 'nullable|exists:users,user_id',
         ]);
 
         // --- LOGIKA BARU: PENGECEKAN STOK ---
@@ -192,7 +197,7 @@ class SalesInvoiceController extends Controller
         // 5. Simpan data utama ke tabel sales_invoices
         $invoice = SalesInvoice::create([
             'client_id' => $validated['client_id'],
-            'invoice_number' => SalesInvoice::generateInvoiceNumber(),
+            'invoice_number' => SalesInvoice::generateInvoiceNumber($request->input('user_id_sales')),
             'order_date' => $validated['order_date'],
             'due_date' => $validated['due_date'],
             'subtotal' => $subtotal,
@@ -201,7 +206,7 @@ class SalesInvoiceController extends Controller
             'total_amount' => $totalAmount,
             'status' => 'unpaid',
             'payment_status' => 'unpaid',
-            'user_id_sales' => Auth::id(),
+            'user_id_sales' => $request->input('user_id_sales', Auth::id()), 
             'amount_paid' => 0,
             'notes' => $request->input('notes'),
         ]);
@@ -238,8 +243,9 @@ class SalesInvoiceController extends Controller
         $clients = Client::all();
         $products = Product::all();
         $taxes = Tax::where('is_active', true)->get();
+         $salesUsers = User::where('role', 'sales')->get();
 
-        return view('invoices.edit', compact('invoice', 'clients', 'products', 'taxes'));
+        return view('invoices.edit', compact('invoice', 'clients', 'products', 'taxes', 'salesUsers'));
     }
 
     /**

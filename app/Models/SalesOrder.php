@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use App\Models\User;
 
 class SalesOrder extends Model
 {
@@ -19,7 +20,7 @@ class SalesOrder extends Model
         'total_amount' => 'float',
     ];
 
-     public static function generateOrderNumber(): string
+     public static function generateOrderNumber($salesUserId = null): string
     {
         $yearMonth = now()->format('Ym');
         $year = now()->format('Y');
@@ -36,8 +37,15 @@ class SalesOrder extends Model
         }
 
         $sequencePadded = str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
+        $baseNumber = "SO/{$year}/{$month}/{$sequencePadded}";
 
-        return "SO/{$year}/{$month}/{$sequencePadded}";
+        if ($salesUserId) {
+        $sales = User::find($salesUserId);
+        if ($sales && $sales->sales_code) {
+            $baseNumber .= '/' . strtoupper($sales->sales_code);
+        }
+    }
+    return $baseNumber;
     }
 
     public function client(): BelongsTo

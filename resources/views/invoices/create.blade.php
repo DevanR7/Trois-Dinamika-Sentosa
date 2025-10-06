@@ -46,7 +46,21 @@
                                 <label for="due_date" class="form-label fw-semibold">Tanggal Jatuh Tempo</label>
                                 <input type="date" class="form-control" id="due_date" name="due_date" value="{{ old("due_date", now()->addDays(30)->format("Y-m-d")) }}" required />
                             </div>
+                                                    <div class="col-md-4">
+    <label for="user_id_sales" class="form-label fw-semibold">Pilih Sales (Opsional)</label>
+    <select name="user_id_sales" id="user_id_sales" class="form-select">
+        <option value="">-- Umum / Tanpa Sales --</option>
+        @foreach ($salesUsers as $sales)
+            {{-- Jika user yang login adalah sales, otomatis pilih dia --}}
+            <option value="{{ $sales->user_id }}" @selected(old('user_id_sales', isset($salesOrder) ? $salesOrder->user_id_sales : null) == $sales->user_id)>
+    {{ $sales->full_name }} ({{ $sales->sales_code }})
+</option>
+        @endforeach
+    </select>
+</div>
                         </div>
+
+
 
                         <h5 class="fw-semibold mb-3">Rincian Item (Berdasarkan Harga Beli)</h5>
                         <div class="table-responsive">

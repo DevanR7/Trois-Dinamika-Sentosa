@@ -35,7 +35,7 @@
                 </div>
                 <div class="col-md-6 text-md-end">
                     <p class="mb-1"><strong>Tanggal Pesanan:</strong> {{ optional($salesOrder->order_date)->format('d F Y') }}</p>
-                    <p class="mb-1"><strong>Dibuat oleh (Sales):</strong> {{ $salesOrder->sales->full_name ?? 'N/A' }}</p>
+                    <p class="mb-1"><strong>Sales:</strong> {{ $salesOrder->sales->full_name ?? 'N/A' }} ({{ $salesOrder->sales->sales_code ?? '' }})</p>
                     <p class="mb-1"><strong>Status:</strong>
                         @if($salesOrder->status == 'invoiced')
                             <span class="badge bg-success">Sudah Dibuat Invoice</span>

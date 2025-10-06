@@ -33,7 +33,7 @@ class ClientController extends Controller
     {
         $validated = $request->validate([
             'client_name' => 'required|string|max:150',
-            'email' => 'required|string|email|max:100|unique:clients,email',
+            'email' => 'nullable|string|email|max:100|unique:clients,email',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'person_in_charge' => 'nullable|string|max:100',
             'address' => 'nullable|string',
@@ -59,7 +59,7 @@ class ClientController extends Controller
     {
         $validated = $request->validate([
             'client_name' => 'required|string|max:150',
-            'email' => ['required', 'string', 'email', 'max:100', Rule::unique('clients')->ignore($client->client_id, 'client_id')],
+            'email' => ['nullable', 'string', 'email', 'max:100', Rule::unique('clients')->ignore($client->client_id, 'client_id')], // <-- UBAH INI
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
             'person_in_charge' => 'nullable|string|max:100',
             'address' => 'nullable|string',

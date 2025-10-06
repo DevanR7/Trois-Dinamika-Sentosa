@@ -51,6 +51,9 @@
                         <strong>Tanggal Pesanan:</strong> {{ optional($invoice->order_date)->format('d M Y') }}<br>
                         <strong>Tanggal Jatuh Tempo:</strong> {{ optional($invoice->due_date)->format('d M Y') }}
                     </p>
+                    @if($invoice->sales)
+<p class="mb-0"><strong>Sales:</strong> {{ $invoice->sales->full_name }} ({{ $invoice->sales->sales_code }})</p>
+@endif
                 </div>
             </div>
             <hr>

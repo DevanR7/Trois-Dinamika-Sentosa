@@ -1,168 +1,73 @@
 @extends("layouts.app")
 
 @section("content")
-    <div class="container py-4">
-        <div class="row justify-content-center">
-            <div class="col-lg-8">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-primary text-white">
-                        <h4 class="mb-0">Tambah User Baru</h4>
-                    </div>
-                    <div class="card-body p-4">
-                        @if ($errors->any())
-                            <div class="alert alert-danger">
-                                <ul class="mb-0">
-                                    @foreach ($errors->all() as $error)
-                                        <li>{{ $error }}</li>
-                                    @endforeach
-                                </ul>
-                            </div>
-                        @endif
-
-                        <form
-                            action="{{ route("users.store") }}"
-                            method="POST"
-                        >
-                            @csrf
-                            <div class="row g-3">
-                                <div class="col-md-12">
-                                    <label
-                                        for="full_name"
-                                        class="form-label fw-semibold"
-                                    >
-                                        Nama Lengkap
-                                    </label>
-                                    <input
-                                        type="text"
-                                        class="form-control"
-                                        id="full_name"
-                                        name="full_name"
-                                        value="{{ old("full_name") }}"
-                                        required
-                                    />
-                                </div>
-                                <div class="col-md-6">
-                                    <label
-                                        for="username"
-                                        class="form-label fw-semibold"
-                                    >
-                                        Username
-                                    </label>
-                                    <input
-                                        type="text"
-                                        class="form-control"
-                                        id="username"
-                                        name="username"
-                                        value="{{ old("username") }}"
-                                        required
-                                    />
-                                </div>
-                                <div class="col-md-6">
-                                    <label
-                                        for="email"
-                                        class="form-label fw-semibold"
-                                    >
-                                        Email
-                                    </label>
-                                    <input
-                                        type="email"
-                                        class="form-control"
-                                        id="email"
-                                        name="email"
-                                        value="{{ old("email") }}"
-                                        required
-                                    />
-                                </div>
-                                <div class="col-md-6">
-                                    <label
-                                        for="password"
-                                        class="form-label fw-semibold"
-                                    >
-                                        Password
-                                    </label>
-                                    <input
-                                        type="password"
-                                        class="form-control"
-                                        id="password"
-                                        name="password"
-                                        required
-                                    />
-                                </div>
-                                <div class="col-md-6">
-                                    <label
-                                        for="password_confirmation"
-                                        class="form-label fw-semibold"
-                                    >
-                                        Konfirmasi Password
-                                    </label>
-                                    <input
-                                        type="password"
-                                        class="form-control"
-                                        id="password_confirmation"
-                                        name="password_confirmation"
-                                        required
-                                    />
-                                </div>
-                                <div class="col-md-12">
-                                    <label
-                                        for="role"
-                                        class="form-label fw-semibold"
-                                    >
-                                        Role
-                                    </label>
-                                    <select
-                                        class="form-select"
-                                        id="role"
-                                        name="role"
-                                        required
-                                    >
-                                        <option value="" disabled selected>
-                                            Pilih Role...
-                                        </option>
-                                        <option
-                                            value="admin"
-                                            {{ old("role") == "admin" ? "selected" : "" }}
-                                        >
-                                            Admin
-                                        </option>
-                                        <option
-                                            value="sales"
-                                            {{ old("role") == "sales" ? "selected" : "" }}
-                                        >
-                                            Sales
-                                        </option>
-                                        <option
-                                            value="manajemen"
-                                            {{ old("role") == "manajemen" ? "selected" : "" }}
-                                        >
-                                            Manajemen
-                                        </option>
-                                        <option
-                                            value="kasir"
-                                            {{ old("role") == "kasir" ? "selected" : "" }}
-                                        >
-                                            Kasir
-                                        </option>
-                                        {{-- <-- Tambahkan ini --}}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="d-flex justify-content-end mt-4">
-                                <a
-                                    href="{{ route("users.index") }}"
-                                    class="btn btn-secondary me-2"
-                                >
-                                    Batal
-                                </a>
-                                <button type="submit" class="btn btn-primary">
-                                    Simpan User
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white"><h4 class="mb-0">Tambah User Baru</h4></div>
+                <div class="card-body p-4">
+                    <form action="{{ route("users.store") }}" method="POST">
+                        @csrf
+                        @include('users._form')
+                        <div class="d-flex justify-content-end mt-4">
+                            <a href="{{ route("users.index") }}" class="btn btn-secondary me-2">Batal</a>
+                            <button type="submit" class="btn btn-primary">Simpan User</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
+</div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // --- LOGIKA UNTUK HIDE/UNHIDE PASSWORD ---
+    function setupPasswordToggle(inputId, toggleId) {
+        const passwordInput = document.getElementById(inputId);
+        const toggleButton = document.getElementById(toggleId);
+        if (!passwordInput || !toggleButton) return;
+
+        const eyeIcon = toggleButton.querySelector('i');
+        toggleButton.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            eyeIcon.classList.toggle('bi-eye-slash');
+            eyeIcon.classList.toggle('bi-eye');
+        });
+    }
+    setupPasswordToggle('password', 'toggle-password');
+    setupPasswordToggle('password_confirmation', 'toggle-password-confirmation');
+
+    // --- LOGIKA UNTUK VALIDASI KONFIRMASI PASSWORD ---
+    const passwordInput = document.getElementById('password');
+    const passwordConfirmationInput = document.getElementById('password_confirmation');
+    const passwordError = document.getElementById('password-match-error');
+    if (passwordInput && passwordConfirmationInput && passwordError) {
+        function validatePasswordMatch() {
+            if (passwordInput.value !== passwordConfirmationInput.value && passwordConfirmationInput.value.length > 0) {
+                passwordError.classList.remove('d-none');
+            } else {
+                passwordError.classList.add('d-none');
+            }
+        }
+        passwordInput.addEventListener('input', validatePasswordMatch);
+        passwordConfirmationInput.addEventListener('input', validatePasswordMatch);
+    }
+    
+    // --- LOGIKA UNTUK MENAMPILKAN KODE SALES ---
+    const roleSelect = document.getElementById('role');
+    const salesCodeContainer = document.getElementById('sales-code-container');
+    if (roleSelect && salesCodeContainer) {
+        function toggleSalesCode() {
+            salesCodeContainer.style.display = (roleSelect.value === 'sales') ? 'block' : 'none';
+        }
+        toggleSalesCode();
+        roleSelect.addEventListener('change', toggleSalesCode);
+    }
+});
+</script>
+@endpush
