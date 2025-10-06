@@ -70,3 +70,8 @@
     </a>
 </li>
 @endcan
+<li class="nav-item">
+    <a class="nav-link {{ request()->routeIs("units.*") ? "active" : "" }}" href="{{ route("units.index") }}">
+        <i class="bi bi-rulers me-2"></i> Pengaturan Satuan
+    </a>
+</li>
