@@ -1,22 +1,19 @@
 @extends("layouts.app")
 
 @section("content")
-    <div class="container-fluid">
+    <div class="container py-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class="fw-bold">Manajemen User</h2>
             <a href="{{ route("users.create") }}" class="btn btn-primary">
-                <i class="bi bi-plus-circle me-2"></i>
-                Tambah User Baru
+                <i class="bi bi-plus-circle me-2"></i> Tambah User Baru
             </a>
         </div>
 
         @if (session("success"))
-            <div class="alert alert-success">
-                {{ session("success") }}
-            </div>
+            <div class="alert alert-success">{{ session("success") }}</div>
         @endif
 
-        <div class="card shadow-sm">
+        <div class="card shadow-sm border-0">
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
@@ -33,49 +30,36 @@
                         <tbody>
                             @forelse ($users as $user)
                                 <tr>
-                                    <th>
-                                        {{ $loop->iteration + $users->firstItem() - 1 }}
-                                    </th>
+                                    <td>{{ $loop->iteration + $users->firstItem() - 1 }}</td>
                                     <td>{{ $user->full_name }}</td>
                                     <td>{{ $user->username }}</td>
                                     <td>{{ $user->email }}</td>
                                     <td class="text-center">
-                                        <span class="badge bg-info">
-                                            {{ Str::title($user->role) }}
-                                        </span>
+                                        {{-- =================================== --}}
+                                        {{-- PERBAIKAN: Menampilkan role dari Spatie --}}
+                                        {{-- =================================== --}}
+                                        @foreach($user->getRoleNames() as $role)
+                                            <span class="badge bg-info text-dark">{{ Str::title($role) }}</span>
+                                        @endforeach
                                     </td>
                                     <td class="text-center">
-                                        <form
-                                            action="{{ route("users.destroy", $user->user_id) }}"
-                                            method="POST"
-                                            onsubmit="return confirm('Apakah Anda yakin ingin menghapus user ini?');"
-                                        >
-                                            <a
-                                                href="{{ route("users.edit", $user->user_id) }}"
-                                                class="btn btn-sm btn-outline-secondary"
-                                            >
-                                                <i
-                                                    class="bi bi-pencil-square"
-                                                ></i>
-                                                Edit
+                                        <div class="d-flex justify-content-center gap-1">
+                                            <a href="{{ route("users.edit", $user->user_id) }}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                                <i class="bi bi-pencil-square"></i>
                                             </a>
-                                            @csrf
-                                            @method("DELETE")
-                                            <button
-                                                type="submit"
-                                                class="btn btn-sm btn-outline-danger"
-                                            >
-                                                <i class="bi bi-trash"></i>
-                                                Hapus
-                                            </button>
-                                        </form>
+                                            <form action="{{ route("users.destroy", $user->user_id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus user ini?');">
+                                                @csrf
+                                                @method("DELETE")
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center">
-                                        Tidak ada data user.
-                                    </td>
+                                    <td colspan="6" class="text-center">Tidak ada data user.</td>
                                 </tr>
                             @endforelse
                         </tbody>

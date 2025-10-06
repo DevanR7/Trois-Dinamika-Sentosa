@@ -4,9 +4,8 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
+use App\Models\User;
 use Illuminate\Support\Facades\Hash;
-
 
 class UserSeeder extends Seeder
 {
@@ -15,34 +14,39 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-        DB::table('users')->insert([
-            [
-                'full_name'  => 'Admin Utama',
-                'username'   => 'admin',
-                'email'      => 'admin@example.com', // ✅ tambahkan email
-                'password'   => Hash::make('password'),
-                'role'       => 'admin',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'full_name'  => 'Sales Lapangan',
-                'username'   => 'sales1',
-                'email'      => 'sales1@example.com', // ✅ tambahkan email
-                'password'   => Hash::make('password'),
-                'role'       => 'sales',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'full_name'  => 'Manajemen Kantor',
-                'username'   => 'manajemen',
-                'email'      => 'manajemen@example.com', // ✅ tambahkan email
-                'password'   => Hash::make('password'),
-                'role'       => 'manajemen',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
+        // 1. Membuat User Admin
+        $admin = User::create([
+            'full_name'  => 'Admin Utama',
+            'username'   => 'admin',
+            'email'      => 'admin@example.com',
+            'password'   => Hash::make('password'), // Ganti dengan password yang aman
+            'sales_code' => null, // Admin tidak punya kode sales
         ]);
+        // Memberikan role 'admin' ke user ini
+        $admin->assignRole('admin');
+
+
+        // 2. Membuat User Sales
+        $sales = User::create([
+            'full_name'  => 'Sales Lapangan',
+            'username'   => 'sales1',
+            'email'      => 'sales1@example.com',
+            'password'   => Hash::make('password'),
+            'sales_code' => 'SL01', // Contoh kode sales
+        ]);
+        // Memberikan role 'sales' ke user ini
+        $sales->assignRole('sales');
+
+        
+        // 3. Membuat User Manajemen (Contoh)
+        $manajemen = User::create([
+            'full_name'  => 'Manajemen Kantor',
+            'username'   => 'manajemen',
+            'email'      => 'manajemen@example.com',
+            'password'   => Hash::make('password'),
+            'sales_code' => null,
+        ]);
+        // Anda bisa memberikan role 'manajemen' jika sudah dibuat di RoleAndPermissionSeeder
+        // $manajemen->assignRole('manajemen');
     }
 }

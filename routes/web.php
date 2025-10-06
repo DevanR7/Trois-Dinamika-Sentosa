@@ -14,6 +14,7 @@ use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchaseOrderPaymentController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\UnitController;
+use App\Http\Controllers\RoleController;
 
 /*
 |--------------------------------------------------------------------------
@@ -61,6 +62,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('clients', ClientController::class);
 
     Route::resource('units', UnitController::class)->except(['show']);
+
+    Route::resource('roles', RoleController::class)->except(['show']);
 });
 
 require __DIR__.'/auth.php';

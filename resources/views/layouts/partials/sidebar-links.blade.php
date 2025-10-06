@@ -32,14 +32,13 @@
 
 {{-- Section Penjualan --}}
 <li class="nav-heading">Penjualan</li>
-@can('manage-clients') {{-- Anda bisa sesuaikan nama permission ini --}}
+@can('manage-clients')
 <li class="nav-item">
     <a class="nav-link {{ request()->routeIs("clients.*") ? "active" : "" }}" href="{{ route("clients.index") }}">
         <i class="bi bi-person-lines-fill me-2"></i> Klien
     </a>
 </li>
 @endcan
-
 <li class="nav-item">
     <a class="nav-link {{ request()->routeIs("sales-orders.*") ? "active" : "" }}" href="{{ route("sales-orders.index") }}">
         <i class="bi bi-journal-text me-2"></i> Pesanan Penjualan
@@ -54,7 +53,8 @@
 @endcan
 <hr class="my-2">
 
-{{-- Section Sistem --}}
+{{-- Section Sistem (Hanya untuk Admin) --}}
+@role('admin')
 <li class="nav-heading">Sistem</li>
 @can("view-user-management")
 <li class="nav-item">
@@ -63,15 +63,21 @@
     </a>
 </li>
 @endcan
+<li class="nav-item">
+    <a class="nav-link {{ request()->routeIs("roles.*") ? "active" : "" }}" href="{{ route("roles.index") }}">
+        <i class="bi bi-shield-lock me-2"></i> Manajemen Role
+    </a>
+</li>
 @can("manage-settings")
 <li class="nav-item">
     <a class="nav-link {{ request()->routeIs("taxes.*") ? "active" : "" }}" href="{{ route("taxes.index") }}">
         <i class="bi bi-percent me-2"></i> Pengaturan Pajak
     </a>
 </li>
-@endcan
 <li class="nav-item">
     <a class="nav-link {{ request()->routeIs("units.*") ? "active" : "" }}" href="{{ route("units.index") }}">
         <i class="bi bi-rulers me-2"></i> Pengaturan Satuan
     </a>
 </li>
+@endcan
+@endrole

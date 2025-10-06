@@ -21,10 +21,16 @@
         <label for="role" class="form-label fw-semibold">Role <span class="text-danger">*</span></label>
         <select class="form-select" id="role" name="role" required>
             <option value="" disabled selected>Pilih Role...</option>
-            <option value="admin" @selected(old("role", $user->role ?? '') == "admin")>Admin</option>
-            <option value="sales" @selected(old("role", $user->role ?? '') == "sales")>Sales</option>
-            <option value="manajemen" @selected(old("role", $user->role ?? '') == "manajemen")>Manajemen</option>
-            <option value="kasir" @selected(old("role", $user->role ?? '') == "kasir")>Kasir</option>
+            @foreach ($roles as $role)
+            <option 
+                value="{{ $role->name }}" 
+                @if(isset($user)) 
+                    @selected($user->hasRole($role->name)) 
+                @endif
+            >
+                {{ Str::title($role->name) }}
+            </option>
+        @endforeach
         </select>
     </div>
     <div class="col-md-6" id="sales-code-container" style="display: none;">
