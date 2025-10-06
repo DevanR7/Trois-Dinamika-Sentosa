@@ -9,6 +9,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules;
 use Spatie\Permission\Models\Role;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
@@ -85,9 +86,30 @@ class UserController extends Controller
 
     return redirect()->route('users.index')->with('success', 'Data user berhasil diupdate.');
 }
-    public function destroy(User $user)
-    {
-        $user->delete();
-        return redirect()->route('users.index')->with('success', 'User berhasil dihapus.');
+    public function destroy(User $user): RedirectResponse
+{
+    // [SANGAT PENTING] Cek agar tidak menghapus user yang sedang login
+    if ($user->user_id === Auth::id()) {
+        return back()->with('error', 'Anda tidak bisa menghapus akun Anda sendiri.');
     }
+
+    // Cek agar tidak menghapus user admin terakhir
+    if ($user->hasRole('admin') && User::role('admin')->count() === 1) {
+        return back()->with('error', 'Tidak bisa menghapus satu-satunya user dengan role Admin.');
+    }
+
+    // Cek relasi ke sales invoice
+    if ($user->salesInvoices()->exists()) {
+        return back()->with('error', 'User ini tidak bisa dihapus karena memiliki data invoice penjualan.');
+    }
+
+    // Cek relasi ke purchase order
+    if ($user->purchaseOrders()->exists()) {
+        return back()->with('error', 'User ini tidak bisa dihapus karena memiliki data pesanan pembelian.');
+    }
+
+    $user->delete();
+    
+    return redirect()->route('users.index')->with('success', 'User berhasil dihapus.');
+}
 }

@@ -70,6 +70,10 @@ class RoleController extends Controller
             return back()->with('error', 'Role Admin tidak boleh dihapus.');
         }
 
+        if ($role->users()->count() > 0) {
+        return back()->with('error', 'Role "' . $role->name . '" tidak bisa dihapus karena masih digunakan oleh ' . $role->users()->count() . ' user.');
+    }
+
         $role->delete();
         return redirect()->route('roles.index')->with('success', 'Role berhasil dihapus.');
     }

@@ -9,9 +9,8 @@
             </a>
         </div>
 
-        @if (session("success"))
-            <div class="alert alert-success">{{ session("success") }}</div>
-        @endif
+        @if (session('success')) <div class="alert alert-success">{{ session('success') }}</div> @endif
+        @if (session('error')) <div class="alert alert-danger">{{ session('error') }}</div> @endif
 
         <div class="card shadow-sm border-0">
             <div class="card-body">
@@ -35,9 +34,6 @@
                                     <td>{{ $user->username }}</td>
                                     <td>{{ $user->email }}</td>
                                     <td class="text-center">
-                                        {{-- =================================== --}}
-                                        {{-- PERBAIKAN: Menampilkan role dari Spatie --}}
-                                        {{-- =================================== --}}
                                         @foreach($user->getRoleNames() as $role)
                                             <span class="badge bg-info text-dark">{{ Str::title($role) }}</span>
                                         @endforeach
@@ -47,7 +43,8 @@
                                             <a href="{{ route("users.edit", $user->user_id) }}" class="btn btn-sm btn-outline-secondary" title="Edit">
                                                 <i class="bi bi-pencil-square"></i>
                                             </a>
-                                            <form action="{{ route("users.destroy", $user->user_id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus user ini?');">
+                                            {{-- Menghapus onsubmit dan menambahkan class="delete-form" --}}
+                                            <form action="{{ route("users.destroy", $user->user_id) }}" method="POST" class="d-inline delete-form">
                                                 @csrf
                                                 @method("DELETE")
                                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
@@ -58,9 +55,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr>
-                                    <td colspan="6" class="text-center">Tidak ada data user.</td>
-                                </tr>
+                                <tr><td colspan="6" class="text-center">Tidak ada data user.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -73,3 +68,32 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+{{-- Script untuk konfirmasi hapus dengan SweetAlert --}}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const deleteForms = document.querySelectorAll('.delete-form');
+    deleteForms.forEach(form => {
+        form.addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            Swal.fire({
+                title: 'Anda Yakin?',
+                text: "User yang dihapus tidak bisa dikembalikan!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Hapus!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    event.target.submit();
+                }
+            });
+        });
+    });
+});
+</script>
+@endpush
