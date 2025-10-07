@@ -9,70 +9,44 @@ use Illuminate\Auth\Access\Response;
 class SalesOrderPolicy
 {
     /**
-     * Izinkan admin melakukan apa saja.
-     */
-    public function before(User $user, string $ability): bool|null
-    {
-        if ($user->role === 'admin') {
-            return true;
-        }
-        return null;
-    }
-
-    /**
-     * Tentukan apakah user bisa melihat daftar pesanan.
-     * (Daftar akan kita filter di Controller)
+     * Tentukan apakah user bisa melihat semua sales order.
      */
     public function viewAny(User $user): bool
     {
-        return true; // Semua role boleh melihat halaman daftar pesanan
+        return $user->can('view-sales-orders');
     }
 
     /**
-     * Tentukan apakah user bisa melihat detail pesanan spesifik.
+     * Tentukan apakah user bisa melihat satu sales order.
      */
     public function view(User $user, SalesOrder $salesOrder): bool
     {
-        // Jika rolenya kasir/manajemen, izinkan.
-        if (in_array($user->role, ['kasir', 'manajemen'])) {
-            return true;
-        }
-        // Jika rolenya sales, hanya izinkan jika itu pesanan miliknya.
-        return $user->user_id === $salesOrder->user_id_sales;
+        // Bolehkan jika user punya permission, ATAU jika order ini miliknya (untuk role sales)
+        return $user->can('view-sales-orders') || $user->user_id === $salesOrder->user_id_sales;
     }
 
     /**
-     * Tentukan apakah user bisa membuat pesanan.
+     * Tentukan apakah user bisa membuat sales order.
      */
     public function create(User $user): bool
     {
-        // Sesuai permintaan Anda, semua role internal bisa
-        return in_array($user->role, ['admin', 'sales', 'kasir', 'manajemen']);
+        return $user->can('create-sales-orders');
     }
 
     /**
-     * Tentukan apakah user bisa mengupdate pesanan.
+     * Tentukan apakah user bisa mengedit sales order.
      */
     public function update(User $user, SalesOrder $salesOrder): bool
     {
-        // Jika rolenya kasir/manajemen, izinkan.
-        if (in_array($user->role, ['kasir', 'manajemen','admin'])) {
-            return true;
-        }
-        // Jika rolenya sales, hanya izinkan jika itu pesanan miliknya.
-        return $user->user_id === $salesOrder->user_id_sales;
+        // Bolehkan jika user punya permission, ATAU jika order ini miliknya
+        return $user->can('edit-sales-orders') || $user->user_id === $salesOrder->user_id_sales;
     }
 
     /**
-     * Tentukan apakah user bisa menghapus pesanan.
+     * Tentukan apakah user bisa menghapus sales order.
      */
     public function delete(User $user, SalesOrder $salesOrder): bool
     {
-         // Jika rolenya kasir/manajemen, izinkan.
-        if (in_array($user->role, ['kasir', 'manajemen','admin'])) {
-            return true;
-        }
-        // Jika rolenya sales, hanya izinkan jika itu pesanan miliknya.
-        return $user->user_id === $salesOrder->user_id_sales;
+        return $user->can('delete-sales-orders');
     }
 }

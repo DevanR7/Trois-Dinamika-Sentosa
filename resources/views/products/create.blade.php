@@ -26,11 +26,16 @@
                             </div>
 
                             <div class="col-md-12">
-                                <label for="supplier_id" class="form-label fw-semibold">Supplier</label>
-                                <select name="supplier_id" id="supplier_id" class="form-select" required>
-                                    {{-- ... (isi dropdown supplier tidak berubah) ... --}}
-                                </select>
-                            </div>
+    <label for="supplier_id" class="form-label fw-semibold">Supplier</label>
+    <select name="supplier_id" id="supplier_id" class="form-select" required>
+        <option value="" disabled selected>-- Pilih Supplier --</option>
+        @foreach($suppliers as $supplier)
+            <option value="{{ $supplier->supplier_id }}" @selected(old('supplier_id') == $supplier->supplier_id)>
+                {{ $supplier->supplier_name }}
+            </option>
+        @endforeach
+    </select>
+</div>
 
                             {{-- TAMBAHKAN KOLOM DESKRIPSI DI SINI --}}
                             <div class="col-12">
@@ -63,11 +68,16 @@
                             </div>
 
                             <div class="col-md-12">
-                                <label for="unit_id" class="form-label fw-semibold">Satuan Unit</label>
-                                <select class="form-select" id="unit_id" name="unit_id" required>
-                                    {{-- ... (isi dropdown unit tidak berubah) ... --}}
-                                </select>
-                            </div>
+    <label for="unit_id" class="form-label fw-semibold">Satuan Unit</label>
+    <select class="form-select" id="unit_id" name="unit_id" required>
+        <option value="" disabled selected>-- Pilih Satuan --</option>
+        @foreach ($units as $unit)
+            <option value="{{ $unit->unit_id }}" @selected(old('unit_id') == $unit->unit_id)>
+                {{ $unit->name }}
+            </option>
+        @endforeach
+    </select>
+</div>
                         </div>
 
                         <div class="d-flex justify-content-end mt-4">
@@ -84,6 +94,17 @@
 
     @push('scripts')
     <script>
+
+        $('#supplier_id').select2({
+            theme: 'bootstrap-5',
+            placeholder: '-- Pilih Supplier --'
+        });
+
+        $('#unit_id').select2({
+            theme: 'bootstrap-5',
+            placeholder: '-- Pilih Satuan --'
+        });
+        
     // Fungsi helper untuk format input Rupiah
     function setupCurrencyInput(displayId, hiddenId) {
         const amountDisplay = document.getElementById(displayId);

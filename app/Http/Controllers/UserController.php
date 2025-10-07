@@ -16,8 +16,7 @@ class UserController extends Controller
 
     public function __construct()
     {
-        // Terapkan Gate 'view-user-management' ke semua method di controller ini
-        $this->middleware('can:view-user-management');
+        $this->middleware('can:manage-users');
     }
     public function index()
     {

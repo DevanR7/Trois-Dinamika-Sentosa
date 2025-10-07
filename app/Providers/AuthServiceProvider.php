@@ -12,6 +12,10 @@ use App\Models\SalesOrder;
 use App\Policies\SalesOrderPolicy;
 use App\Policies\PurchaseOrderPolicy;
 use App\Models\PurchaseOrder;
+use App\Models\Supplier;
+use App\Policies\SupplierPolicy;
+use App\Models\SalesInvoice;
+use App\Policies\SalesInvoicePolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -21,8 +25,12 @@ class AuthServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     protected $policies = [
-         SalesOrder::class => SalesOrderPolicy::class, // <-- TAMBAHKAN BARIS INI
-         PurchaseOrder::class => PurchaseOrderPolicy::class,
+        SalesOrder::class => SalesOrderPolicy::class,
+        PurchaseOrder::class => PurchaseOrderPolicy::class,
+        Supplier::class => SupplierPolicy::class,
+        Product::class => ProductPolicy::class,
+        User::class => SupplierPolicy::class, 
+        SalesInvoice::class => SalesInvoicePolicy::class,
     ];
 
     /**
@@ -30,35 +38,6 @@ class AuthServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // --- TAMBAHKAN KODE GATE DI SINI ---
-        Gate::define('view-user-management', function (User $user) {
-            return $user->role === 'admin';
-        });
-        // --- AKHIR KODE GATE ---
-
-        Gate::define('manage-invoices', function (User $user) {
-        return in_array($user->role, ['admin', 'kasir']);
-    });
-
-    Gate::define('manage-settings', function (User $user) {
-        return $user->role === 'admin';
-    });
-
-    Gate::define('manage-suppliers', function (User $user) {
-        return $user->role === 'admin';
-    });
-
-    Gate::define('manage-purchases', function (User $user) {
-        // Contoh: Hanya admin dan manajemen yang bisa mengelola pembelian
-        return in_array($user->role, ['admin', 'manajemen']);
-    });
-
-    Gate::define('manage-clients', function ($user) {
-        // Ganti 'admin' dengan nama role yang Anda inginkan.
-        // Anda bisa menambahkan role lain dengan operator ATAU (||)
-        // contoh: return $user->role === 'admin' || $user->role === 'sales_manager';
-        return $user->role === 'admin'; 
-    });
     
     }  
     

@@ -9,35 +9,45 @@ use Illuminate\Auth\Access\Response;
 class PurchaseOrderPolicy
 {
     /**
-     * Izinkan admin melakukan apa saja, ini akan meng-override method lain.
+     * Tentukan apakah user bisa melihat semua pesanan pembelian.
      */
-    public function before(User $user, string $ability): bool|null
-    {
-        if ($user->role === 'admin') {
-            return true;
-        }
-        return null; // Lanjutkan ke pemeriksaan method di bawah jika bukan admin
-    }
-
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['admin', 'manajemen']);
+        return $user->can('view-purchase-orders');
     }
 
+    /**
+     * Tentukan apakah user bisa melihat satu pesanan pembelian.
+     */
     public function view(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        return in_array($user->role, ['admin', 'manajemen']);
+        return $user->can('view-purchase-orders');
     }
 
+    /**
+     * Tentukan apakah user bisa membuat pesanan pembelian.
+     */
     public function create(User $user): bool
     {
-        return in_array($user->role, ['admin', 'manajemen']);
+        return $user->can('create-purchase-orders');
     }
 
+    /**
+     * Tentukan apakah user bisa mengedit pesanan pembelian.
+     */
     public function update(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        // Izinkan jika pesanan belum selesai diproses
-        return in_array($user->role, ['admin', 'manajemen']) && $purchaseOrder->status !== 'completed';
+        return $user->can('edit-purchase-orders');
+    }
+
+    /**
+     * Tentukan apakah user bisa menghapus pesanan pembelian.
+     */
+    public function delete(User $user, PurchaseOrder $purchaseOrder): bool
+    {
+        // Kita belum membuat permission ini, tapi ini adalah pola yang baik
+        // return $user->can('delete-purchase-orders');
+        return false; // Sementara tidak ada yang bisa menghapus PO
     }
 
     /**
@@ -45,7 +55,22 @@ class PurchaseOrderPolicy
      */
     public function cancel(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        // Izinkan jika pesanan belum selesai diproses
-        return in_array($user->role, ['admin', 'manajemen']) && $purchaseOrder->status !== 'completed';
+        return $user->can('cancel-purchase-orders');
+    }
+
+    /**
+     * Tentukan apakah user bisa menandai barang telah diterima.
+     */
+    public function receive(User $user, PurchaseOrder $purchaseOrder): bool
+    {
+        return $user->can('receive-purchase-orders');
+    }
+
+    /**
+     * Tentukan apakah user bisa mencatat pembayaran PO.
+     */
+    public function pay(User $user, PurchaseOrder $purchaseOrder): bool
+    {
+        return $user->can('pay-purchase-orders');
     }
 }

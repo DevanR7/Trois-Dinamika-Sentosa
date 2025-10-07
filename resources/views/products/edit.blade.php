@@ -98,6 +98,16 @@
 @push('scripts')
 {{-- Kode JavaScript Anda untuk format harga sudah benar dan tidak perlu diubah --}}
 <script>
+
+    $('#supplier_id').select2({
+            theme: 'bootstrap-5',
+            placeholder: '-- Pilih Supplier --'
+        });
+
+        $('#unit_id').select2({
+            theme: 'bootstrap-5',
+            placeholder: '-- Pilih Satuan --'
+        });
     // Fungsi helper untuk format input Rupiah (SAMA SEPERTI DI CREATE)
     function setupCurrencyInput(displayId, hiddenId) {
         const amountDisplay = document.getElementById(displayId);

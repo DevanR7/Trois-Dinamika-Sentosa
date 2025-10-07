@@ -30,23 +30,30 @@ class RegisteredUserController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        // 1. SESUAIKAN ATURAN VALIDASI
         $request->validate([
-        'full_name' => ['required', 'string', 'max:255'], // <-- Diubah
-        'username' => ['required', 'string', 'max:255', 'unique:'.User::class], // <-- Diubah
-        'password' => ['required', 'confirmed', Rules\Password::defaults()],
-    ]);
+            'full_name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'max:255', 'unique:'.User::class],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:'.User::class],
+            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+        ]);
 
-    $user = User::create([
-        'full_name' => $request->full_name, // <-- Diubah
-        'username' => $request->username, // <-- Diubah
-        'password' => Hash::make($request->password),
-        'role' => 'sales', // <-- Tambahkan role default untuk user baru
-    ]);
+        // 2. BUAT USER DENGAN FIELD YANG BENAR
+        $user = User::create([
+            'full_name' => $request->full_name,
+            'username' => $request->username,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+        ]);
+
+        // 3. BERIKAN ROLE DEFAULT UNTUK USER BARU
+        // Misalnya, setiap user baru yang mendaftar akan diberi role 'sales'
+        $user->assignRole('sales');
 
         event(new Registered($user));
 
         Auth::login($user);
 
-        return redirect(RouteServiceProvider::HOME);
+        return redirect(route('dashboard', absolute: false));
     }
 }

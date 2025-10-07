@@ -20,11 +20,12 @@ class SalesInvoiceController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('can:manage-invoices');
+       
     }
     
     public function index(Request $request): View
 {
+    $this->authorize('viewAny', SalesInvoice::class);
     $query = SalesInvoice::with('client', 'sales');
 
      // Filter pencarian
@@ -78,6 +79,7 @@ class SalesInvoiceController extends Controller
 } 
     public function show(SalesInvoice $invoice): View
 {
+    $this->authorize('view', $invoice);
     // Laravel sudah otomatis melakukan findOrFail($id) untuk Anda.
     // Kita hanya perlu me-load relasi yang dibutuhkan.
     $invoice->load(['client', 'sales', 'payments.receivedBy', 'items.product' => function ($query) {
@@ -89,21 +91,23 @@ class SalesInvoiceController extends Controller
 
     public function create(): View
     {
+        $this->authorize('create', SalesInvoice::class);
         $clients = Client::all();
         $products = Product::all();
         $taxes = Tax::where('is_active', true)->get();
-        $salesUsers = User::where('role', 'sales')->get(); 
+        $salesUsers = User::role('sales')->get();
 
     return view('invoices.create', compact('clients', 'products', 'taxes', 'salesUsers'));
     }
     
     public function createFromOrder(SalesOrder $salesOrder): View
     {
+        $this->authorize('create', SalesInvoice::class);
         $salesOrder->load('items.product');
         $clients = Client::all();
         $products = Product::all();
         $taxes = Tax::where('is_active', true)->get();
-        $salesUsers = User::where('role', 'sales')->get();
+        $salesUsers = User::role('sales')->get();
         return view('invoices.create', compact('clients', 'products', 'salesOrder', 'taxes', 'salesUsers'));
     }
 
@@ -112,6 +116,7 @@ class SalesInvoiceController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', SalesInvoice::class);
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,client_id',
             'order_date' => 'required|date',
@@ -239,11 +244,12 @@ class SalesInvoiceController extends Controller
      */
     public function edit(SalesInvoice $invoice): View
     {
+        $this->authorize('update', $invoice);
         $invoice->load(['items.product', 'taxes']);
         $clients = Client::all();
         $products = Product::all();
         $taxes = Tax::where('is_active', true)->get();
-         $salesUsers = User::where('role', 'sales')->get();
+        $salesUsers = User::role('sales')->get();
 
         return view('invoices.edit', compact('invoice', 'clients', 'products', 'taxes', 'salesUsers'));
     }
@@ -253,6 +259,7 @@ class SalesInvoiceController extends Controller
      */
     public function update(Request $request, SalesInvoice $invoice): RedirectResponse
 {
+    $this->authorize('update', $invoice);
     // 1. Validasi input (disamakan dengan method store)
     $validated = $request->validate([
         'client_id' => 'required|exists:clients,client_id',
@@ -361,7 +368,8 @@ class SalesInvoiceController extends Controller
      * Menghapus invoice dari database (atau membatalkan).
      */
     public function destroy(SalesInvoice $invoice): RedirectResponse
-    {     
+    {    
+        $this->authorize('delete', $invoice); 
         // Sebaiknya gunakan Soft Deletes atau ubah status menjadi 'cancelled'
         $invoice->delete();
         
@@ -370,6 +378,7 @@ class SalesInvoiceController extends Controller
 
     public function cancel(SalesInvoice $invoice): RedirectResponse
 {
+    $this->authorize('cancel', $invoice);
     // Logika bisnis: Invoice yang sudah lunas tidak boleh dibatalkan.
     if ($invoice->status == 'paid') {
         return back()->with('error', 'Invoice yang sudah lunas tidak bisa dibatalkan.');
@@ -383,6 +392,7 @@ class SalesInvoiceController extends Controller
 
 public function downloadPDF(SalesInvoice $invoice)
     {
+        $this->authorize('view', $invoice);
         // Pastikan semua relasi yang dibutuhkan sudah ter-load
         $invoice->load(['client', 'items.product', 'taxes']);
 
