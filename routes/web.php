@@ -15,6 +15,7 @@ use App\Http\Controllers\PurchaseOrderPaymentController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\GoogleAuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -25,6 +26,9 @@ use App\Http\Controllers\RoleController;
 Route::get('/', function () {
     return redirect()->route('login');
 });
+
+Route::get('auth/google', [GoogleAuthController::class, 'redirectToGoogle'])->name('auth.google');
+Route::get('auth/google/callback', [GoogleAuthController::class, 'handleGoogleCallback']);
 
 Route::middleware(['auth', 'verified'])->group(function () {
     
@@ -64,6 +68,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('units', UnitController::class)->except(['show']);
 
     Route::resource('roles', RoleController::class)->except(['show']);
+    
 });
 
 require __DIR__.'/auth.php';
