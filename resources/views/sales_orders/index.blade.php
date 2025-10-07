@@ -109,37 +109,21 @@
                                                 <i class="bi bi-eye"></i>
                                             </a>
 
-                                            @can("update", $order)
-                                                <a
-                                                    href="{{ route("sales-orders.edit", $order->order_id) }}"
-                                                    class="btn btn-sm btn-outline-secondary"
-                                                    title="Edit"
-                                                >
-                                                    <i
-                                                        class="bi bi-pencil-square"
-                                                    ></i>
-                                                </a>
-                                            @endcan
+                                             @if (!in_array($order->status, ['invoiced', 'rejected']))
+            @can("update", $order)
+                <a href="{{ route("sales-orders.edit", $order->order_id) }}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                    <i class="bi bi-pencil-square"></i>
+                </a>
+            @endcan
 
                                             @can("delete", $order)
-                                                <form
-                                                    class="delete-form"
-                                                    action="{{ route("sales-orders.destroy", $order->order_id) }}"
-                                                    method="POST"
-                                                >
-                                                    @csrf
-                                                    @method("DELETE")
-                                                    <button
-                                                        type="submit"
-                                                        class="btn btn-sm btn-outline-danger"
-                                                        title="Hapus"
-                                                    >
-                                                        <i
-                                                            class="bi bi-trash"
-                                                        ></i>
-                                                    </button>
-                                                </form>
-                                            @endcan
+                <form class="delete-form" action="{{ route("sales-orders.destroy", $order->order_id) }}" method="POST">
+                    @csrf
+                    @method("DELETE")
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus"><i class="bi bi-trash"></i></button>
+                </form>
+            @endcan
+        @endif
                                         </div>
                                     </td>
                                 </tr>

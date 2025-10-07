@@ -38,6 +38,11 @@ class SalesOrderPolicy
      */
     public function update(User $user, SalesOrder $salesOrder): bool
     {
+        // [PERBAIKAN] HANYA boleh edit jika statusnya BUKAN 'invoiced'
+        if ($salesOrder->status === 'invoiced') {
+            return false;
+        }
+
         // Bolehkan jika user punya permission, ATAU jika order ini miliknya
         return $user->can('edit-sales-orders') || $user->user_id === $salesOrder->user_id_sales;
     }
@@ -45,8 +50,13 @@ class SalesOrderPolicy
     /**
      * Tentukan apakah user bisa menghapus sales order.
      */
-    public function delete(User $user, SalesOrder $salesOrder): bool
+     public function delete(User $user, SalesOrder $salesOrder): bool
     {
+        // [PERBAIKAN] HANYA boleh hapus jika statusnya BUKAN 'invoiced'
+        if ($salesOrder->status === 'invoiced') {
+            return false;
+        }
+        
         return $user->can('delete-sales-orders');
     }
 }

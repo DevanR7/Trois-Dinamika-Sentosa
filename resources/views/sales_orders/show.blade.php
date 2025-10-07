@@ -4,24 +4,58 @@
 <div class="container py-4">
     {{-- HEADER HALAMAN --}}
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <h2 class="fw-bold mb-0">Detail Pesanan: {{ $salesOrder->order_number }}</h2>
-        
-        <div class="d-flex flex-wrap justify-content-end gap-2">
-            <a href="{{ route('sales-orders.index') }}" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left me-1"></i> Kembali
-            </a>
+    <h2 class="fw-bold mb-0">Detail Pesanan: {{ $salesOrder->order_number }}</h2>
+    
+    <div class="d-flex flex-wrap justify-content-end gap-2">
+        <a href="{{ route('sales-orders.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Kembali
+        </a>
 
-            {{-- Tombol untuk membuat Invoice dari Sales Order ini --}}
+        {{-- Tombol untuk membuat Invoice dari Sales Order ini --}}
+        @can('create', App\Models\SalesInvoice::class)
             @if($salesOrder->status !== 'invoiced' && $salesOrder->status !== 'rejected')
                 <a href="{{ route('invoices.createFromOrder', $salesOrder->order_id) }}" class="btn btn-primary">
                     <i class="bi bi-receipt-cutoff me-1"></i> Buat Invoice
                 </a>
             @endif
-            
-            {{-- Tombol aksi lainnya jika diperlukan --}}
-            {{-- <a href="{{ route('sales-orders.edit', $salesOrder->order_id) }}" class="btn btn-secondary">Edit</a> --}}
+        @endcan
+        
+        {{-- Dropdown untuk Opsi Edit & Hapus --}}
+        <div class="btn-group">
+            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-gear"></i> Opsi
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                {{-- Tombol Edit & Hapus hanya muncul jika statusnya belum final --}}
+                @if (!in_array($salesOrder->status, ['invoiced', 'rejected']))
+                    @can("update", $salesOrder)
+                    <li>
+                        <a class="dropdown-item" href="{{ route('sales-orders.edit', $salesOrder->order_id) }}">
+                            <i class="bi bi-pencil-square me-2"></i> Edit Pesanan
+                        </a>
+                    </li>
+                    @endcan
+                    @can("delete", $salesOrder)
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form class="delete-form" action="{{ route('sales-orders.destroy', $salesOrder->order_id) }}" method="POST">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="dropdown-item text-danger">
+                                    <i class="bi bi-trash me-2"></i> Hapus Pesanan
+                                </button>
+                            </form>
+                    </li>
+                    @endcan
+                @endif
+                {{-- Jika tidak ada menu di atas, bisa tampilkan pesan --}}
+                @if (in_array($salesOrder->status, ['invoiced', 'rejected']) && auth()->user()->cannot('update', $salesOrder) && auth()->user()->cannot('delete', $salesOrder))
+                     <li><span class="dropdown-item disabled text-muted">Tidak ada aksi tersedia</span></li>
+                @endif
+            </ul>
         </div>
     </div>
+</div>
 
     {{-- KARTU DETAIL --}}
     <div class="card shadow-sm border-0">
@@ -94,3 +128,31 @@
     </div>
 </div>
 @endsection
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const deleteForm = document.querySelector('.delete-form');
+
+    if (deleteForm) {
+        deleteForm.addEventListener('submit', function(event) {
+            event.preventDefault(); 
+            
+            Swal.fire({
+                title: 'Anda Yakin?',
+                text: "Pesanan yang dihapus tidak bisa dikembalikan!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Hapus!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    event.target.submit();
+                }
+            });
+        });
+    }
+});
+</script>
+@endpush
