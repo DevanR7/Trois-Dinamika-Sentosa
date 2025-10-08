@@ -16,6 +16,8 @@ use App\Http\Controllers\ClientController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\GoogleAuthController;
+use App\Http\Controllers\SalesReturnController;
+use App\Http\Controllers\PurchaseReturnController;
 
 /*
 |--------------------------------------------------------------------------
@@ -68,6 +70,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('units', UnitController::class)->except(['show']);
 
     Route::resource('roles', RoleController::class)->except(['show']);
+    
+    Route::resource('sales-returns', SalesReturnController::class);
+    Route::resource('purchase-returns', PurchaseReturnController::class);
     
 });
 
