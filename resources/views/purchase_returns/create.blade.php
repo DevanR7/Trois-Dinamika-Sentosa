@@ -87,28 +87,62 @@ document.addEventListener('DOMContentLoaded', function () {
                 itemsContainer.empty();
                 if (data.items && data.items.length > 0) {
                     data.items.forEach((item, index) => {
-                        const row = `
-                            <tr>
-                                <td>${item.product.product_name}</td>
-                                <td class="text-center">${item.quantity}</td>
-                                <td class="text-end">${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(item.price_per_unit)}</td>
-                                <td>
-                                    <input type="hidden" name="items[${index}][product_id]" value="${item.product_id}">
-                                    <input type="hidden" name="items[${index}][price_per_unit]" value="${item.price_per_unit}">
-                                    <input type="number" name="items[${index}][quantity]" class="form-control form-control-sm" min="0" max="${item.quantity}" placeholder="0">
-                                </td>
-                            </tr>
-                        `;
-                        itemsContainer.append(row);
+                        const maxQty = item.quantity - (item.quantity_returned || 0);
+                        
+                        if (maxQty > 0) {
+                            const rowHTML = `
+                                <tr>
+                                    <td>${item.product.product_name}<br><small class="text-muted">Sudah diretur: ${item.quantity_returned || 0}</small></td>
+                                    <td class="text-center align-middle">${item.quantity}</td>
+                                    <td class="text-end align-middle">${formatRupiah(item.price_per_unit)}</td>
+                                    <td>
+                                        <input type="hidden" name="items[${index}][item_id]" value="${item.item_id}">
+                                        <input 
+                                            type="number" 
+                                            name="items[${index}][quantity]" 
+                                            class="form-control form-control-sm return-qty-input" 
+                                            min="0" 
+                                            max="${maxQty}" 
+                                            placeholder="Maks: ${maxQty}"
+                                        >
+                                        
+                                        <div class="text-danger small mt-1 d-none qty-error-message">Jumlah melebihi batas retur!</div>
+                                    </td>
+                                </tr>
+                            `;
+                            const newRow = $(rowHTML);
+
+                            // Tambahkan event listener untuk validasi real-time
+                            newRow.find('.return-qty-input').on('input', function() {
+                                const input = $(this);
+                                const errorMessage = newRow.find('.qty-error-message');
+                                const currentValue = parseInt(input.val(), 10);
+                                const maxValue = parseInt(input.attr('max'), 10);
+
+                                if (currentValue > maxValue) {
+                                    errorMessage.removeClass('d-none'); // Tampilkan error
+                                    input.addClass('is-invalid'); // Tambah border merah
+                                } else {
+                                    errorMessage.addClass('d-none'); // Sembunyikan error
+                                    input.removeClass('is-invalid'); // Hapus border merah
+                                }
+                            });
+                            
+                            itemsContainer.append(newRow);
+                        }
                     });
                     instructionText.hide();
                     tableContainer.show();
                 } else {
-                    instructionText.text('Tidak ada item ditemukan di PO ini.').show();
+                    instructionText.text('Tidak ada item yang bisa diretur dari PO ini.').show();
                 }
             })
             .catch(error => console.error('Error:', error));
     });
+
+    function formatRupiah(number) {
+        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
+    }
 });
 </script>
 @endpush

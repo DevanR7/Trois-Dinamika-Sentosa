@@ -114,4 +114,9 @@ public static function generateInvoiceNumber($salesUserId = null): string
     }
     return $baseNumber;
     }
+
+    public function returns(): HasMany
+{
+    return $this->hasMany(SalesReturn::class, 'sales_invoice_id', 'invoice_id');
+}
 }

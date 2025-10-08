@@ -25,7 +25,8 @@ return new class extends Migration
         $table->decimal('total_amount', 15, 2);
 
         // ✅ DIHAPUS ->after('total_amount')
-        $table->decimal('amount_paid', 15, 2)->default(0); 
+        $table->decimal('amount_paid', 15, 2)->default(0);
+        $table->decimal('total_returned', 15, 2)->default(0);
 
         $table->enum('status', ['draft', 'ordered', 'completed', 'cancelled'])->default('draft');
         $table->text('notes')->nullable();

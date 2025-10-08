@@ -23,7 +23,11 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::get('/invoices/{invoice}/items', function (SalesInvoice $invoice) {
     // Load relasi item beserta info produknya
     $invoice->load('items.product');
-    return response()->json(['items' => $invoice->items]);
+    // Kembalikan data invoice dan itemnya
+    return response()->json([
+        'invoice' => $invoice, // Mengirim info invoice (termasuk diskon)
+        'items' => $invoice->items
+    ]);
 });
 
 Route::get('/purchase-orders/{purchaseOrder}/items', function (PurchaseOrder $purchaseOrder) {

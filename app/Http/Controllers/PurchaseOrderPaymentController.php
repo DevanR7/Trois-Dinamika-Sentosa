@@ -28,18 +28,22 @@ class PurchaseOrderPaymentController extends Controller
 
         // 2. Hitung ulang total yang sudah dibayar
         $totalPaid = $purchaseOrder->payments()->sum('amount');
+        $totalReturned = $purchaseOrder->returns()->sum('total_amount');
 
         // 3. Update status pembayaran di Purchase Order
         $newStatus = 'unpaid';
-        if ($totalPaid > 0) {
-            $newStatus = ($totalPaid >= $purchaseOrder->total_amount) ? 'paid' : 'partially_paid';
-        }
+    // [PERBAIKAN] Cek lunas berdasarkan sisa tagihan setelah retur
+    if ($totalPaid >= ($purchaseOrder->total_amount - $totalReturned)) {
+        $newStatus = 'paid';
+    } elseif ($totalPaid > 0) {
+        $newStatus = 'partially_paid';
+    }
 
-        $purchaseOrder->update([
-            'amount_paid' => $totalPaid,
-            'payment_status' => $newStatus
-        ]);
+    $purchaseOrder->update([
+        'amount_paid' => $totalPaid,
+        'payment_status' => $newStatus
+    ]);
 
-        return back()->with('success', 'Pembayaran berhasil dicatat.');
+    return back()->with('success', 'Pembayaran berhasil dicatat.');
     }
 }

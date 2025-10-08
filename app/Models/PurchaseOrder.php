@@ -46,6 +46,7 @@ class PurchaseOrder extends Model
         'total_amount',
         'grand_total',
         'amount_paid',
+        'total_returned', 
     ];
 
     /**
@@ -119,7 +120,12 @@ class PurchaseOrder extends Model
     }
 
     public function payments(): HasMany
-{
+    {
     return $this->hasMany(PurchaseOrderPayment::class, 'po_id', 'po_id');
-}
+    }
+
+public function returns(): HasMany
+    {
+        return $this->hasMany(PurchaseReturn::class, 'purchase_order_id', 'po_id');
+    }
 }

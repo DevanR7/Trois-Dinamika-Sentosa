@@ -14,11 +14,30 @@ use App\Models\InvoiceItem;
 
 class SalesReturnController extends Controller
 {
-    public function index(): View
+     public function index(Request $request): View
     {
-        $salesReturns = SalesReturn::with(['client', 'salesInvoice'])
-            ->latest('return_date')
-            ->paginate(15);
+        $query = SalesReturn::with(['client', 'salesInvoice']);
+
+        // Logika untuk Pencarian Umum
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('return_number', 'like', "%{$search}%")
+                  ->orWhereHas('client', function($q_client) use ($search) {
+                      $q_client->where('client_name', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('salesInvoice', function($q_invoice) use ($search) {
+                      $q_invoice->where('invoice_number', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Logika untuk Filter Tanggal
+        if ($request->filled('return_date')) {
+            $query->whereDate('return_date', $request->return_date);
+        }
+
+        $salesReturns = $query->latest('return_date')->paginate(15)->appends($request->query());
             
         return view('sales_returns.index', compact('salesReturns'));
     }
@@ -42,89 +61,74 @@ class SalesReturnController extends Controller
         'return_date' => 'required|date',
         'notes' => 'nullable|string',
         'items' => 'required|array',
-        'items.*.product_id' => 'required|exists:products,product_id',
-        'items.*.quantity' => 'nullable|integer|min:1', // Boleh kosong, tapi jika diisi harus minimal 1
-        'items.*.price_per_unit' => 'required|numeric',
+        'items.*.item_id' => 'required|exists:invoice_items,item_id', // Menggunakan item_id asli
+        'items.*.quantity' => 'nullable|integer|min:1',
     ]);
 
     DB::beginTransaction();
     try {
         $invoice = SalesInvoice::findOrFail($validated['sales_invoice_id']);
+        $discountRate = $invoice->discount_percentage / 100; // Ambil rate diskon global dari invoice
         $totalReturnValue = 0;
-        $hasReturnedItems = false; // Penanda apakah ada item yang diretur
+        $hasReturnedItems = false;
 
-        // 1. Buat data utama retur
         $salesReturn = SalesReturn::create([
-            'return_number' => 'SR/' . date('Y/m/') . time(), // Ganti dengan generator nomor Anda nanti
+            'return_number' => SalesReturn::generateReturnNumber(),
             'client_id' => $invoice->client_id,
             'sales_invoice_id' => $invoice->invoice_id,
             'user_id' => Auth::id(),
             'return_date' => $validated['return_date'],
             'notes' => $validated['notes'],
-            'total_amount' => 0, // Akan diupdate nanti
+            'total_amount' => 0,
         ]);
 
-        // 2. Loop melalui item yang dikirim dari form
         foreach ($validated['items'] as $itemData) {
-            // Hanya proses jika kuantitas diisi dan lebih dari 0
             if (!empty($itemData['quantity']) && $itemData['quantity'] > 0) {
+                $hasReturnedItems = true;
                 $originalItem = InvoiceItem::find($itemData['item_id']);
+
+                // Validasi agar tidak bisa retur lebih dari sisa
                 $maxQty = $originalItem->quantity - $originalItem->quantity_returned;
                 if ($itemData['quantity'] > $maxQty) {
-                    throw new \Exception("Jumlah retur untuk produk '{$originalItem->product->product_name}' melebihi batas.");
+                    throw new \Exception("Jumlah retur melebihi batas untuk produk " . $originalItem->product->product_name);
                 }
-                $hasReturnedItems = true; // Set penanda menjadi true
-                $subtotal = $itemData['quantity'] * $itemData['price_per_unit'];
+
+                // [LOGIKA BARU] Hitung harga satuan setelah diskon
+                $priceAfterDiscount = $originalItem->price_per_unit * (1 - $discountRate);
+                $subtotal = $itemData['quantity'] * $priceAfterDiscount;
                 $totalReturnValue += $subtotal;
 
-                // Simpan item retur
+                // Simpan item retur dengan harga setelah diskon
                 $salesReturn->items()->create([
-                    'product_id' => $itemData['product_id'],
+                    'product_id' => $originalItem->product_id,
                     'quantity' => $itemData['quantity'],
-                    'price_per_unit' => $itemData['price_per_unit'],
+                    'price_per_unit' => $priceAfterDiscount, // Simpan harga net
                     'subtotal' => $subtotal,
                 ]);
 
-                // Tambah kembali kuantitas yang diretur pada item asli
+                // Update catatan retur di item invoice asli
                 $originalItem->increment('quantity_returned', $itemData['quantity']);
 
                 // Tambah kembali stok produk
-                $product = Product::find($itemData['product_id']);
+                $product = Product::find($originalItem->product_id);
                 if ($product) {
                     $product->increment('stock_quantity', $itemData['quantity']);
                 }
             }
         }
 
-        // Jika tidak ada item yang diretur sama sekali, batalkan proses
-        if (!$hasReturnedItems) {
-            throw new \Exception("Tidak ada item yang dipilih untuk diretur. Harap isi kuantitas retur minimal pada satu barang.");
-        }
-        
-        // 3. Update total nilai retur
+        if (!$hasReturnedItems) throw new \Exception("Tidak ada item yang dipilih untuk diretur.");
+
         $salesReturn->update(['total_amount' => $totalReturnValue]);
 
-        // 4. (Opsional) Sesuaikan sisa tagihan pada invoice asli
-        $invoice->amount_paid -= $totalReturnValue; 
-        
-        // Cek ulang status invoice
-        if ($invoice->amount_paid >= $invoice->total_amount) {
-            $invoice->status = 'paid';
-        } elseif ($invoice->amount_paid > 0) {
-            $invoice->status = 'partially_paid';
-        } else {
-             $invoice->status = 'unpaid';
-        }
-        $invoice->save();
-
         DB::commit();
-
-        return redirect()->route('sales-returns.index')->with('success', 'Retur penjualan berhasil disimpan dan stok telah diperbarui.');
+        return redirect()->route('sales-returns.index')->with('success', 'Retur penjualan berhasil disimpan.');
 
     } catch (\Exception $e) {
         DB::rollBack();
         return back()->with('error', 'Gagal menyimpan retur: ' . $e->getMessage())->withInput();
     }
+
 }
 
     public function show(SalesReturn $salesReturn): View
@@ -139,18 +143,14 @@ public function destroy(SalesReturn $salesReturn): RedirectResponse
 {
     DB::beginTransaction();
     try {
-        // 1. Ambil invoice asli
-        $invoice = $salesReturn->salesInvoice;
-
-        // 2. Loop melalui item retur untuk mengembalikan stok
         foreach ($salesReturn->items as $item) {
+            // Kurangi kembali stok produk
             $product = Product::find($item->product_id);
             if ($product) {
-                // Kurangi kembali stok produk
                 $product->decrement('stock_quantity', $item->quantity);
             }
 
-            // [BARU] Kurangi kembali jumlah yang sudah diretur di invoice_items
+            // Kurangi kembali jumlah yang sudah diretur di invoice_items
             $originalItem = InvoiceItem::where('invoice_id', $salesReturn->sales_invoice_id)
                                        ->where('product_id', $item->product_id)
                                        ->first();
@@ -158,31 +158,13 @@ public function destroy(SalesReturn $salesReturn): RedirectResponse
                 $originalItem->decrement('quantity_returned', $item->quantity);
             }
         }
-
-        // 3. (Opsional) Kembalikan penyesuaian pada invoice asli
-        if ($invoice) {
-            $invoice->amount_paid += $salesReturn->total_amount; // Tambah lagi jumlah terbayar
-            // Cek ulang status
-            if ($invoice->amount_paid >= $invoice->total_amount) {
-                $invoice->status = 'paid';
-            } elseif ($invoice->amount_paid > 0) {
-                $invoice->status = 'partially_paid';
-            } else {
-                $invoice->status = 'unpaid';
-            }
-            $invoice->save();
-        }
-
-        // 4. Hapus data retur
         $salesReturn->delete();
-
         DB::commit();
-
-        return redirect()->route('sales-returns.index')->with('success', 'Retur penjualan berhasil dibatalkan dan stok telah disesuaikan kembali.');
-
+        return redirect()->route('sales-returns.index')->with('success', 'Retur penjualan berhasil dibatalkan.');
     } catch (\Exception $e) {
         DB::rollBack();
         return back()->with('error', 'Gagal membatalkan retur: ' . $e->getMessage());
     }
+
 }
 }

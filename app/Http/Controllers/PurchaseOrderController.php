@@ -32,21 +32,17 @@
         $this->authorize('viewAny', PurchaseOrder::class);
         $query = PurchaseOrder::with(['supplier', 'requester'])->latest('order_date');
 
-        // Logika untuk Pencarian Umum (No. PO / Supplier)
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('po_number', 'like', "%{$search}%")
-                ->orWhereHas('supplier', function($q) use ($search) {
-                    $q->where('supplier_name', 'like', "%{$search}%");
-                });
-            });
-        }
-
-        // LOGIKA BARU: Pencarian berdasarkan No. Faktur Supplier
-        if ($request->filled('supplier_invoice_number')) {
-            $query->where('supplier_invoice_number', 'like', '%' . $request->supplier_invoice_number . '%');
-        }
+        // [DIUBAH] Logika pencarian umum sekarang mencakup 3 kolom
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function($q) use ($search) {
+            $q->where('po_number', 'like', "%{$search}%")
+              ->orWhere('supplier_invoice_number', 'like', "%{$search}%") // Ditambahkan
+              ->orWhereHas('supplier', function($q_supplier) use ($search) {
+                  $q_supplier->where('supplier_name', 'like', "%{$search}%");
+              });
+        });
+    }
 
         // LOGIKA BARU: Filter berdasarkan Tanggal Pesanan (spesifik)
         if ($request->filled('order_date')) {
