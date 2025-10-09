@@ -17,6 +17,9 @@ class PurchaseReturnController extends Controller
 {
     public function index(Request $request): View
     {
+        // [AUTH] Panggil policy untuk memeriksa permission 'view-purchase-returns'
+        $this->authorize('viewAny', PurchaseReturn::class);
+
         $query = PurchaseReturn::with(['supplier', 'purchaseOrder']);
 
         // Logika untuk Pencarian Umum
@@ -45,6 +48,10 @@ class PurchaseReturnController extends Controller
 
     public function create(): View
     {
+
+        // [AUTH] Panggil policy untuk memeriksa permission 'create-purchase-returns'
+        $this->authorize('create', PurchaseReturn::class);
+
         $purchaseOrders = PurchaseOrder::where('status', 'completed')
             ->orderBy('order_date', 'desc')
             ->get();
@@ -57,6 +64,9 @@ class PurchaseReturnController extends Controller
      */
      public function store(Request $request): RedirectResponse
     {
+        // [AUTH] Panggil policy untuk memeriksa permission 'create-purchase-returns'
+        $this->authorize('create', PurchaseReturn::class);
+
         $validated = $request->validate([
             'purchase_order_id' => 'required|exists:purchase_orders,po_id',
             'return_date' => 'required|date',
@@ -158,12 +168,18 @@ class PurchaseReturnController extends Controller
 
     public function show(PurchaseReturn $purchaseReturn)
     {
+        // [AUTH] Panggil policy untuk memeriksa permission 'view-purchase-returns'
+        $this->authorize('view', $purchaseReturn);
+
         $purchaseReturn->load(['supplier', 'purchaseOrder', 'user', 'items.product.unit']);
         return view('purchase_returns.show', compact('purchaseReturn'));
     }
 
     public function destroy(PurchaseReturn $purchaseReturn)
     {
+        // [AUTH] Panggil policy untuk memeriksa permission 'delete-purchase-returns'
+        $this->authorize('delete', $purchaseReturn);
+        
         DB::beginTransaction();
         try {
             foreach ($purchaseReturn->items as $item) {

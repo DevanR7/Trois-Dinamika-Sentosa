@@ -63,6 +63,23 @@ class RoleAndPermissionSeeder extends Seeder
         Permission::create(['name' => 'manage-users']);
         Permission::create(['name' => 'manage-roles']);
         Permission::create(['name' => 'manage-settings']); // Untuk Pajak & Satuan
+        Permission::create(['name' => 'manage-products']);
+        Permission::create(['name' => 'manage-clients']);
+        Permission::create(['name' => 'manage-suppliers']);
+        Permission::create(['name' => 'manage-purchase-orders']);
+        Permission::create(['name' => 'manage-sales-orders']);
+        Permission::create(['name' => 'manage-invoices']);
+
+        // [BARU] Permission untuk Retur Penjualan
+        Permission::create(['name' => 'view-sales-returns']);
+        Permission::create(['name' => 'create-sales-returns']);
+        Permission::create(['name' => 'delete-sales-returns']);
+
+        // [BARU] Permission untuk Retur Pembelian
+        Permission::create(['name' => 'view-purchase-returns']);
+        Permission::create(['name' => 'create-purchase-returns']);
+        Permission::create(['name' => 'delete-purchase-returns']);
+
 
         // === BUAT ROLES ===
         $adminRole = Role::create(['name' => 'admin']);
@@ -86,7 +103,7 @@ class RoleAndPermissionSeeder extends Seeder
             'view-sales-orders', 'create-sales-orders', 'edit-sales-orders', 'delete-sales-orders',
             'view-invoices', 'create-invoices', 'edit-invoices', 'delete-invoices', 'pay-invoices', // Bisa catat pembayaran invoice
             'manage-settings',
-            'view-suppliers', 'create-suppliers', 'edit-suppliers', 'delete-suppliers', // Bisa atur pajak & satuan
+            'view-suppliers', 'create-suppliers', 'edit-suppliers', 'delete-suppliers','view-purchase-returns', // Bisa atur pajak & satuan
         ]);
 
         // SALES

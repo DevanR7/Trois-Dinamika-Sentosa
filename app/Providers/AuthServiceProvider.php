@@ -16,6 +16,10 @@ use App\Models\Supplier;
 use App\Policies\SupplierPolicy;
 use App\Models\SalesInvoice;
 use App\Policies\SalesInvoicePolicy;
+use App\Models\SalesReturn;
+use App\Policies\SalesReturnPolicy;
+use App\Models\PurchaseReturn;
+use App\Policies\PurchaseReturnPolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -31,6 +35,8 @@ class AuthServiceProvider extends ServiceProvider
         Product::class => ProductPolicy::class,
         User::class => SupplierPolicy::class, 
         SalesInvoice::class => SalesInvoicePolicy::class,
+        SalesReturn::class => SalesReturnPolicy::class,
+        PurchaseReturn::class => PurchaseReturnPolicy::class,
     ];
 
     /**

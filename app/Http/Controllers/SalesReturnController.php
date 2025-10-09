@@ -16,6 +16,9 @@ class SalesReturnController extends Controller
 {
      public function index(Request $request): View
     {
+        // [AUTH] Panggil policy untuk memeriksa permission 'view-sales-returns'
+        $this->authorize('viewAny', SalesReturn::class);
+
         $query = SalesReturn::with(['client', 'salesInvoice']);
 
         // Logika untuk Pencarian Umum
@@ -44,6 +47,9 @@ class SalesReturnController extends Controller
 
     public function create(): View
     {
+        // [AUTH] Panggil policy untuk memeriksa permission 'create-sales-returns'
+        $this->authorize('create', SalesReturn::class);
+
         $invoices = SalesInvoice::whereNotIn('status', ['draft', 'cancelled'])
             ->orderBy('order_date', 'desc')
             ->get();
@@ -56,6 +62,9 @@ class SalesReturnController extends Controller
      */
     public function store(Request $request): RedirectResponse
 {
+    // [AUTH] Panggil policy untuk memeriksa permission 'create-sales-returns'
+    $this->authorize('create', SalesReturn::class);
+
     $validated = $request->validate([
         'sales_invoice_id' => 'required|exists:sales_invoices,invoice_id',
         'return_date' => 'required|date',
@@ -133,6 +142,9 @@ class SalesReturnController extends Controller
 
     public function show(SalesReturn $salesReturn): View
 {
+    // [AUTH] Panggil policy untuk memeriksa permission 'view-sales-returns'
+    $this->authorize('view', $salesReturn);
+
     // Load semua relasi yang dibutuhkan oleh view
     $salesReturn->load(['client', 'salesInvoice', 'user', 'items.product.unit']);
     
@@ -141,6 +153,13 @@ class SalesReturnController extends Controller
 
 public function destroy(SalesReturn $salesReturn): RedirectResponse
 {
+    // [AUTH] Panggil policy untuk memeriksa permission 'delete-sales-returns'
+    $this->authorize('delete', $salesReturn);
+    // Validasi agar hanya retur dengan invoice yang belum lunas atau masih ada sisa yang bisa dibatalkan
+    if ($salesReturn->salesInvoice->status === 'paid') {
+        return back()->with('error', 'Retur ini tidak bisa dibatalkan karena invoice sudah lunas.');
+    }
+    
     DB::beginTransaction();
     try {
         foreach ($salesReturn->items as $item) {

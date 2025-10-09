@@ -68,17 +68,23 @@
 @endcan
 @endif
 
+@if(Auth::user()->canany(['view-sales-returns', 'view-purchase-returns']))
 <li class="nav-heading">Retur Barang</li>
+@can('view-sales-returns')
 <li class="nav-item">
     <a class="nav-link text-white {{ request()->routeIs("sales-returns.*") ? "active" : "" }}" href="{{ route('sales-returns.index') }}">
         <i class="bi bi-box-arrow-in-down me-2"></i><span class="menu-text">Retur Penjualan</span>
     </a>
 </li>
+@endcan
+@can('view-purchase-returns')
 <li class="nav-item">
       <a class="nav-link text-white {{ request()->routeIs("purchase-returns.*") ? "active" : "" }}" href="{{ route('purchase-returns.index') }}">
         <i class="bi bi-box-arrow-up me-2"></i><span class="menu-text">Retur Pembelian</span>
     </a>
 </li>
+@endcan
+@endif
 
 @if (Auth::user()->canany(['view-clients', 'view-sales-orders', 'view-invoices']) && Auth::user()->canany(['manage-users', 'manage-roles', 'manage-settings']))
     <hr class="my-2">

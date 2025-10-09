@@ -2,130 +2,196 @@
 
 @section("content")
     <div class="container-fluid py-4">
-        <h2 class="fw-bold mb-4">Dashboard</h2>
+        {{-- HEADER DENGAN FILTER TAHUN --}}
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <h2 class="fw-bold mb-0">Dashboard</h2>
+            <form action="{{ route('dashboard') }}" method="GET" class="d-flex align-items-center gap-2">
+                <label for="year-filter" class="form-label mb-0 fw-semibold">Tahun:</label>
+                <select name="year" id="year-filter" class="form-select form-select-sm" onchange="this.form.submit()" style="width: 120px;">
+                    @forelse($availableYears as $year)
+                        <option value="{{ $year }}" @selected($selectedYear == $year)>{{ $year }}</option>
+                    @empty
+                        <option>{{ date('Y') }}</option>
+                    @endforelse
+                </select>
+            </form>
+        </div>
 
-        {{-- Baris untuk Kartu Statistik --}}
-        <div class="row g-4 mb-4">
-            <div class="col-md-4">
-                <div class="card shadow-sm h-100">
-                    <div class="card-body d-flex align-items-center">
-                        <div class="flex-shrink-0 me-3">
-                            <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px">
-                                <i class="bi bi-cash-stack fs-4"></i>
-                            </div>
-                        </div>
-                        <div>
-                            <h5 class="card-title fw-bold mb-1">Rp {{ number_format($totalRevenue, 0, ",", ".") }}</h5>
-                            <p class="card-text text-muted mb-0">Total Pendapatan</p>
-                        </div>
+        {{-- BARIS KARTU STATISTIK BARU (5 KOLOM) --}}
+        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-5 g-4 mb-4">
+            <div class="col">
+                <div class="card shadow-sm h-100 border-start border-success border-4">
+                    <div class="card-body">
+                        <div class="text-muted text-uppercase small">Total Pendapatan</div>
+                        <h4 class="fw-bold mb-0">Rp {{ number_format($totalRevenue, 0, ",", ".") }}</h4>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card shadow-sm h-100">
-                    <div class="card-body d-flex align-items-center">
-                        <div class="flex-shrink-0 me-3">
-                            <div class="bg-warning text-dark rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px">
-                                <i class="bi bi-file-earmark-text fs-4"></i>
-                            </div>
-                        </div>
-                        <div>
-                            <h5 class="card-title fw-bold mb-1">{{ $unpaidInvoicesCount }}</h5>
-                            <p class="card-text text-muted mb-0">Invoice Belum Lunas</p>
-                        </div>
+            <div class="col">
+                <div class="card shadow-sm h-100 border-start border-danger border-4">
+                    <div class="card-body">
+                        <div class="text-muted text-uppercase small">Total Piutang</div>
+                        <h4 class="fw-bold mb-0">Rp {{ number_format($totalPiutang, 0, ",", ".") }}</h4>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card shadow-sm h-100">
-                    <div class="card-body d-flex align-items-center">
-                        <div class="flex-shrink-0 me-3">
-                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px">
-                                <i class="bi bi-box-seam fs-4"></i>
-                            </div>
-                        </div>
-                        <div>
-                            <h5 class="card-title fw-bold mb-1">{{ $productCount }}</h5>
-                            <p class="card-text text-muted mb-0">Total Jenis Produk</p>
-                        </div>
+            <div class="col">
+                <div class="card shadow-sm h-100 border-start border-warning border-4">
+                    <div class="card-body">
+                        <div class="text-muted text-uppercase small">Total Utang</div>
+                        <h4 class="fw-bold mb-0">Rp {{ number_format($totalHutang, 0, ",", ".") }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card shadow-sm h-100 border-start border-info border-4">
+                    <div class="card-body">
+                        <div class="text-muted text-uppercase small">Retur Penjualan</div>
+                        <h4 class="fw-bold mb-0">Rp {{ number_format($totalSalesReturn, 0, ",", ".") }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card shadow-sm h-100 border-start border-secondary border-4">
+                    <div class="card-body">
+                        <div class="text-muted text-uppercase small">Retur Pembelian</div>
+                        <h4 class="fw-bold mb-0">Rp {{ number_format($totalPurchaseReturn, 0, ",", ".") }}</h4>
                     </div>
                 </div>
             </div>
         </div>
 
-        {{-- Baris untuk Grafik dan Stok Menipis --}}
+        {{-- GRAFIK UTAMA INTERAKTIF --}}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0 fw-semibold">Analisis Keuangan (Tahun {{ $selectedYear }})</h5>
+                <div class="btn-group btn-group-sm" role="group">
+                    <input type="radio" class="btn-check" name="chartType" id="switchToLine" autocomplete="off" checked>
+                    <label class="btn btn-outline-primary" for="switchToLine">Line</label>
+
+                    <input type="radio" class="btn-check" name="chartType" id="switchToBar" autocomplete="off">
+                    <label class="btn btn-outline-primary" for="switchToBar">Bar</label>
+                </div>
+            </div>
+            <div class="card-body">
+                <div style="height: 350px;">
+                    <canvas id="mainFinancialChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        {{-- GRAFIK PRODUK & STOK --}}
         <div class="row g-4 mb-4">
-            <div class="col-lg-8">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white">
-                        <h5 class="mb-0 fw-semibold">Grafik Pendapatan (Tahun Ini)</h5>
-                    </div>
-                    <div class="card-body">
-                        <canvas id="revenueChart"></canvas>
+            <div class="col-lg-7">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white"><h5 class="mb-0 fw-semibold">5 Produk Terlaris (Tahun {{ $selectedYear }})</h5></div>
+                    <div class="card-body d-flex align-items-center justify-content-center">
+                        <div style="position: relative; height:300px; width:100%">
+                             <canvas id="topProductsChart"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-lg-4">
+            <div class="col-lg-5">
                 <div class="card shadow-sm h-100">
-                    <div class="card-header bg-white">
-                        <h5 class="mb-0 fw-semibold">Produk Stok Menipis (&lt;10)</h5>
-                    </div>
+                    <div class="card-header bg-white"><h5 class="mb-0 fw-semibold">Produk Stok Menipis (&le;10)</h5></div>
                     <div class="card-body">
                         <ul class="list-group list-group-flush">
                             @forelse ($lowStockProducts as $product)
                                 <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                                    {{ $product->product_name }}
+                                    <a href="{{ route('products.edit', $product->product_id) }}" class="text-decoration-none">{{ $product->product_name }}</a>
                                     <span class="badge bg-danger rounded-pill">{{ $product->stock_quantity }}</span>
                                 </li>
                             @empty
-                                <li class="list-group-item px-0">Semua stok produk aman.</li>
+                                <li class="list-group-item px-0 text-center text-muted">Semua stok produk aman.</li>
                             @endforelse
                         </ul>
                     </div>
                 </div>
             </div>
         </div>
-
-        {{-- Tabel Invoice Terbaru --}}
+        
+        {{-- KINERJA PENJUALAN DENGAN FILTER UNIVERSAL --}}
         <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0 fw-semibold">Pesanan Penjualan Terbaru (Tahun {{ $selectedYear }})</h5>
+                <form action="{{ route('dashboard') }}" method="GET">
+                    <input type="hidden" name="year" value="{{ $selectedYear }}">
+                    <div class="input-group">
+                        <select name="sales_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                            <option value="">-- Semua User --</option>
+                            @foreach($filterableUsers as $role => $users)
+                                <optgroup label="{{ $role }}">
+                                    @foreach($users as $user)
+                                        <option value="{{ $user->user_id }}" @selected($selectedSalesId == $user->user_id)>{{ $user->full_name }}</option>
+                                    @endforeach
+                                </optgroup>
+                            @endforeach
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead><tr class="table-light"><th>No. Pesanan</th><th>Klien</th><th>Sales</th><th>Tanggal</th><th class="text-center">Status</th><th class="text-end">Jumlah</th></tr></thead>
+                        <tbody>
+                            @forelse ($latestSalesOrders as $order)
+                                <tr>
+                                    <td><a href="{{ route('sales-orders.show', $order->order_id) }}">{{ $order->order_number }}</a></td>
+                                    <td>{{ $order->client->client_name ?? "N/A" }}</td>
+                                    <td>{{ $order->sales->full_name ?? "N/A" }}</td>
+                                    <td>{{ optional($order->order_date)->format("d M Y") }}</td>
+                                    <td class="text-center"><span class="badge bg-secondary">{{ Str::title($order->status) }}</span></td>
+                                    <td class="text-end">Rp {{ number_format($order->total_amount, 0, ",", ".") }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="6" class="text-center text-muted">Belum ada pesanan penjualan.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+  <div class="card shadow-sm">
             <div class="card-header bg-white">
-                <h5 class="mb-0 fw-semibold">Invoice Terbaru</h5>
+                <h5 class="mb-0 fw-semibold">Invoice Berjalan (Belum Lunas)</h5>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead>
                             <tr class="table-light">
-                                <th>Nomor Invoice</th>
+                                <th>No. Invoice</th>
                                 <th>Klien</th>
-                                <th>Tanggal</th>
+                                <th>Jatuh Tempo</th>
                                 <th class="text-center">Status</th>
-                                <th class="text-end">Jumlah</th>
+                                <th class="text-end">Sisa Tagihan</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse ($latestInvoices as $invoice)
+                            @forelse ($latestRunningInvoices as $invoice)
+                                @php
+                                    $sisaTagihan = $invoice->total_amount - $invoice->amount_paid - $invoice->returns->sum('total_amount');
+                                @endphp
                                 <tr>
-                                    <td class="fw-semibold">
-                                        <a href="{{ route('invoices.show', $invoice->invoice_id) }}">{{ $invoice->invoice_number }}</a>
-                                    </td>
+                                    <td><a href="{{ route('invoices.show', $invoice->invoice_id) }}">{{ $invoice->invoice_number }}</a></td>
                                     <td>{{ $invoice->client->client_name ?? "N/A" }}</td>
-                                    {{-- PERBAIKAN: Menggunakan order_date dan optional() --}}
-                                    <td>{{ optional($invoice->order_date)->format("d M Y") }}</td>
+                                    <td class="{{ optional($invoice->due_date)->isPast() ? 'text-danger fw-bold' : '' }}">
+                                        {{ optional($invoice->due_date)->format("d M Y") }}
+                                    </td>
                                     <td class="text-center">
-                                        {{-- PERBAIKAN: Logika status yang lebih lengkap --}}
-                                        @if($invoice->status == 'paid') <span class="badge bg-success">Lunas</span>
-                                        @elseif($invoice->status == 'partially_paid') <span class="badge bg-info text-dark">Cicil</span>
-                                        @elseif($invoice->status == 'cancelled') <span class="badge bg-dark">Dibatalkan</span>
-                                        @else <span class="badge bg-warning text-dark">Belum Lunas</span>
+                                        @if($invoice->status == 'partially_paid')
+                                            <span class="badge bg-info text-dark">Cicil</span>
+                                        @else
+                                            <span class="badge bg-warning text-dark">Belum Lunas</span>
                                         @endif
                                     </td>
-                                    <td class="text-end">Rp {{ number_format($invoice->total_amount, 0, ",", ".") }}</td>
+                                    <td class="text-end fw-bold text-danger">
+                                        Rp {{ number_format($sisaTagihan, 0, ",", ".") }}
+                                    </td>
                                 </tr>
                             @empty
-                                <tr>
-                                    <td colspan="5" class="text-center">Belum ada invoice.</td>
-                                </tr>
+                                <tr><td colspan="5" class="text-center text-muted">Tidak ada invoice yang sedang berjalan.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -136,44 +202,70 @@
 @endsection
 
 @push("scripts")
-    {{-- Library untuk Grafik --}}
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // Ambil data dari controller
-        const salesData = @json($salesData);
+        document.addEventListener('DOMContentLoaded', function() {
+            const formatRupiah = (value) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
+            const mainChartData = @json($mainChartData);
+            const topProductsData = @json($topProductsChartData);
 
-        // Proses data untuk Chart.js (tidak berubah, sudah benar)
-        const chartLabels = salesData.map((item) => item.month);
-        const chartValues = salesData.map((item) => item.total_sales);
-
-        const ctx = document.getElementById('revenueChart');
-
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: chartLabels,
-                datasets: [
-                    {
-                        label: 'Total Pendapatan',
-                        data: chartValues,
-                        backgroundColor: 'rgba(23, 162, 184, 0.2)', // Warna info
-                        borderColor: 'rgba(23, 162, 184, 1)',
-                        borderWidth: 1,
-                    },
-                ],
-            },
-            options: {
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function (value, index, values) {
-                                return ('Rp ' + new Intl.NumberFormat('id-ID').format(value));
-                            },
-                        },
-                    },
+            // --- GRAFIK UTAMA (KEUANGAN) ---
+            const ctxMain = document.getElementById('mainFinancialChart');
+            const mainChart = new Chart(ctxMain, {
+                type: 'line',
+                data: {
+                    labels: mainChartData.labels,
+                    datasets: [
+                        { label: 'Penjualan', data: mainChartData.penjualan, borderColor: '#0d6efd', backgroundColor: 'rgba(13, 110, 253, 0.1)', tension: 0.3, fill: true, hidden: false },
+                        { label: 'Pembelian', data: mainChartData.pembelian, borderColor: '#ffc107', backgroundColor: 'rgba(255, 193, 7, 0.1)', tension: 0.3, fill: true, hidden: false },
+                        { label: 'Pendapatan', data: mainChartData.pendapatan, borderColor: '#198754', backgroundColor: 'rgba(25, 135, 84, 0.1)', tension: 0.3, fill: true, hidden: false }
+                    ]
                 },
-            },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, ticks: { callback: (value) => formatRupiah(value) } } },
+                    plugins: { 
+                        legend: { 
+                            position: 'top',
+                            onClick: (e, legendItem, legend) => {
+                                const index = legendItem.datasetIndex;
+                                const ci = legend.chart;
+                                const meta = ci.getDatasetMeta(index);
+                                meta.hidden = !meta.hidden;
+                                ci.update();
+                            }
+                        }, 
+                        tooltip: { callbacks: { label: (context) => `${context.dataset.label}: ${formatRupiah(context.raw)}` } } 
+                    }
+                }
+            });
+            document.getElementById('switchToBar').addEventListener('click', () => { mainChart.config.type = 'bar'; mainChart.update(); });
+            document.getElementById('switchToLine').addEventListener('click', () => { mainChart.config.type = 'line'; mainChart.update(); });
+            
+            // --- GRAFIK PRODUK TERLARIS (PIE) ---
+            const ctxTopProducts = document.getElementById('topProductsChart');
+            if (topProductsData.data.length > 0) {
+                new Chart(ctxTopProducts, {
+                    type: 'pie',
+                    data: {
+                        labels: topProductsData.labels,
+                        datasets: [{
+                            label: 'Jumlah Terjual',
+                            data: topProductsData.data,
+                            backgroundColor: ['#0d6efd', '#6c757d', '#198754', '#ffc107', '#dc3545'],
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom' } }
+                    }
+                });
+            } else {
+                 ctxTopProducts.parentElement.innerHTML = '<div class="text-center text-muted">Tidak ada data penjualan produk untuk ditampilkan.</div>';
+            }
         });
     </script>
 @endpush
