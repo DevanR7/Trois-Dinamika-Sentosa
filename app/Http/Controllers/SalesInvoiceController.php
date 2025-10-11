@@ -13,8 +13,9 @@ use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\Facade\Pdf; 
 use App\Models\User;
+
 
 class SalesInvoiceController extends Controller
 {
@@ -391,15 +392,27 @@ class SalesInvoiceController extends Controller
 }
 
 public function downloadPDF(SalesInvoice $invoice)
-    {
-        $this->authorize('view', $invoice);
-        // Pastikan semua relasi yang dibutuhkan sudah ter-load
-        $invoice->load(['client', 'items.product', 'taxes']);
+{
+    // Otorisasi, pastikan user boleh melihat invoice ini
+    $this->authorize('view', $invoice);
 
-        // Render view ke dalam PDF
-        $pdf = Pdf::loadView('invoices.pdf_template', compact('invoice'));
+    // Load semua relasi yang dibutuhkan oleh template PDF
+    $invoice->load(['client', 'items.product.unit', 'taxes', 'sales']);
 
-        // Download file PDF dengan nama yang dinamis
-        return $pdf->download('invoice-' . $invoice->invoice_number . '.pdf');
-    }
+    // [PERBAIKAN 1] Tentukan ukuran kertas faktur kustom (9.5" x 5.5")
+    $paperSize = [0, 0, 684, 396];
+
+    // Render view ke dalam PDF
+    $pdf = Pdf::loadView('invoices.pdf_template', compact('invoice'));
+    
+    // Terapkan ukuran kertas kustom
+    $pdf->setPaper($paperSize);
+
+    // [PERBAIKAN 2] Ganti karakter '/' dengan '-' agar nama file valid
+    $cleanInvoiceNumber = str_replace('/', '-', $invoice->invoice_number);
+    $fileName = 'Invoice-' . $cleanInvoiceNumber . '.pdf';
+
+    // Download file PDF dengan nama yang sudah bersih
+    return $pdf->download($fileName);
+}
 }
