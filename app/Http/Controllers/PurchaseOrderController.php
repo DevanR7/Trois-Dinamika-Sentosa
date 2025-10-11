@@ -15,8 +15,6 @@
     use Illuminate\View\View;
     use Illuminate\Http\RedirectResponse;
     use Barryvdh\DomPDF\Facade\Pdf;
-    use Maatwebsite\Excel\Facades\Excel;
-    use App\Exports\PurchaseOrderExport;
     use Illuminate\Support\Facades\Gate;
 
     class PurchaseOrderController extends Controller
@@ -410,21 +408,20 @@
                         ->with('success', 'Pesanan berhasil ditandai LUNAS.');
     }
     public function downloadPDF(PurchaseOrder $purchaseOrder)
-    {
-        $this->authorize('view', $purchaseOrder);
-        $purchaseOrder->load(['supplier', 'items.product.unit', 'tax']);
+{
+    $this->authorize('view', $purchaseOrder);
+    $purchaseOrder->load(['supplier', 'items.product.unit', 'items.discounts', 'tax']);
 
-        // ✅ PERBARUI UKURAN KERTAS DI SINI
-        // Ukuran kertas faktur kustom (setengah halaman)
-        $paperSize = [0, 0, 684, 396]; // Lebar 9.5", Tinggi 5.5"
+    // [PERBAIKAN] Mengubah ukuran kertas menjadi 9.5" x 5.5"
+    $paperSize = [0, 0, 684, 396]; 
 
-        $pdf = Pdf::loadView('purchase_orders.pdf_template', compact('purchaseOrder'));
-        
-        $pdf->setPaper($paperSize);
+    $pdf = Pdf::loadView('purchase_orders.pdf_template', compact('purchaseOrder'));
+    
+    $pdf->setPaper($paperSize);
 
-        $fileName = 'PO_' . str_replace('/', '-', $purchaseOrder->po_number) . '.pdf';
-        return $pdf->download($fileName);
-    }
+    $fileName = 'PO_' . str_replace('/', '-', $purchaseOrder->po_number) . '.pdf';
+    return $pdf->download($fileName);
+}
 
     public function addSupplierInvoice(Request $request, PurchaseOrder $purchaseOrder)
     {
@@ -440,20 +437,4 @@
         return back()->with('success', 'Nomor Faktur Supplier berhasil disimpan.');
     }
 
-    public function exportExcel($id)
-    {
-        $this->authorize('view', PurchaseOrder::class);
-        $purchaseOrder = PurchaseOrder::with(['supplier', 'items.product', 'items.discounts', 'tax'])
-            ->findOrFail($id);
-        
-        // Prioritaskan nomor faktur supplier, fallback ke PO number
-        $invoiceNumber = $purchaseOrder->supplier_invoice_number ?? $purchaseOrder->po_number;
-        
-        // Bersihkan karakter yang tidak diizinkan
-        $cleanInvoiceNumber = preg_replace('/[\/\\\:*?"<>|]/', '-', $invoiceNumber);
-        
-        $fileName = "faktur-{$cleanInvoiceNumber}.xlsx";
-        
-        return Excel::download(new PurchaseOrderExport($purchaseOrder), $fileName);
-    }
-    }
+}

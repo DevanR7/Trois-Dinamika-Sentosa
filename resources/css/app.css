@@ -1,3 +1,5 @@
+/* resources/css/app.css */
+
 body {
     font-family: 'Poppins', sans-serif;
     background-color: #f8f9fa;
@@ -5,31 +7,35 @@ body {
 
 /* --- Wrapper Konten Utama --- */
 .main-wrapper {
-    padding-top: 56px; /* jaga jarak dari navbar di mobile */
+    /* Padding atas untuk memberi ruang di bawah navbar/header di mobile */
+    padding-top: 1rem; 
 }
 
-/* --- Aturan untuk DESKTOP (Layar >= 992px) --- */
+/* --- Aturan untuk DESKTOP (Layar besar, >= 992px) --- */
 @media (min-width: 992px) {
     .main-wrapper {
-        margin-left: 250px;
-        padding-top: 0; /* hilangkan padding-top di desktop */
+        /* Memberi ruang di kiri untuk sidebar */
+        margin-left: 280px; 
+        padding-top: 0;
     }
     .sidebar {
+        /* Membuat sidebar menempel di kiri layar */
         position: fixed;
         top: 0;
         left: 0;
         height: 100vh;
-        width: 250px;
-        display: flex !important;
+        width: 280px;
+        /* Memastikan sidebar selalu terlihat di desktop */
         transform: none !important;
         visibility: visible !important;
     }
     .sidebar .offcanvas-header {
+        /* Sembunyikan header offcanvas (tombol close) di desktop */
         display: none;
     }
 }
 
-/* --- Style Floating Menu (Mobile) --- */
+/* --- Tombol Menu Melayang (Mobile) --- */
 .floating-menu-btn {
     position: fixed;
     bottom: 20px;
@@ -41,11 +47,11 @@ body {
     z-index: 1040;
 }
 
-/* --- Style Sidebar --- */
+/* --- Style Sidebar (Warna, Link, dll.) --- */
 .sidebar {
     background: #111827 !important; 
     color: white;
-    overflow-y: auto;
+    overflow-y: auto; /* Memungkinkan menu di-scroll jika panjang */
 }
 .sidebar .nav-link { 
     color: #adb5bd; 
@@ -60,7 +66,7 @@ body {
     font-weight: 500; 
 }
 
-/* --- Style Section Header di Sidebar --- */
+/* --- Style Judul Seksi di Sidebar --- */
 .nav-heading {
     font-size: 0.75rem;
     font-weight: 600;
@@ -74,6 +80,6 @@ body {
     margin-top: 0;
 }
 
-/* --- Style Umum --- */
+/* --- Style Umum Lainnya --- */
 .main-content { padding: 1.5rem; }
 .card { border: none; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border-radius: 12px; }

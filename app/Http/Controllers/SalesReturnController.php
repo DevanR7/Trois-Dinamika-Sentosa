@@ -21,24 +21,24 @@ class SalesReturnController extends Controller
 
         $query = SalesReturn::with(['client', 'salesInvoice']);
 
-        // Logika untuk Pencarian Umum
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('return_number', 'like', "%{$search}%")
-                  ->orWhereHas('client', function($q_client) use ($search) {
-                      $q_client->where('client_name', 'like', "%{$search}%");
-                  })
-                  ->orWhereHas('salesInvoice', function($q_invoice) use ($search) {
-                      $q_invoice->where('invoice_number', 'like', "%{$search}%");
-                  });
-            });
-        }
+        // Logika untuk Pencarian Umum (No. Retur / Klien / No. Invoice)
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function($q) use ($search) {
+            $q->where('return_number', 'like', "%{$search}%")
+              ->orWhereHas('client', function($q_client) use ($search) {
+                  $q_client->where('client_name', 'like', "%{$search}%");
+              })
+              ->orWhereHas('salesInvoice', function($q_invoice) use ($search) {
+                  $q_invoice->where('invoice_number', 'like', "%{$search}%");
+              });
+        });
+    }
 
-        // Logika untuk Filter Tanggal
-        if ($request->filled('return_date')) {
-            $query->whereDate('return_date', $request->return_date);
-        }
+    // Logika untuk Filter Tanggal
+    if ($request->filled('return_date')) {
+        $query->whereDate('return_date', $request->return_date);
+    }
 
         $salesReturns = $query->latest('return_date')->paginate(15)->appends($request->query());
             

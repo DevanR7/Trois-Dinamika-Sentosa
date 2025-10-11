@@ -120,3 +120,11 @@
 </li>
 @endcan
 @endif
+
+@can("manage-settings")
+<li class="nav-item">
+    <a class="nav-link text-white {{ request()->routeIs("settings.*") ? "active" : "" }}" href="{{ route("settings.index") }}">
+        <i class="bi bi-building-gear me-2"></i><span class="menu-text">Pengaturan Perusahaan</span>
+    </a>
+</li>
+@endcan

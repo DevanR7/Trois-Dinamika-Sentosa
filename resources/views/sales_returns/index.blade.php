@@ -9,6 +9,28 @@
         </a>
     </div>
 
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form action="{{ route('sales-returns.index') }}" method="GET">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-6">
+                        <input type="text" name="search" class="form-control" placeholder="Cari No. Retur / Klien / No. Invoice..." value="{{ request('search') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <div class="input-group">
+                            <span class="input-group-text" style="font-size: 0.8rem;">Tgl. Retur:</span>
+                            <input type="date" name="return_date" class="form-control" value="{{ request('return_date') }}">
+                        </div>
+                    </div>
+                    <div class="col-md-2 d-flex gap-2">
+                        <button type="submit" class="btn btn-dark w-100" title="Filter"><i class="bi bi-funnel-fill"></i> Filter</button>
+                        <a href="{{ route('sales-returns.index') }}" class="btn btn-outline-secondary w-100" title="Reset Filter"><i class="bi bi-arrow-clockwise"></i></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
     @if (session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
     
     <div class="card shadow-sm border-0">

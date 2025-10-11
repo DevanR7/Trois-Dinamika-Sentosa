@@ -18,6 +18,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\SalesReturnController;
 use App\Http\Controllers\PurchaseReturnController;
+use App\Http\Controllers\SettingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -61,10 +62,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/purchase-orders/{purchaseOrder}/mark-as-paid', [PurchaseOrderController::class, 'markAsPaid'])->name('purchase-orders.markAsPaid');
     Route::post('/purchase-orders/{purchaseOrder}/payments', [PurchaseOrderPaymentController::class, 'store'])->name('purchase-orders.payments.store');
     Route::post('/purchase-orders/{purchaseOrder}/add-supplier-invoice', [PurchaseOrderController::class, 'addSupplierInvoice'])->name('purchase-orders.addSupplierInvoice');
-    Route::get('/purchase-orders/{purchaseOrder}/download-pdf', [PurchaseOrderController::class, 'downloadPDF'])->name('purchase-orders.pdf');
+    Route::get('/purchase-orders/{purchaseOrder}/download-pdf', [PurchaseOrderController::class, 'downloadPDF'])->name('purchase-orders.pdf');    
     
     // Parameter {id} diganti menjadi {purchaseOrder}
-    Route::get('/purchase-orders/{purchaseOrder}/export-excel', [PurchaseOrderController::class, 'exportExcel'])->name('purchase-orders.exportExcel');
+    // Route::get('/purchase-orders/{purchaseOrder}/export-excel', [PurchaseOrderController::class, 'exportExcel'])->name('purchase-orders.exportExcel');
     Route::resource('clients', ClientController::class);
 
     Route::resource('units', UnitController::class)->except(['show']);
@@ -73,6 +74,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     Route::resource('sales-returns', SalesReturnController::class);
     Route::resource('purchase-returns', PurchaseReturnController::class);
+    Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
+    Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
     
 });
 

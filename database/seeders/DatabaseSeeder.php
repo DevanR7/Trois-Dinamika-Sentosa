@@ -41,7 +41,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             // Panggil RoleAndPermissionSeeder SEBELUM UserSeeder
             RoleAndPermissionSeeder::class, 
-            
+            SettingSeeder::class,
             UserSeeder::class,
             SupplierSeeder::class, 
             ClientSeeder::class,   

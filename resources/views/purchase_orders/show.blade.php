@@ -27,8 +27,7 @@
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li><a class="dropdown-item" href="{{ route('purchase-orders.edit', $purchaseOrder->po_id) }}"><i class="bi bi-pencil-square me-2"></i> Edit Pesanan</a></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="{{ route('purchase-orders.pdf', $purchaseOrder->po_id) }}"><i class="bi bi-file-earmark-pdf me-2"></i> Download PDF</a></li>
-                    <li><a class="dropdown-item" href="{{ route('purchase-orders.exportExcel', $purchaseOrder->po_id) }}"><i class="bi bi-file-earmark-excel me-2"></i> Export Excel</a></li>
+                    <li><a class="dropdown-item" href="{{ route('purchase-orders.pdf', $purchaseOrder->po_id) }}"><i class="bi bi-file-earmark-pdf me-2"></i> Download PDF</a></li> 
                     @can('cancel', $purchaseOrder)
                         @if(in_array($purchaseOrder->status, ['draft', 'ordered']))
                             <li><hr class="dropdown-divider"></li>
