@@ -66,7 +66,7 @@
                 <table class="table table-bordered align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th>#</th>
+                            <th>N</th>
                             <th>Produk</th>
                             <th class="text-center">Kuantitas</th>
                             <th class="text-end">Harga Satuan</th>
