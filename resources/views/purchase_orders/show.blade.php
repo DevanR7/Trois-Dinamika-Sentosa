@@ -25,7 +25,13 @@
             <div class="btn-group">
                 <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-gear"></i> Opsi</button>
                 <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" href="{{ route('purchase-orders.edit', $purchaseOrder->po_id) }}"><i class="bi bi-pencil-square me-2"></i> Edit Pesanan</a></li>
+                    @if (in_array($purchaseOrder->status, ['draft', 'ordered']))
+        <li>
+            <a class="dropdown-item" href="{{ route('purchase-orders.edit', $purchaseOrder->po_id) }}">
+                <i class="bi bi-pencil-square me-2"></i> Edit Pesanan
+            </a>
+        </li>
+        @endif
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" href="{{ route('purchase-orders.pdf', $purchaseOrder->po_id) }}"><i class="bi bi-file-earmark-pdf me-2"></i> Download PDF</a></li> 
                     @can('cancel', $purchaseOrder)

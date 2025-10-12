@@ -36,9 +36,15 @@ class PurchaseOrderPolicy
      * Tentukan apakah user bisa mengedit pesanan pembelian.
      */
     public function update(User $user, PurchaseOrder $purchaseOrder): bool
-    {
-        return $user->can('edit-purchase-orders');
+{
+    // [PERBAIKAN] Tambahkan pengecekan status di sini
+    // Hanya izinkan edit jika statusnya adalah 'draft' atau 'ordered'
+    if (!in_array($purchaseOrder->status, ['draft', 'ordered'])) {
+        return false;
     }
+
+    return $user->can('edit-purchase-orders');
+}
 
     /**
      * Tentukan apakah user bisa menghapus pesanan pembelian.
