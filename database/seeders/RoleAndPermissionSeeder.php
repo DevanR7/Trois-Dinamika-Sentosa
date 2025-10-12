@@ -70,6 +70,9 @@ class RoleAndPermissionSeeder extends Seeder
         Permission::create(['name' => 'manage-sales-orders']);
         Permission::create(['name' => 'manage-invoices']);
 
+        // [BARU] Permission untuk Laporan
+        Permission::create(['name' => 'view-reports']);
+
         // [BARU] Permission untuk Retur Penjualan
         Permission::create(['name' => 'view-sales-returns']);
         Permission::create(['name' => 'create-sales-returns']);

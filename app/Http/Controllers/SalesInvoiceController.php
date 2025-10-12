@@ -27,7 +27,7 @@ class SalesInvoiceController extends Controller
     public function index(Request $request): View
 {
     $this->authorize('viewAny', SalesInvoice::class);
-    $query = SalesInvoice::with('client', 'sales');
+    $query = SalesInvoice::with(['client', 'sales', 'returns']);
 
      // Filter pencarian
     if ($request->filled('search')) {

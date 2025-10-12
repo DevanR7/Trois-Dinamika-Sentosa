@@ -19,6 +19,7 @@ use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\SalesReturnController;
 use App\Http\Controllers\PurchaseReturnController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\ReportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -77,6 +78,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
     Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
     
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 });
 
 require __DIR__.'/auth.php';
