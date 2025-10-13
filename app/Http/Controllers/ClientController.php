@@ -9,6 +9,7 @@ use Illuminate\View\View;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules;
+use Illuminate\Validation\Rules\Password;
 
 class ClientController extends Controller
 {
@@ -82,4 +83,10 @@ class ClientController extends Controller
         $client->delete();
         return redirect()->route('clients.index')->with('success', 'Klien berhasil dihapus.');
     }
+
+    public function approve(Client $client): RedirectResponse
+{
+    $client->update(['is_approved' => true]);
+    return back()->with('success', 'Akun klien ' . $client->client_name . ' telah disetujui.');
+}
 }

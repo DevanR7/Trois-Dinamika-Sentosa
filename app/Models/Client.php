@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\SoftDeletes; // <-- Tambahkan ini
             'person_in_charge',
             'address',
             'phone_number',
+            'is_approved',
         ];
 
         /**
@@ -41,6 +42,7 @@ use Illuminate\Database\Eloquent\SoftDeletes; // <-- Tambahkan ini
         protected $casts = [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_approved' => 'boolean',
         ];
 
         /**

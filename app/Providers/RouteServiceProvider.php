@@ -28,8 +28,6 @@ class RouteServiceProvider extends ServiceProvider
 
             // PASTIKAN BLOK INI ADA DAN BENAR
             Route::middleware('web')
-                ->prefix('client')
-                ->as('client.')
                 ->group(base_path('routes/client.php'));
         });
     }

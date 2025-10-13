@@ -15,12 +15,20 @@ class RedirectIfAuthenticated
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
-    public function handle(Request $request, Closure $next, string ...$guards): Response
+     public function handle(Request $request, Closure $next, string ...$guards): Response
     {
         $guards = empty($guards) ? [null] : $guards;
 
         foreach ($guards as $guard) {
             if (Auth::guard($guard)->check()) {
+                // --- INI ADALAH LOGIKA BARU YANG PENTING ---
+                
+                // Jika yang sudah login adalah 'client', arahkan ke dashboard klien.
+                if ($guard === 'client') {
+                    return redirect()->route('client.dashboard');
+                }
+
+                // Jika tidak (guard adalah 'web' atau null), arahkan ke dashboard utama.
                 return redirect(RouteServiceProvider::HOME);
             }
         }

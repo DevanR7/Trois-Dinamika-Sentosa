@@ -5,53 +5,91 @@ namespace App\Http\Controllers\Client\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Laravel\Socialite\Facades\Socialite;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Laravel\Socialite\Facades\Socialite;
+use Exception;
 
 class ClientGoogleController extends Controller
 {
     /**
-     * Redirect ke halaman autentikasi Google.
+     * Redirect user ke halaman login Google (untuk portal klien).
      */
-    public function redirectToGoogle(): RedirectResponse
+    public function redirectToGoogle(Request $request): RedirectResponse
     {
-        // Ambil konfigurasi dari config/services.php
-        $config = config('services.google_client');
-        
-        // Buat provider Google dengan konfigurasi kustom
-        return Socialite::buildProvider(\Laravel\Socialite\Two\GoogleProvider::class, $config)
-            ->redirect();
+        try {
+            // Bersihkan sesi lama untuk mencegah error CSRF / invalid state
+            session()->forget('state');
+            session()->forget('code_verifier');
+
+            // Ambil konfigurasi client Google untuk klien
+            $config = config('services.google_client');
+
+            $google = Socialite::buildProvider(\Laravel\Socialite\Two\GoogleProvider::class, $config);
+
+            // Jika ingin memaksa pemilihan akun
+            if ($request->get('prompt') === 'select_account') {
+                $google->with(['prompt' => 'select_account']);
+            }
+
+            return $google->redirect();
+
+        } catch (Exception $e) {
+            Log::error('Google redirect error (client)', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return redirect()->route('client.login')->with('error', 'Gagal menghubungkan ke Google. Silakan coba lagi.');
+        }
     }
 
     /**
-     * Menangani callback dari Google.
+     * Tangani callback dari Google setelah user login.
      */
     public function handleGoogleCallback(): RedirectResponse
     {
         try {
-            // Ambil konfigurasi
+            // Gunakan konfigurasi client Google khusus klien
             $config = config('services.google_client');
-            
-            // Ambil data user dari Google menggunakan konfigurasi kustom
-            $googleUser = Socialite::buildProvider(\Laravel\Socialite\Two\GoogleProvider::class, $config)
-                ->user();
+            $google = Socialite::buildProvider(\Laravel\Socialite\Two\GoogleProvider::class, $config);
 
-            $client = Client::updateOrCreate(
-                ['google_id' => $googleUser->id],
-                [
-                    'client_name' => $googleUser->name,
-                    'email' => $googleUser->email,
-                    'password' => Hash::make(uniqid()),
-                ]
-            );
+            $googleUser = $google->user();
 
-            Auth::guard('client')->login($client);
+            // Cari client berdasarkan email
+            $client = Client::where('email', $googleUser->getEmail())->first();
 
+            // Jika belum ada, buat user baru (belum disetujui admin)
+            if (!$client) {
+                $client = Client::create([
+                    'client_name' => $googleUser->getName(),
+                    'email' => $googleUser->getEmail(),
+                    'google_id' => $googleUser->getId(),
+                    'password' => bcrypt(Str::random(12)),
+                    'is_approved' => false, // Belum disetujui admin
+                ]);
+            }
+
+            // Jika akun belum disetujui
+            if (!$client->is_approved) {
+                return redirect()->route('client.login')
+                    ->with('error', 'Akun Anda sedang dalam proses verifikasi admin.');
+            }
+
+            // Jika sudah disetujui, login dan arahkan ke dashboard
+            Auth::guard('client')->login($client, true);
             return redirect()->intended(route('client.dashboard'));
 
-        } catch (\Exception $e) {
-            return redirect()->route('client.login')->with('error', 'Login dengan Google gagal: ' . $e->getMessage());
+        } catch (Exception $e) {
+            Log::error('Google login error (client)', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return redirect()->route('client.login')
+                ->with('error', 'Terjadi kesalahan saat login menggunakan Google. Silakan coba lagi.');
         }
     }
 }
