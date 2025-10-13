@@ -1,4 +1,6 @@
-<x-guest-layout>
+@extends('layouts.guest')
+
+@section('content')
     <form method="POST" action="{{ route("login") }}">
         @csrf
 
@@ -17,7 +19,6 @@
                 {{ session('error') }}
             </div>
         @endif
-
 
         <div class="mb-3">
             <label for="username" class="form-label">{{ __("Username") }}</label>
@@ -56,9 +57,6 @@
             </button>
         </div>
 
-        {{-- =================================== --}}
-        {{-- BAGIAN BARU: Tombol Login Google --}}
-        {{-- =================================== --}}
         <div class="d-flex align-items-center my-4">
             <hr class="flex-grow-1">
             <span class="px-3 text-muted">ATAU</span>
@@ -72,18 +70,21 @@
             </a>
         </div>
     </form>
-</x-guest-layout>
+@endsection
 
-{{-- Script untuk toggle password (tidak berubah) --}}
+@push('scripts')
 <script>
-    const togglePassword = document.querySelector('#togglePassword');
-    const password = document.querySelector('#password');
-    const icon = togglePassword.querySelector('i');
+    document.addEventListener('DOMContentLoaded', function() {
+        const togglePassword = document.querySelector('#togglePassword');
+        const password = document.querySelector('#password');
+        const icon = togglePassword.querySelector('i');
 
-    togglePassword.addEventListener('click', function () {
-        const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
-        password.setAttribute('type', type);
-        icon.classList.toggle('bi-eye-slash-fill');
-        icon.classList.toggle('bi-eye-fill');
+        togglePassword.addEventListener('click', function () {
+            const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+            password.setAttribute('type', type);
+            icon.classList.toggle('bi-eye-slash-fill');
+            icon.classList.toggle('bi-eye-fill');
+        });
     });
 </script>
+@endpush
