@@ -18,3 +18,9 @@
         <i class="bi bi-receipt me-2"></i> Riwayat Invoice
     </a>
 </li>
+<li class="nav-heading mt-3">Akun</li>
+<li class="nav-item">
+    <a class="nav-link {{ request()->routeIs('client.profile.edit') ? 'active' : '' }}" href="{{ route('client.profile.edit') }}">
+        <i class="bi bi-person-circle me-2"></i> Profil Saya
+    </a>
+</li>

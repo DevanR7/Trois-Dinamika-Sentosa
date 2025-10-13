@@ -34,7 +34,13 @@ return [
     'google' => [
     'client_id' => env('GOOGLE_CLIENT_ID'),
     'client_secret' => env('GOOGLE_CLIENT_SECRET'),
-    'redirect' => env('GOOGLE_REDIRECT_URI'),
-],
+    'redirect' => env('GOOGLE_REDIRECT_URI'),  
+    ],
+    
+    'google_client' => [
+        'client_id' => env('GOOGLE_CLIENT_ID_CLIENT'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET_CLIENT'),
+        'redirect' => env('GOOGLE_REDIRECT_URI_CLIENT'),
+    ],
 
 ];
