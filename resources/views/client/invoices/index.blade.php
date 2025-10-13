@@ -1,34 +1,9 @@
 @extends('layouts.client')
 
 @section('content')
-<div class="container-fluid py-4">
-    <h2 class="fw-bold mb-4">Dashboard</h2>
+    <h2 class="fw-bold mb-4">Riwayat Invoice</h2>
 
-    {{-- SUMMARY CARDS --}}
-    <div class="row g-4 mb-4">
-        <div class="col-md-6">
-            <div class="card shadow-sm h-100 border-start border-danger border-4">
-                <div class="card-body">
-                    <div class="text-muted text-uppercase small">Total Tagihan Belum Lunas</div>
-                    <h4 class="fw-bold mb-0">Rp {{ number_format($totalPiutang, 0, ',', '.') }}</h4>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card shadow-sm h-100 border-start border-primary border-4">
-                <div class="card-body">
-                    <div class="text-muted text-uppercase small">Pesanan Aktif</div>
-                    <h4 class="fw-bold mb-0">{{ $activeOrders }}</h4>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- RECENT INVOICES TABLE --}}
     <div class="card shadow-sm">
-        <div class="card-header bg-white">
-            <h5 class="mb-0 fw-semibold">5 Invoice Terbaru</h5>
-        </div>
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
@@ -38,21 +13,23 @@
                             <th>Tanggal Terbit</th>
                             <th>Jatuh Tempo</th>
                             <th class="text-end">Total Tagihan</th>
+                            <th class="text-end">Sisa Tagihan</th>
                             <th class="text-center">Status</th>
+                            <th class="text-center">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($latestInvoices as $invoice)
+                        @forelse($invoices as $invoice)
                             <tr>
-                                <td>
-                                    {{-- We will create this route in the next step --}}
-                                    <a href="#">{{ $invoice->invoice_number }}</a>
-                                </td>
+                                <td>{{ $invoice->invoice_number }}</td>
                                 <td>{{ optional($invoice->order_date)->format('d M Y') }}</td>
                                 <td class="{{ optional($invoice->due_date)->isPast() && $invoice->status != 'paid' ? 'text-danger fw-bold' : '' }}">
                                     {{ optional($invoice->due_date)->format('d M Y') }}
                                 </td>
                                 <td class="text-end">Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</td>
+                                <td class="text-end fw-bold {{ ($invoice->total_amount - $invoice->amount_paid > 0) ? 'text-danger' : '' }}">
+                                    Rp {{ number_format($invoice->total_amount - $invoice->amount_paid, 0, ',', '.') }}
+                                </td>
                                 <td class="text-center">
                                     @if($invoice->status == 'paid')
                                         <span class="badge bg-success">Lunas</span>
@@ -62,16 +39,23 @@
                                         <span class="badge bg-warning text-dark">Belum Lunas</span>
                                     @endif
                                 </td>
+                                <td class="text-center">
+                                    <a href="{{ route('client.invoices.show', $invoice->invoice_id) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> Detail
+                                    </a>
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="text-center text-muted py-4">Anda belum memiliki invoice.</td>
+                                <td colspan="7" class="text-center py-4">Anda belum memiliki invoice.</td>
                             </tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
+            <div class="mt-3 d-flex justify-content-center">
+                {{ $invoices->links() }}
+            </div>
         </div>
     </div>
-</div>
 @endsection

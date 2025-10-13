@@ -50,4 +50,9 @@ use Illuminate\Database\Eloquent\SoftDeletes; // <-- Tambahkan ini
     {
         return $this->hasMany(SalesInvoice::class, 'client_id', 'client_id');
     }
+
+    public function salesOrders(): HasMany
+    {
+        return $this->hasMany(SalesOrder::class, 'client_id', 'client_id');
     }
+}

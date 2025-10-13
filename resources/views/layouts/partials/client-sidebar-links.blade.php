@@ -9,12 +9,12 @@
 {{-- Section Riwayat --}}
 <li class="nav-heading mt-3">Riwayat</li>
 <li class="nav-item">
-    <a class="nav-link" href="#">
+    <a class="nav-link {{ request()->routeIs('client.sales-orders.*') ? 'active' : '' }}" href="{{ route('client.sales-orders.index') }}">
         <i class="bi bi-box-seam me-2"></i> Riwayat Pesanan
     </a>
 </li>
 <li class="nav-item">
-    <a class="nav-link" href="#">
+    <a class="nav-link {{ request()->routeIs('client.invoices.*') ? 'active' : '' }}" href="{{ route('client.invoices.index') }}">
         <i class="bi bi-receipt me-2"></i> Riwayat Invoice
     </a>
 </li>
