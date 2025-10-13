@@ -2,17 +2,22 @@
 
 @section('content')
 <div class="container-fluid">
+    {{-- HEADER DENGAN TOMBOL AKSI --}}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <a href="{{ route('client.invoices.index') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Kembali ke Daftar
         </a>
-        <div>
-            {{-- Tombol "Upload Bukti Bayar" bisa kita tambahkan di sini nanti --}}
-        </div>
+        @if(in_array($invoice->status, ['unpaid', 'partially_paid']))
+            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal">
+                <i class="bi bi-cash-coin me-2"></i>Catat Pembayaran
+            </button>
+        @endif
     </div>
 
-    <div class="card shadow-sm">
+    {{-- KARTU DETAIL INVOICE --}}
+    <div class="card shadow-sm border-0">
         <div class="card-body p-5">
+            {{-- Header Invoice --}}
             <div class="row mb-4">
                 <div class="col-md-6">
                     <h2 class="fw-bold">INVOICE</h2>
@@ -21,7 +26,6 @@
                 <div class="col-md-6 text-md-end">
                     <p class="mb-1"><strong>Tanggal Pesanan:</strong> {{ optional($invoice->order_date)->format('d F Y') }}</p>
                     @if($invoice->due_date)<p class="mb-1"><strong>Jatuh Tempo:</strong> {{ optional($invoice->due_date)->format('d F Y') }}</p>@endif
-                    @if($invoice->sales)<p class="mb-1"><strong>Sales:</strong> {{ $invoice->sales->full_name }} ({{ $invoice->sales->sales_code }})</p>@endif
                     <p class="mb-1"><strong>Status:</strong>
                         @if($invoice->status == 'paid') <span class="badge bg-success fs-6">Lunas</span>
                         @elseif($invoice->status == 'partially_paid') <span class="badge bg-info text-dark fs-6">Cicil</span>
@@ -33,12 +37,13 @@
             </div>
             <hr>
             
+            {{-- Tabel Rincian Item --}}
             <h5 class="fw-semibold mt-4">Rincian Invoice</h5>
             <div class="table-responsive">
                 <table class="table table-bordered align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th>N</th>
+                            <th>#</th>
                             <th>Produk</th>
                             <th class="text-center">Kuantitas</th>
                             <th class="text-end">Harga Satuan</th>
@@ -61,6 +66,7 @@
                 </table>
             </div>
 
+            {{-- Bagian Catatan & Ringkasan Keuangan --}}
             <div class="row mt-4">
                 <div class="col-md-7">
                     @if($invoice->notes)
@@ -71,29 +77,22 @@
                 <div class="col-md-5">
                     <h5 class="fw-semibold mb-3">Ringkasan Keuangan</h5>
                     <div class="border rounded p-3">
-                        <div class="d-flex justify-content-between mb-2"><span>Subtotal Produk</span><span>Rp {{ number_format($invoice->subtotal, 0, ',', '.') }}</span></div>
-                        @if($invoice->discount_amount > 0)
-                            <div class="d-flex justify-content-between mb-2 text-danger"><span>Diskon ({{ $invoice->discount_percentage }}%)</span><span>(-) Rp {{ number_format($invoice->discount_amount, 0, ',', '.') }}</span></div>
-                        @endif
-                        <hr class="my-1">
-                        <div class="d-flex justify-content-between fw-semibold mb-2"><span>Subtotal Setelah Diskon</span><span>Rp {{ number_format($invoice->subtotal - $invoice->discount_amount, 0, ',', '.') }}</span></div>
-                        @foreach($invoice->taxes as $tax)
-                            <div class="d-flex justify-content-between mb-2"><span>{{ $tax->pivot->name }} ({{ $tax->pivot->rate }}%)</span><span>(+) Rp {{ number_format($tax->pivot->amount, 0, ',', '.') }}</span></div>
-                        @endforeach
-                        <hr class="my-1">
-                        <div class="d-flex justify-content-between fw-bold"><span>Total Tagihan</span><span>Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span></div>
-                        <div class="d-flex justify-content-between text-success"><span>Sudah Dibayar</span><span>Rp {{ number_format($invoice->amount_paid, 0, ',', '.') }}</span></div>
                         @php
                             $totalRetur = $invoice->returns->sum('total_amount');
-                            $sisaTagihan = $invoice->total_amount - $invoice->amount_paid - $totalRetur;
+                            $pendingAmount = $invoice->payments->where('status', 'pending_verification')->sum('amount');
+                            $sisaTagihan = $invoice->total_amount - $invoice->amount_paid - $totalRetur - $pendingAmount;
                         @endphp
+                        <div class="d-flex justify-content-between fw-bold"><span>Total Tagihan</span><span>Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span></div>
                         @if($totalRetur > 0)
                             <div class="d-flex justify-content-between text-warning"><span>Total Retur</span><span>(-) Rp {{ number_format($totalRetur, 0, ',', '.') }}</span></div>
                         @endif
-                        <hr class="my-1">
+                        <div class="d-flex justify-content-between text-success"><span>Sudah Dibayar</span><span>(-) Rp {{ number_format($invoice->amount_paid, 0, ',', '.') }}</span></div>
+                        @if($pendingAmount > 0)
+                            <div class="d-flex justify-content-between text-info"><span>Menunggu Verifikasi</span><span>(-) Rp {{ number_format($pendingAmount, 0, ',', '.') }}</span></div>
+                        @endif
+                        <hr class="my-2">
                         <div class="d-flex justify-content-between fw-bold fs-5 {{ $sisaTagihan > 0 ? 'text-danger' : 'text-success' }}">
-                            <span>Sisa Tagihan</span>
-                            <span>Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</span>
+                            <span>Sisa Tagihan</span><span>Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</span>
                         </div>
                     </div>
                 </div>
@@ -101,20 +100,28 @@
         </div>
     </div>
 
+    {{-- KARTU RIWAYAT PEMBAYARAN --}}
     @if($invoice->payments->isNotEmpty())
     <div class="card shadow-sm border-0 mt-4">
         <div class="card-header"><h5 class="mb-0">Riwayat Pembayaran</h5></div>
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-striped table-hover mb-0">
-                    <thead><tr><th>Tanggal</th><th>Metode</th><th class="text-end">Jumlah</th><th>Catatan</th></tr></thead>
+                    <thead><tr><th>Tanggal</th><th>Metode</th><th class="text-end">Jumlah</th><th>Status</th><th>Bukti</th></tr></thead>
                     <tbody>
                         @foreach($invoice->payments as $payment)
                         <tr>
                             <td>{{ optional($payment->payment_date)->format('d M Y') }}</td>
                             <td>{{ Str::title(str_replace('_', ' ', $payment->payment_method)) }}</td>
                             <td class="text-end">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
-                            <td>{{ $payment->notes }}</td>
+                            <td>{{ Str::title(str_replace('_', ' ', $payment->status)) }}</td>
+                            <td>
+                                @if($payment->proof_of_payment_path)
+                                    <a href="{{ asset('storage/' . $payment->proof_of_payment_path) }}" target="_blank" class="btn btn-sm btn-outline-info">Lihat</a>
+                                @else
+                                    -
+                                @endif
+                            </td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -125,41 +132,48 @@
     @endif
 </div>
 
-{{-- MODAL PEMBAYARAN --}}
+{{-- MODAL PEMBAYARAN DINAMIS --}}
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Catat Pembayaran untuk #{{ $invoice->invoice_number }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <form action="{{ route('payments.store', $invoice->invoice_id) }}" method="POST">
+            <div class="modal-header"><h5 class="modal-title">Catat Pembayaran</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form action="{{ route('client.invoices.uploadProof', $invoice->invoice_id) }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 <div class="modal-body">
                     @php
-                        $totalRetur = $invoice->returns->sum('total_amount');
-                        $sisaTagihan = $invoice->total_amount - $invoice->amount_paid - $totalRetur;
+                        $sisaTagihanModal = $invoice->total_amount - $invoice->amount_paid - $invoice->returns->sum('total_amount') - $invoice->payments->where('status', 'pending_verification')->sum('amount');
                     @endphp
-                    <div class="alert alert-info">
-                        <div class="d-flex justify-content-between"><span>Total Tagihan:</span><span>Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span></div>
-                        @if($totalRetur > 0)<div class="d-flex justify-content-between"><span>Total Retur:</span><span>(-) Rp {{ number_format($totalRetur, 0, ',', '.') }}</span></div>@endif
-                        <div class="d-flex justify-content-between"><span>Sudah Dibayar:</span><span>(+) Rp {{ number_format($invoice->amount_paid, 0, ',', '.') }}</span></div>
-                        <hr class="my-1"><div class="d-flex justify-content-between fw-bold"><span>Sisa Tagihan:</span><span>Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</span></div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="amount-formatted" class="form-label">Jumlah Dibayar</label>
-                        <input type="text" class="form-control" id="amount-formatted" required>
-                        <input type="hidden" name="amount" id="amount">
-                        <div id="amount-error" class="text-danger small mt-1"></div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="payment_date" class="form-label">Tanggal Bayar</label>
-                        <input type="date" class="form-control" name="payment_date" id="payment_date" value="{{ now()->format('Y-m-d') }}" required>
-                    </div>
+                    <div class="alert alert-info">Sisa Tagihan: <strong class="fs-5">Rp {{ number_format($sisaTagihanModal, 0, ',', '.') }}</strong></div>
                     <div class="mb-3">
                         <label for="payment_method" class="form-label">Metode Pembayaran</label>
-                        <select name="payment_method" class="form-select" required>
+                        <select name="payment_method" id="payment_method" class="form-select" required>
+                            <option value="" disabled selected>-- Pilih Metode --</option>
+                            <option value="cash">Cash (via Sales)</option>
                             <option value="manual_transfer">Transfer Bank</option>
-                            <option value="cash">Cash</option>
-                            <option value="other">Lainnya</option>
                         </select>
+                    </div>
+                    <div id="cash-fields" class="d-none">
+                        <div class="mb-3">
+                            <label for="user_id_sales" class="form-label">Diterima oleh Sales</label>
+                            <select name="user_id_sales" id="user_id_sales" class="form-select">
+                                <option value="" disabled selected>-- Pilih Sales --</option>
+                                @foreach($salesUsers as $sales)
+                                    <option value="{{ $sales->user_id }}">{{ $sales->full_name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <div id="transfer-fields" class="d-none">
+                        <div class="mb-3">
+                            <label for="proof_of_payment" class="form-label">File Bukti Bayar (JPG, PNG)</label>
+                            <input type="file" class="form-control" name="proof_of_payment" id="proof_of_payment" accept="image/jpeg,image/png">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="payment_amount_display" class="form-label">Jumlah Dibayar</label>
+                        <input type="text" class="form-control" id="payment_amount_display" placeholder="Rp 0" required>
+                        <input type="hidden" name="payment_amount" id="payment_amount">
+                        <div id="amount-error" class="text-danger small mt-1 d-none">Jumlah tidak boleh melebihi sisa tagihan.</div>
                     </div>
                     <div class="mb-3">
                         <label for="notes" class="form-label">Catatan</label>
@@ -168,7 +182,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary">Simpan Pembayaran</button>
+                    <button type="submit" class="btn btn-primary" id="submit-proof-btn">Kirim</button>
                 </div>
             </form>
         </div>
@@ -177,37 +191,59 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const addPaymentBtn = document.getElementById('add-payment-btn');
-    const amountFormattedInput = document.getElementById('amount-formatted');
-    const amountHiddenInput = document.getElementById('amount');
-    const amountError = document.getElementById('amount-error');
+    // Skrip untuk Modal Dinamis
+    const paymentMethodSelect = document.getElementById('payment_method');
+    const cashFields = document.getElementById('cash-fields');
+    const transferFields = document.getElementById('transfer-fields');
+    const proofInput = document.getElementById('proof_of_payment');
+    const salesInput = document.getElementById('user_id_sales');
 
-    if (amountFormattedInput) {
-        const autoNumericInstance = new AutoNumeric(amountFormattedInput, { decimalPlaces: 0, digitGroupSeparator: '.', decimalCharacter: ',' });
-        if (addPaymentBtn) {
-            addPaymentBtn.addEventListener('click', function() {
-                const remainingBalance = {{ ($invoice->total_amount - $invoice->returns->sum('total_amount') - $invoice->amount_paid) ?? 0 }};
-                autoNumericInstance.set(remainingBalance);
-                amountHiddenInput.value = remainingBalance;
-                autoNumericInstance.update({ maximumValue: remainingBalance });
-                amountError.textContent = '';
-            });
-
-            amountFormattedInput.addEventListener('autoNumeric:rawValueModified', function(event) {
-                const rawValue = event.detail.newRawValue;
-                amountHiddenInput.value = rawValue;
-                const remainingBalance = {{ ($invoice->total_amount - $invoice->returns->sum('total_amount') - $invoice->amount_paid) ?? 0 }};
-                if (parseFloat(rawValue) > remainingBalance) {
-                    amountError.textContent = 'Jumlah pembayaran tidak boleh melebihi sisa tagihan!';
-                } else {
-                    amountError.textContent = '';
-                }
-            });
+    paymentMethodSelect.addEventListener('change', function() {
+        if (this.value === 'cash') {
+            cashFields.classList.remove('d-none');
+            transferFields.classList.add('d-none');
+            proofInput.required = false;
+            salesInput.required = true;
+        } else if (this.value === 'manual_transfer') {
+            cashFields.classList.add('d-none');
+            transferFields.classList.remove('d-none');
+            proofInput.required = true;
+            salesInput.required = false;
+        } else {
+            cashFields.classList.add('d-none');
+            transferFields.classList.add('d-none');
+            proofInput.required = false;
+            salesInput.required = false;
         }
-    }
+    });
+
+    // Skrip untuk Format Rupiah dan Validasi
+    const amountDisplay = document.getElementById('payment_amount_display');
+    const amountRaw = document.getElementById('payment_amount');
+    const sisaTagihan = {{ $sisaTagihanModal }};
+    const amountError = document.getElementById('amount-error');
+    const submitBtn = document.getElementById('submit-proof-btn');
+
+    amountDisplay.addEventListener('input', function(e) {
+        let rawValue = e.target.value.replace(/[^0-9]/g, '');
+        let numericValue = rawValue ? parseInt(rawValue, 10) : 0;
+        
+        // Tampilkan input pengguna apa adanya
+        e.target.value = numericValue > 0 ? 'Rp ' + numericValue.toLocaleString('id-ID') : '';
+        
+        // Validasi setelah menampilkan
+        if (numericValue > sisaTagihan) {
+            amountError.classList.remove('d-none');
+            submitBtn.disabled = true;
+            amountRaw.value = sisaTagihan;
+        } else {
+            amountError.classList.add('d-none');
+            submitBtn.disabled = false;
+            amountRaw.value = numericValue;
+        }
+    });
 });
 </script>
 @endpush

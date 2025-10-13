@@ -89,6 +89,120 @@
                 </table>
             </div>
 
+            {{-- =============================================== --}}
+            {{-- BAGIAN BARU: VERIFIKASI BUKTI PEMBAYARAN --}}
+            {{-- =============================================== --}}
+            @php
+    $pendingPayments = $invoice->payments->where('status', 'pending_verification');
+@endphp
+
+@if($pendingPayments->isNotEmpty())
+<div class="card my-4 border-warning">
+    <div class="card-header bg-warning text-dark">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>Menunggu Verifikasi Pembayaran</h5>
+    </div>
+    <div class="card-body">
+        @foreach($pendingPayments as $payment)
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-3">
+            {{-- Informasi Jumlah dan Tanggal --}}
+            <div>
+                <div><strong>Jumlah:</strong> Rp {{ number_format($payment->amount, 0, ',', '.') }}</div>
+                <div><strong>Tanggal Lapor:</strong> {{ $payment->created_at->format('d M Y H:i') }}</div>
+                @if($payment->notes)
+                    <div class="text-muted small mt-1"><strong>Catatan Klien:</strong> {{ $payment->notes }}</div>
+                @endif
+            </div>
+
+            {{-- Aksi Verifikasi --}}
+            <div class="d-flex gap-3 align-items-center">
+                {{-- Kolom Bukti / Penerima --}}
+                <div class="text-center">
+                    @if($payment->payment_method == 'manual_transfer' && $payment->proof_of_payment_path)
+                        <a href="{{ asset('storage/' . $payment->proof_of_payment_path) }}" target="_blank" class="btn btn-sm btn-outline-info">Lihat Bukti</a>
+                    @elseif($payment->payment_method == 'cash' && $payment->receivedBy)
+                        {{-- TOMBOL BARU DENGAN POPOVER --}}
+                        <button type="button" class="btn btn-sm btn-outline-secondary" 
+                                data-bs-toggle="popover" 
+                                data-bs-title="Diterima Oleh" 
+                                data-bs-content="{{ $payment->receivedBy->full_name }}">
+                            Cash
+                        </button>
+                    @else
+                        <span class="text-muted">-</span>
+                    @endif
+                </div>
+                
+                {{-- Kolom Tombol Aksi --}}
+                <div class="d-flex gap-2">
+                    <form action="{{ route('payments.reject', $payment->payment_id) }}" method="POST" class="d-inline mb-0">
+                        @csrf
+                        <button type="submit" class="btn btn-sm btn-danger">Tolak</button>
+                    </form>
+                    <form action="{{ route('payments.approve', $payment->payment_id) }}" method="POST" class="d-inline mb-0">
+                        @csrf
+                        <button type="submit" class="btn btn-sm btn-success">Setujui</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        @endforeach
+    </div>
+</div>
+@endif
+
+            {{-- =============================================== --}}
+            {{-- BAGIAN BARU: RIWAYAT PEMBAYARAN --}}
+            {{-- =============================================== --}}
+            <h5 class="fw-semibold mt-4">Riwayat Pembayaran</h5>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Tanggal Bayar</th>
+                            <th class="text-end">Jumlah</th>
+                            <th>Metode</th>
+                            <th>Status</th>
+                            <th>Diverifikasi oleh</th>
+                            <th>Penerima / Bukti</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($invoice->payments as $payment)
+                        <tr>
+                            <td>{{ $payment->payment_date->format('d M Y') }}</td>
+                            <td class="text-end">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
+                            <td>{{ Str::title(str_replace('_', ' ', $payment->payment_method)) }}</td>
+                            <td>
+                                @if($payment->status == 'completed')
+                                    <span class="badge bg-success">Completed</span>
+                                @elseif($payment->status == 'pending_verification')
+                                    <span class="badge bg-warning text-dark">Pending</span>
+                                @else
+                                    <span class="badge bg-danger">Failed</span>
+                                @endif
+                            </td>
+                            <td>{{ $payment->receivedBy->full_name ?? '-' }}</td>
+                             <td>
+                    @if($payment->payment_method == 'cash' && $payment->receivedBy)
+                        {{ $payment->receivedBy->full_name }} (Sales)
+                    @elseif($payment->proof_of_payment_path)
+                        <a href="{{ asset('storage/' . $payment->proof_of_payment_path) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                            Lihat Bukti
+                        </a>
+                    @else
+                        -
+                    @endif
+                </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">Belum ada riwayat pembayaran.</td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
             <div class="row mt-4">
                 <div class="col-md-7">
                     @if($invoice->notes)
@@ -128,29 +242,6 @@
             </div>
         </div>
     </div>
-
-    @if($invoice->payments->isNotEmpty())
-    <div class="card shadow-sm border-0 mt-4">
-        <div class="card-header"><h5 class="mb-0">Riwayat Pembayaran</h5></div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-striped table-hover mb-0">
-                    <thead><tr><th>Tanggal</th><th>Metode</th><th class="text-end">Jumlah</th><th>Catatan</th></tr></thead>
-                    <tbody>
-                        @foreach($invoice->payments as $payment)
-                        <tr>
-                            <td>{{ optional($payment->payment_date)->format('d M Y') }}</td>
-                            <td>{{ Str::title(str_replace('_', ' ', $payment->payment_method)) }}</td>
-                            <td class="text-end">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
-                            <td>{{ $payment->notes }}</td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    @endif
 </div>
 
 {{-- MODAL PEMBAYARAN --}}
@@ -212,6 +303,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const amountFormattedInput = document.getElementById('amount-formatted');
     const amountHiddenInput = document.getElementById('amount');
     const amountError = document.getElementById('amount-error');
+    const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
+        [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl));
 
     if (amountFormattedInput) {
         const autoNumericInstance = new AutoNumeric(amountFormattedInput, { decimalPlaces: 0, digitGroupSeparator: '.', decimalCharacter: ',' });

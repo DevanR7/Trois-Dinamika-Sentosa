@@ -24,7 +24,6 @@
             'payment_method',
             'proof_of_payment_path',
             'transaction_id',
-            'transaction_reference',
             'received_by_user_id',
             'status',
             'notes',

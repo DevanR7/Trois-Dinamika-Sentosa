@@ -76,4 +76,52 @@ class PaymentController extends Controller
         return back()->with('error', 'Gagal mencatat pembayaran: ' . $e->getMessage());
     }
     }
+
+    public function approve(Payment $payment): RedirectResponse
+{
+    if ($payment->status !== 'pending_verification') {
+        return back()->with('error', 'Pembayaran ini tidak sedang dalam status verifikasi.');
+    }
+
+    try {
+        DB::beginTransaction();
+
+        // 1. Ubah status pembayaran menjadi 'completed'
+        $payment->update(['status' => 'completed', 'received_by_user_id' => Auth::id()]);
+
+        // 2. Update invoice terkait
+        $invoice = $payment->salesInvoice;
+        $invoice->amount_paid += $payment->amount;
+
+        // 3. Cek dan update status invoice
+        if ($invoice->amount_paid >= $invoice->total_amount) {
+            $invoice->status = 'paid';
+        } else {
+            $invoice->status = 'partially_paid';
+        }
+        $invoice->save();
+
+        DB::commit();
+        return back()->with('success', 'Pembayaran berhasil disetujui.');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->with('error', 'Gagal menyetujui pembayaran: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Menolak pembayaran yang sedang diverifikasi.
+ */
+public function reject(Payment $payment): RedirectResponse
+{
+    if ($payment->status !== 'pending_verification') {
+        return back()->with('error', 'Pembayaran ini tidak sedang dalam status verifikasi.');
+    }
+
+    // Cukup ubah status pembayaran menjadi 'failed'
+    $payment->update(['status' => 'failed', 'received_by_user_id' => Auth::id()]);
+
+    return back()->with('success', 'Bukti pembayaran telah ditolak.');
+}
 }
