@@ -16,6 +16,7 @@ use App\Http\Controllers\MidtransController;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
+Route::post('/midtrans/callback', [MidtransController::class, 'callback'])->name('midtrans.callback');
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
@@ -36,4 +37,3 @@ Route::get('/purchase-orders/{purchaseOrder}/items', function (PurchaseOrder $pu
     return response()->json(['items' => $purchaseOrder->items]);
 });
 
-Route::post('/midtrans/callback', [MidtransController::class, 'callback'])->name('midtrans.callback');
