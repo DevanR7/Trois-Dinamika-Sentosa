@@ -7,6 +7,7 @@ use App\Http\Controllers\Client\InvoiceController;
 use App\Http\Controllers\Client\ProfileController;
 use App\Http\Controllers\Client\SalesOrderController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\MidtransController;
 
 Route::prefix('client')->name('client.')->group(function () {
 
@@ -27,6 +28,9 @@ Route::prefix('client')->name('client.')->group(function () {
         Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
 
+        // Midtrans
+        Route::post('/invoices/{invoice}/pay', [MidtransController::class, 'pay'])->name('invoices.pay');
+        
         // Wajib profil lengkap
         Route::middleware('ensure.client.profile.complete')->group(function() {
             Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -34,6 +38,7 @@ Route::prefix('client')->name('client.')->group(function () {
             Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
             Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
             Route::post('invoices/{invoice}/upload-proof', [InvoiceController::class, 'uploadProof'])->name('invoices.uploadProof');
+            
 
             Route::get('sales-orders', [SalesOrderController::class, 'index'])->name('sales-orders.index');
             Route::get('sales-orders/{salesOrder}', [SalesOrderController::class, 'show'])->name('sales-orders.show');

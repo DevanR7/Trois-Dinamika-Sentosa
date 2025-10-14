@@ -14,6 +14,7 @@
         "laravel/socialite": "^5.23",
         "laravel/tinker": "^2.8",
         "maatwebsite/excel": "^3.1",
+        "midtrans/midtrans-php": "^2.6",
         "riskihajar/terbilang": "^2.0",
         "spatie/laravel-permission": "^6.21"
     },

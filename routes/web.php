@@ -20,6 +20,7 @@
     use App\Http\Controllers\PurchaseReturnController;
     use App\Http\Controllers\SettingController;
     use App\Http\Controllers\ReportController;
+    use App\Http\Controllers\MidtransController;
 
     /*
     |--------------------------------------------------------------------------

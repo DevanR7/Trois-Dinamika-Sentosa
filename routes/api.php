@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Models\SalesInvoice;
 use App\Models\PurchaseOrder;
+use App\Http\Controllers\MidtransController;
 
 /*
 |--------------------------------------------------------------------------
@@ -34,3 +35,5 @@ Route::get('/purchase-orders/{purchaseOrder}/items', function (PurchaseOrder $pu
     $purchaseOrder->load('items.product.unit');
     return response()->json(['items' => $purchaseOrder->items]);
 });
+
+Route::post('/midtrans/callback', [MidtransController::class, 'callback'])->name('midtrans.callback');
