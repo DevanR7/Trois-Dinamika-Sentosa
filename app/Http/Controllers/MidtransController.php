@@ -37,12 +37,15 @@ class MidtransController extends Controller
         $amount = $request->input('amount');
         $client = Auth::guard('client')->user();
 
-        // Gunakan nomor invoice asli agar cocok dengan callback Midtrans
-        $orderId = $invoice->invoice_number;
+        // ====================================================================
+        // PERUBAHAN KUNCI #1: Buat order_id yang unik untuk setiap transaksi
+        // ====================================================================
+        // Ini memungkinkan klien membayar invoice yang sama berkali-kali (cicilan).
+        $uniqueOrderId = $invoice->invoice_number . '-' . time();
 
         $params = [
             'transaction_details' => [
-                'order_id' => $orderId,
+                'order_id' => $uniqueOrderId, // Gunakan ID yang unik
                 'gross_amount' => $amount,
             ],
             'customer_details' => [
@@ -57,60 +60,89 @@ class MidtransController extends Controller
             return response()->json(['snap_token' => $snapToken]);
         } catch (\Exception $e) {
             Log::error('Midtrans Snap Error: ' . $e->getMessage());
-            return response()->json(['error' => $e->getMessage()], 500);
+            // Berikan pesan error yang lebih jelas ke front-end
+            return response()->json(['message' => 'Gagal memulai sesi pembayaran. Silakan coba lagi nanti.'], 500);
         }
     }
 
     /**
-     * 🔹 Callback / Webhook dari Midtrans (atau simulasi dari Postman)
+     * 🔹 Callback / Webhook dari Midtrans
      */
     public function callback(Request $request)
     {
         Log::info('Midtrans Callback Received: ');
 
         try {
-            // Deteksi apakah request berasal dari Midtrans atau dari Postman lokal
-            $isFromMidtrans = $request->hasHeader('X-Callback-Signature') || str_contains($request->header('User-Agent', ''), 'Midtrans');
-            if ($isFromMidtrans) {
-                Log::info('Mode: Midtrans Real Callback');
-            } else {
-                Log::info('Mode: Local/Postman Testing');
-            }
+            // Verifikasi notifikasi dari Midtrans (lebih aman)
+            $notification = new Notification();
 
-            // --- Ambil data dari request ---
-            $transactionStatus = $request->input('transaction_status');
-            $orderId           = $request->input('order_id') ?? $request->input('invoice_number');
-            $transactionId     = $request->input('transaction_id');
-            $paymentType       = $request->input('payment_type');
-            $grossAmount       = (float) $request->input('gross_amount', 0);
+            $transactionStatus = $notification->transaction_status;
+            $rawOrderId        = $notification->order_id;
+            $transactionId     = $notification->transaction_id;
+            $paymentType       = $notification->payment_type;
+            $grossAmount       = (float) $notification->gross_amount;
 
-            // --- Cari invoice berdasarkan order_id ---
-            $invoice = SalesInvoice::where('invoice_number', $orderId)->first();
+            // ====================================================================
+            // PERUBAHAN KUNCI #2: Ekstrak nomor invoice asli dari order_id
+            // ====================================================================
+            $orderIdParts = explode('-', $rawOrderId);
+            array_pop($orderIdParts); // Hapus bagian terakhir (timestamp)
+            $originalInvoiceNumber = implode('-', $orderIdParts); // Gabungkan kembali sisanya
+
+            // --- Cari invoice berdasarkan nomor invoice asli ---
+            $invoice = SalesInvoice::where('invoice_number', $originalInvoiceNumber)->first();
 
             if (!$invoice) {
-                Log::error("Invoice tidak ditemukan untuk order_id: {$orderId}");
+                Log::error("Invoice tidak ditemukan untuk order_id: {$rawOrderId} (Parsed as: {$originalInvoiceNumber})");
                 return response()->json(['error' => 'Invoice not found'], 404);
             }
 
             Log::info("Invoice ditemukan: #{$invoice->invoice_id} ({$invoice->invoice_number})");
+            
+            // --- Cek duplikasi callback berdasarkan transaction_id ---
+            $isProcessed = PaymentGatewayCallback::where('vendor_transaction_id', $transactionId)->exists();
+            if ($isProcessed) {
+                Log::warning("Callback untuk transaction_id: {$transactionId} sudah pernah diproses.");
+                return response()->json(['message' => 'Notification already processed.'], 200);
+            }
 
-            // --- Proses status transaksi ---
+            // --- Simpan log callback terlebih dahulu ---
+            PaymentGatewayCallback::create([
+                'invoice_id'            => $invoice->invoice_id,
+                'vendor_transaction_id' => $transactionId,
+                'status'                => $transactionStatus,
+                'amount'                => $grossAmount,
+                'payment_type'          => $paymentType,
+                'raw_response'          => $request->all(),
+            ]);
+
+            // --- Proses status transaksi (HANYA JIKA BERHASIL) ---
             if (in_array($transactionStatus, ['capture', 'settlement'])) {
                 DB::transaction(function () use ($invoice, $transactionId, $grossAmount, $paymentType) {
-                    // Simpan ke tabel payments
-                    Payment::create([
-                        'invoice_id'      => $invoice->invoice_id,
-                        'payment_date'    => now(),
-                        'amount'          => $grossAmount,
-                        'payment_method'  => 'payment_gateway', // fixed sesuai enum
-                        'transaction_id'  => $transactionId,
-                        'status'          => 'completed',
-                        'notes'           => 'Auto processed from Midtrans callback',
-                    ]);
+                    
+                    // Cek lagi apakah pembayaran dengan transaction_id ini sudah ada untuk mencegah double entry
+                    $existingPayment = Payment::where('transaction_id', $transactionId)->first();
+                    if ($existingPayment) {
+                        Log::warning("Payment with transaction_id {$transactionId} already exists.");
+                        return; // Keluar dari transaksi jika sudah ada
+                    }
 
-                    // Hitung total pembayaran
-                    $totalPaid = $invoice->payments()->sum('amount');
-                    $status    = $totalPaid >= $invoice->total_amount ? 'paid' : 'partially_paid';
+                    Payment::create([
+                        'invoice_id'            => $invoice->invoice_id,
+                        'payment_date'          => now(),
+                        'amount'                => $grossAmount,
+                        'payment_method'        => $paymentType, // Lebih dinamis, mencatat metode yg dipakai
+                        'transaction_id'        => $transactionId,
+                        'status'                => 'completed',
+                        'notes'                 => 'Auto processed from Midtrans callback.',
+                    ]);
+                    
+                    // Refresh relasi untuk mendapatkan data pembayaran terbaru
+                    $invoice->load('payments');
+                    
+                    // Hitung total pembayaran yang sudah 'completed'
+                    $totalPaid = $invoice->payments()->where('status', 'completed')->sum('amount');
+                    $status    = ($totalPaid >= $invoice->total_amount) ? 'paid' : 'partially_paid';
 
                     $invoice->update([
                         'amount_paid' => $totalPaid,
@@ -119,30 +151,12 @@ class MidtransController extends Controller
 
                     Log::info("Invoice #{$invoice->invoice_id} updated: paid={$totalPaid}, status={$status}");
                 });
-            } elseif ($transactionStatus === 'pending') {
-                $invoice->update(['status' => 'pending']);
-            } elseif (in_array($transactionStatus, ['deny', 'cancel', 'expire'])) {
-                $invoice->update(['status' => 'cancelled']);
             }
-
-            // --- Simpan log callback ke tabel payment_gateway_callbacks ---
-            PaymentGatewayCallback::create([
-                'invoice_id'            => $invoice->invoice_id,
-                'vendor_transaction_id' => $transactionId ?? 'unknown',
-                'status'                => $transactionStatus ?? 'unknown',
-                'amount'                => $grossAmount ?? 0,
-                'payment_type'          => $paymentType ?? 'unknown',
-                'raw_response'          => $request->all(),
-            ]);
-
-            Log::info("Callback saved successfully for invoice #{$invoice->invoice_id}");
-
-            // 💬 Tambahkan notifikasi dashboard (SweetAlert via session flash)
-            session()->flash('success', '💰 Pembayaran berhasil diterima untuk ' . $invoice->invoice_number);
-
+            
             return response()->json(['message' => 'Notification processed successfully.'], 200);
+
         } catch (Exception $e) {
-            Log::error('Midtrans Callback Error: ' . $e->getMessage());
+            Log::error('Midtrans Callback Error: ' . $e->getMessage() . ' on line ' . $e->getLine());
             return response()->json(['error' => 'Internal Server Error'], 500);
         }
     }

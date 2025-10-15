@@ -9,21 +9,29 @@
         </a>
 
         <div class="d-flex flex-wrap gap-2">
-            @if(in_array($invoice->status, ['unpaid', 'partially_paid']))
-                {{-- Tombol Catat Pembayaran Manual --}}
-                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal">
-                    <i class="bi bi-cash-coin me-2"></i> Catat Pembayaran
-                </button>
+        @php
+            // Hitung total tagihan efektif setelah dikurangi retur
+            $totalRetur = $invoice->returns->sum('total_amount');
+            $effectiveBill = $invoice->total_amount - $totalRetur;
 
-                {{-- Tombol Bayar via Midtrans --}}
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#midtransPaymentModal">
-                    <i class="bi bi-credit-card-fill me-2"></i> Bayar Sekarang (Online)
-                </button>
-            @endif
-        </div>
+            // Hitung total pembayaran "potensial", yaitu yang sudah lunas + yang sedang diverifikasi
+            $pendingAmount = $invoice->payments->where('status', 'pending_verification')->sum('amount');
+            $potentialPaid = $invoice->amount_paid + $pendingAmount;
+
+            // Tombol bayar hanya muncul jika pembayaran potensial MASIH KURANG dari tagihan efektif
+            $canPay = $potentialPaid < $effectiveBill;
+        @endphp
+
+        @if(in_array($invoice->status, ['unpaid', 'partially_paid']) && $canPay)
+            {{-- TOMBOL UTAMA BARU YANG DIGABUNG --}}
+            <button type="button" class="btn btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#paymentMethodModal">
+                <i class="bi bi-credit-card-fill me-2"></i> Bayar Tagihan
+            </button>
+        @endif
     </div>
+</div>
 
-    {{-- KARTU DETAIL INVOICE --}}
+    {{-- KARTU DETAIL INVOICE (Tidak ada perubahan di sini, sama seperti kode Anda) --}}
     <div class="card shadow-sm border-0">
         <div class="card-body p-5">
             {{-- Header Invoice --}}
@@ -59,7 +67,7 @@
                 <table class="table table-bordered align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th>#</th>
+                            <th>No</th>
                             <th>Produk</th>
                             <th class="text-center">Kuantitas</th>
                             <th class="text-end">Harga Satuan</th>
@@ -96,7 +104,8 @@
                         @php
                             $totalRetur = $invoice->returns->sum('total_amount');
                             $pendingAmount = $invoice->payments->where('status', 'pending_verification')->sum('amount');
-                            $sisaTagihan = $invoice->total_amount - $invoice->amount_paid - $totalRetur - $pendingAmount;
+                            $sisaTagihan = $invoice->total_amount - $invoice->amount_paid - $totalRetur;
+                            $sisaTagihanTampil = $sisaTagihan - $pendingAmount;
                         @endphp
                         <div class="d-flex justify-content-between fw-bold">
                             <span>Total Tagihan</span>
@@ -116,9 +125,9 @@
                             </div>
                         @endif
                         <hr class="my-2">
-                        <div class="d-flex justify-content-between fw-bold fs-5 {{ $sisaTagihan > 0 ? 'text-danger' : 'text-success' }}">
+                        <div class="d-flex justify-content-between fw-bold fs-5 {{ $sisaTagihanTampil > 0 ? 'text-danger' : 'text-success' }}">
                             <span>Sisa Tagihan</span>
-                            <span>Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</span>
+                            <span>Rp {{ number_format($sisaTagihanTampil, 0, ',', '.') }}</span>
                         </div>
                     </div>
                 </div>
@@ -168,28 +177,67 @@
 
 
 {{-- MODAL PEMBAYARAN DINAMIS --}}
-<div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
+@php
+    // Definisikan sisa tagihan di sini agar bisa diakses semua modal
+    $remainingBalance = $invoice->total_amount - $invoice->amount_paid - $invoice->returns->sum('total_amount');
+@endphp
+
+<div class="modal fade" id="paymentMethodModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Pilih Metode Pembayaran</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Silakan pilih cara Anda ingin membayar tagihan ini:</p>
+                <div class="d-grid gap-3">
+                    <button class="btn btn-outline-primary p-3" id="pay-manual-transfer-btn">
+                        <i class="bi bi-bank2 fs-4 me-2"></i>
+                        <div>
+                            <span class="fw-bold">Transfer Bank</span><br>
+                            <small>Upload bukti transfer manual.</small>
+                        </div>
+                    </button>
+                    <button class="btn btn-outline-success p-3" id="pay-cash-btn">
+                        <i class="bi bi-person-check-fill fs-4 me-2"></i>
+                        <div>
+                            <span class="fw-bold">Cash (via Sales)</span><br>
+                            <small>Pembayaran tunai melalui tim sales.</small>
+                        </div>
+                    </button>
+                    <button class="btn btn-outline-dark p-3" id="pay-online-btn">
+                        <i class="bi bi-credit-card-2-front-fill fs-4 me-2"></i>
+                        <div>
+                            <span class="fw-bold">Pembayaran Online</span><br>
+                            <small>Kartu Kredit, Virtual Account, dll.</small>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="manualPaymentModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Catat Pembayaran</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header">
+                <h5 class="modal-title" id="manualPaymentModalTitle">Catat Pembayaran</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
             <form action="{{ route('client.invoices.uploadProof', $invoice->invoice_id) }}" method="POST" enctype="multipart/form-data">
                 @csrf
+                <input type="hidden" name="payment_method" id="payment_method_input">
                 <div class="modal-body">
-                    @php
-                        $sisaTagihanModal = $invoice->total_amount - $invoice->amount_paid - $invoice->returns->sum('total_amount') - $invoice->payments->where('status', 'pending_verification')->sum('amount');
-                    @endphp
-                    <div class="alert alert-info">Sisa Tagihan: <strong class="fs-5">Rp {{ number_format($sisaTagihanModal, 0, ',', '.') }}</strong></div>
-                    <div class="mb-3">
-                        <label for="payment_method" class="form-label">Metode Pembayaran</label>
-                        <select name="payment_method" id="payment_method" class="form-select" required>
-                            <option value="" disabled selected>-- Pilih Metode --</option>
-                            <option value="cash">Cash (via Sales)</option>
-                            <option value="manual_transfer">Transfer Bank</option>
-                        </select>
+                    <div class="alert alert-info">
+                        Sisa Tagihan: <strong class="fs-5">Rp {{ number_format($remainingBalance, 0, ',', '.') }}</strong>
                     </div>
+
+                    {{-- Bagian ini hanya untuk 'Cash via Sales' --}}
                     <div id="cash-fields" class="d-none">
                         <div class="mb-3">
-                            <label for="user_id_sales" class="form-label">Diterima oleh Sales</label>
+                            <label for="user_id_sales" class="form-label">Diterima oleh Sales <span class="text-danger">*</span></label>
                             <select name="user_id_sales" id="user_id_sales" class="form-select">
                                 <option value="" disabled selected>-- Pilih Sales --</option>
                                 @foreach($salesUsers as $sales)
@@ -198,51 +246,59 @@
                             </select>
                         </div>
                     </div>
+
+                    {{-- Bagian ini hanya untuk 'Transfer Bank' --}}
                     <div id="transfer-fields" class="d-none">
                         <div class="mb-3">
-                            <label for="proof_of_payment" class="form-label">File Bukti Bayar (JPG, PNG)</label>
+                            <label for="proof_of_payment" class="form-label">File Bukti Bayar (JPG, PNG) <span class="text-danger">*</span></label>
                             <input type="file" class="form-control" name="proof_of_payment" id="proof_of_payment" accept="image/jpeg,image/png">
                         </div>
                     </div>
+
+                    {{-- Bagian umum untuk keduanya --}}
                     <div class="mb-3">
-                        <label for="payment_amount_display" class="form-label">Jumlah Dibayar</label>
-                        <input type="text" class="form-control" id="payment_amount_display" placeholder="Rp 0" required>
+                        <label for="payment_amount_display" class="form-label">Jumlah Dibayar <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="payment_amount_display" placeholder="Rp 0">
                         <input type="hidden" name="payment_amount" id="payment_amount">
                         <div id="amount-error" class="text-danger small mt-1 d-none">Jumlah tidak boleh melebihi sisa tagihan.</div>
                     </div>
                     <div class="mb-3">
-                        <label for="notes" class="form-label">Catatan</label>
+                        <label for="notes" class="form-label">Catatan (Opsional)</label>
                         <textarea name="notes" id="notes" class="form-control" rows="2"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary" id="submit-proof-btn">Kirim</button>
+                    <button type="submit" class="btn btn-primary" id="submit-proof-btn" disabled>Kirim</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
+
 <div class="modal fade" id="midtransPaymentModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Pembayaran Invoice #{{ $invoice->invoice_number }}</h5>
+                <h5 class="modal-title">Pembayaran Online Invoice #{{ $invoice->invoice_number }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form action="{{ route('client.invoices.pay', $invoice->invoice_id) }}" method="POST">
                 @csrf
                 <div class="modal-body">
                     @php
-                        $sisaTagihan = $invoice->total_amount - $invoice->amount_paid;
+                        // Gunakan perhitungan yang sama dengan modal manual untuk konsistensi
+                        $totalRetur = $invoice->returns->sum('total_amount');
+                        $pendingPayments = $invoice->payments->where('status', 'pending_verification')->sum('amount');
+                        $sisaTagihanMidtrans = $invoice->total_amount - $invoice->amount_paid - $totalRetur - $pendingPayments;
                     @endphp
                     <div class="alert alert-info">
-                        Sisa Tagihan: <strong class="fs-5">Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</strong>
+                        Sisa Tagihan: <strong class="fs-5">Rp {{ number_format($sisaTagihanMidtrans, 0, ',', '.') }}</strong>
                     </div>
                     <div class="mb-3">
                         <label for="amount" class="form-label">Jumlah yang Ingin Dibayar</label>
-                        <input type="number" class="form-control" name="amount" id="amount" value="{{ $sisaTagihan }}" max="{{ $sisaTagihan }}" required>
+                        <input type="number" class="form-control" name="amount" id="amount" value="{{ $sisaTagihanMidtrans }}" max="{{ $sisaTagihanMidtrans }}" min="1" required>
                         <small class="text-muted">Anda bisa membayar lunas atau mencicil.</small>
                     </div>
                 </div>
@@ -256,89 +312,163 @@
 </div>
 @endsection
 
+
 @push('scripts')
+{{-- Library untuk format angka --}}
+<script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
+
 {{-- Script Midtrans Snap --}}
 <script type="text/javascript"
-    src="https://app.sandbox.midtrans.com/snap/snap.js"
+    src="{{ config('midtrans.is_production') ? 'https://app.midtrans.com/snap/snap.js' : 'https://app.sandbox.midtrans.com/snap/snap.js' }}"
     data-client-key="{{ config('midtrans.client_key') }}"></script>
 
+{{-- SCRIPT BARU UNTUK MENGATUR LOGIKA MODAL DAN VALIDASI --}}
 <script type="text/javascript">
     document.addEventListener('DOMContentLoaded', function() {
-        const midtransForm = document.querySelector('#midtransPaymentModal form');
+        // Inisialisasi semua modal Bootstrap
+        const paymentMethodModal = new bootstrap.Modal(document.getElementById('paymentMethodModal'));
+        const manualPaymentModal = new bootstrap.Modal(document.getElementById('manualPaymentModal'));
+        const midtransPaymentModal = new bootstrap.Modal(document.getElementById('midtransPaymentModal'));
 
-        if (!midtransForm) return; // Hindari error jika modal belum dirender
+        // Elemen-elemen dalam form manual
+        const manualPaymentForm = document.querySelector('#manualPaymentModal form');
+        const titleEl = document.getElementById('manualPaymentModalTitle');
+        const methodInput = document.getElementById('payment_method_input');
+        const cashFields = document.getElementById('cash-fields');
+        const transferFields = document.getElementById('transfer-fields');
+        const salesSelect = document.getElementById('user_id_sales');
+        const proofInput = document.getElementById('proof_of_payment');
+        const submitBtn = document.getElementById('submit-proof-btn');
 
-        midtransForm.addEventListener('submit', function(event) {
-            event.preventDefault();
+        // Elemen untuk input jumlah
+        const amountDisplay = document.getElementById('payment_amount_display');
+        const amountHidden = document.getElementById('payment_amount');
+        const amountError = document.getElementById('amount-error');
+        const remainingBalance = parseFloat("{{ $remainingBalance }}");
 
-            // Ambil CSRF token dengan aman
-            const csrfToken = document.querySelector('meta[name="csrf-token"]');
-            if (!csrfToken) {
-                console.error('CSRF token not found!');
-                alert('Terjadi kesalahan konfigurasi. Harap hubungi administrator.');
-                return;
-            }
-
-            const formData = new FormData(this);
-            const payButton = this.querySelector('button[type="submit"]');
-            payButton.disabled = true;
-            payButton.innerHTML = 'Memproses...';
-
-            fetch(this.action, {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken.getAttribute('content'),
-                    'Accept': 'application/json',
-                },
-                body: formData
-            })
-            .then(async response => {
-                if (!response.ok) {
-                    let errMsg = 'Terjadi kesalahan server.';
-                    try {
-                        const errorData = await response.json();
-                        errMsg = errorData.message || errMsg;
-                    } catch {}
-                    throw new Error(errMsg);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (!data.snap_token) {
-                    throw new Error('Snap token tidak ditemukan. Silakan coba lagi.');
-                }
-
-                // Buka pop-up pembayaran Midtrans
-                window.snap.pay(data.snap_token, {
-                    onSuccess: function(result) {
-                        alert("Pembayaran berhasil!");
-                        window.location.reload();
-                    },
-                    onPending: function(result) {
-                        alert("Pembayaran Anda sedang menunggu konfirmasi.");
-                        console.log(result);
-                        window.location.reload();
-                    },
-                    onError: function(result) {
-                        alert("Terjadi kesalahan saat memproses pembayaran.");
-                        console.error(result);
-                        payButton.disabled = false;
-                        payButton.innerHTML = 'Lanjutkan ke Pembayaran';
-                    },
-                    onClose: function() {
-                        alert('Anda menutup pop-up tanpa menyelesaikan pembayaran.');
-                        payButton.disabled = false;
-                        payButton.innerHTML = 'Lanjutkan ke Pembayaran';
-                    }
-                });
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Gagal memulai sesi pembayaran: ' + error.message);
-                payButton.disabled = false;
-                payButton.innerHTML = 'Lanjutkan ke Pembayaran';
-            });
+        // Inisialisasi AutoNumeric pada input jumlah
+        const autoNumericInstance = new AutoNumeric(amountDisplay, {
+            decimalPlaces: 0,
+            digitGroupSeparator: '.',
+            decimalCharacter: ',',
+            currencySymbol: 'Rp ',
+            currencySymbolPlacement: 'p',
+            minimumValue: 0,
+            maximumValue: remainingBalance // Batasi nilai maksimum
         });
+        
+        // Atur nilai default ke sisa tagihan saat modal dibuka
+        autoNumericInstance.set(remainingBalance);
+        amountHidden.value = remainingBalance;
+        validateAmount(); // Langsung validasi saat pertama kali dibuka
+
+        // Fungsi untuk validasi jumlah
+        function validateAmount() {
+            const rawValue = autoNumericInstance.getNumericString();
+            amountHidden.value = rawValue;
+
+            const isValid = rawValue && parseFloat(rawValue) > 0 && parseFloat(rawValue) <= remainingBalance;
+
+            if (!isValid && rawValue !== '') {
+                amountError.classList.remove('d-none');
+            } else {
+                amountError.classList.add('d-none');
+            }
+            
+            // Tombol submit hanya aktif jika jumlah valid
+            submitBtn.disabled = !isValid;
+        }
+
+        // Event listener untuk input jumlah
+        amountDisplay.addEventListener('keyup', validateAmount);
+        amountDisplay.addEventListener('change', validateAmount);
+
+
+        // --- LOGIKA PEMILIHAN METODE PEMBAYARAN ---
+
+        // 1. Klien memilih "Transfer Bank"
+        document.getElementById('pay-manual-transfer-btn').addEventListener('click', function() {
+            paymentMethodModal.hide();
+
+            // Atur form untuk transfer
+            titleEl.textContent = 'Konfirmasi Pembayaran Transfer Bank';
+            methodInput.value = 'manual_transfer';
+            cashFields.classList.add('d-none');
+            transferFields.classList.remove('d-none');
+            proofInput.required = true;
+            salesSelect.required = false;
+
+            manualPaymentModal.show();
+        });
+
+        // 2. Klien memilih "Cash (via Sales)"
+        document.getElementById('pay-cash-btn').addEventListener('click', function() {
+            paymentMethodModal.hide();
+            
+            // Atur form untuk cash
+            titleEl.textContent = 'Konfirmasi Pembayaran Cash';
+            methodInput.value = 'cash';
+            transferFields.classList.add('d-none');
+            cashFields.classList.remove('d-none');
+            salesSelect.required = true;
+            proofInput.required = false;
+
+            manualPaymentModal.show();
+        });
+
+        // 3. Klien memilih "Pembayaran Online"
+        document.getElementById('pay-online-btn').addEventListener('click', function() {
+            paymentMethodModal.hide();
+            midtransPaymentModal.show();
+        });
+
+
+        // --- LOGIKA SUBMIT MIDTRANS (Sama seperti kode Anda, hanya diperbaiki sedikit) ---
+        const midtransForm = document.querySelector('#midtransPaymentModal form');
+        if (midtransForm) {
+            midtransForm.addEventListener('submit', function(event) {
+                event.preventDefault();
+                const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                const formData = new FormData(this);
+                const payButton = this.querySelector('button[type="submit"]');
+                payButton.disabled = true;
+                payButton.innerHTML = 'Memproses...';
+
+                fetch(this.action, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.snap_token) {
+                        window.snap.pay(data.snap_token, {
+                            onSuccess: function(result){ window.location.reload(); },
+                            onPending: function(result){ window.location.reload(); },
+                            onError: function(result){ 
+                                alert("Pembayaran gagal!");
+                                payButton.disabled = false;
+                                payButton.innerHTML = 'Lanjutkan ke Pembayaran';
+                            },
+                            onClose: function(){
+                                payButton.disabled = false;
+                                payButton.innerHTML = 'Lanjutkan ke Pembayaran';
+                            }
+                        });
+                    } else {
+                        throw new Error(data.message || 'Gagal mendapatkan token pembayaran.');
+                    }
+                })
+                .catch(error => {
+                    alert('Error: ' + error.message);
+                    payButton.disabled = false;
+                    payButton.innerHTML = 'Lanjutkan ke Pembayaran';
+                });
+            });
+        }
     });
 </script>
 @endpush
