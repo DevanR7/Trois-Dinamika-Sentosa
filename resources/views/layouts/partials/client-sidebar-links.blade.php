@@ -6,6 +6,12 @@
     </a>
 </li>
 
+<li class="nav-item">
+    <a class="nav-link {{ request()->routeIs('client.orders.create') ? 'active' : '' }}" href="{{ route('client.orders.create') }}">
+        <i class="bi bi-cart-plus-fill me-2"></i> Buat Pesanan Baru
+    </a>
+</li>
+
 {{-- Section Riwayat --}}
 <li class="nav-heading mt-3">Riwayat</li>
 <li class="nav-item">

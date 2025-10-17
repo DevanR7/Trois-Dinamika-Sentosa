@@ -8,6 +8,7 @@ use App\Http\Controllers\Client\ProfileController;
 use App\Http\Controllers\Client\SalesOrderController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\MidtransController;
+use App\Http\Controllers\Client\ClientOrderController;
 
 Route::prefix('client')->name('client.')->group(function () {
 
@@ -42,6 +43,9 @@ Route::prefix('client')->name('client.')->group(function () {
 
             Route::get('sales-orders', [SalesOrderController::class, 'index'])->name('sales-orders.index');
             Route::get('sales-orders/{salesOrder}', [SalesOrderController::class, 'show'])->name('sales-orders.show');
+        
+            Route::get('orders/create', [ClientOrderController::class, 'create'])->name('orders.create');
+            Route::post('orders', [ClientOrderController::class, 'store'])->name('orders.store');
         });
     });
 });
