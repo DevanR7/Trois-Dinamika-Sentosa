@@ -4,16 +4,21 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-// use Illuminate\Database\Eloquent\Model; // This is not needed if extending Authenticatable
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Models\Order; // ✅ TAMBAHKAN: Import model Order
+use App\Models\Order;
+use App\Notifications\ClientResetPasswordNotification;
 
-class Client extends Authenticatable
+// 1. TAMBAHKAN DUA 'USE' INI
+use Illuminate\Contracts\Auth\CanResetPassword;
+use Illuminate\Auth\Passwords\CanResetPassword as CanResetPasswordTrait;
+
+class Client extends Authenticatable implements CanResetPassword
 {
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes, CanResetPasswordTrait;
+
     protected $primaryKey = 'client_id';
 
     /**
@@ -46,6 +51,17 @@ class Client extends Authenticatable
         'password' => 'hashed',
         'is_approved' => 'boolean',
     ];
+
+    /**
+     * Mengirim notifikasi reset password kustom.
+     *
+     * @param  string  $token
+     * @return void
+     */
+    public function sendPasswordResetNotification($token)
+    {
+        $this->notify(new ClientResetPasswordNotification($token));
+    }
 
     /**
      * Get all of the sales invoices for the Client.

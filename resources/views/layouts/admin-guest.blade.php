@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content="{{ csrf_token() }}" />
-    <title>{{ config('app.name', 'Laravel') }} - Client Login</title>
+    <title>{{ config('app.name', 'Laravel') }} - Login</title>
 
     {{-- Fonts & CSS --}}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -26,12 +26,12 @@
                 
                 <img src="{{ asset('images/TDS-side-text.png') }}" alt="Logo" class="login-logo">
 
-                <h2 class="welcome-title">Hello, welcome!</h2>
+                <h2 class="welcome-title">Internal Portal</h2>
                 <p class="welcome-subtitle">
-                    Client Portal Trois Dinamika Sentosa
+                    Trois Dinamika Sentosa
                 </p>
                 <p class="welcome-text">
-                    Silakan masuk untuk melanjutkan ke portal Anda.
+                    Silakan masuk untuk melanjutkan ke dasbor Anda.
                 </p>
             </div>
 

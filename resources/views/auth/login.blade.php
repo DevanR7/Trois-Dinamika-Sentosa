@@ -1,90 +1,123 @@
-@extends('layouts.guest')
+@extends('layouts.admin-guest')
 
 @section('content')
-    <form method="POST" action="{{ route("login") }}">
+
+    {{-- 
+      Judul "Selamat Datang Kembali" kita hilangkan agar konsisten
+      dengan desain baru, di mana logo sudah menjadi 'judul' utama 
+      di bagian atas form.
+    --}}
+
+    {{-- Notifikasi Error/Sukses (style disamakan) --}}
+    @if ($errors->any())
+        <div class="alert alert-danger">
+            <ul class="mb-0 ps-3">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+    @if (session('error'))
+        <div class="alert alert-danger" role="alert">
+            {{ session('error') }}
+        </div>
+    @endif
+
+    {{-- Form login (dengan class & style baru) --}}
+    <form method="POST" action="{{ route('login') }}" class="login-form">
         @csrf
 
-        <div class="text-center mb-4">
-            <h4 class="fw-bold">Selamat Datang Kembali</h4>
-            <p class="text-muted">Silakan masuk untuk melanjutkan</p>
-        </div>
-
-        @if ($errors->any())
-            <div class="alert alert-danger text-center p-2 mb-3">
-                {{ $errors->first() }}
-            </div>
-        @endif
-        @if (session('error'))
-            <div class="alert alert-danger text-center p-2 mb-3">
-                {{ session('error') }}
-            </div>
-        @endif
-
+        {{-- Input Username dengan Ikon (Struktur disamakan) --}}
         <div class="mb-3">
-            <label for="username" class="form-label">{{ __("Username") }}</label>
-            <div class="input-group">
-                <span class="input-group-text"><i class="bi bi-person-fill"></i></span>
-                <input id="username" class="form-control" type="text" name="username" placeholder="Masukkan username Anda" value="{{ old("username") }}" required autofocus />
+            <label for="username" class="form-label">{{ __('Username') }}</label>
+            <div class="input-wrapper">
+                {{-- Ikon Orang --}}
+                <i class="bi bi-person input-icon"></i>
+                <input id="username" type="text" name="username"
+                       class="form-control @error('username') is-invalid @enderror"
+                       value="{{ old('username') }}" required autofocus 
+                       placeholder="Masukkan Username Anda">
             </div>
         </div>
 
+        {{-- Input Password dengan Ikon & Toggle (Struktur disamakan) --}}
         <div class="mb-3">
-            <label for="password" class="form-label">{{ __("Password") }}</label>
-            <div class="input-group">
-                <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
-                <input id="password" class="form-control" type="password" name="password" placeholder="Masukkan password" required />
-                <button class="btn btn-outline-secondary" type="button" id="togglePassword">
-                    <i class="bi bi-eye-slash-fill"></i>
-                </button>
+            <label for="password" class="form-label">{{ __('Password') }}</label>
+            <div class="input-wrapper">
+                {{-- Ikon Gembok --}}
+                <i class="bi bi-lock input-icon"></i>
+                <input id="password" type="password" name="password"
+                       class="form-control @error('password') is-invalid @enderror"
+                       required 
+                       placeholder="Masukkan Password Anda">
+                {{-- Ikon Mata (Toggle) --}}
+                <i class="bi bi-eye-slash" id="togglePassword"></i>
             </div>
         </div>
 
+        {{-- Remember me & Forgot Password --}}
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div class="form-check">
-                <input id="remember_me" type="checkbox" class="form-check-input" name="remember" />
-                <label for="remember_me" class="form-check-label">{{ __("Remember me") }}</label>
+                <input type="checkbox" name="remember" id="remember" class="form-check-input">
+                <label for="remember" class="form-check-label">{{ __('Remember me') }}</label>
             </div>
-            @if (Route::has("password.request"))
-                <a class="text-decoration-none small" href="{{ route("password.request") }}">
-                    {{ __("Lupa password?") }}
+            
+            @if (Route::has('password.request'))
+                <a href="{{ route('password.request') }}" class="forgot-password-link">
+                    {{ __('Lupa password?') }}
                 </a>
             @endif
         </div>
 
-        <div class="d-grid">
-            <button type="submit" class="btn btn-primary btn-lg">
-                {{ __("Log in") }}
+        {{-- Tombol Login (Full-width, tanpa "Sign up") --}}
+        <div class="d-grid mb-4">
+            <button type="submit" class="btn btn-login">
+                {{ __('Log in') }}
             </button>
         </div>
-
-        <div class="d-flex align-items-center my-4">
-            <hr class="flex-grow-1">
-            <span class="px-3 text-muted">ATAU</span>
-            <hr class="flex-grow-1">
+        
+        {{-- Pemisah "ATAU" (Style disamakan) --}}
+        <div class="text-center text-muted my-3">
+            <span>ATAU</span>
         </div>
 
-        <div class="d-grid">
-            <a href="{{ route('auth.google') }}" class="btn btn-outline-dark">
-                <svg class="me-2" style="width: 1.2em; height: 1.2em; vertical-align: text-bottom;" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56,12.25C22.56,11.47,22.49,10.72,22.36,10H12V14.5H18.33C18.05,16.05,17.26,17.34,16.07,18.23V21H20.25C22.09,19.34,22.56,16.53,22.56,12.25Z" fill="#4285F4"/><path d="M12,24C15.24,24,17.97,22.9,20.25,21L16.07,18.23C14.99,18.91,13.62,19.33,12,19.33C9.09,19.33,6.6,17.4,5.63,14.83H1.34V17.74C3.23,21.46,7.27,24,12,24Z" fill="#34A853"/><path d="M5.63,14.83C5.44,14.28,5.33,13.67,5.33,13C5.33,12.33,5.44,11.72,5.63,11.17V8.26H1.34C0.47,10.04,0,11.9,0,14C0,16.1,0.47,17.96,1.34,19.74L5.63,14.83Z" fill="#FBBC05"/><path d="M12,6.67C13.75,6.67,15.06,7.34,15.93,8.14L19.43,4.64C17.97,3.23,15.24,2,12,2C7.27,2,3.23,4.54,1.34,8.26L5.63,11.17C6.6,8.6,9.09,6.67,12,6.67Z" fill="#EA4335"/></svg>
-                Lanjutkan dengan Google
+        {{-- Login Google (Style disamakan) --}}
+        <div class="d-grid mb-3">
+            <a href="{{ route('auth.google') }}" class="btn btn-outline-secondary fw-semibold">
+                <i class="bi bi-google me-1"></i> Masuk dengan Google
             </a>
         </div>
+
+        <div class="text-center mt-4">
+            <small class="text-muted">
+                Apakah Anda seorang Klien? 
+                {{-- Pastikan 'client.login' adalah nama route Anda --}}
+                <a href="{{ route('client.login') }}" class="redirect-link">Masuk di Portal Klien</a>
+            </small>
+        </div>
+
     </form>
 @endsection
 
+{{-- SCRIPT UNTUK TOGGLE PASSWORD (Harus sama dengan script client) --}}
 @push('scripts')
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const togglePassword = document.querySelector('#togglePassword');
-        const password = document.querySelector('#password');
-        const icon = togglePassword.querySelector('i');
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const togglePassword = document.querySelector('#togglePassword');
+            const password = document.querySelector('#password');
 
-        togglePassword.addEventListener('click', function () {
-            const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
-            password.setAttribute('type', type);
-            icon.classList.toggle('bi-eye-slash-fill');
-            icon.classList.toggle('bi-eye-fill');
+            if (togglePassword && password) {
+                togglePassword.addEventListener('click', function (e) {
+                    // Toggle tipe input
+                    const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+                    password.setAttribute('type', type);
+                    
+                    // Toggle ikon mata
+                    this.classList.toggle('bi-eye');
+                    this.classList.toggle('bi-eye-slash');
+                });
+            }
         });
-    });
-</script>
+    </script>
 @endpush

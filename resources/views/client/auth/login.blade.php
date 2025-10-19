@@ -3,11 +3,18 @@
 @section('content')
 
     {{-- Notifikasi Error/Sukses (jika ada) --}}
+    @if (session('success'))
+        <div class="alert alert-success" role="alert">
+            {{ session('success') }}
+        </div>
+    @endif
+
     @if (session('error'))
         <div class="alert alert-danger" role="alert">
             {{ session('error') }}
         </div>
     @endif
+    
     @if ($errors->any())
         <div class="alert alert-danger">
             <ul class="mb-0 ps-3">
@@ -57,7 +64,7 @@
                 <label for="remember" class="form-check-label">Remember me</label>
             </div>
             
-            <a href="#" class="forgot-password-link">Forgot password?</a>
+            <a href="{{ route('client.password.request') }}" class="forgot-password-link">Forgot password?</a>
         </div>
 
         {{-- Tombol Login & Sign up --}}
@@ -68,7 +75,7 @@
                 </button>
             </div>
             <div class="col-6">
-                <a href="#" class="btn btn-signup">
+                <a href="{{ route('client.register') }}" class="btn btn-signup">
                     Sign up
                 </a>
             </div>
@@ -76,7 +83,7 @@
         
         {{-- Login Google --}}
         <div class="text-center text-muted my-3">
-            <span>atau</span>
+            <span>ATAU</span>
         </div>
         <div class="d-grid mb-3">
             <a href="{{ route('client.auth.google') }}" class="btn btn-outline-secondary fw-semibold">

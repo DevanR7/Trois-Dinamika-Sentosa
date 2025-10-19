@@ -153,6 +153,18 @@ html {
     font-weight: 500;
 }
 .forgot-password-link:hover { color: #111827; }
+
+.redirect-link {
+    color: #111827; /* Warna gelap utama kita */
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+.redirect-link:hover {
+    text-decoration: underline;
+    color: #1f2937; /* Sedikit lebih terang saat hover */
+}
+
 .form-check-input:checked {
     background-color: #111827;
     border-color: #111827;
