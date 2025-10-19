@@ -27,8 +27,9 @@ class DashboardController extends Controller
             ->sum(DB::raw('total_amount - amount_paid'));
 
         // Count active sales orders
-        $activeOrders = $client->salesOrders()
-            ->whereIn('status', ['pending', 'approved', 'draft'])
+        $activeOrders = $client->orders() // ✅ BERUBAH: Gunakan method orders()
+            ->whereIn('status', ['pending', 'approved']) // Status 'draft' tidak ada di model Order
+            // ->where('order_source', 'client') // Optional: Tambahkan filter jika perlu
             ->count();
 
         return view('client.dashboard', compact(

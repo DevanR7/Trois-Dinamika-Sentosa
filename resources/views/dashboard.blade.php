@@ -133,24 +133,39 @@
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle">
-                        <thead><tr class="table-light"><th>No. Pesanan</th><th>Klien</th><th>Sales</th><th>Tanggal</th><th class="text-center">Status</th><th class="text-end">Jumlah</th></tr></thead>
-                        <tbody>
-                            @forelse ($latestSalesOrders as $order)
-                                <tr>
-                                    <td><a href="{{ route('sales-orders.show', $order->order_id) }}">{{ $order->order_number }}</a></td>
-                                    <td>{{ $order->client->client_name ?? "N/A" }}</td>
-                                    <td>{{ $order->sales->full_name ?? "N/A" }}</td>
-                                    <td>{{ optional($order->order_date)->format("d M Y") }}</td>
-                                    <td class="text-center"><span class="badge bg-secondary">{{ Str::title($order->status) }}</span></td>
-                                    <td class="text-end">Rp {{ number_format($order->total_amount, 0, ",", ".") }}</td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="6" class="text-center text-muted">Belum ada pesanan penjualan.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
+        <table class="table table-hover align-middle">
+            <thead><tr class="table-light"><th>No. Pesanan</th><th>Klien</th><th>Sales</th><th>Tanggal</th><th class="text-center">Status</th><th class="text-end">Jumlah</th></tr></thead>
+            <tbody>
+                {{-- ✅ BERUBAH: Menggunakan variabel $latestOrders --}}
+                @forelse ($latestOrders as $order)
+                    <tr>
+                        {{-- Link route 'sales-orders.show' masih benar karena merujuk ke route admin --}}
+                        <td><a href="{{ route('sales-orders.show', $order->order_id) }}">{{ $order->order_number }}</a></td>
+                        <td>{{ $order->client->client_name ?? "N/A" }}</td>
+                        <td>{{ $order->sales->full_name ?? "N/A" }}</td>
+                        <td>{{ optional($order->order_date)->format("d M Y") }}</td>
+                        {{-- Status badge bisa dibuat lebih dinamis --}}
+                        @php
+                            $statusClass = [
+                                'pending' => 'bg-secondary',
+                                'approved' => 'bg-info text-dark',
+                                'rejected' => 'bg-danger',
+                                'invoiced' => 'bg-success',
+                            ];
+                        @endphp
+                        <td class="text-center">
+                            <span class="badge {{ $statusClass[$order->status] ?? 'bg-light text-dark' }}">
+                                {{ Str::title(str_replace('_', ' ', $order->status)) }}
+                            </span>
+                        </td>
+                        <td class="text-end">Rp {{ number_format($order->total_amount, 0, ",", ".") }}</td>
+                    </tr>
+                @empty
+                    <tr><td colspan="6" class="text-center text-muted">Belum ada pesanan penjualan.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
             </div>
   <div class="card shadow-sm">
             <div class="card-header bg-white">

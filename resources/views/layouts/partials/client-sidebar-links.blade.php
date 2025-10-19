@@ -15,7 +15,8 @@
 {{-- Section Riwayat --}}
 <li class="nav-heading mt-3">Riwayat</li>
 <li class="nav-item">
-    <a class="nav-link {{ request()->routeIs('client.sales-orders.*') ? 'active' : '' }}" href="{{ route('client.sales-orders.index') }}">
+    {{-- ✅ BERUBAH: Tambahkan pengecualian untuk create --}}
+    <a class="nav-link {{ request()->routeIs('client.orders.index') || request()->routeIs('client.orders.show') ? 'active' : '' }}" href="{{ route('client.orders.index') }}">
         <i class="bi bi-box-seam me-2"></i> Riwayat Pesanan
     </a>
 </li>

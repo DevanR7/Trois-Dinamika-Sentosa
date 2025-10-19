@@ -13,19 +13,42 @@ class EnsureClientProfileIsComplete
     {
         $client = Auth::guard('client')->user();
 
-        // Tentukan field mana saja yang wajib diisi
+        if (!$client) {
+            return $next($request);
+        }
+
         $requiredFields = ['client_name', 'address', 'phone_number', 'person_in_charge'];
 
         foreach ($requiredFields as $field) {
-            // Jika salah satu field kosong DAN klien tidak sedang mencoba mengakses halaman profil
-            if (empty($client->$field) && !$request->routeIs('client.profile.*')) {
-                // Paksa redirect ke halaman edit profil dengan pesan
+            $isProfileRoute = $request->routeIs('client.profile.edit') || $request->routeIs('client.profile.update');
+
+            // Ambil nilai field saat ini
+            $currentValue = $client->$field ?? null; // Gunakan null coalescing operator
+
+            // Cek apakah dianggap kosong
+            $isValueEmpty = empty($currentValue);
+
+            // Kondisi yang menyebabkan redirect
+            $shouldRedirect = $isValueEmpty && !$isProfileRoute;
+
+            // Jika HARUS redirect, TAMPILKAN DEBUG dan hentikan
+            if ($shouldRedirect) {
+                dd(
+                    "REDIRECTING! Check failed ON THIS FIELD:",
+                    "Field:", $field, // Field yang *sebenarnya* menyebabkan masalah
+                    "Value:", $currentValue,
+                    "Is considered empty?", $isValueEmpty,
+                    "Is Profile Route?", $isProfileRoute,
+                    "Current Route:", $request->route()->getName()
+                );
+
+                // Baris redirect asli (sekarang tidak akan tercapai jika dd() aktif)
                 return redirect()->route('client.profile.edit')
-                    ->with('info', 'Harap lengkapi informasi profil Anda untuk melanjutkan.');
+                    ->with('info', 'Harap lengkapi informasi profil Anda (Nama, Alamat, Telepon, PIC) untuk melanjutkan.');
             }
         }
 
-        // Jika semua field sudah terisi, izinkan akses
+        // Jika lolos loop tanpa redirect
         return $next($request);
     }
 }

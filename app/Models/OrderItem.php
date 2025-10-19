@@ -5,10 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Order;
+use App\Models\Product;
 
-class SalesOrderItem extends Model
+class OrderItem extends Model
 {
     use HasFactory;
+
+    // protected $table = 'order_items'; // Tidak perlu, Laravel sudah otomatis
 
     protected $primaryKey = 'item_id';
 
@@ -25,9 +29,10 @@ class SalesOrderItem extends Model
         'subtotal',
     ];
 
-    public function salesOrder(): BelongsTo
+    public function order(): BelongsTo 
     {
-        return $this->belongsTo(SalesOrder::class, 'order_id', 'order_id');
+        // Arahkan ke model 'Order' yang baru
+        return $this->belongsTo(Order::class, 'order_id', 'order_id');
     }
 
     public function product(): BelongsTo

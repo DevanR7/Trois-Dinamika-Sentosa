@@ -8,10 +8,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
+use App\Models\Client;
+use App\Models\OrderItem;
+use App\Models\OrderChangeRequest;
 
-class SalesOrder extends Model
+class Order extends Model
 {
     use HasFactory;
+
+    // protected $table = 'orders'; // Tidak perlu, Laravel sudah otomatis
     
     protected $primaryKey = 'order_id';
 
@@ -60,6 +65,13 @@ class SalesOrder extends Model
 
     public function items(): HasMany
     {
-        return $this->hasMany(SalesOrderItem::class, 'order_id', 'order_id');
+        // Arahkan ke model 'OrderItem' yang baru
+        return $this->hasMany(OrderItem::class, 'order_id', 'order_id'); 
+    }
+
+    public function changeRequests(): HasMany
+    {
+    // Mengurutkan berdasarkan yang terbaru
+    return $this->hasMany(OrderChangeRequest::class, 'order_id', 'order_id')->latest();
     }
 }

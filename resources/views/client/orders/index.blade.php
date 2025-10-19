@@ -17,16 +17,29 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($salesOrders as $order)
+                        {{-- ✅ BERUBAH: $salesOrders -> $orders --}}
+                        @forelse($orders as $order)
                             <tr>
                                 <td>{{ $order->order_number }}</td>
                                 <td>{{ $order->order_date->format('d M Y') }}</td>
                                 <td class="text-end">Rp {{ number_format($order->total_amount, 0, ',', '.') }}</td>
                                 <td class="text-center">
-                                    <span class="badge bg-secondary">{{ Str::title($order->status) }}</span>
+                                    {{-- Status badge bisa dibuat lebih dinamis seperti di admin --}}
+                                    @php
+                                        $statusClass = [
+                                            'pending' => 'bg-secondary',
+                                            'approved' => 'bg-info text-dark',
+                                            'rejected' => 'bg-danger',
+                                            'invoiced' => 'bg-success',
+                                        ];
+                                    @endphp
+                                    <span class="badge {{ $statusClass[$order->status] ?? 'bg-light text-dark' }}">
+                                        {{ Str::title(str_replace('_', ' ', $order->status)) }}
+                                    </span>
                                 </td>
                                 <td class="text-center">
-                                    <a href="{{ route('client.sales-orders.show', $order->order_id) }}" class="btn btn-sm btn-outline-primary">
+                                    {{-- ❗️ PERHATIAN: Nama route ini mungkin perlu diubah nanti --}}
+                                    <a href="{{ route('client.orders.show', $order->order_id) }}" class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-eye"></i> Detail
                                     </a>
                                 </td>
@@ -40,7 +53,8 @@
                 </table>
             </div>
             <div class="mt-3 d-flex justify-content-center">
-                {{ $salesOrders->links() }}
+                {{-- ✅ BERUBAH: $salesOrders -> $orders --}}
+                {{ $orders->links() }}
             </div>
         </div>
     </div>

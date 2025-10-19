@@ -15,107 +15,111 @@ class RoleAndPermissionSeeder extends Seeder
 
         // === BUAT SEMUA PERMISSION YANG DIBUTUHKAN SECARA DETAIL ===
         // Format: aksi-modul
-        
+
         // Dashboard
-        Permission::create(['name' => 'view-dashboard']);
+        Permission::updateOrCreate(['name' => 'view-dashboard']); // Gunakan updateOrCreate
 
         // Suppliers
-        Permission::create(['name' => 'view-suppliers']);
-        Permission::create(['name' => 'create-suppliers']);
-        Permission::create(['name' => 'edit-suppliers']);
-        Permission::create(['name' => 'delete-suppliers']);
+        Permission::updateOrCreate(['name' => 'view-suppliers']);
+        Permission::updateOrCreate(['name' => 'create-suppliers']);
+        Permission::updateOrCreate(['name' => 'edit-suppliers']);
+        Permission::updateOrCreate(['name' => 'delete-suppliers']);
 
         // Purchase Orders
-        Permission::create(['name' => 'view-purchase-orders']);
-        Permission::create(['name' => 'create-purchase-orders']);
-        Permission::create(['name' => 'edit-purchase-orders']);
-        Permission::create(['name' => 'cancel-purchase-orders']);
-        Permission::create(['name' => 'receive-purchase-orders']); // Terima barang
-        Permission::create(['name' => 'pay-purchase-orders']);   // Pembayaran PO
+        Permission::updateOrCreate(['name' => 'view-purchase-orders']);
+        Permission::updateOrCreate(['name' => 'create-purchase-orders']);
+        Permission::updateOrCreate(['name' => 'edit-purchase-orders']);
+        Permission::updateOrCreate(['name' => 'cancel-purchase-orders']);
+        Permission::updateOrCreate(['name' => 'receive-purchase-orders']); // Terima barang
+        Permission::updateOrCreate(['name' => 'pay-purchase-orders']);   // Pembayaran PO
 
         // Products
-        Permission::create(['name' => 'view-products']);
-        Permission::create(['name' => 'create-products']);
-        Permission::create(['name' => 'edit-products']);
-        Permission::create(['name' => 'delete-products']);
+        Permission::updateOrCreate(['name' => 'view-products']);
+        Permission::updateOrCreate(['name' => 'create-products']);
+        Permission::updateOrCreate(['name' => 'edit-products']);
+        Permission::updateOrCreate(['name' => 'delete-products']);
 
         // Clients
-        Permission::create(['name' => 'view-clients']);
-        Permission::create(['name' => 'create-clients']);
-        Permission::create(['name' => 'edit-clients']);
-        Permission::create(['name' => 'delete-clients']);
+        Permission::updateOrCreate(['name' => 'view-clients']);
+        Permission::updateOrCreate(['name' => 'create-clients']);
+        Permission::updateOrCreate(['name' => 'edit-clients']);
+        Permission::updateOrCreate(['name' => 'delete-clients']);
 
-        // Sales Orders
-        Permission::create(['name' => 'view-sales-orders']);
-        Permission::create(['name' => 'create-sales-orders']);
-        Permission::create(['name' => 'edit-sales-orders']);
-        Permission::create(['name' => 'delete-sales-orders']);
+        // Sales Orders (Now Orders)
+        Permission::updateOrCreate(['name' => 'view-sales-orders']); // Keep name for consistency or rename
+        Permission::updateOrCreate(['name' => 'create-sales-orders']);
+        Permission::updateOrCreate(['name' => 'edit-sales-orders']);
+        Permission::updateOrCreate(['name' => 'delete-sales-orders']);
+
+        // ✅ TAMBAHKAN PERMISSION BARU UNTUK REVIEW REQUEST
+        Permission::updateOrCreate(['name' => 'review-order-change-requests']);
 
         // Invoices
-        Permission::create(['name' => 'view-invoices']);
-        Permission::create(['name' => 'create-invoices']);
-        Permission::create(['name' => 'edit-invoices']);
-        Permission::create(['name' => 'delete-invoices']);
-        Permission::create(['name' => 'cancel-invoices']);
-        Permission::create(['name' => 'pay-invoices']);
+        Permission::updateOrCreate(['name' => 'view-invoices']);
+        Permission::updateOrCreate(['name' => 'create-invoices']);
+        Permission::updateOrCreate(['name' => 'edit-invoices']);
+        Permission::updateOrCreate(['name' => 'delete-invoices']);
+        Permission::updateOrCreate(['name' => 'cancel-invoices']);
+        Permission::updateOrCreate(['name' => 'pay-invoices']);
 
-        // System
-        Permission::create(['name' => 'manage-users']);
-        Permission::create(['name' => 'manage-roles']);
-        Permission::create(['name' => 'manage-settings']); // Untuk Pajak & Satuan
-        Permission::create(['name' => 'manage-products']);
-        Permission::create(['name' => 'manage-clients']);
-        Permission::create(['name' => 'manage-suppliers']);
-        Permission::create(['name' => 'manage-purchase-orders']);
-        Permission::create(['name' => 'manage-sales-orders']);
-        Permission::create(['name' => 'manage-invoices']);
+        // Sales Returns
+        Permission::updateOrCreate(['name' => 'view-sales-returns']);
+        Permission::updateOrCreate(['name' => 'create-sales-returns']);
+        Permission::updateOrCreate(['name' => 'delete-sales-returns']);
 
-        // [BARU] Permission untuk Laporan
-        Permission::create(['name' => 'view-reports']);
+        // Purchase Returns
+        Permission::updateOrCreate(['name' => 'view-purchase-returns']);
+        Permission::updateOrCreate(['name' => 'create-purchase-returns']);
+        Permission::updateOrCreate(['name' => 'delete-purchase-returns']);
 
-        // [BARU] Permission untuk Retur Penjualan
-        Permission::create(['name' => 'view-sales-returns']);
-        Permission::create(['name' => 'create-sales-returns']);
-        Permission::create(['name' => 'delete-sales-returns']);
+        // Reports
+        Permission::updateOrCreate(['name' => 'view-reports']);
 
-        // [BARU] Permission untuk Retur Pembelian
-        Permission::create(['name' => 'view-purchase-returns']);
-        Permission::create(['name' => 'create-purchase-returns']);
-        Permission::create(['name' => 'delete-purchase-returns']);
+        // System (Simplify or keep detailed as needed)
+        Permission::updateOrCreate(['name' => 'manage-users']);
+        Permission::updateOrCreate(['name' => 'manage-roles']);
+        Permission::updateOrCreate(['name' => 'manage-settings']); // Pajak, Satuan, Perusahaan
 
 
-        // === BUAT ROLES ===
-        $adminRole = Role::create(['name' => 'admin']);
-        $manajemenRole = Role::create(['name' => 'manajemen']);
-        $kasirRole = Role::create(['name' => 'kasir']);
-        $salesRole = Role::create(['name' => 'sales']);
+        // === BUAT ROLES (Gunakan updateOrCreate agar aman dijalankan ulang) ===
+        $adminRole = Role::updateOrCreate(['name' => 'admin']);
+        $manajemenRole = Role::updateOrCreate(['name' => 'manajemen']);
+        $kasirRole = Role::updateOrCreate(['name' => 'kasir']);
+        $salesRole = Role::updateOrCreate(['name' => 'sales']);
 
         // === BERIKAN PERMISSION KE SETIAP ROLE ===
-        
-        // ADMIN & MANAJEMEN: Bisa melakukan segalanya
-        $adminRole->givePermissionTo(Permission::all());
-        $manajemenRole->givePermissionTo(Permission::all());
+        // JANGAN GUNAKAN Permission::all() lagi jika seeder dijalankan ulang
+        // Lebih baik sync permission yang spesifik
 
-        // KASIR
-        $kasirRole->givePermissionTo([
+        // ADMIN & MANAJEMEN: Beri semua permission yang *didefinisikan di atas*
+        // (Permission baru akan otomatis masuk)
+        $allDefinedPermissions = Permission::pluck('name'); // Ambil nama semua permission yg dibuat
+        $adminRole->syncPermissions($allDefinedPermissions);
+        $manajemenRole->syncPermissions($allDefinedPermissions);
+
+
+        // KASIR (Gunakan syncPermissions)
+        $kasirRole->syncPermissions([
             'view-dashboard',
             'view-suppliers', 'create-suppliers', 'edit-suppliers', 'delete-suppliers',
-            'view-purchase-orders', 'create-purchase-orders', 'edit-purchase-orders', 'receive-purchase-orders', // Tidak bisa bayar PO
+            'view-purchase-orders', 'create-purchase-orders', 'edit-purchase-orders', 'receive-purchase-orders',
             'view-products', 'create-products', 'edit-products', 'delete-products',
             'view-clients', 'create-clients', 'edit-clients', 'delete-clients',
             'view-sales-orders', 'create-sales-orders', 'edit-sales-orders', 'delete-sales-orders',
-            'view-invoices', 'create-invoices', 'edit-invoices', 'delete-invoices', 'pay-invoices', // Bisa catat pembayaran invoice
-            'manage-settings',
-            'view-suppliers', 'create-suppliers', 'edit-suppliers', 'delete-suppliers','view-purchase-returns', // Bisa atur pajak & satuan
+            'view-invoices', 'create-invoices', 'edit-invoices', 'delete-invoices', 'pay-invoices',
+            'manage-settings', // Hanya akses bagian Pajak & Satuan (perlu diatur di controller/view)
+            'view-purchase-returns', // Hanya view retur beli
+            'view-sales-returns', // Hanya view retur jual
         ]);
 
-        // SALES
-        $salesRole->givePermissionTo([
+        // SALES (Gunakan syncPermissions)
+        $salesRole->syncPermissions([
             'view-dashboard',
-            'view-suppliers', // Hanya lihat supplier
-            'view-products', // Hanya lihat produk
-            'view-clients', 'create-clients', 'edit-clients', 'delete-clients', // Bisa kelola klien
-            'view-sales-orders', 'create-sales-orders', 'edit-sales-orders', 'delete-sales-orders', // Bisa kelola SO
+            'view-suppliers',
+            'view-products',
+            'view-clients', 'create-clients', 'edit-clients', 'delete-clients',
+            'view-sales-orders', 'create-sales-orders', 'edit-sales-orders', 'delete-sales-orders',
+             'view-invoices', // Sales hanya bisa view invoice terkait mereka (logic di controller)
         ]);
     }
 }

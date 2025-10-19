@@ -40,12 +40,14 @@
 @endif
 
 {{-- PEMBATAS OTOMATIS --}}
-@if (Auth::user()->canany(['view-suppliers', 'view-purchase-orders', 'view-products']) && Auth::user()->canany(['view-clients', 'view-sales-orders', 'view-invoices']))
+{{-- ✅ BERUBAH: Tambahkan permission baru 'review-order-change-requests' di kondisi ini --}}
+@if (Auth::user()->canany(['view-suppliers', 'view-purchase-orders', 'view-products']) && Auth::user()->canany(['view-clients', 'view-sales-orders', 'review-order-change-requests', 'view-invoices']))
     <hr class="my-2">
 @endif
 
 {{-- Section Penjualan --}}
-@if(Auth::user()->canany(['view-clients', 'view-sales-orders', 'view-invoices']))
+{{-- ✅ BERUBAH: Tambahkan permission baru 'review-order-change-requests' di kondisi ini --}}
+@if(Auth::user()->canany(['view-clients', 'view-sales-orders', 'review-order-change-requests', 'view-invoices']))
     <li class="nav-heading">Penjualan</li>
     @can('view-clients')
     <li class="nav-item">
@@ -61,6 +63,25 @@
         </a>
     </li>
     @endcan
+
+    {{-- ✅ MENU BARU UNTUK REVIEW REQUEST --}}
+    @can('review-order-change-requests')
+    <li class="nav-item">
+        {{-- Gunakan route name yang sudah kita definisikan --}}
+        <a class="nav-link {{ request()->routeIs('order-change-requests.*') ? 'active' : '' }}" href="{{ route('order-change-requests.index') }}">
+            <i class="bi bi-bell-fill me-2 position-relative"></i> Permintaan Perubahan
+            {{-- Optional: Tambahkan badge jika ada request pending --}}
+            {{-- @php $pendingRequestsCount = \App\Models\OrderChangeRequest::where('status', 'pending')->count(); @endphp
+            @if($pendingRequestsCount > 0)
+                <span class="badge bg-danger rounded-pill position-absolute top-0 start-100 translate-middle ms-2">
+                    {{ $pendingRequestsCount }}
+                </span>
+            @endif --}}
+        </a>
+    </li>
+    @endcan
+    {{-- =================================== --}}
+
     @can("view-invoices")
     <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('invoices.*') ? 'active' : '' }}" href="{{ route('invoices.index') }}">
@@ -71,7 +92,8 @@
 @endif
 
 {{-- PEMBATAS OTOMATIS --}}
-@if (Auth::user()->canany(['view-clients', 'view-sales-orders', 'view-invoices']) && Auth::user()->canany(['view-sales-returns', 'view-purchase-returns']))
+{{-- ✅ BERUBAH: Tambahkan permission baru 'review-order-change-requests' di kondisi ini --}}
+@if (Auth::user()->canany(['view-clients', 'view-sales-orders', 'review-order-change-requests', 'view-invoices']) && Auth::user()->canany(['view-sales-returns', 'view-purchase-returns']))
     <hr class="my-2">
 @endif
 

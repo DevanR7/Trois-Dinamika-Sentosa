@@ -8,6 +8,10 @@
             @if ($errors->any())
                 <div class="alert alert-danger"><ul class="mb-0">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
             @endif
+            {{-- Tambahkan notifikasi error dari session jika ada --}}
+             @if (session('error'))
+                <div class="alert alert-danger">{{ session('error') }}</div>
+            @endif
 
             <form action="{{ route('client.orders.store') }}" method="POST">
                 @csrf
@@ -18,7 +22,7 @@
                     </div>
                     <div class="col-md-6">
                         <label for="order_date" class="form-label fw-semibold">Tanggal Pesanan</label>
-                        <input type="date" class="form-control" id="order_date" name="order_date" value="{{ now()->format('Y-m-d') }}" required>
+                        <input type="date" class="form-control" id="order_date" name="order_date" value="{{ old('order_date', now()->format('Y-m-d')) }}" required max="{{ now()->format('Y-m-d') }}"> {{-- Tambahkan max date --}}
                     </div>
                 </div>
 
@@ -38,16 +42,17 @@
                     </table>
                 </div>
                 <button type="button" id="add-product-btn" class="btn btn-secondary btn-sm"><i class="bi bi-plus-circle me-1"></i> Tambah Item</button>
-                
+
                 <hr class="my-4">
-                
+
                 <div class="row justify-content-between">
                     <div class="col-md-6">
                         <label for="notes" class="form-label fw-semibold">Catatan (Opsional)</label>
                         <textarea class="form-control" name="notes" id="notes" rows="3">{{ old('notes') }}</textarea>
                     </div>
                     <div class="col-md-5 text-end">
-                        <h4 class="fw-bold">Total Estimasi: <span id="grand-total" class="text-primary">Rp 0</span></h4>
+                        {{-- Ganti teks Total Estimasi --}}
+                        <h4 class="fw-bold">Total Pesanan: <span id="grand-total" class="text-primary">Rp 0</span></h4>
                     </div>
                 </div>
 
@@ -60,26 +65,35 @@
     </div>
 </div>
 
+{{-- Template untuk baris item --}}
 <template id="product-row-template">
     <tr>
         <td>
             <select class="form-select form-select-sm product-select" required>
-                <option></option>
+                <option value="" data-price="0" disabled selected>-- Pilih Produk --</option> {{-- Tambah data-price=0 --}}
                 @foreach ($products as $product)
-                    <option value="{{ $product->product_id }}" data-price="{{ $product->selling_price }}">{{ $product->product_name }}</option>
+                    {{-- ✅ PASTIKAN MENGGUNAKAN purchase_price --}}
+                    <option value="{{ $product->product_id }}" data-price="{{ $product->purchase_price ?? 0 }}">{{ $product->product_name }}</option>
                 @endforeach
             </select>
+            <input type="hidden" class="price-raw"> {{-- Pindahkan hidden input ke sini --}}
         </td>
         <td><input type="number" class="form-control form-control-sm quantity" value="1" min="1" required></td>
         <td><input type="text" class="form-control form-control-sm price-display" readonly></td>
         <td class="text-end fw-bold"><span class="subtotal">Rp 0</span></td>
         <td class="text-center"><button type="button" class="btn btn-danger btn-sm remove-product-btn"><i class="bi bi-trash"></i></button></td>
-        <input type="hidden" class="price-raw">
+        {{-- Hapus hidden input dari sini --}}
     </tr>
 </template>
 @endsection
 
 @push('scripts')
+{{-- Select2 CSS & JS jika belum ada di layout utama --}}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const productItemsContainer = document.getElementById('product-items');
@@ -104,10 +118,10 @@
             document.getElementById('grand-total').textContent = formatRupiah(grandTotal);
         }
 
-        function addProductRow() {
+        function addProductRow(preselectedProductId = null) { // Tambah parameter opsional
             const newRowFragment = productRowTemplate.content.cloneNode(true);
             const newRow = newRowFragment.querySelector('tr');
-            
+
             const productSelect = newRow.querySelector('.product-select');
             const quantityInput = newRow.querySelector('.quantity');
             const priceDisplay = newRow.querySelector('.price-display');
@@ -116,17 +130,17 @@
 
             productSelect.name = `products[${productIndex}][product_id]`;
             quantityInput.name = `products[${productIndex}][quantity]`;
-            
+
             productItemsContainer.appendChild(newRow);
 
             const select2 = $(productSelect).select2({
                 placeholder: '-- Pilih Produk --',
                 theme: 'bootstrap-5',
-                dropdownParent: $(productSelect).parent()
+                dropdownParent: $(productSelect).parent() // Penting untuk baris dinamis
             });
 
-            select2.on('select2:select', function(e) {
-                const selectedOption = e.params.data.element;
+            select2.on('change', function(e) { // Ganti ke event 'change' agar harga terupdate saat dipilih
+                const selectedOption = this.options[this.selectedIndex];
                 const price = selectedOption.getAttribute('data-price') || 0;
                 priceDisplay.value = formatRupiah(price);
                 priceRaw.value = price;
@@ -134,18 +148,28 @@
             });
 
             quantityInput.addEventListener('input', calculateTotals);
-            
+
             removeBtn.addEventListener('click', () => {
-                select2.select2('destroy');
+                select2.select2('destroy'); // Hapus instance Select2 sebelum hapus elemen
                 newRow.remove();
                 calculateTotals();
             });
+
+             // Jika ada preselectedProductId, set nilainya
+            if (preselectedProductId) {
+                select2.val(preselectedProductId).trigger('change');
+            } else {
+                 // Trigger change saat pertama kali agar harga default (jika ada) muncul
+                 select2.trigger('change');
+            }
+
 
             productIndex++;
         }
 
         addProductBtn.addEventListener('click', addProductRow);
-        addProductRow(); // Add one empty row on page load
+        addProductRow(); // Tambahkan satu baris kosong saat halaman dimuat
+        calculateTotals(); // Hitung total awal (biasanya Rp 0)
     });
 </script>
 @endpush

@@ -61,10 +61,12 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse ($salesOrders as $order)
+                            {{-- ✅ BERUBAH: $salesOrders -> $orders --}}
+                            @forelse ($orders as $order)
                                 <tr>
                                     <th scope="row">
-                                        {{ $loop->iteration + $salesOrders->firstItem() - 1 }}
+                                        {{-- ✅ BERUBAH: $salesOrders -> $orders --}}
+                                        {{ $loop->iteration + $orders->firstItem() - 1 }}
                                     </th>
                                     <td>
                                         <span class="fw-semibold">
@@ -85,18 +87,18 @@
                                         {{ number_format($order->total_amount, 0, ",", ".") }}
                                     </td>
                                     <td class="text-center">
-    @php
-        $statusClass = [
-            'pending' => 'bg-secondary',
-            'approved' => 'bg-info text-dark',
-            'rejected' => 'bg-danger',
-            'invoiced' => 'bg-success',
-        ];
-    @endphp
-    <span class="badge {{ $statusClass[$order->status] ?? 'bg-light text-dark' }}">
-        {{ Str::title(str_replace('_', ' ', $order->status)) }}
-    </span>
-</td>
+                                        @php
+                                            $statusClass = [
+                                                'pending' => 'bg-secondary',
+                                                'approved' => 'bg-info text-dark',
+                                                'rejected' => 'bg-danger',
+                                                'invoiced' => 'bg-success',
+                                            ];
+                                        @endphp
+                                        <span class="badge {{ $statusClass[$order->status] ?? 'bg-light text-dark' }}">
+                                            {{ Str::title(str_replace('_', ' ', $order->status)) }}
+                                        </span>
+                                    </td>
                                     <td class="text-center">
                                         <div
                                             class="d-flex justify-content-center gap-2"
@@ -109,21 +111,22 @@
                                                 <i class="bi bi-eye"></i>
                                             </a>
 
-                                             @if (!in_array($order->status, ['invoiced', 'rejected']))
-            @can("update", $order)
-                <a href="{{ route("sales-orders.edit", $order->order_id) }}" class="btn btn-sm btn-outline-secondary" title="Edit">
-                    <i class="bi bi-pencil-square"></i>
-                </a>
-            @endcan
+                                            {{-- Logika @can sudah benar, karena $order adalah instance dari App\Models\Order --}}
+                                            @if (!in_array($order->status, ['invoiced', 'rejected']))
+                                                @can("update", $order)
+                                                    <a href="{{ route("sales-orders.edit", $order->order_id) }}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                                        <i class="bi bi-pencil-square"></i>
+                                                    </a>
+                                                @endcan
 
-                                            @can("delete", $order)
-                <form class="delete-form" action="{{ route("sales-orders.destroy", $order->order_id) }}" method="POST">
-                    @csrf
-                    @method("DELETE")
-                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus"><i class="bi bi-trash"></i></button>
-                </form>
-            @endcan
-        @endif
+                                                @can("delete", $order)
+                                                    <form class="delete-form" action="{{ route("sales-orders.destroy", $order->order_id) }}" method="POST">
+                                                        @csrf
+                                                        @method("DELETE")
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus"><i class="bi bi-trash"></i></button>
+                                                    </form>
+                                                @endcan
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>
@@ -144,7 +147,8 @@
 
         {{-- Pagination --}}
         <div class="mt-4 d-flex justify-content-center">
-            {{ $salesOrders->links() }}
+            {{-- ✅ BERUBAH: $salesOrders -> $orders --}}
+            {{ $orders->links() }}
         </div>
     </div>
 @endsection

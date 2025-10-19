@@ -5,10 +5,11 @@ use App\Http\Controllers\Client\Auth\ClientGoogleController;
 use App\Http\Controllers\Client\DashboardController;
 use App\Http\Controllers\Client\InvoiceController;
 use App\Http\Controllers\Client\ProfileController;
-use App\Http\Controllers\Client\SalesOrderController;
+use App\Http\Controllers\Client\OrderController; // Controller Riwayat Order
+use App\Http\Controllers\Client\ClientOrderController; // Controller Create/Store Order
+use App\Http\Controllers\Client\OrderChangeRequestController; // Controller Request Ubah
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\MidtransController;
-use App\Http\Controllers\Client\ClientOrderController;
 
 Route::prefix('client')->name('client.')->group(function () {
 
@@ -26,26 +27,37 @@ Route::prefix('client')->name('client.')->group(function () {
     Route::middleware('auth:client')->group(function () {
         Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
+        // Profil bisa diakses walau belum lengkap
         Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
 
-        // Midtrans
+        // Midtrans (Mungkin perlu di dalam middleware profile complete juga?)
         Route::post('/invoices/{invoice}/pay', [MidtransController::class, 'pay'])->name('invoices.pay');
+
         
-        // Wajib profil lengkap
+
+        // === WAJIB PROFIL LENGKAP ===
         Route::middleware('ensure.client.profile.complete')->group(function() {
-            Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-            Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
-            Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
-            Route::post('invoices/{invoice}/upload-proof', [InvoiceController::class, 'uploadProof'])->name('invoices.uploadProof');
-            
+    // Invoices (Tidak ada konflik)
+    Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+    Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+    Route::post('invoices/{invoice}/upload-proof', [InvoiceController::class, 'uploadProof'])->name('invoices.uploadProof');
 
-            Route::get('sales-orders', [SalesOrderController::class, 'index'])->name('sales-orders.index');
-            Route::get('sales-orders/{salesOrder}', [SalesOrderController::class, 'show'])->name('sales-orders.show');
-        
-            Route::get('orders/create', [ClientOrderController::class, 'create'])->name('orders.create');
-            Route::post('orders', [ClientOrderController::class, 'store'])->name('orders.store');
-        });
+    // === BAGIAN ORDERS ===
+    // 1. Definisikan '/create' DULU (lebih spesifik)
+    Route::get('orders/create', [ClientOrderController::class, 'create'])->name('orders.create');
+    Route::post('orders', [ClientOrderController::class, 'store'])->name('orders.store'); // Store juga harus sebelum wildcard jika path sama
+
+    // 2. Definisikan '/{order}/request-change' KEMUDIAN (lebih spesifik dari /{order})
+    Route::get('orders/{order}/request-change', [OrderChangeRequestController::class, 'create'])->name('orders.requestChange.create');
+    Route::post('orders/{order}/request-change', [OrderChangeRequestController::class, 'store'])->name('orders.requestChange.store');
+
+    // 3. Definisikan '/' (index) dan '/{order}' (show) TERAKHIR
+    Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
+    Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
+    // ======================
+});
     });
 });

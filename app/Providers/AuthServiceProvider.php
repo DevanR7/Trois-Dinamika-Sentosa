@@ -2,23 +2,26 @@
 
 namespace App\Providers;
 
-
-use App\Models\User; // <-- Tambahkan ini
-use Illuminate\Support\Facades\Gate; // <-- Tambahkan ini
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+
+// DAFTAR MODEL
+use App\Models\User;
 use App\Models\Product;
-use App\Policies\ProductPolicy;
-use App\Models\SalesOrder;
-use App\Policies\SalesOrderPolicy;
-use App\Policies\PurchaseOrderPolicy;
+use App\Models\Order; // ✅ BERUBAH: Menggunakan model Order
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
-use App\Policies\SupplierPolicy;
 use App\Models\SalesInvoice;
-use App\Policies\SalesInvoicePolicy;
 use App\Models\SalesReturn;
-use App\Policies\SalesReturnPolicy;
 use App\Models\PurchaseReturn;
+
+// DAFTAR POLICY
+use App\Policies\ProductPolicy;
+use App\Policies\OrderPolicy; // ✅ BERUBAH: Menggunakan policy OrderPolicy
+use App\Policies\PurchaseOrderPolicy;
+use App\Policies\SupplierPolicy;
+use App\Policies\SalesInvoicePolicy;
+use App\Policies\SalesReturnPolicy;
 use App\Policies\PurchaseReturnPolicy;
 
 class AuthServiceProvider extends ServiceProvider
@@ -29,14 +32,18 @@ class AuthServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     protected $policies = [
-        SalesOrder::class => SalesOrderPolicy::class,
+        // ✅ PERBAIKAN 1: Mapping yang benar
+        Order::class => OrderPolicy::class, 
+
         PurchaseOrder::class => PurchaseOrderPolicy::class,
         Supplier::class => SupplierPolicy::class,
         Product::class => ProductPolicy::class,
-        User::class => SupplierPolicy::class, 
         SalesInvoice::class => SalesInvoicePolicy::class,
         SalesReturn::class => SalesReturnPolicy::class,
         PurchaseReturn::class => PurchaseReturnPolicy::class,
+
+        // ❗️ PERBAIKAN 3: Baris ini dihapus karena salah
+        // User::class => SupplierPolicy::class, 
     ];
 
     /**
@@ -44,7 +51,6 @@ class AuthServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-    
-    }  
-    
+        //
+    }   
 }

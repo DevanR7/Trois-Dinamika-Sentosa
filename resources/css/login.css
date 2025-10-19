@@ -1,0 +1,216 @@
+/* resources/css/login.css */
+
+/* --- Pengaturan Dasar & Font --- */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+body,
+html {
+    height: 100%;
+    margin: 0;
+    font-family: 'Poppins', sans-serif;
+    /* Kita hapus background-color agar container bisa 100% */
+}
+
+/* --- Wrapper Utama Halaman Login --- */
+.login-page-container {
+    display: flex;
+    min-height: 100vh;
+    width: 100%;
+}
+
+/* --- 1. Kolom Kiri (Formulir) --- */
+.login-form-section {
+    background-color: #262626; /* Warna gelap dari gambar */
+    color: #E0E0E0;
+    flex: 1;
+    display: flex;
+    flex-direction: column; /* Membuat footer menempel di bawah */
+    justify-content: space-between; /* Mendorong footer ke bawah */
+    padding: 3rem;
+    
+    /* Perkiraan lebar dari gambar (bisa disesuaikan) */
+    width: 45%; 
+    max-width: 45%;
+}
+
+.login-form-content {
+    /* Mencegah form menjadi terlalu lebar di layar besar */
+    width: 100%;
+    max-width: 420px; 
+    /* Memusatkan kotak form di tengah kolom kiri */
+    margin: auto; 
+}
+
+/* --- 2. Kolom Kanan (Welcome) --- */
+.login-welcome-section {
+    background-color: #6A49E0; /* Warna ungu dari gambar */
+    color: #FFFFFF;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    
+    /* Perkiraan lebar dari gambar */
+    width: 55%;
+
+    /* Sembunyikan di mobile agar form lebih fokus */
+    display: none; 
+}
+
+/* --- Style Teks Welcome --- */
+.login-welcome-content h2 {
+    font-size: 2.8rem;
+    font-weight: 600;
+    line-height: 1.3;
+    margin-bottom: 0.5rem;
+}
+.login-welcome-content p {
+    font-size: 1.1rem;
+    color: #E0E0E0;
+}
+.welcome-illustration {
+    margin-top: 2rem;
+    max-width: 100%;
+    height: auto;
+}
+
+/* --- Style Formulir (Kolom Kiri) --- */
+.login-title {
+    font-size: 2.5rem;
+    font-weight: 600;
+    color: #FFFFFF;
+    margin-bottom: 0.5rem;
+}
+
+.login-subtitle {
+    color: #A0A0A0;
+    margin-bottom: 2.5rem;
+}
+
+/* Mengubah style label default Bootstrap */
+.login-form .form-label {
+    color: #A0A0A0;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+/* Mengubah style input default Bootstrap */
+.login-form .form-control {
+    background-color: transparent;
+    border: none;
+    /* Style garis bawah dari gambar */
+    border-bottom: 2px solid #555; 
+    border-radius: 0;
+    color: #FFFFFF;
+    padding: 0.5rem 0;
+    font-size: 1rem;
+}
+
+/* Style saat input di-klik (focus) */
+.login-form .form-control:focus {
+    background-color: transparent;
+    box-shadow: none;
+    border-color: #6A49E0; /* Warna ungu saat aktif */
+    color: #FFFFFF;
+}
+/* Placeholder text color */
+.login-form .form-control::placeholder {
+    color: #777;
+}
+
+/* Wrapper untuk ikon mata password */
+.password-wrapper {
+    position: relative;
+}
+.password-wrapper .form-control {
+    padding-right: 2.5rem; /* Beri ruang untuk ikon */
+}
+.password-wrapper #togglePassword {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: #777;
+    padding: 0.5rem;
+}
+
+/* Style "Remember Me" & "Forgot Password" */
+.form-check-input {
+    background-color: #333;
+    border-color: #555;
+}
+.form-check-input:checked {
+    background-color: #6A49E0;
+    border-color: #6A49E0;
+}
+.form-check-label,
+.forgot-password-link {
+    font-size: 0.9rem;
+    color: #A0A0A0;
+    text-decoration: none;
+}
+.forgot-password-link:hover {
+    color: #FFFFFF;
+}
+
+/* Tombol Login Utama */
+.btn-login {
+    background-color: #6A49E0;
+    color: #FFFFFF;
+    border: none;
+    padding: 0.85rem;
+    font-weight: 600;
+    font-size: 1rem;
+    border-radius: 8px;
+    transition: background-color 0.2s;
+}
+.btn-login:hover {
+    background-color: #583cc4;
+    color: #FFFFFF;
+}
+
+/* Footer "Don't have an account?" */
+.login-footer {
+    text-align: center;
+    color: #A0A0A0;
+    font-size: 0.9rem;
+    margin-top: 2rem; /* Beri jarak dari form jika form pendek */
+}
+.login-footer a {
+    color: #FFFFFF;
+    font-weight: 600;
+    text-decoration: none;
+}
+.login-footer a:hover {
+    text-decoration: underline;
+}
+
+/* --- Aturan Responsive (Mobile & Tablet) --- */
+@media (min-width: 992px) {
+    /* Tampilkan kolom welcome HANYA di desktop */
+    .login-welcome-section {
+        display: flex;
+    }
+}
+
+@media (max-width: 991px) {
+    /* Di mobile, buat kolom tumpuk */
+    .login-page-container {
+        flex-direction: column;
+    }
+    
+    .login-form-section {
+        width: 100%;
+        max-width: 100%;
+        min-height: 100vh; /* Pastikan form memenuhi layar */
+        padding: 2rem;
+    }
+
+    .login-form-content {
+         margin-top: auto; /* Pusatkan form secara vertikal */
+         margin-bottom: auto;
+    }
+}
