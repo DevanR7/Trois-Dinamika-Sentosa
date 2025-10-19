@@ -3,214 +3,229 @@
 /* --- Pengaturan Dasar & Font --- */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
+/* --- Style untuk Latar Belakang Partikel --- */
+#particles-bg {
+    position: fixed; /* Menempel di layar */
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    z-index: -1; /* PENTING: Posisikan di belakang semua elemen */
+    
+    /* Warna fallback jika script gagal dimuat */
+    background-color: #f0f2f5; 
+}
+
 body,
 html {
     height: 100%;
     margin: 0;
     font-family: 'Poppins', sans-serif;
-    /* Kita hapus background-color agar container bisa 100% */
 }
 
-/* --- Wrapper Utama Halaman Login --- */
-.login-page-container {
-    display: flex;
-    min-height: 100vh;
-    width: 100%;
-}
-
-/* --- 1. Kolom Kiri (Formulir) --- */
-.login-form-section {
-    background-color: #262626; /* Warna gelap dari gambar */
-    color: #E0E0E0;
-    flex: 1;
-    display: flex;
-    flex-direction: column; /* Membuat footer menempel di bawah */
-    justify-content: space-between; /* Mendorong footer ke bawah */
-    padding: 3rem;
+/* --- 1. Latar Belakang Halaman (Wrapper) --- */
+.login-page-wrapper {
+    /* Dibuat transparan agar partikel terlihat */
+    background-color: transparent; 
     
-    /* Perkiraan lebar dari gambar (bisa disesuaikan) */
-    width: 45%; 
-    max-width: 45%;
-}
-
-.login-form-content {
-    /* Mencegah form menjadi terlalu lebar di layar besar */
-    width: 100%;
-    max-width: 420px; 
-    /* Memusatkan kotak form di tengah kolom kiri */
-    margin: auto; 
-}
-
-/* --- 2. Kolom Kanan (Welcome) --- */
-.login-welcome-section {
-    background-color: #6A49E0; /* Warna ungu dari gambar */
-    color: #FFFFFF;
-    flex: 1;
+    /* Style untuk memusatkan card */
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 3rem;
+    min-height: 100vh;
+    padding: 2rem;
+}
+
+/* --- 2. Card "Timbul" Utama --- */
+.login-card-container {
+    display: flex;
+    width: 100%;
+    max-width: 960px; /* Lebar total card */
+    background-color: #FFFFFF;
+    border-radius: 16px; /* Sudut melengkung */
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.1); /* Efek "timbul" */
+    overflow: hidden; /* Penting agar kolom kiri ikut melengkung */
+}
+
+/* --- 3. Kolom Kiri (Welcome & Warna Gelap) --- */
+.login-welcome-section {
+    /* Mengganti gradien biru dengan warna gelap */
+    background-color: #111827; 
     
-    /* Perkiraan lebar dari gambar */
-    width: 55%;
-
-    /* Sembunyikan di mobile agar form lebih fokus */
-    display: none; 
+    color: #FFFFFF; 
+    width: 45%; 
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 3rem 3.5rem;
 }
 
-/* --- Style Teks Welcome --- */
-.login-welcome-content h2 {
-    font-size: 2.8rem;
-    font-weight: 600;
-    line-height: 1.3;
-    margin-bottom: 0.5rem;
-}
-.login-welcome-content p {
-    font-size: 1.1rem;
-    color: #E0E0E0;
-}
-.welcome-illustration {
-    margin-top: 2rem;
-    max-width: 100%;
-    height: auto;
+/* --- 4. Kolom Kanan (Formulir Putih) --- */
+.login-form-section {
+    width: 55%; /* Lebar kolom kanan */
+    background-color: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 3.5rem;
 }
 
-/* --- Style Formulir (Kolom Kiri) --- */
-.login-title {
+/* --- Style Logo (Kembali di Kiri) --- */
+.login-logo {
+    width: 180px; /* Ukuran asli, bisa disesuaikan */
+    margin-bottom: 2.5rem; /* Jarak ke teks di bawahnya */
+}
+
+/* Teks di Kolom Kiri */
+.welcome-title {
     font-size: 2.5rem;
     font-weight: 600;
-    color: #FFFFFF;
-    margin-bottom: 0.5rem;
+    margin-bottom: 1rem;
 }
-
-.login-subtitle {
-    color: #A0A0A0;
-    margin-bottom: 2.5rem;
+.welcome-subtitle, .welcome-text {
+    font-size: 1rem;
+    color: #e0e0e0;
+    line-height: 1.6;
 }
+.welcome-subtitle { font-weight: 500; }
+.welcome-text { font-size: 0.9rem; color: #c0d5ff; }
 
-/* Mengubah style label default Bootstrap */
+
+/* --- Style Formulir (di Kanan) --- */
 .login-form .form-label {
-    color: #A0A0A0;
-    font-size: 0.9rem;
-    font-weight: 500;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #555;
     margin-bottom: 0.25rem;
 }
-
-/* Mengubah style input default Bootstrap */
 .login-form .form-control {
-    background-color: transparent;
-    border: none;
-    /* Style garis bawah dari gambar */
-    border-bottom: 2px solid #555; 
-    border-radius: 0;
-    color: #FFFFFF;
-    padding: 0.5rem 0;
-    font-size: 1rem;
+    border-radius: 8px;
+    border: 1px solid #ced4da;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
 }
-
-/* Style saat input di-klik (focus) */
 .login-form .form-control:focus {
-    background-color: transparent;
-    box-shadow: none;
-    border-color: #6A49E0; /* Warna ungu saat aktif */
-    color: #FFFFFF;
-}
-/* Placeholder text color */
-.login-form .form-control::placeholder {
-    color: #777;
+    border-color: #111827; /* Sesuaikan warna focus */
+    box-shadow: 0 0 0 0.25rem rgba(17,24,39,.25); /* Sesuaikan bayangan focus */
 }
 
-/* Wrapper untuk ikon mata password */
-.password-wrapper {
+/* --- Style Input dengan Ikon --- */
+.input-wrapper {
     position: relative;
 }
-.password-wrapper .form-control {
-    padding-right: 2.5rem; /* Beri ruang untuk ikon */
-}
-.password-wrapper #togglePassword {
+
+/* Ikon di kiri (Orang & Gembok) */
+.input-icon {
     position: absolute;
-    right: 0;
+    left: 1rem; /* Jarak dari kiri */
     top: 50%;
     transform: translateY(-50%);
+    color: #adb5bd; /* Warna abu-abu placeholder */
+    z-index: 3; 
+}
+
+/* Tombol mata di kanan */
+#togglePassword {
+    position: absolute;
+    right: 1rem; /* Jarak dari kanan */
+    top: 50%;
+    transform: translateY(-50%);
+    color: #adb5bd;
     cursor: pointer;
-    color: #777;
-    padding: 0.5rem;
+    z-index: 3;
 }
 
-/* Style "Remember Me" & "Forgot Password" */
-.form-check-input {
-    background-color: #333;
-    border-color: #555;
+/* Semua input di dalam wrapper diberi padding kiri untuk ikon */
+.input-wrapper .form-control {
+    padding-left: 2.75rem; 
 }
-.form-check-input:checked {
-    background-color: #6A49E0;
-    border-color: #6A49E0;
+
+/* Input password (yang punya ID 'password') diberi padding kanan juga untuk ikon mata */
+.input-wrapper input#password {
+    padding-right: 2.75rem;
 }
-.form-check-label,
-.forgot-password-link {
-    font-size: 0.9rem;
-    color: #A0A0A0;
+
+/* Link & Checkbox */
+.forgot-password-link, .form-check-label {
+    font-size: 0.85rem;
+    color: #555;
     text-decoration: none;
+    font-weight: 500;
 }
-.forgot-password-link:hover {
-    color: #FFFFFF;
+.forgot-password-link:hover { color: #111827; }
+.form-check-input:checked {
+    background-color: #111827;
+    border-color: #111827;
 }
 
-/* Tombol Login Utama */
-.btn-login {
-    background-color: #6A49E0;
-    color: #FFFFFF;
-    border: none;
-    padding: 0.85rem;
+/* --- Style Tombol (Disesuaikan Warna Gelap) --- */
+.btn-login, .btn-signup {
+    padding: 0.75rem;
     font-weight: 600;
-    font-size: 1rem;
     border-radius: 8px;
-    transition: background-color 0.2s;
+    width: 100%;
+    transition: all 0.2s ease-in-out; 
+}
+
+/* Tombol Login (Solid) */
+.btn-login {
+    background-color: #111827; 
+    color: #FFFFFF;
+    border: 2px solid #111827; 
 }
 .btn-login:hover {
-    background-color: #583cc4;
+    background-color: #1f2937; 
+    border-color: #1f2937;
     color: #FFFFFF;
 }
 
-/* Footer "Don't have an account?" */
-.login-footer {
-    text-align: center;
-    color: #A0A0A0;
-    font-size: 0.9rem;
-    margin-top: 2rem; /* Beri jarak dari form jika form pendek */
+/* Tombol Sign Up (Outline) */
+.btn-signup {
+    background-color: #FFFFFF;
+    color: #111827; 
+    border: 2px solid #111827; 
 }
-.login-footer a {
-    color: #FFFFFF;
+.btn-signup:hover {
+    background-color: #f3f4f6; 
+    color: #111827;
+    border-color: #111827;
+}
+
+/* --- Footer (Social Media) --- */
+.social-follow-text {
+    font-size: 0.8rem;
     font-weight: 600;
+    color: #aaa;
+    letter-spacing: 0.5px;
+    margin: 0;
+}
+.social-links a {
+    color: #aaa;
+    font-size: 1.2rem;
+    margin-left: 1rem;
     text-decoration: none;
+    transition: color 0.2s;
 }
-.login-footer a:hover {
-    text-decoration: underline;
-}
+.social-links a:hover { color: #111827; }
 
-/* --- Aturan Responsive (Mobile & Tablet) --- */
-@media (min-width: 992px) {
-    /* Tampilkan kolom welcome HANYA di desktop */
-    .login-welcome-section {
-        display: flex;
-    }
-}
-
+/* --- 5. Aturan Responsive (Mobile) --- */
 @media (max-width: 991px) {
-    /* Di mobile, buat kolom tumpuk */
-    .login-page-container {
-        flex-direction: column;
+    .login-card-container {
+        flex-direction: column; /* Tumpuk kolom di mobile */
+        max-width: 450px; /* Buat card lebih ramping di mobile */
+    }
+    
+    .login-welcome-section,
+    .login-form-section {
+        width: 100%;
+    }
+    
+    .login-welcome-section {
+        padding: 2.5rem;
+        text-align: center;
     }
     
     .login-form-section {
-        width: 100%;
-        max-width: 100%;
-        min-height: 100vh; /* Pastikan form memenuhi layar */
-        padding: 2rem;
-    }
-
-    .login-form-content {
-         margin-top: auto; /* Pusatkan form secara vertikal */
-         margin-bottom: auto;
+        padding: 2.5rem;
     }
 }
