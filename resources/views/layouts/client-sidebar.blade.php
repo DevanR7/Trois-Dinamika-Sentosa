@@ -1,34 +1,54 @@
-<div class="sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="clientSidebarMenu">
-    <div class="offcanvas-header">
-        <h5 class="offcanvas-title text-white">Client Portal</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#clientSidebarMenu" aria-label="Close"></button>
+<nav class="sidebar locked">
+    <div class="logo_items flex">
+        <span class="nav_image">
+            <img src="{{ asset('images/TDS-favicon.png') }}" alt="logo_img" />
+        </span>
+        <span class="logo_name">Client</span>
+
+        <i class="bx bx-lock-alt" id="lock-icon" title="Kunci/Buka Sidebar"></i>
+        <i class="bx bx-x" id="sidebar-close"></i>
     </div>
-    <div class="offcanvas-body d-flex flex-column p-3">
-        <div class="text-center mb-4">
-            <img src="{{ asset('images/TDS-side-text.png') }}" alt="Logo Aplikasi" style="max-width: 80%;" class="d-none d-lg-block mx-auto">
+
+    {{-- <div class="scroll-fade scroll-fade-top"></div> --}}
+
+    <div class="menu_container">
+        <div class="menu_items">
+            @include("layouts.partials.client-sidebar-links")
         </div>
-        
-        <ul class="nav nav-pills flex-column mb-auto">
-            {{-- Memanggil link menu klien --}}
-            @include('layouts.partials.client-sidebar-links')
-        </ul>
-        
-        <hr>
-        
-        <div class="dropdown">
-            <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                <strong>{{ Str::limit(Auth::guard('client')->user()->client_name, 15) }}</strong>
+    </div> {{-- <div class="scroll-fade scroll-fade-bottom"></div> --}}
+
+
+    <div class="sidebar_profile flex">
+        <span class="nav_image">
+            <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::guard('client')->user()->client_name) }}&background=4f46e5&color=fff" alt="profil" />
+        </span>
+        <div class="data_text">
+            <span class="name">{{ Str::limit(Auth::guard('client')->user()->client_name, 15) }}</span>
+            <span class="email">{{ Str::limit(Auth::guard('client')->user()->email, 18) }}</span>
+        </div>
+
+        <div class="dropdown ms-auto dropup">
+            <a href="#" class="text-white"
+               data-bs-toggle="dropdown"
+               aria-expanded="false"
+               data-bs-placement="top-end">
+                <i class='bx bx-dots-vertical-rounded fs-5'></i>
             </a>
             <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
+                <li><a class="dropdown-item" href="{{ route("client.profile.edit") }}">
+                    <i class="bi bi-person-circle me-2"></i> Profil
+                </a></li>
+                <li><hr class="dropdown-divider" /></li>
                 <li>
-                    <form method="POST" action="{{ route('client.logout') }}">
+                    <form method="POST" action="{{ route("client.logout") }}">
                         @csrf
-                        <button type="submit" class="dropdown-item">
-                            <i class="bi bi-box-arrow-right me-2"></i>Logout
-                        </button>
+                        <a class="dropdown-item text-danger" href="{{ route("client.logout") }}"
+                           onclick="event.preventDefault(); this.closest('form').submit();">
+                            <i class="bi bi-box-arrow-right me-2"></i> Logout
+                        </a>
                     </form>
                 </li>
             </ul>
         </div>
     </div>
-</div>
+    </nav>

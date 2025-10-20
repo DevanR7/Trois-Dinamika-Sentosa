@@ -6,6 +6,8 @@
     <meta name="csrf-token" content="{{ csrf_token() }}" />
     <title>{{ config('app.name', 'Laravel') }} - Login</title>
 
+    <link rel="icon" type="image/x-icon" href="{{ asset('images/TDS-favicon.png') }}">
+
     {{-- Fonts & CSS --}}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -33,6 +35,7 @@
                 <p class="welcome-text">
                     Silakan masuk untuk melanjutkan ke dasbor Anda.
                 </p>
+                <div id="clock-widget" class="mt-4"></div>
             </div>
 
             <div class="login-form-section">
@@ -47,6 +50,23 @@
 
     {{-- Scripts --}}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    @push('scripts')
+    <script>
+        function updateClock() {
+            const now = new Date();
+            const clockElement = document.getElementById('clock-widget');
+            if (clockElement) {
+                const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                const formattedDate = now.toLocaleDateString('id-ID', dateOptions);
+                const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Jakarta' };
+                const formattedTime = now.toLocaleTimeString('id-ID', timeOptions).replace(/\./g,':');
+                clockElement.innerHTML = `<div>${formattedDate}</div><div>${formattedTime} WIB</div>`;
+            }
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+    </script>
+    @endpush
     @stack('scripts')
 
     <script src="https://cdn.jsdelivr.net/npm/tsparticles@2/tsparticles.bundle.min.js"></script>

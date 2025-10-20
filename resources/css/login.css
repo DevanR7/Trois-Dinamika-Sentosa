@@ -220,6 +220,20 @@ html {
 }
 .social-links a:hover { color: #111827; }
 
+#clock-widget {
+  color: #adb5bd; /* Warna terang default (cocok untuk background gelap #111827) */
+  text-align: left; /* Rata kiri agar sejajar teks lain */
+  font-size: 0.9rem; /* Ukuran font (sesuaikan) */
+  font-weight: 500;
+  opacity: 0.9; /* Sedikit transparan */
+  margin-top: 2rem !important; /* Beri jarak lebih dari teks di atas */
+  margin-bottom: 1.5rem; /* Jarak ke bawah (jika ada ilustrasi) */
+}
+#clock-widget div:last-child {
+  font-size: 1rem; /* Waktu sedikit lebih besar */
+  font-weight: 600;
+}
+
 /* --- 5. Aturan Responsive (Mobile) --- */
 @media (max-width: 991px) {
     .login-card-container {

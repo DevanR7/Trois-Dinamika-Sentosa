@@ -1,85 +1,494 @@
-/* resources/css/app.css */
+/* resources/css/app.css (Lengkap - Sticky Scroll Fade) */
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700&display=swap");
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Variabel Warna */
+  --sidebar-bg: #111827;
+  --sidebar-link-hover: #374151;
+  --sidebar-link-active: #4f46e5;
+  --sidebar-link-text: #adb5bd;
+  --sidebar-text-active: #ffffff;
+  --sidebar-heading-text: #6b7280;
+  --body-bg: #f8f9fa;
+  --sidebar-transition: all 0.4s ease; /* Transisi utama */
+}
 
 body {
-    font-family: 'Poppins', sans-serif;
-    background-color: #f8f9fa;
+  min-height: 100vh;
+  background: var(--body-bg);
+  font-family: "Poppins", sans-serif;
 }
 
 /* --- Wrapper Konten Utama --- */
 .main-wrapper {
-    /* Padding atas untuk memberi ruang di bawah navbar/header di mobile */
-    padding-top: 1rem; 
+  position: relative;
+  margin-left: 270px;
+  width: calc(100% - 270px);
+  padding: 0;
+  transition: var(--sidebar-transition); /* Gunakan variabel transisi */
+}
+/* Wrapper saat sidebar DITUTUP */
+.sidebar.close ~ .main-wrapper {
+  margin-left: 75px;
+  width: calc(100% - 75px);
 }
 
-/* --- Aturan untuk DESKTOP (Layar besar, >= 992px) --- */
-@media (min-width: 992px) {
-    .main-wrapper {
-        /* Memberi ruang di kiri untuk sidebar */
-        margin-left: 280px; 
-        padding-top: 0;
-    }
-    .sidebar {
-        /* Membuat sidebar menempel di kiri layar */
-        position: fixed;
-        top: 0;
-        left: 0;
-        height: 100vh;
-        width: 280px;
-        /* Memastikan sidebar selalu terlihat di desktop */
-        transform: none !important;
-        visibility: visible !important;
-    }
-    .sidebar .offcanvas-header {
-        /* Sembunyikan header offcanvas (tombol close) di desktop */
-        display: none;
-    }
-}
-
-/* --- Tombol Menu Melayang (Mobile) --- */
-.floating-menu-btn {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    border-radius: 50%;
-    width: 60px;
-    height: 60px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    z-index: 1040;
-}
-
-/* --- Style Sidebar (Warna, Link, dll.) --- */
-.sidebar {
-    background: #111827 !important; 
-    color: white;
-    overflow-y: auto; /* Memungkinkan menu di-scroll jika panjang */
-}
-.sidebar .nav-link { 
-    color: #adb5bd; 
-}
-.sidebar .nav-link:hover { 
-    background-color: #374151; 
-    color: #ffffff; 
-}
-.sidebar .nav-link.active { 
-    background-color: #4f46e5; 
-    color: #ffffff; 
-    font-weight: 500; 
-}
-
-/* --- Style Judul Seksi di Sidebar --- */
-.nav-heading {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: .05em;
-    padding: 1rem 1.25rem 0.5rem;
-    margin-top: 0.75rem;
-}
-.nav-heading:first-of-type {
-    margin-top: 0;
-}
-
-/* --- Style Umum Lainnya --- */
 .main-content { padding: 1.5rem; }
 .card { border: none; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border-radius: 12px; }
+
+/* --- Struktur Helper --- */
+.flex {
+  display: flex;
+  align-items: center;
+}
+
+/* --- Sidebar --- */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 270px;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-link-text);
+  padding: 15px 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  transition: var(--sidebar-transition);
+  z-index: 1050; /* Z-index utama sidebar */
+  /* Hapus overflow visible dari sini */
+}
+.sidebar.close {
+  width: 75px;
+}
+
+/* --- Header Sidebar (Logo & Lock) --- */
+.sidebar .logo_items {
+  gap: 8px;
+  padding: 0 10px;
+  transition: var(--sidebar-transition);
+  overflow: hidden; /* Cegah elemen keluar saat transisi */
+  height: 60px; /* Beri tinggi fix untuk header */
+  align-items: center; /* Vertikal center */
+}
+.sidebar .logo_name {
+  font-size: 22px;
+  color: #ffffff;
+  font-weight: 500;
+  white-space: nowrap; /* Biarkan nowrap */
+  transition: opacity 0.2s 0.1s ease;
+
+  /* === TAMBAHKAN INI UNTUK MENGONTROL OVERFLOW === */
+  overflow: hidden;         /* Sembunyikan teks yang meluber */
+  text-overflow: ellipsis;  /* Tampilkan "..." jika terpotong */
+  flex-shrink: 1;         /* Izinkan elemen ini menyusut jika perlu */
+  /* Optional: Beri sedikit margin kanan agar tidak terlalu mepet ikon */
+  margin-right: 5px;
+  /* ============================================== */
+}
+.sidebar .nav_image {
+  display: flex;
+  min-width: 55px;
+  justify-content: center;
+  transition: var(--sidebar-transition);
+}
+.sidebar .nav_image img {
+  height: 40px;
+  width: 100%;
+  max-width: 180px;
+  object-fit: contain;
+  transition: var(--sidebar-transition);
+}
+#lock-icon,
+#sidebar-close {
+  padding: 10px;
+  color: #ffffff;
+  font-size: 25px;
+  cursor: pointer;
+  margin-left: auto;
+  transition: opacity 0.3s ease, transform 0.3s ease; /* Tambahkan transisi */
+}
+#sidebar-close {
+  display: none;
+}
+
+/* === FIX SIMETRI & ANIMASI LOGO (Final - Left Align) === */
+.sidebar.close .logo_name,
+.sidebar.close #lock-icon {
+    /* Sembunyikan total dari layout saat close */
+    display: none;
+}
+.sidebar.close .logo_items {
+    padding: 0;             /* Hapus padding */
+    /* justify-content: center; <-- Dihapus */
+}
+/* Pastikan container logo punya lebar minimum */
+.sidebar.close .logo_items .nav_image {
+    min-width: 55px;
+    justify-content: center; /* Center image inside container */
+}
+/* ======================================= */
+
+/* --- Menu Container --- */
+.menu_container {
+  display: flex;
+  flex-direction: column;
+  margin-top: 20px;
+  overflow-y: auto; /* Memungkinkan scroll */
+  overflow-x: hidden;
+  height: calc(100% - 80px - 70px); /* Sesuaikan tinggi jika perlu */
+  position: relative; /* <<<<<< PASTIKAN INI ADA >>>>>> */
+}
+.menu_container::-webkit-scrollbar {
+  display: none;
+}
+
+/* === EFEK FADE PADA AREA SCROLL (Sticky) === */
+.menu_container::before,
+.menu_container::after {
+    content: "";
+    position: sticky; /* <<<<<< GUNAKAN STICKY >>>>>> */
+    left: 0;
+    right: 0;
+    height: 30px; /* Tinggi area fade (sesuaikan) */
+    z-index: 5; /* Di atas item menu */
+    pointer-events: none; /* Tidak mengganggu klik/scroll */
+}
+/* Gradient di ATAS area scroll */
+.menu_container::before {
+    top: 0;
+    background: linear-gradient(
+        to bottom,
+        var(--sidebar-bg) 0%,       /* Mulai solid (warna sidebar) */
+        rgba(17, 24, 39, 0) 100% /* Transparan */
+    );
+}
+/* Gradient di BAWAH area scroll */
+.menu_container::after {
+    bottom: 0;
+    /* Sticky bottom (otomatis) */
+    background: linear-gradient(
+        to top,
+        var(--sidebar-bg) 0%,       /* Mulai solid (warna sidebar) */
+        rgba(17, 24, 39, 0) 100% /* Transparan */
+    );
+}
+/* ======================================== */
+
+.menu_item {
+  padding-left: 0;
+}
+
+/* --- Menu Heading (Judul Seksi) --- */
+.menu_title {
+  position: relative;
+  margin-left: 10px;
+  margin-bottom: 8px;
+  display: flex; /* Gunakan flex untuk alignment */
+  align-items: center;
+  transition: margin-left 0.4s ease; /* Samakan dengan transisi sidebar */
+  height: 50px; /* Kembalikan height agar konsisten */
+  width: calc(100% - 10px); /* Lebar relatif */
+}
+.sidebar.close .menu_title {
+  margin-left: 0;
+  width: 100%;
+  /* justify-content: center; <-- Dihapus */
+}
+.menu_title .title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--sidebar-heading-text);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  white-space: nowrap;
+  transition: opacity 0.2s ease; /* Fast fade out */
+}
+.sidebar.close .title {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease; /* Even faster fade out when closing */
+}
+.menu_title .line {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 3px;
+  width: 20px;
+  border-radius: 25px;
+  background: var(--sidebar-link-hover);
+  opacity: 0;
+  transition: opacity 0.3s ease 0.1s; /* Sedikit delay agar muncul setelah text hilang */
+}
+.sidebar.close .menu_title .line {
+  opacity: 1;
+  left: 37.5px; /* Sesuaikan posisi horizontal garis saat close */
+  transform: translateX(-50%);
+}
+
+/* --- Menu Item (Link) --- */
+.item {
+  list-style: none;
+}
+.link {
+  display: flex;
+  align-items: center;
+  position: relative; /* Tambahkan ini untuk badge absolute */
+  width: 100%;
+  text-decoration: none;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  color: var(--sidebar-link-text);
+  padding-left: 5px;  /* Padding kiri saja */
+  padding-right: 15px; /* Padding kanan normal */
+  transition: background-color 0.3s ease, color 0.3s ease; /* Transisi hover */
+  overflow: hidden; /* Sembunyikan teks yg keluar */
+  height: 50px; /* Fix height agar konsisten */
+}
+.link:hover {
+  color: var(--sidebar-text-active);
+  background-color: var(--sidebar-link-hover);
+}
+.link.active {
+  color: var(--sidebar-text-active);
+  background-color: var(--sidebar-link-active);
+  font-weight: 500;
+}
+.link span {
+  white-space: nowrap;
+  opacity: 1;
+  /* Hanya transisi opacity, delay fade-in */
+  transition: opacity 0.2s 0.1s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Max-width agar ellipsis bekerja */
+  max-width: 185px;
+  display: inline-block;
+  vertical-align: middle;
+}
+.sidebar.close .link span {
+  opacity: 0;
+  pointer-events: none;
+  /* Faster fade-out */
+  transition: opacity 0.1s ease;
+}
+.link i {
+  height: 50px;
+  min-width: 55px;
+  display: flex;
+  font-size: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: var(--sidebar-transition); /* Ikon ikut transisi */
+}
+
+/* --- Badge Notification (Absolute Top Left) --- */
+.link .badge {
+  transition: opacity 0.3s ease;
+  position: absolute;
+  left: 15px;  /* Jarak dari kiri container .link (sesuaikan) */
+  top: 10px;   /* Jarak dari atas container .link (sesuaikan) */
+  font-size: 0.6rem; /* Perkecil font */
+  line-height: 1; /* Hapus line-height berlebih */
+  padding: 3px 5px; /* Padding lebih kecil */
+  border-radius: 50%; /* Membuatnya bulat */
+  min-width: 18px; /* Lebar minimum */
+  height: 18px; /* Tinggi minimum */
+  text-align: center;
+  z-index: 6; /* Sedikit di atas fade */
+}
+/* =========================================== */
+
+.sidebar.close .link .badge {
+  opacity: 0;
+  pointer-events: none;
+}
+/* Styling saat sidebar DITUTUP (Left Align) */
+.sidebar.close .link {
+  padding: 0;
+  /* justify-content: center; <-- Dihapus */
+  height: 50px !important; /* Fix height saat close */
+}
+
+/* --- Profil di Bawah Sidebar --- */
+.sidebar_profile {
+  position: relative; /* Pastikan ini ada */
+  padding-top: 15px;
+  margin-top: 15px;
+  gap: 10px;
+  border-top: 2px solid rgba(255, 255, 255, 0.1);
+  padding: 15px 10px;
+  overflow: visible !important; /* <-- Pastikan ini ada */
+  height: 70px; /* Fix height */
+  transition: var(--sidebar-transition);
+}
+.sidebar_profile .nav_image img {
+  height: 35px;
+  width: 35px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.sidebar_profile .data_text {
+  /* Hanya transisi opacity, delay fade-in */
+  transition: opacity 0.2s 0.1s ease;
+  overflow: hidden; /* Pastikan teks tidak keluar */
+}
+.sidebar_profile .name,
+.sidebar_profile .email {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+.sidebar_profile .name {
+  font-size: 0.9rem;
+  color: #fff;
+}
+.sidebar_profile .email {
+  font-size: 0.8rem;
+  color: var(--sidebar-link-text);
+}
+.sidebar_profile .dropdown {
+    position: relative; /* Pastikan ini ada */
+    transition: opacity 0.3s ease;
+}
+
+/* Sembunyikan elemen profil saat sidebar ditutup */
+.sidebar.close .sidebar_profile {
+    height: 50px;             /* Sesuaikan tinggi */
+    justify-content: center;  /* Pusatkan avatar */
+    padding: 7px 0;         /* Sesuaikan padding vertikal */
+    border-top: none;         /* Hapus border atas saat close */
+}
+.sidebar.close .sidebar_profile .data_text,
+.sidebar.close .sidebar_profile .dropdown {
+    /* Sembunyikan total dari layout saat close */
+    display: none;
+}
+/* Pastikan container avatar punya lebar minimum */
+.sidebar.close .sidebar_profile .nav_image {
+    min-width: 55px;
+    margin: 0; /* Hapus margin otomatis jika ada */
+}
+
+/* --- FIX Z-INDEX DROPDOWN PROFIL SIDEBAR --- */
+.sidebar_profile .dropdown-menu {
+    z-index: 1051 !important; /* Cukup pastikan selalu di atas sidebar & fade (10) */
+    /* Posisi diatur oleh Bootstrap via data-bs-placement */
+}
+/* ========================================= */
+
+.sidebar::before,
+.sidebar::after {
+    bottom: 60px; /* <-- KURANGI NILAI INI SEDIKIT */
+    background: linear-gradient(
+        to top,
+        var(--sidebar-bg) 0%,       /* Mulai solid */
+        rgba(17, 24, 39, 0) 100% /* Transparan ke atas */
+    );
+    
+    content: "";
+    position: absolute; /* Relatif terhadap .sidebar */
+    left: 0;
+    right: 0;
+    height: 35px; /* Tinggi area fade (sesuaikan) */
+    z-index: 5;   /* Di atas menu, di bawah dropdown */
+    pointer-events: none; /* Tidak mengganggu klik */
+}
+
+/* Gradient di BAWAH Header */
+.sidebar::before {
+    /* Mulai tepat di bawah header (tinggi header ~60px) */
+    top: 90px; 
+    background: linear-gradient(
+        to bottom,
+        var(--sidebar-bg) 0%,       /* Mulai solid */
+        rgba(17, 24, 39, 0) 100% /* Transparan ke bawah */
+    );
+}
+
+/* Gradient di ATAS Profile */
+.sidebar::after {
+    /* Akhiri tepat di atas profile (tinggi profile ~70px) */
+    bottom: 84px; 
+    background: linear-gradient(
+        to top,
+        var(--sidebar-bg) 0%,       /* Mulai solid */
+        rgba(17, 24, 39, 0) 100% /* Transparan ke atas */
+    );
+}
+
+/* --- Tombol Floating Mobile --- */
+.floating-menu-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  z-index: 1040;
+}
+
+/* --- Responsive (Mobile View) --- */
+@media screen and (max-width: 991px) {
+  .sidebar {
+    left: -100%; /* Default: Sembunyi di kiri */
+    /* Pastikan transisi ada untuk efek slide */
+    transition: var(--sidebar-transition);
+    /* Pastikan tidak ada overflow: hidden di sini */
+    overflow: visible !important;
+  }
+
+  /* >>>>> INI ATURAN KUNCINYA <<<<< */
+  .sidebar.open {
+    left: 0; /* Pindahkan ke posisi terlihat saat .open ditambahkan */
+  }
+  /* >>>>> AKHIR ATURAN KUNCI <<<<< */
+
+  /* Saat close (default di mobile), pastikan tetap tersembunyi */
+  .sidebar.close {
+    left: -100%;
+    width: 270px;
+  }
+
+  #sidebar-close { /* Tombol X di dalam sidebar */
+    display: block;
+  }
+  #lock-icon {
+    display: none;
+  }
+
+  .main-wrapper { /* Konten utama full width */
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black */
+    z-index: 1049; /* Just below the sidebar (1050) */
+    opacity: 0; /* Hidden by default */
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+.sidebar-overlay.active {
+    opacity: 1; /* Visible when active */
+    visibility: visible;
+}
+
+}
+
+/* --- Hapus Efek Fade Tepi Sidebar --- */
+/* Blok .sidebar::before dan .sidebar::after telah dihapus */
+
