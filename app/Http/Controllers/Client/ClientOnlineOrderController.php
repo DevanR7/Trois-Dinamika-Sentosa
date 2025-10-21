@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Controllers\Client;
+namespace App\Http\Controllers\Client; // Pastikan namespace benar
 
 use App\Http\Controllers\Controller;
-use App\Models\Order; // ✅ BERUBAH: Gunakan model Order
-use App\Models\OrderItem; // ✅ BERUBAH: Gunakan model OrderItem
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,21 +12,51 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 
-class ClientOrderController extends Controller
+// Nama class diubah
+class ClientOnlineOrderController extends Controller
 {
+    /**
+     * Menampilkan daftar pesanan yang dibuat oleh klien sendiri.
+     */
+    public function index(): View
+    {
+        $client = Auth::guard('client')->user();
+        $myOrders = $client->orders()
+                           ->where('order_source', 'client') // Filter hanya order dari klien
+                           ->latest('order_date')
+                           ->paginate(15);
+
+        return view('client.client_online_orders.index', compact('myOrders'));
+    }
+
+     /**
+     * Menampilkan detail pesanan yang dibuat oleh klien sendiri.
+     */
+    public function show(Order $order): View | RedirectResponse // Tambah RedirectResponse
+    {
+        // Keamanan: Pastikan order milik klien DAN dibuat oleh klien
+        if ($order->client_id !== Auth::guard('client')->id() || $order->order_source !== 'client') {
+             // Redirect ke index jika mencoba akses order sales di sini
+             return redirect()->route('client.client-orders.index')->with('error', 'Pesanan tidak ditemukan.');
+            // abort(403, 'Akses Ditolak');
+        }
+
+        $order->load(['items.product']); // Tidak perlu load 'sales'
+
+        return view('client.client_online_orders.show', compact('order'));
+    }
+
     /**
      * Menampilkan form untuk klien membuat pesanan baru.
      */
     public function create(): View
     {
-        // Ambil produk yang stoknya ada dan gunakan harga jual (selling_price)
         $products = Product::where('stock_quantity', '>', 0)
-                            ->whereNotNull('selling_price') // Pastikan harga jual ada
+                            ->whereNotNull('purchase_price') // Tetap pakai purchase_price
                             ->orderBy('product_name')
                             ->get();
 
-        // Pastikan view mengarah ke lokasi yang benar
-        return view('client.orders.create', compact('products'));
+        return view('client.client_online_orders.create', compact('products'));
     }
 
     /**
@@ -34,7 +64,6 @@ class ClientOrderController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        // Validasi input
         $validated = $request->validate([
             'order_date' => 'required|date|before_or_equal:today',
             'notes' => 'nullable|string|max:1000',
@@ -47,67 +76,47 @@ class ClientOrderController extends Controller
 
         try {
             DB::beginTransaction();
-
             $totalAmount = 0;
             $itemsDataForOrder = [];
 
-            // Loop untuk validasi stok dan hitung total
             foreach ($validated['products'] as $productData) {
                 $product = Product::find($productData['product_id']);
-
-                // Validasi Produk & Stok
-                if (!$product) {
-                     throw new \Exception("Produk tidak valid.");
-                }
-                // Anda mungkin ingin menambahkan validasi jika purchase_price null, tergantung aturan bisnis
-                // if (is_null($product->purchase_price)) {
-                //      throw new \Exception("Produk {$product->product_name} tidak memiliki harga beli.");
-                // }
+                if (!$product) throw new \Exception("Produk tidak valid.");
                 if ($product->stock_quantity < $productData['quantity']) {
                     throw new \Exception("Stok produk '{$product->product_name}' tidak mencukupi (sisa: {$product->stock_quantity}).");
                 }
-
                 $quantity = $productData['quantity'];
-                // ✅ BERUBAH: Gunakan purchase_price, default ke 0 jika null
-                $price = $product->purchase_price ?? 0;
+                $price = $product->purchase_price ?? 0; // Tetap pakai purchase_price
                 $subtotal = $quantity * $price;
                 $totalAmount += $subtotal;
-
-                // Siapkan data item untuk disimpan nanti
-                $itemsDataForOrder[] = [
+                $itemsDataForOrder[] = [ /* ... data item ... */
                     'product_id' => $product->product_id,
                     'quantity' => $quantity,
-                    // ✅ BERUBAH: Simpan purchase_price
                     'price_per_unit' => $price,
                     'subtotal' => $subtotal,
                 ];
-
-                // Kurangi stok (jika perlu)
-                 $product->decrement('stock_quantity', $quantity);
+                // $product->decrement('stock_quantity', $quantity); // Pindahkan decrement ke admin saat approval?
             }
 
-            // Buat entri Order baru
             $order = $client->orders()->create([
                 'order_number' => Order::generateOrderNumber(null),
                 'user_id_sales' => null,
                 'order_date' => $validated['order_date'],
                 'notes' => $validated['notes'],
-                'total_amount' => $totalAmount, // Total berdasarkan purchase_price
-                'status' => 'pending',
+                'total_amount' => $totalAmount,
+                'status' => 'pending_review', // Ubah status awal jadi 'pending_review'
                 'order_source' => 'client',
             ]);
-
-            // Simpan item-item pesanan
             $order->items()->createMany($itemsDataForOrder);
 
             DB::commit();
 
-            return redirect()->route('client.orders.index')
-                ->with('success', 'Permintaan pesanan Anda berhasil dikirim.');
+            // Redirect ke riwayat pesanan online klien
+            return redirect()->route('client.client-orders.index')
+                ->with('success', 'Permintaan pesanan Anda berhasil dikirim dan akan ditinjau oleh tim kami.');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            // Kembalikan stok jika perlu
             return back()->with('error', 'Gagal membuat pesanan: ' . $e->getMessage())->withInput();
         }
     }

@@ -17,8 +17,8 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {{-- ✅ BERUBAH: $salesOrders -> $orders --}}
-                        @forelse($orders as $order)
+                        {{-- ✅ BERUBAH: $salesOrders -> $salesOrders --}}
+                        @forelse($salesOrders as $order)
                             <tr>
                                 <td>{{ $order->order_number }}</td>
                                 <td>{{ $order->order_date->format('d M Y') }}</td>
@@ -39,7 +39,7 @@
                                 </td>
                                 <td class="text-center">
                                     {{-- ❗️ PERHATIAN: Nama route ini mungkin perlu diubah nanti --}}
-                                    <a href="{{ route('client.orders.show', $order->order_id) }}" class="btn btn-sm btn-outline-primary">
+                                    <a href="{{ route('client.sales-orders.show', $order->order_id) }}" class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-eye"></i> Detail
                                     </a>
                                 </td>
@@ -53,8 +53,8 @@
                 </table>
             </div>
             <div class="mt-3 d-flex justify-content-center">
-                {{-- ✅ BERUBAH: $salesOrders -> $orders --}}
-                {{ $orders->links() }}
+                {{-- ✅ BERUBAH: $salesOrders -> $salesOrders --}}
+                {{ $salesOrders->links() }}
             </div>
         </div>
     </div>

@@ -23,6 +23,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\MidtransController;
 // ✅ TAMBAHKAN USE STATEMENT UNTUK CONTROLLER BARU
 use App\Http\Controllers\OrderChangeRequestController;
+use App\Http\Controllers\ClientOrderReviewController;
 
 /*
 |--------------------------------------------------------------------------
@@ -84,6 +85,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 
+    Route::prefix('client-order-reviews')->name('client-order-reviews.')->group(function() { // Tambah prefix admin. jika perlu
+        Route::get('/', [ClientOrderReviewController::class, 'index'])->name('index'); // admin.client-order-reviews.index
+        Route::get('/{order}', [ClientOrderReviewController::class, 'show'])->name('show'); // admin.client-order-reviews.show
+        Route::post('/{order}/approve', [ClientOrderReviewController::class, 'approve'])->name('approve'); // admin.client-order-reviews.approve
+        Route::post('/{order}/reject', [ClientOrderReviewController::class, 'reject'])->name('reject'); // admin.client-order-reviews.reject
+    });
 
     // ✅ === ROUTE BARU UNTUK ADMIN REVIEW REQUEST PERUBAHAN ORDER ===
     // (Anda bisa pindahkan grup ini ke mana saja di dalam middleware group)

@@ -40,8 +40,12 @@
                                         <i class="bi bi-pencil-square"></i> Edit
                                     </a>
                                 @endcan
+                                
                                 @can('delete', $product)
-                                    <form action="{{ route('products.destroy', $product->product_id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus produk ini?');">
+                                    {{-- Form Hapus (terhubung ke SweetAlert via class 'form-delete') --}}
+                                    <form action="{{ route('products.destroy', $product->product_id) }}" method="POST" 
+                                          class="d-inline form-delete"
+                                          data-product-name="{{ e($product->product_name) }}">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-danger">
@@ -89,3 +93,42 @@
     </div>
 </div>
 @endsection
+
+{{-- Script untuk memicu SweetAlert --}}
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Temukan form hapus di halaman ini
+        const deleteForm = document.querySelector('.form-delete');
+        
+        // Cek jika form-nya ada
+        if (deleteForm) {
+            deleteForm.addEventListener('submit', function(event) {
+                // Hentikan form agar tidak langsung terkirim
+                event.preventDefault(); 
+                
+                // Ambil nama produk dari data-attribute
+                const productName = this.dataset.productName;
+
+                // Tampilkan SweetAlert
+                Swal.fire({
+                    title: 'Apakah Anda yakin?',
+                    text: `Anda akan menghapus produk "${productName}". Tindakan ini tidak dapat dibatalkan!`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Ya, hapus!',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    // Jika user menekan "Ya, hapus!"
+                    if (result.isConfirmed) {
+                        // Lanjutkan submit form
+                        this.submit();
+                    }
+                });
+            });
+        }
+    });
+</script>
+@endpush

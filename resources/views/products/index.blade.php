@@ -112,13 +112,15 @@
                                     @endcan
                                     @can('delete', $product)
                                         {{-- Tombol Hapus memerlukan form --}}
-                                        <form action="{{ route('products.destroy', $product->product_id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus produk {{ $product->product_name }}?');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </form>
+                                        <form action="{{ route('products.destroy', $product->product_id) }}" method="POST" 
+          class="d-inline form-delete" 
+          data-product-name="{{ e($product->product_name) }}">
+        @csrf
+        @method('DELETE')
+        <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
+            <i class="bi bi-trash"></i>
+        </button>
+    </form>
                                     @endcan
                                 </td>
                             </tr>
@@ -145,3 +147,49 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // --- Kode Popover Anda (Sudah Ada) ---
+        var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+        var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+            return new bootstrap.Popover(popoverTriggerEl);
+        });
+        
+        // --- TAMBAHAN: Script untuk SweetAlert Hapus ---
+        
+        // 1. Temukan semua form dengan class 'form-delete'
+        const deleteForms = document.querySelectorAll('.form-delete');
+        
+        // 2. Tambahkan event listener untuk setiap form
+        deleteForms.forEach(form => {
+            form.addEventListener('submit', function(event) {
+                // 3. Hentikan pengiriman form standar
+                event.preventDefault(); 
+                
+                // Ambil nama produk dari data-attribute
+                const productName = this.dataset.productName;
+
+                // 4. Tampilkan SweetAlert
+                Swal.fire({
+                    title: 'Apakah Anda yakin?',
+                    text: `Anda akan menghapus produk "${productName}". Tindakan ini tidak dapat dibatalkan!`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Ya, hapus!',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    // 5. Jika user mengklik "Ya, hapus!"
+                    if (result.isConfirmed) {
+                        // Lanjutkan pengiriman form
+                        this.submit();
+                    }
+                });
+            });
+        });
+    });
+</script>
+@endpush

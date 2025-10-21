@@ -4,7 +4,7 @@
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         {{-- Tombol Kembali --}}
-        <a href="{{ route('client.orders.show', $order->order_id) }}" class="btn btn-outline-secondary">
+        <a href="{{ route('client.sales-orders.show', $order->order_id) }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Kembali ke Detail Pesanan
         </a>
         <h2 class="fw-bold mb-0">Ajukan Perubahan Pesanan: {{ $order->order_number }}</h2>
@@ -19,7 +19,7 @@
                 <div class="alert alert-danger">{{ session('error') }}</div>
             @endif
 
-            <form action="{{ route('client.orders.requestChange.store', $order->order_id) }}" method="POST" id="change-request-form">
+            <form action="{{ route('client.sales-orders.requestChange.store', $order->order_id) }}" method="POST" id="change-request-form">
                 @csrf
 
                 {{-- PILIHAN JENIS PERMINTAAN --}}
@@ -73,7 +73,7 @@
 
                 {{-- TOMBOL SUBMIT --}}
                 <div class="d-flex justify-content-end mt-4">
-                    <a href="{{ route('client.orders.show', $order->order_id) }}" class="btn btn-light me-2">Batal</a>
+                    <a href="{{ route('client.sales-orders.show', $order->order_id) }}" class="btn btn-light me-2">Batal</a>
                     <button type="submit" class="btn btn-primary">Kirim Permintaan</button>
                 </div>
             </form>

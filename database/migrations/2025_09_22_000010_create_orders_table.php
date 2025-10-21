@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('invoice_id')->nullable()->constrained('sales_invoices', 'invoice_id');
             $table->date('order_date');
             $table->decimal('total_amount', 15, 2);
-            $table->enum('status', ['pending', 'approved', 'rejected', 'invoiced'])->default('pending');
+            $table->enum('status', ['pending', 'approved', 'rejected', 'invoiced', 'pending_review'])->default('pending');
             $table->string('order_source')->default('sales'); // 'sales' or 'client'
             $table->text('notes')->nullable();
             $table->timestamps();

@@ -3,7 +3,7 @@
 @section('content')
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2"> {{-- Tambah flex-wrap & gap --}}
-        <a href="{{ route('client.orders.index') }}" class="btn btn-outline-secondary">
+        <a href="{{ route('client.sales-orders.index') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Kembali ke Daftar
         </a>
         <h2 class="fw-bold mb-0">Detail Pesanan: {{ $order->order_number }}</h2>
@@ -15,7 +15,7 @@
                 $canRequestChange = in_array($order->status, ['pending', 'approved']) && !$order->changeRequests()->where('status', 'pending')->exists();
             @endphp
             @if($canRequestChange)
-                <a href="{{ route('client.orders.requestChange.create', $order->order_id) }}" class="btn btn-warning">
+                <a href="{{ route('client.sales-orders.requestChange.create', $order->order_id) }}" class="btn btn-warning">
                     <i class="bi bi-pencil-fill me-1"></i> Ajukan Perubahan
                 </a>
             @endif

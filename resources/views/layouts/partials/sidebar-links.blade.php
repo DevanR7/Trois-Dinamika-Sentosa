@@ -49,7 +49,7 @@
 {{-- 4. Manajemen Supplier dan Pembelian Barang --}}
 @if(Auth::user()->canany(['view-suppliers', 'view-purchase-orders']))
     <div class="menu_title flex">
-        <span class="title">Supplier & Pembelian</span> {{-- Disingkat --}}
+        <span class="title">Supplier & Pembelian</span>
         <span class="line"></span>
     </div>
     <ul class="menu_item">
@@ -72,10 +72,11 @@
     </ul>
 @endif
 
-{{-- 5. Transaksi Sales --}}
-@if(Auth::user()->canany(['view-sales-orders', 'review-order-change-requests']))
+{{-- 5. Transaksi Sales & Klien --}}
+{{-- ✅ Kondisi @if diperbarui --}}
+@if(Auth::user()->canany(['view-sales-orders', 'review-client-orders', 'review-order-change-requests']))
     <div class="menu_title flex">
-        <span class="title">Transaksi Sales</span>
+        <span class="title">Transaksi Sales & Klien</span>
         <span class="line"></span>
     </div>
     <ul class="menu_item">
@@ -83,18 +84,38 @@
         <li class="item">
             <a class="link flex {{ request()->routeIs('sales-orders.*') ? 'active' : '' }}" href="{{ route('sales-orders.index') }}">
                 <i class="bx bxs-file-doc"></i>
-                <span>Pesanan Penjualan</span>
+                <span>Pesanan (dari Sales)</span>
             </a>
         </li>
         @endcan
+
+        {{-- ✅ MENU BARU: Review Pesanan Klien --}}
+        @can('review-client-orders')
+        <li class="item">
+            <a class="link flex {{ request()->routeIs('client-order-reviews.*') ? 'active' : '' }}" href="{{ route('client-order-reviews.index') }}">
+                <i class='bx bxs-user-voice position-relative'></i> {{-- Ganti ikon --}}
+                <span>Review Pesanan Klien</span>
+                {{-- Badge Notifikasi Pending --}}
+                @php $pendingClientOrdersCount = \App\Models\Order::where('order_source', 'client')->where('status', 'pending_review')->count(); @endphp
+                @if($pendingClientOrdersCount > 0)
+                    <span class="badge bg-danger rounded-pill ms-auto"> {{-- ms-auto agar di kanan --}}
+                        {{ $pendingClientOrdersCount }}
+                    </span>
+                @endif
+            </a>
+        </li>
+        @endcan
+        {{-- =================================== --}}
+
         @can('review-order-change-requests')
         <li class="item">
             <a class="link flex {{ request()->routeIs('order-change-requests.*') ? 'active' : '' }}" href="{{ route('order-change-requests.index') }}">
                 <i class="bx bxs-bell-ring position-relative"></i>
                 <span>Permintaan Perubahan</span>
+                 {{-- Badge notifikasi --}}
                 @php $pendingRequestsCount = \App\Models\OrderChangeRequest::where('status', 'pending')->count(); @endphp
                 @if($pendingRequestsCount > 0)
-                    <span class="badge bg-danger rounded-pill">
+                    <span class="badge bg-danger rounded-pill ms-auto"> {{-- ms-auto agar di kanan --}}
                         {{ $pendingRequestsCount }}
                     </span>
                 @endif
@@ -163,10 +184,9 @@
 @endcan
 
 {{-- 9. Pengaturan Satuan dan Pajak --}}
-{{-- Asumsi keduanya memerlukan permission 'manage-settings' --}}
 @can("manage-settings")
     <div class="menu_title flex">
-        <span class="title">Satuan & Pajak</span> {{-- Disingkat --}}
+        <span class="title">Satuan & Pajak</span>
         <span class="line"></span>
     </div>
     <ul class="menu_item">
@@ -178,7 +198,7 @@
         </li>
          <li class="item">
             <a class="link flex {{ request()->routeIs("taxes.*") ? "active" : "" }}" href="{{ route("taxes.index") }}">
-                <i class="bx bx-file-blank"></i>
+                <i class="bx bx-file-blank"></i> {{-- Pertimbangkan ganti ikon % --}}
                 <span>Pengaturan Pajak</span>
             </a>
         </li>
