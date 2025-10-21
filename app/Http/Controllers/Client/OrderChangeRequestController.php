@@ -29,13 +29,13 @@ class OrderChangeRequestController extends Controller
         // 2. Logika Bisnis: Hanya boleh request jika status order memungkinkan
         // Anda bisa sesuaikan status ini sesuai kebutuhan
         if (!in_array($order->status, ['pending', 'approved'])) {
-            return redirect()->route('client.orders.show', $order->order_id)
+            return redirect()->route('client.sales-orders.show', $order->order_id)
                 ->with('error', 'Permintaan perubahan tidak dapat diajukan untuk pesanan dengan status ' . $order->status . '.');
         }
 
         // 3. Logika Bisnis: Cek apakah sudah ada request pending untuk order ini
         if ($order->changeRequests()->where('status', 'pending')->exists()) {
-             return redirect()->route('client.orders.show', $order->order_id)
+             return redirect()->route('client.sales-orders.show', $order->order_id)
                 ->with('warning', 'Sudah ada permintaan perubahan yang sedang menunggu diproses untuk pesanan ini.');
         }
 
@@ -45,7 +45,7 @@ class OrderChangeRequestController extends Controller
 
         // Tampilkan view form permintaan
         // ❗️ Nama view 'client.orders.request_change' perlu dibuat
-        return view('client.orders.request_change', compact('order', 'products'));
+        return view('client.sales_orders.request_change', compact('order', 'products'));
     }
 
     /**
@@ -117,7 +117,7 @@ class OrderChangeRequestController extends Controller
             DB::commit();
 
             // 5. Redirect kembali ke halaman detail order dengan pesan sukses
-            return redirect()->route('client.orders.show', $order->order_id)
+            return redirect()->route('client.sales-orders.show', $order->order_id)
                 ->with('success', 'Permintaan perubahan pesanan berhasil diajukan dan sedang menunggu diproses.');
 
         } catch (\Exception $e) {

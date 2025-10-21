@@ -1,7 +1,58 @@
 @extends('layouts.client')
 
 @section('content')
-    <h2 class="fw-bold mb-4">Riwayat Pesanan Penjualan</h2>
+    <h2 class="fw-bold mb-4">Riwayat Pesanan (dari Sales)</h2> {{-- Judul diubah --}}
+
+    {{-- Notifikasi --}}
+    @if (session('success'))
+        <div class="alert alert-success">{{ session('success') }}</div>
+    @endif
+    @if (session('error'))
+        <div class="alert alert-danger">{{ session('error') }}</div>
+    @endif
+
+    {{-- ✅ FORM FILTER BARU --}}
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form action="{{ route('client.sales-orders.index') }}" method="GET" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label for="search" class="form-label">Cari No. Pesanan</label>
+                    <input type="text" name="search" id="search" class="form-control form-control-sm" placeholder="Contoh: SO/..." value="{{ request('search') }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="date_filter" class="form-label">Filter Tanggal Pesan</label>
+                    <select name="date_filter" id="date_filter" class="form-select form-select-sm">
+                        <option value="">-- Semua Tanggal --</option>
+                        @foreach($uniqueDates as $ym => $dateLabel)
+                            <option value="{{ $ym }}" @selected(request('date_filter') == $ym)>{{ $dateLabel }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                 <div class="col-md-2">
+                    <label for="status_filter" class="form-label">Status</label>
+                    <select name="status_filter" id="status_filter" class="form-select form-select-sm">
+                        <option value="">-- Semua Status --</option>
+                        <option value="pending" @selected(request('status_filter') == 'pending')>Pending</option>
+                        <option value="approved" @selected(request('status_filter') == 'approved')>Approved</option>
+                        <option value="rejected" @selected(request('status_filter') == 'rejected')>Rejected</option>
+                        <option value="invoiced" @selected(request('status_filter') == 'invoiced')>Invoiced</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="sort" class="form-label">Urutkan</label>
+                    <select name="sort" id="sort" class="form-select form-select-sm">
+                        <option value="terbaru" @selected(request('sort', 'terbaru') == 'terbaru')>Terbaru</option>
+                        <option value="terlama" @selected(request('sort') == 'terlama')>Terlama</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-dark btn-sm w-100">Filter</button>
+                    <a href="{{ route('client.sales-orders.index') }}" class="btn btn-outline-secondary btn-sm w-100">Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+    {{-- ======================== --}}
 
     <div class="card shadow-sm">
         <div class="card-body">
@@ -17,14 +68,12 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {{-- ✅ BERUBAH: $salesOrders -> $salesOrders --}}
                         @forelse($salesOrders as $order)
                             <tr>
                                 <td>{{ $order->order_number }}</td>
                                 <td>{{ $order->order_date->format('d M Y') }}</td>
                                 <td class="text-end">Rp {{ number_format($order->total_amount, 0, ',', '.') }}</td>
                                 <td class="text-center">
-                                    {{-- Status badge bisa dibuat lebih dinamis seperti di admin --}}
                                     @php
                                         $statusClass = [
                                             'pending' => 'bg-secondary',
@@ -38,7 +87,6 @@
                                     </span>
                                 </td>
                                 <td class="text-center">
-                                    {{-- ❗️ PERHATIAN: Nama route ini mungkin perlu diubah nanti --}}
                                     <a href="{{ route('client.sales-orders.show', $order->order_id) }}" class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-eye"></i> Detail
                                     </a>
@@ -46,15 +94,15 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="text-center py-4">Anda belum memiliki riwayat pesanan.</td>
+                                <td colspan="5" class="text-center py-4">Tidak ada riwayat pesanan (dari sales) yang cocok dengan filter Anda.</td>
                             </tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
             <div class="mt-3 d-flex justify-content-center">
-                {{-- ✅ BERUBAH: $salesOrders -> $salesOrders --}}
-                {{ $salesOrders->links() }}
+                {{-- Tambahkan appends agar filter tetap ada saat ganti halaman --}}
+                {{ $salesOrders->appends(request()->query())->links() }}
             </div>
         </div>
     </div>

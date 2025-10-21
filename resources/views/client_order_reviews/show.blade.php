@@ -5,6 +5,7 @@
     {{-- HEADER HALAMAN --}}
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h2 class="fw-bold mb-0">Review Pesanan Klien: {{ $order->order_number }}</h2>
+        {{-- Pastikan nama route index benar (order-change-requests.index atau client-order-reviews.index) --}}
         <a href="{{ route('client-order-reviews.index') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left me-1"></i> Kembali ke Daftar Review
         </a>
@@ -18,7 +19,7 @@
         <div class="alert alert-danger">{{ session('error') }}</div>
     @endif
 
-    {{-- KARTU DETAIL PESANAN (Mirip sales_orders.show tapi tanpa tombol edit/invoice) --}}
+    {{-- KARTU DETAIL PESANAN --}}
     <div class="card shadow-sm border-0 mb-4">
          <div class="card-header bg-light d-flex justify-content-between align-items-center">
              <h5 class="mb-0 fw-semibold">Detail Pesanan</h5>
@@ -34,7 +35,6 @@
                 </div>
                 <div class="col-md-6 text-md-end">
                     <p class="mb-1"><strong>Tanggal Pesanan:</strong> {{ optional($order->order_date)->format('d F Y') }}</p>
-                    {{-- Sales tidak ada untuk order ini --}}
                 </div>
             </div>
             <hr>
@@ -83,71 +83,92 @@
     </div>
 
     {{-- FORM AKSI APPROVE / REJECT --}}
+    @if($order->status == 'pending_review')
     <div class="card shadow-sm border-0">
          <div class="card-header bg-primary text-white">
             <h5 class="mb-0 fw-semibold">Tindakan Review</h5>
         </div>
         <div class="card-body p-4">
-            {{-- Form untuk Reject --}}
-             <form action="{{ route('client-order-reviews.reject', $order->order_id) }}" method="POST" id="reject-form" class="mb-3">
-                 @csrf
-                 <div class="mb-3">
-                    <label for="rejection_notes" class="form-label">Alasan Penolakan (Opsional)</label>
-                    <textarea class="form-control form-control-sm" name="rejection_notes" id="rejection_notes" rows="2"></textarea>
-                 </div>
-                 <button type="submit" class="btn btn-danger">
+            <p>Setujui pesanan ini untuk melanjutkan ke pembuatan invoice (Anda bisa menambahkan pajak/diskon di langkah berikutnya), atau tolak pesanan ini.</p>
+            
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                
+                {{-- Tombol Tolak (dengan Modal) --}}
+                <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal">
                      <i class="bi bi-x-circle-fill me-1"></i> Tolak Pesanan Ini
-                 </button>
-             </form>
+                </button>
 
-             <hr>
+                {{-- ✅ TOMBOL BARU: BUAT INVOICE --}}
+                {{-- Ini mengarah ke route yang SAMA dengan "Buat Invoice" dari Sales Order --}}
+                <a href="{{ route('invoices.createFromOrder', $order->order_id) }}" class="btn btn-success btn-lg">
+                    <i class="bi bi-check-circle-fill me-1"></i> Proses & Buat Invoice
+                </a>
+            </div>
+        </div>
+    </div>
+    @else
+    {{-- Tampilkan info jika sudah diproses --}}
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-light">
+             <h5 class="mb-0 fw-semibold">Status Pesanan</h5>
+        </div>
+         <div class="card-body p-4">
+             <p classs="mb-0">Pesanan ini telah diproses dan statusnya sekarang adalah: 
+                <strong class="{{ $order->status == 'invoiced' ? 'text-success' : ($order->status == 'rejected' ? 'text-danger' : 'text-secondary') }}">
+                    {{ Str::title(str_replace('_', ' ', $order->status)) }}
+                </strong>.
+            </p>
+            @if($order->invoice_id)
+                <a href="{{ route('invoices.show', $order->invoice_id) }}" class="btn btn-outline-info btn-sm mt-2">Lihat Invoice Terkait</a>
+            @endif
+         </div>
+     </div>
+    @endif
+</div>
 
-             {{-- Form untuk Approve --}}
-             <form action="{{ route('client-order-reviews.approve', $order->order_id) }}" method="POST" id="approve-form" class="mt-3 text-end">
-                  @csrf
-                 <button type="submit" class="btn btn-success btn-lg"> {{-- Buat tombol approve lebih besar --}}
-                     <i class="bi bi-check-circle-fill me-1"></i> Setujui Pesanan Ini
-                 </button>
-             </form>
+{{-- MODAL UNTUK REJECT (PINDAHKAN DARI FORM) --}}
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ route('client-order-reviews.reject', $order->order_id) }}" method="POST"> {{-- Pastikan nama route benar --}}
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title" id="rejectModalLabel">Tolak Pesanan #{{ $order->order_number }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="rejection_notes" class="form-label">Alasan Penolakan (Opsional)</label>
+                        <textarea class="form-control" name="rejection_notes" id="rejection_notes" rows="3" placeholder="Jelaskan mengapa pesanan ini ditolak..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-danger">Tolak Pesanan</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 @endsection
 
 @push('scripts')
-{{-- SweetAlert untuk konfirmasi --}}
+{{-- SweetAlert untuk konfirmasi Tolak --}}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const approveForm = document.getElementById('approve-form');
-    const rejectForm = document.getElementById('reject-form');
+    const rejectForm = document.querySelector('#rejectModal form'); // Target form di dalam modal
 
-    if (approveForm) {
-        approveForm.addEventListener('submit', function(event) {
-            event.preventDefault();
-            Swal.fire({
-                title: 'Setujui Pesanan?',
-                text: "Pastikan detail pesanan sudah benar sebelum disetujui.",
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#198754',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Ya, Setujui!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    event.target.submit();
-                }
-            });
-        });
-    }
-
-     if (rejectForm) {
+    if (rejectForm) {
         rejectForm.addEventListener('submit', function(event) {
             event.preventDefault();
+            // Sembunyikan modal dulu (opsional, tapi rapi)
+            // const modalInstance = bootstrap.Modal.getInstance(document.getElementById('rejectModal'));
+            // modalInstance.hide();
+            
             Swal.fire({
                 title: 'Tolak Pesanan?',
-                text: "Pesanan yang ditolak tidak dapat diproses lebih lanjut.",
+                text: "Pesanan yang ditolak tidak dapat diproses lebih lanjut dan stok akan dikembalikan.",
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#dc3545',
@@ -156,8 +177,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 cancelButtonText: 'Batal'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    event.target.submit();
+                    event.target.submit(); // Kirim form jika dikonfirmasi
                 }
+                // else {
+                //     modalInstance.show(); // Tampilkan lagi modal jika batal
+                // }
             });
         });
     }

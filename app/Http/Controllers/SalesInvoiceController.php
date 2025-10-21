@@ -16,7 +16,6 @@ use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf; 
 use App\Models\User;
 
-
 class SalesInvoiceController extends Controller
 {
     public function __construct()
@@ -125,10 +124,7 @@ class SalesInvoiceController extends Controller
             'client_id' => 'required|exists:clients,client_id',
             'order_date' => 'required|date',
             'due_date' => 'required|date', 
-            
-            // ✅ BERUBAH: Validasi ke tabel 'orders'
             'sales_order_id' => 'nullable|exists:orders,order_id', 
-            
             'products' => 'required|array|min:1',
             'products.*.product_id' => 'required|exists:products,product_id',
             'products.*.quantity' => 'required|integer|min:1',
@@ -138,22 +134,16 @@ class SalesInvoiceController extends Controller
             'notes' => 'nullable|string',
             'user_id_sales' => 'nullable|exists:users,user_id',
         ]);
-
-        // --- LOGIKA BARU: PENGECEKAN STOK ---
-    /*foreach ($validated['products'] as $productData) {
-        $product = Product::find($productData['product_id']);
-        if ($product->stock_quantity < $productData['quantity']) {
-            // Jika stok tidak cukup, kembalikan dengan pesan error
-            return back()
-                ->with('error', "Stok untuk produk '{$product->product_name}' tidak mencukupi. Sisa stok: {$product->stock_quantity}.")
-                ->withInput();
-        }
-    }*/
+        
+        $itemsToDecrementStock = []; // Tampung data stok yang perlu dikurangi
 
         try {
             DB::beginTransaction();
             
-            // 1. Hitung Subtotal dari Produk
+            // Cek apakah invoice ini dibuat dari order
+            $originOrder = $request->filled('sales_order_id') ? Order::find($request->sales_order_id) : null;
+
+            // 1. Hitung Subtotal dan siapkan item
             $subtotal = 0;
             $productsToSave = [];
             foreach ($validated['products'] as $productData) {
@@ -161,8 +151,23 @@ class SalesInvoiceController extends Controller
                 if (!$product) {
                     throw new \Exception("Produk dengan ID {$productData['product_id']} tidak ditemukan.");
                 }
+
+                // Cek Stok:
+                // HANYA kurangi stok jika ini BUKAN dari 'client order'
+                // (Karena 'client order' sudah kurangi stok saat checkout/approve)
+                $isFromClientOrder = $originOrder && $originOrder->order_source === 'client';
                 
-                // ✅ Sesuai permintaan Anda: Tetap menggunakan purchase_price
+                if (!$isFromClientOrder) {
+                    if ($product->stock_quantity < $productData['quantity']) {
+                         throw new \Exception("Stok untuk produk '{$product->product_name}' tidak mencukupi. Sisa stok: {$product->stock_quantity}.");
+                    }
+                    // Tandai untuk dikurangi nanti
+                    $itemsToDecrementStock[] = [
+                        'product_id' => $product->product_id, // Simpan ID
+                        'quantity' => $productData['quantity']
+                    ];
+                }
+
                 $price = $product->purchase_price ?? 0; 
                 $quantity = $productData['quantity'];
                 $itemSubtotal = $quantity * $price;
@@ -174,8 +179,6 @@ class SalesInvoiceController extends Controller
                     'price_per_unit' => $price,
                     'subtotal' => $itemSubtotal,
                 ];
-
-                $product->decrement('stock_quantity', $quantity);
             }
 
             // 2. Hitung Diskon Global
@@ -191,7 +194,6 @@ class SalesInvoiceController extends Controller
                 foreach ($selectedTaxes as $tax) {
                     $taxAmountForItem = $subtotalAfterDiscount * ($tax->rate / 100);
                     $totalTaxAmount += $taxAmountForItem;
-                    
                     $taxesToAttach[$tax->id] = [
                         'name' => $tax->name,
                         'rate' => $tax->rate,
@@ -203,10 +205,25 @@ class SalesInvoiceController extends Controller
             // 4. Hitung Total Akhir
             $totalAmount = $subtotalAfterDiscount + $totalTaxAmount;
 
+            // ✅ ===== LOGIKA PENENTUAN NOMOR INVOICE (PINDAH KE ATAS) =====
+            $salesUserId = $request->input('user_id_sales');
+            $orderSource = 'sales'; // Default 'sales'
+
+            if ($originOrder) {
+                 $orderSource = $originOrder->order_source;
+                 if (empty($salesUserId) && $originOrder->user_id_sales) {
+                     $salesUserId = $originOrder->user_id_sales;
+                 }
+            }
+            // ==============================================================
+
             // 5. Simpan data utama ke tabel sales_invoices
             $invoice = SalesInvoice::create([
                 'client_id' => $validated['client_id'],
-                'invoice_number' => SalesInvoice::generateInvoiceNumber($request->input('user_id_sales')),
+                
+                // ✅ Panggil dengan variabel yang sudah didefinisikan
+                'invoice_number' => SalesInvoice::generateInvoiceNumber($salesUserId, $orderSource),
+                
                 'order_date' => $validated['order_date'],
                 'due_date' => $validated['due_date'],
                 'subtotal' => $subtotal,
@@ -214,8 +231,7 @@ class SalesInvoiceController extends Controller
                 'discount_amount' => $discountAmount,
                 'total_amount' => $totalAmount,
                 'status' => 'unpaid',
-                // 'payment_status' => 'unpaid', // Kolom ini sepertinya tidak ada di migrasi, saya hapus
-                'user_id_sales' => $request->input('user_id_sales', Auth::id()), 
+                'user_id_sales' => $salesUserId, // Gunakan $salesUserId yang sudah pasti
                 'amount_paid' => 0,
                 'notes' => $request->input('notes'),
             ]);
@@ -224,22 +240,26 @@ class SalesInvoiceController extends Controller
             $invoice->taxes()->attach($taxesToAttach);
             $invoice->items()->createMany($productsToSave);
 
-            // ✅ BERUBAH: Logika update ke model Order
-            if ($request->filled('sales_order_id')) {
-                $order = Order::find($request->sales_order_id); // Gunakan model Order
-                if ($order) {
-                    $order->status = 'invoiced'; // Ubah status menjadi 'invoiced'
-                    $order->invoice_id = $invoice->invoice_id; // Simpan referensi ID invoice
-                    $order->save();
-                }
+            // 7. Update status Order jika dibuat dari order
+            if ($originOrder) {
+                $originOrder->status = 'invoiced';
+                $originOrder->invoice_id = $invoice->invoice_id;
+                $originOrder->save();
             }
             
+            // 8. Kurangi Stok (HANYA jika perlu)
+            foreach ($itemsToDecrementStock as $item) {
+                // Lock produk sebelum decrement
+                Product::where('product_id', $item['product_id'])->lockForUpdate()->decrement('stock_quantity', $item['quantity']);
+            }
+
             DB::commit();
 
             return redirect()->route('invoices.show', $invoice->invoice_id)->with('success', 'Invoice berhasil dibuat!');
 
         } catch (\Exception $e) {
             DB::rollBack();
+            // Tidak perlu kembalikan stok karena kita belum commit decrement
             return back()->with('error', 'Gagal membuat invoice: ' . $e->getMessage())->withInput();
         }
     }

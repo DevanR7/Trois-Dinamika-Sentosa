@@ -8,13 +8,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
+// Import model lain yang direlasikan
+use App\Models\Client;
+use App\Models\InvoiceItem;
+use App\Models\Tax;
+use App\Models\Payment;
+use App\Models\SalesReturn;
+
 
 class SalesInvoice extends Model
 {
     use HasFactory;
     protected $primaryKey = 'invoice_id';
 
-/**
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>
@@ -26,7 +33,7 @@ class SalesInvoice extends Model
         'order_date',
         'due_date',
         'subtotal',
-        'discount_percentage', 
+        'discount_percentage',
         'discount_amount',
         'total_amount',
         'amount_paid',
@@ -34,14 +41,14 @@ class SalesInvoice extends Model
         'notes'
     ];
 
-   /**
+    /**
      * The attributes that should be cast.
      *
      * @var array
      */
     protected $casts = [
         'order_date' => 'date',
-        'due_date' => 'date', 
+        'due_date' => 'date',
         'total_amount' => 'float',
         'subtotal' => 'float',
         'discount_percentage' => 'float',
@@ -50,7 +57,6 @@ class SalesInvoice extends Model
 
     /**
      * Mendapatkan data client yang memiliki invoice ini.
-     * Ini adalah relasi yang menyebabkan error.
      */
     public function client(): BelongsTo
     {
@@ -73,24 +79,37 @@ class SalesInvoice extends Model
         return $this->hasMany(InvoiceItem::class, 'invoice_id', 'invoice_id');
     }
 
+    /**
+     * Relasi pivot ke tabel pajak.
+     */
     public function taxes()
-{
-    return $this->belongsToMany(Tax::class, 'invoice_tax', 'invoice_id', 'tax_id')
-                ->withPivot('name', 'rate', 'amount');
-}
+    {
+        return $this->belongsToMany(Tax::class, 'invoice_tax', 'invoice_id', 'tax_id')
+                        ->withPivot('name', 'rate', 'amount');
+    }
 
-public function payments(): HasMany
-{
-    return $this->hasMany(Payment::class, 'invoice_id', 'invoice_id');
-}
+    /**
+     * Relasi ke pembayaran.
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'invoice_id', 'invoice_id');
+    }
 
-public static function generateInvoiceNumber($salesUserId = null): string
+    /**
+     * Generate nomor invoice baru dengan suffix kondisional.
+     *
+     * @param int|null $salesUserId ID user sales (jika ada)
+     * @param string|null $orderSource Sumber order ('client' atau 'sales')
+     * @return string
+     */
+    public static function generateInvoiceNumber($salesUserId = null, $orderSource = null): string
     {
         $yearMonth = now()->format('Ym');
         $year = now()->format('Y');
         $month = now()->format('m');
 
-        // Lock baris untuk mencegah duplikasi nomor saat ada >1 user membuat invoice bersamaan
+        // Lock baris untuk mencegah duplikasi nomor
         $counter = DB::table('invoice_counters')->where('ym', $yearMonth)->lockForUpdate()->first();
 
         if ($counter) {
@@ -98,25 +117,40 @@ public static function generateInvoiceNumber($salesUserId = null): string
             DB::table('invoice_counters')->where('ym', $yearMonth)->update(['last_sequence' => $nextSequence]);
         } else {
             $nextSequence = 1;
-            DB::table('invoice_counters')->insert(['ym' => $yearMonth, 'last_sequence' => $nextSequence]);
+            // Tambahkan timestamps saat insert baru
+            DB::table('invoice_counters')->insert([
+                'ym' => $yearMonth,
+                'last_sequence' => $nextSequence,
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
         }
 
         $sequencePadded = str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
-
         $baseNumber = "INV/{$year}/{$month}/{$sequencePadded}";
 
-    // Logika baru untuk menambahkan kode sales
-    if ($salesUserId) {
-        $sales = User::find($salesUserId);
-        if ($sales && $sales->sales_code) {
-            $baseNumber .= '/' . strtoupper($sales->sales_code);
+        // --- LOGIKA SUFFIX BARU ---
+        if ($salesUserId) {
+            // KASUS 1: Invoice dibuat DENGAN sales ID (dari SO Sales atau manual pilih sales)
+            $sales = User::find($salesUserId);
+            if ($sales && $sales->sales_code) {
+                $baseNumber .= '/' . strtoupper($sales->sales_code);
+            }
+        } elseif ($orderSource === 'client') {
+            // KASUS 2: Invoice dibuat TANPA sales ID, TAPI dari order klien ('client')
+            $baseNumber .= '/CO'; // Suffix untuk Client Order
         }
-    }
-    return $baseNumber;
+        // KASUS 3: $salesUserId null DAN $orderSource bukan 'client' (misal admin buat manual)
+        // Maka tidak ada suffix tambahan.
+
+        return $baseNumber;
     }
 
+    /**
+     * Relasi ke retur penjualan.
+     */
     public function returns(): HasMany
-{
-    return $this->hasMany(SalesReturn::class, 'sales_invoice_id', 'invoice_id');
-}
+    {
+        return $this->hasMany(SalesReturn::class, 'sales_invoice_id', 'invoice_id');
+    }
 }
