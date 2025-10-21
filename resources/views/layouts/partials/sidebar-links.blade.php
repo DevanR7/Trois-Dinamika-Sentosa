@@ -203,7 +203,7 @@
         @can("manage-roles")
         <li class="item">
             <a class="link flex {{ request()->routeIs("roles.*") ? "active" : "" }}" href="{{ route("roles.index") }}">
-                <i class="bx bxs-shield-lock"></i>
+                <i class="bx bxs-key"></i>
                 <span>Manajemen Role</span>
             </a>
         </li>
