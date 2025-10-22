@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('sales_code', 10)->nullable()->unique();
             $table->rememberToken();
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

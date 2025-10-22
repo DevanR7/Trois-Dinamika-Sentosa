@@ -18,9 +18,27 @@ class UserController extends Controller
     {
         $this->middleware('can:manage-users');
     }
-    public function index()
+    
+    public function index(Request $request)
     {
-        $users = User::latest()->paginate(10);
+        $query = User::query();
+
+        // Tambahkan filter untuk melihat data terhapus
+        if ($request->get('status') === 'deleted') {
+            $query->onlyTrashed();
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            // Gunakan where agar filter 'onlyTrashed' tetap berlaku
+            $query->where(function($q) use ($search) {
+                $q->where('full_name', 'like', "%{$search}%")
+                  ->orWhere('username', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+        
+        $users = $query->latest('user_id')->paginate(10);
         return view('users.index', compact('users'));
     }
 
@@ -106,13 +124,13 @@ class UserController extends Controller
 {
     // [SANGAT PENTING] Cek agar tidak menghapus user yang sedang login
     if ($user->user_id === Auth::id()) {
-        return back()->with('error', 'Anda tidak bisa menghapus akun Anda sendiri.');
-    }
+            return back()->with('error', 'Anda tidak bisa menghapus akun Anda sendiri.');
+        }
 
-    // Cek agar tidak menghapus user admin terakhir
-    if ($user->hasRole(['admin', 'superadmin']) && User::role(['admin', 'superadmin'])->count() === 1) {
-    return back()->with('error', 'Tidak bisa menghapus satu-satunya user dengan role Admin atau Superadmin.');
-    }
+        // Cek agar tidak menghapus user admin terakhir
+        if ($user->hasRole(['admin', 'superadmin']) && User::role(['admin', 'superadmin'])->count() === 1) {
+             return back()->with('error', 'Tidak bisa menghapus satu-satunya user dengan role Admin atau Superadmin.');
+        }
 
     // Cek relasi ke sales invoice
     if ($user->salesInvoices()->exists()) {
@@ -128,4 +146,17 @@ class UserController extends Controller
     
     return redirect()->route('users.index')->with('success', 'User berhasil dihapus.');
 }
+
+/**
+     * Memulihkan user yang di-soft-delete.
+     */
+    public function restore(User $user): RedirectResponse
+    {
+        // Cek ini memastikan kita hanya restore data yang terhapus
+        if ($user->trashed()) {
+            $user->restore();
+            return back()->with('success', 'Akun user ' . $user->full_name . ' telah dipulihkan.');
+        }
+        return back()->with('error', 'User tidak terhapus.');
+    }
 }

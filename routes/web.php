@@ -44,6 +44,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // Resource Controllers
@@ -86,6 +87,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // ✅ === ROUTE BARU UNTUK APPROVAL USER/STAF ===
     Route::patch('users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
+    Route::patch('users/{user}/restore', [UserController::class, 'restore'])
+          ->name('users.restore')
+          ->withTrashed();
 
     // Pengaturan & Laporan
     Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
