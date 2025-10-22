@@ -16,12 +16,12 @@ class UserSeeder extends Seeder
     {
         // 1. ✅ Membuat User Super Admin (BARU)
         $superadmin = User::create([
-            'full_name'  => 'Super Admin',
-            'username'   => 'superadmin',
-            'email'      => 'superadmin@example.com',
-            'password'   => Hash::make('password'), // Ganti dengan password yang aman
+            'full_name'  => 'Trois Dinamika Sentosa', // Ganti namanya
+            'username'   => 'superadmin', // Ganti username
+            'email'      => 'troisdinamikasentosa@gmail.com', // <-- PAKAI EMAIL ASLI DI SINI
+            'password'   => Hash::make('PasswordSuperAman123!'), // Password lokal (opsional)
             'sales_code' => null,
-            'is_approved' => true, // <-- PENTING
+            'is_approved' => true,
         ]);
         // Memberikan role 'superadmin' ke user ini
         $superadmin->assignRole('superadmin');
