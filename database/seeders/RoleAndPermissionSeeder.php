@@ -86,6 +86,7 @@ class RoleAndPermissionSeeder extends Seeder
 
 
         // === BUAT ROLES ===
+        $superadminRole = Role::updateOrCreate(['name' => 'superadmin']);
         $adminRole = Role::updateOrCreate(['name' => 'admin']);
         $manajemenRole = Role::updateOrCreate(['name' => 'manajemen']);
         $kasirRole = Role::updateOrCreate(['name' => 'kasir']);
@@ -95,6 +96,7 @@ class RoleAndPermissionSeeder extends Seeder
 
         // ADMIN & MANAJEMEN: Beri semua permission yang didefinisikan
         $allDefinedPermissions = Permission::pluck('name');
+        $superadminRole->syncPermissions($allDefinedPermissions);
         $adminRole->syncPermissions($allDefinedPermissions);
         $manajemenRole->syncPermissions($allDefinedPermissions);
 

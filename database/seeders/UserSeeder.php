@@ -14,39 +14,54 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Membuat User Admin
+        // 1. ✅ Membuat User Super Admin (BARU)
+        $superadmin = User::create([
+            'full_name'  => 'Super Admin',
+            'username'   => 'superadmin',
+            'email'      => 'superadmin@example.com',
+            'password'   => Hash::make('password'), // Ganti dengan password yang aman
+            'sales_code' => null,
+            'is_approved' => true, // <-- PENTING
+        ]);
+        // Memberikan role 'superadmin' ke user ini
+        $superadmin->assignRole('superadmin');
+
+        // 2. Membuat User Admin
         $admin = User::create([
             'full_name'  => 'Admin Utama',
             'username'   => 'admin',
             'email'      => 'admin@example.com',
             'password'   => Hash::make('password'), // Ganti dengan password yang aman
             'sales_code' => null, // Admin tidak punya kode sales
+            'is_approved' => true, // <-- PENTING
         ]);
         // Memberikan role 'admin' ke user ini
         $admin->assignRole('admin');
 
 
-        // 2. Membuat User Sales
+        // 3. Membuat User Sales
         $sales = User::create([
             'full_name'  => 'Sales Lapangan',
             'username'   => 'sales1',
             'email'      => 'sales1@example.com',
             'password'   => Hash::make('password'),
             'sales_code' => 'SL01', // Contoh kode sales
+            'is_approved' => true, // <-- PENTING (Asumsi user default langsung aktif)
         ]);
         // Memberikan role 'sales' ke user ini
         $sales->assignRole('sales');
 
         
-        // 3. Membuat User Manajemen (Contoh)
+        // 4. Membuat User Manajemen
         $manajemen = User::create([
             'full_name'  => 'Manajemen Kantor',
             'username'   => 'manajemen',
             'email'      => 'manajemen@example.com',
             'password'   => Hash::make('password'),
             'sales_code' => null,
+            'is_approved' => true, // <-- PENTING (Asumsi user default langsung aktif)
         ]);
-        // Anda bisa memberikan role 'manajemen' jika sudah dibuat di RoleAndPermissionSeeder
-        // $manajemen->assignRole('manajemen');
+        // Memberikan role 'manajemen'
+        $manajemen->assignRole('manajemen'); // <-- Saya uncomment ini agar role-nya ter-assign
     }
 }

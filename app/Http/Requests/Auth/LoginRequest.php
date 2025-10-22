@@ -9,8 +9,12 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * @mixin \Illuminate\Http\Request
+ */
 class LoginRequest extends FormRequest
 {
+   
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -27,9 +31,9 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-        'username' => ['required', 'string'], // <-- Diubah
-        'password' => ['required', 'string'],
-    ];
+            'username' => ['required', 'string'], // <-- Ini sudah benar
+            'password' => ['required', 'string'],
+        ];
     }
 
     /**
@@ -45,7 +49,8 @@ class LoginRequest extends FormRequest
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                // 'email' diubah menjadi 'username'
+                'username' => trans('auth.failed'), // <-- DIUBAH
             ]);
         }
 
@@ -68,7 +73,8 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
+             // 'email' diubah menjadi 'username'
+            'username' => trans('auth.throttle', [ // <-- DIUBAH
                 'seconds' => $seconds,
                 'minutes' => ceil($seconds / 60),
             ]),
@@ -80,6 +86,7 @@ class LoginRequest extends FormRequest
      */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        // $this->string('email') diubah menjadi $this->string('username')
+        return Str::transliterate(Str::lower($this->string('username')).'|'.$this->ip()); // <-- DIUBAH
     }
 }

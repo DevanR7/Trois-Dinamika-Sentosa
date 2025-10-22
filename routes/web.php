@@ -80,6 +80,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Custom Routes untuk Client
     Route::patch('clients/{client}/approve', [ClientController::class, 'approve'])->name('clients.approve');
 
+    // ✅ === ROUTE BARU UNTUK APPROVAL USER/STAF ===
+    Route::patch('users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
+
     // Pengaturan & Laporan
     Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
     Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');

@@ -79,7 +79,8 @@ class SalesOrderController extends Controller
     public function create(): View
     {
         $this->authorize('create', Order::class);
-        $clients = Client::where('is_approved', true)->get();
+        $clients = Client::all();
+        //$clients = Client::where('is_approved', true)->get();
         $products = Product::where('stock_quantity', '>', 0)->get();
         
         return view('sales_orders.create', compact('clients', 'products'));

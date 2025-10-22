@@ -36,6 +36,7 @@ class User extends Authenticatable
         'password',
         'sales_code',
         'google_id',
+        'is_approved',
         
     ];
 

@@ -47,6 +47,7 @@ class UserController extends Controller
         'email' => $request->email,
         'password' => Hash::make($request->password),
         'sales_code' => $request->sales_code,
+        'is_approved' => true,
     ]);
 
     // Gunakan method dari Spatie untuk memberikan role
@@ -85,6 +86,22 @@ class UserController extends Controller
 
     return redirect()->route('users.index')->with('success', 'Data user berhasil diupdate.');
 }
+
+    public function approve(User $user): RedirectResponse
+    {
+        // Cek agar admin tidak menyetujui dirinya sendiri (walau tidak logis)
+        if ($user->user_id === Auth::id()) {
+            return back()->with('error', 'Anda tidak bisa menyetujui akun Anda sendiri.');
+        }
+
+        $user->update(['is_approved' => true]);
+        
+        // TODO: Anda bisa tambahkan notifikasi email ke user di sini
+        // Mail::to($user->email)->send(new AkunDisetujuiMail($user));
+
+        return back()->with('success', 'Akun staf ' . $user->full_name . ' telah disetujui.');
+    }
+
     public function destroy(User $user): RedirectResponse
 {
     // [SANGAT PENTING] Cek agar tidak menghapus user yang sedang login
@@ -93,8 +110,8 @@ class UserController extends Controller
     }
 
     // Cek agar tidak menghapus user admin terakhir
-    if ($user->hasRole('admin') && User::role('admin')->count() === 1) {
-        return back()->with('error', 'Tidak bisa menghapus satu-satunya user dengan role Admin.');
+    if ($user->hasRole(['admin', 'superadmin']) && User::role(['admin', 'superadmin'])->count() === 1) {
+    return back()->with('error', 'Tidak bisa menghapus satu-satunya user dengan role Admin atau Superadmin.');
     }
 
     // Cek relasi ke sales invoice
