@@ -55,6 +55,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('invoices', SalesInvoiceController::class);
     Route::resource('taxes', TaxController::class)->except(['show']);
     Route::resource('suppliers', SupplierController::class);
+    Route::patch('suppliers/{supplier}/restore', [SupplierController::class, 'restore'])
+      ->name('suppliers.restore')
+      ->withTrashed();
     Route::resource('purchase-orders', PurchaseOrderController::class);
     Route::resource('clients', ClientController::class);
     Route::resource('units', UnitController::class)->except(['show']);

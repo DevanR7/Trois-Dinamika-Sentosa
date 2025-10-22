@@ -15,10 +15,13 @@ class Supplier extends Model
     protected $primaryKey = 'supplier_id';
 
     protected $fillable = [
-        'supplier_name',      // <-- Sesuaikan ini
-        'person_in_charge', // <-- Sesuaikan ini
+        'supplier_name',     
+        'person_in_charge', 
         'phone_number',
         'address',
+        'npwp',
+        'bank_name',
+        'account_number',
     ];
     /**
      * Mendapatkan semua produk yang disuplai oleh supplier ini.

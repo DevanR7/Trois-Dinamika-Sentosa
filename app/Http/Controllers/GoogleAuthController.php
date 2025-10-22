@@ -16,7 +16,16 @@ class GoogleAuthController extends Controller
     public function redirectToGoogle(): RedirectResponse
     {
         try {
-            return Socialite::driver('google')->redirect();
+            // Pecah menjadi dua baris
+            $googleDriver = Socialite::driver('google');
+
+            // ✅ TAMBAHKAN PETUNJUK INI untuk VS Code
+            /** @var \Laravel\Socialite\Two\GoogleProvider $googleDriver */
+
+            // Sekarang panggil method-nya
+            return $googleDriver->with(['prompt' => 'select_account']) 
+                               ->redirect();
+
         } catch (Exception $e) {
             Log::error('Google redirect error (admin)', ['message' => $e->getMessage()]);
             return redirect()->route('login')->with('error', 'Gagal menghubungkan ke Google. Silakan coba lagi.');

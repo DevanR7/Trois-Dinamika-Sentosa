@@ -6,6 +6,7 @@ use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
+use Illuminate\Validation\Rule;
 
 class SupplierController extends Controller
 {
@@ -15,12 +16,27 @@ class SupplierController extends Controller
         // Kita akan pindahkan pemeriksaan hak akses ke setiap method.
     }
 
-    public function index(): View
+    public function index(Request $request): View
     {
-        // [AUTH] Panggil policy untuk memeriksa permission 'view-suppliers'
         $this->authorize('viewAny', Supplier::class);
 
-        $suppliers = Supplier::latest()->paginate(10);
+        $query = Supplier::query();
+
+        // Logika untuk melihat arsip (data terhapus)
+        if ($request->get('status') === 'deleted') {
+            $query->onlyTrashed();
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('supplier_name', 'like', "%{$search}%")
+                  ->orWhere('person_in_charge', 'like', "%{$search}%")
+                  ->orWhere('phone_number', 'like', "%{$search}%");
+            });
+        }
+
+        $suppliers = $query->latest('supplier_id')->paginate(10);
         return view('suppliers.index', compact('suppliers'));
     }
 
@@ -34,7 +50,6 @@ class SupplierController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        // [AUTH] Panggil policy untuk memeriksa permission 'create-suppliers'
         $this->authorize('create', Supplier::class);
 
         $request->validate([
@@ -42,10 +57,13 @@ class SupplierController extends Controller
             'person_in_charge' => 'nullable|string|max:100',
             'phone_number' => 'nullable|string|max:20',
             'address' => 'nullable|string',
+            'npwp' => ['nullable', 'string', 'max:30', Rule::unique('suppliers')],
+            'bank_name' => 'nullable|string|max:50',
+            'account_number' => 'nullable|string|max:50',
         ]);
 
         Supplier::create($request->all());
-        return redirect()->route('suppliers.index')->with('success', 'Supplier berhasil ditambahkan.');
+        return redirect()->route('suppliers.index')->with('success', 'Supplier baru berhasil ditambahkan.');
     }
 
     public function edit(Supplier $supplier): View
@@ -58,14 +76,16 @@ class SupplierController extends Controller
 
     public function update(Request $request, Supplier $supplier): RedirectResponse
     {
-        // [AUTH] Panggil policy untuk memeriksa permission 'edit-suppliers'
         $this->authorize('update', $supplier);
 
         $request->validate([
-            'supplier_name' => 'required|string|max:150|unique:suppliers,supplier_name,' . $supplier->supplier_id . ',supplier_id',
+            'supplier_name' => ['required', 'string', 'max:150', Rule::unique('suppliers')->ignore($supplier->supplier_id, 'supplier_id')],
             'person_in_charge' => 'nullable|string|max:100',
             'phone_number' => 'nullable|string|max:20',
             'address' => 'nullable|string',
+            'npwp' => ['nullable', 'string', 'max:30', Rule::unique('suppliers')->ignore($supplier->supplier_id, 'supplier_id')],
+            'bank_name' => 'nullable|string|max:50',
+            'account_number' => 'nullable|string|max:50',
         ]);
 
         $supplier->update($request->all());
@@ -74,15 +94,24 @@ class SupplierController extends Controller
 
     public function destroy(Supplier $supplier): RedirectResponse
     {
-        // [AUTH] Panggil policy untuk memeriksa permission 'delete-suppliers'
         $this->authorize('delete', $supplier);
 
-        // Tambahkan validasi agar supplier yang sudah punya PO tidak bisa dihapus
         if ($supplier->purchaseOrders()->exists()) {
             return back()->with('error', 'Supplier ini tidak bisa dihapus karena sudah memiliki data Pesanan Pembelian.');
         }
 
-        $supplier->delete();
-        return redirect()->route('suppliers.index')->with('success', 'Supplier berhasil dihapus.');
+        $supplier->delete(); // Ini akan soft delete
+        return redirect()->route('suppliers.index')->with('success', 'Supplier berhasil diarsipkan.'); // Ganti pesan
+    }
+
+    public function restore(Supplier $supplier): RedirectResponse
+    {
+        $this->authorize('restore', $supplier); // Asumsi Anda punya policy 'restore'
+
+        if ($supplier->trashed()) {
+            $supplier->restore();
+            return back()->with('success', 'Supplier ' . $supplier->supplier_name . ' telah dipulihkan.');
+        }
+        return back()->with('error', 'Supplier tidak terhapus.');
     }
 }
