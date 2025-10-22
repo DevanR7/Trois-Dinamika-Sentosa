@@ -23,6 +23,7 @@ class RoleAndPermissionSeeder extends Seeder
         Permission::updateOrCreate(['name' => 'create-suppliers']);
         Permission::updateOrCreate(['name' => 'edit-suppliers']);
         Permission::updateOrCreate(['name' => 'delete-suppliers']);
+        Permission::updateOrCreate(['name' => 'restore-suppliers']);
 
         // Purchase Orders
         Permission::updateOrCreate(['name' => 'view-purchase-orders']);
