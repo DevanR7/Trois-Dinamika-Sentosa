@@ -80,6 +80,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Custom Routes untuk Client
     Route::patch('clients/{client}/approve', [ClientController::class, 'approve'])->name('clients.approve');
 
+    Route::patch('clients/{client}/restore', [ClientController::class, 'restore'])
+          ->name('clients.restore')
+          ->withTrashed();
+
     // ✅ === ROUTE BARU UNTUK APPROVAL USER/STAF ===
     Route::patch('users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
 

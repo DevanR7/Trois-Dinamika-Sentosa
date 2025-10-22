@@ -13,14 +13,25 @@ use Illuminate\Validation\Rules\Password;
 
 class ClientController extends Controller
 {
+    // ✅ UBAH METHOD INDEX INI
     public function index(Request $request): View
     {
         $query = Client::query();
+
+        // ✅ Tambahkan filter untuk melihat data terhapus
+        if ($request->get('status') === 'deleted') {
+            $query->onlyTrashed();
+        }
+
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where('client_name', 'like', "%{$search}%")
+            // Gunakan where agar filter 'onlyTrashed' tetap berlaku
+            $query->where(function($q) use ($search) {
+                $q->where('client_name', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%");
+            });
         }
+        
         $clients = $query->latest('client_id')->paginate(10);
         return view('clients.index', compact('clients'));
     }
@@ -32,6 +43,7 @@ class ClientController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        // ... (Method store Anda tetap sama)
         $validated = $request->validate([
             'client_name' => 'required|string|max:150',
             'email' => 'nullable|string|email|max:100|unique:clients,email',
@@ -58,9 +70,10 @@ class ClientController extends Controller
 
     public function update(Request $request, Client $client): RedirectResponse
     {
+        // ... (Method update Anda tetap sama)
         $validated = $request->validate([
             'client_name' => 'required|string|max:150',
-            'email' => ['nullable', 'string', 'email', 'max:100', Rule::unique('clients')->ignore($client->client_id, 'client_id')], // <-- UBAH INI
+            'email' => ['nullable', 'string', 'email', 'max:100', Rule::unique('clients')->ignore($client->client_id, 'client_id')],
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
             'person_in_charge' => 'nullable|string|max:100',
             'address' => 'nullable|string',
@@ -70,7 +83,6 @@ class ClientController extends Controller
         if ($request->filled('password')) {
             $validated['password'] = Hash::make($validated['password']);
         } else {
-            // Hapus password dari array jika tidak diisi
             unset($validated['password']);
         }
 
@@ -85,8 +97,22 @@ class ClientController extends Controller
     }
 
     public function approve(Client $client): RedirectResponse
-{
-    $client->update(['is_approved' => true]);
-    return back()->with('success', 'Akun klien ' . $client->client_name . ' telah disetujui.');
-}
+    {
+        $client->update(['is_approved' => true]);
+        return back()->with('success', 'Akun klien ' . $client->client_name . ' telah disetujui.');
+    }
+    
+    // ✅ TAMBAHKAN METHOD BARU INI
+    /**
+     * Memulihkan client yang di-soft-delete.
+     */
+    public function restore(Client $client): RedirectResponse
+    {
+        // Cek ini memastikan kita hanya restore data yang terhapus
+        if ($client->trashed()) {
+            $client->restore();
+            return back()->with('success', 'Akun klien ' . $client->client_name . ' telah dipulihkan.');
+        }
+        return back()->with('error', 'Klien tidak terhapus.');
+    }
 }

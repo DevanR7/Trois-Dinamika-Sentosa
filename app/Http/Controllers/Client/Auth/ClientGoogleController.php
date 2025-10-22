@@ -58,8 +58,10 @@ class ClientGoogleController extends Controller
 
             $googleUser = $google->user();
 
-            // Cari client berdasarkan email
-            $client = Client::where('email', $googleUser->getEmail())->first();
+            // ✅ UBAHAN 1: Cari client, TERMASUK yang sudah di soft-delete
+            $client = Client::where('email', $googleUser->getEmail())
+                            ->withTrashed() // <-- Ini akan mencari di data yang terhapus juga
+                            ->first();
 
             // Jika belum ada, buat user baru (belum disetujui admin)
             if (!$client) {
@@ -72,13 +74,29 @@ class ClientGoogleController extends Controller
                 ]);
             }
 
+            // ✅ UBAHAN 2: Tambahkan pengecekan 'trashed' (soft-deleted)
+            // Cek ini harus SEBELUM cek 'is_approved'
+            if ($client->trashed()) {
+                // Jika akunnya dihapus, beri pesan error spesifik
+                return redirect()->route('client.login')
+                    ->with('error', 'Akun Anda telah dinonaktifkan atau dihapus. Silakan hubungi admin.');
+            }
+
             // Jika akun belum disetujui
             if (!$client->is_approved) {
+                
+                // ✅ UBAHAN 3: Beri pesan berbeda untuk user yang baru dibuat
+                if ($client->wasRecentlyCreated) {
+                     return redirect()->route('client.login')
+                        ->with('error', 'Akun Anda berhasil dibuat dan sedang menunggu persetujuan admin.');
+                }
+                
+                // Pesan untuk user lama yang belum di-approve
                 return redirect()->route('client.login')
                     ->with('error', 'Akun Anda sedang dalam proses verifikasi admin.');
             }
 
-            // Jika sudah disetujui, login dan arahkan ke dashboard
+            // Jika sudah disetujui dan tidak dihapus, login dan arahkan ke dashboard
             Auth::guard('client')->login($client, true);
             return redirect()->intended(route('client.dashboard'));
 
