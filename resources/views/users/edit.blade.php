@@ -23,29 +23,7 @@
 </div>
 @endsection
 
-@push('scripts')
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const roleSelect = document.getElementById('role');
-        const salesCodeContainer = document.getElementById('sales-code-container');
-
-        function toggleSalesCode() {
-            if (roleSelect.value === 'sales') {
-                salesCodeContainer.style.display = 'block';
-            } else {
-                salesCodeContainer.style.display = 'none';
-            }
-        }
-
-        // Jalankan saat halaman dimuat
-        toggleSalesCode();
-
-        // Jalankan setiap kali role berubah
-        roleSelect.addEventListener('change', toggleSalesCode);
-    });
-</script>
-@endpush
-
+{{-- ✅ SCRIPT DIGABUNGKAN MENJADI SATU BLOK --}}
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {

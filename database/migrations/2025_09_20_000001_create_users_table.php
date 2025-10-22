@@ -17,6 +17,9 @@ return new class extends Migration
             $table->string('full_name', 100);
             $table->string('email', 255)->unique();
             $table->string('sales_code', 10)->nullable()->unique();
+            $table->string('nik', 20)->nullable()->unique();
+            $table->text('address')->nullable();
+            $table->string('phone_number', 20)->nullable();
             $table->rememberToken();
             $table->timestamps();
             $table->softDeletes();

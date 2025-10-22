@@ -39,7 +39,9 @@ class User extends Authenticatable
         'sales_code',
         'google_id',
         'is_approved',
-        
+        'nik',
+        'address',
+        'phone_number',
     ];
 
     /**

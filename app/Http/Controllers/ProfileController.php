@@ -40,6 +40,9 @@ class ProfileController extends Controller
             'full_name' => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'max:255', Rule::unique('users')->ignore($user->user_id, 'user_id')],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->user_id, 'user_id')],
+            'nik' => ['nullable', 'string', 'max:20', Rule::unique('users')->ignore($user->user_id, 'user_id')],
+            'address' => ['nullable', 'string'],
+            'phone_number' => ['nullable', 'string', 'max:20'],
         ]);
 
         // Isi data yang divalidasi

@@ -57,6 +57,9 @@ class UserController extends Controller
         'password' => ['required', 'confirmed', Rules\Password::defaults()],
         'role' => ['required', 'string', 'exists:roles,name'], // Validasi baru
         'sales_code' => ['nullable', 'string', 'max:10', 'unique:users,sales_code'],
+        'nik' => ['nullable', 'string', 'max:20', Rule::unique('users')],
+        'address' => ['nullable', 'string'],
+        'phone_number' => ['nullable', 'string', 'max:20'],
     ]);
 
     $user = User::create([
@@ -66,6 +69,9 @@ class UserController extends Controller
         'password' => Hash::make($request->password),
         'sales_code' => $request->sales_code,
         'is_approved' => true,
+        'nik' => $request->nik,
+        'address' => $request->address,
+        'phone_number' => $request->phone_number,
     ]);
 
     // Gunakan method dari Spatie untuk memberikan role
@@ -89,6 +95,9 @@ class UserController extends Controller
         'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
         'role' => ['required', 'string', 'exists:roles,name'], // Validasi baru
         'sales_code' => ['nullable', 'string', 'max:10', Rule::unique('users')->ignore($user->user_id, 'user_id')],
+        'nik' => ['nullable', 'string', 'max:20', Rule::unique('users')->ignore($user->user_id, 'user_id')],
+        'address' => ['nullable', 'string'],
+        'phone_number' => ['nullable', 'string', 'max:20'],
     ]);
 
     $userData = $request->except('password', 'role');

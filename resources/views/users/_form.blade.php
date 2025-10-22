@@ -5,6 +5,7 @@
 @endif
 
 <div class="row g-3">
+    {{-- Info Utama --}}
     <div class="col-12">
         <label for="full_name" class="form-label fw-semibold">Nama Lengkap <span class="text-danger">*</span></label>
         <input type="text" class="form-control" id="full_name" name="full_name" value="{{ old('full_name', $user->full_name ?? '') }}" required>
@@ -37,8 +38,34 @@
         <label for="sales_code" class="form-label fw-semibold">Kode Sales (Contoh: KV)</label>
         <input type="text" class="form-control" id="sales_code" name="sales_code" value="{{ old('sales_code', $user->sales_code ?? '') }}">
     </div>
+    
+    {{-- ✅ START: INFORMASI TAMBAHAN (OPSIONAL) --}}
+    <div class="col-12"><hr class="my-3"></div>
 
-    {{-- Kolom Password dengan Tombol Hide/Unhide --}}
+    <div class="col-md-6">
+        <label for="nik" class="form-label fw-semibold">NIK (Opsional)</label>
+        <input type="text" class="form-control @error('nik') is-invalid @enderror" 
+               id="nik" name="nik" value="{{ old('nik', $user->nik ?? '') }}">
+        @error('nik') <div class="invalid-feedback">{{ $message }}</div> @enderror
+    </div>
+    <div class="col-md-6">
+        <label for="phone_number" class="form-label fw-semibold">No. Telepon (Opsional)</label>
+        <input type="text" class="form-control @error('phone_number') is-invalid @enderror" 
+               id="phone_number" name="phone_number" value="{{ old('phone_number', $user->phone_number ?? '') }}">
+        @error('phone_number') <div class="invalid-feedback">{{ $message }}</div> @enderror
+    </div>
+    <div class="col-12">
+        <label for="address" class="form-label fw-semibold">Alamat (Opsional)</label>
+        <textarea class="form-control @error('address') is-invalid @enderror" 
+                  id="address" name="address" rows="3">{{ old('address', $user->address ?? '') }}</textarea>
+        @error('address') <div class="invalid-feedback">{{ $message }}</div> @enderror
+    </div>
+    
+    <div class="col-12"><hr class="my-3"></div>
+    {{-- ✅ END: INFORMASI TAMBAHAN --}}
+
+
+    {{-- Kolom Password --}}
     <div class="col-md-6">
         <label for="password" class="form-label fw-semibold">Password @if(!isset($user))<span class="text-danger">*</span>@endif</label>
         <div class="input-group">
@@ -50,7 +77,7 @@
         @if(isset($user))<small class="text-muted">Kosongkan jika tidak ingin mengubah password.</small>@endif
     </div>
 
-    {{-- Kolom Konfirmasi Password dengan Tombol Hide/Unhide --}}
+    {{-- Kolom Konfirmasi Password --}}
     <div class="col-md-6">
         <label for="password_confirmation" class="form-label fw-semibold">Konfirmasi Password @if(!isset($user))<span class="text-danger">*</span>@endif</label>
         <div class="input-group">
