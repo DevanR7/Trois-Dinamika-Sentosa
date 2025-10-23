@@ -14,6 +14,7 @@ use App\Models\Supplier;
 use App\Models\SalesInvoice;
 use App\Models\SalesReturn;
 use App\Models\PurchaseReturn;
+use App\Models\Announcement;
 
 // DAFTAR POLICY
 use App\Policies\ProductPolicy;
@@ -23,6 +24,7 @@ use App\Policies\SupplierPolicy;
 use App\Policies\SalesInvoicePolicy;
 use App\Policies\SalesReturnPolicy;
 use App\Policies\PurchaseReturnPolicy;
+use App\Policies\AnnouncementPolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -34,13 +36,13 @@ class AuthServiceProvider extends ServiceProvider
     protected $policies = [
         // ✅ PERBAIKAN 1: Mapping yang benar
         Order::class => OrderPolicy::class, 
-
         PurchaseOrder::class => PurchaseOrderPolicy::class,
         Supplier::class => SupplierPolicy::class,
         Product::class => ProductPolicy::class,
         SalesInvoice::class => SalesInvoicePolicy::class,
         SalesReturn::class => SalesReturnPolicy::class,
         PurchaseReturn::class => PurchaseReturnPolicy::class,
+        Announcement::class => AnnouncementPolicy::class,
 
         // ❗️ PERBAIKAN 3: Baris ini dihapus karena salah
         // User::class => SupplierPolicy::class, 

@@ -24,6 +24,7 @@ use App\Http\Controllers\MidtransController;
 // ✅ TAMBAHKAN USE STATEMENT UNTUK CONTROLLER BARU
 use App\Http\Controllers\OrderChangeRequestController;
 use App\Http\Controllers\ClientOrderReviewController;
+use App\Http\Controllers\AnnouncementController;
 
 /*
 |--------------------------------------------------------------------------
@@ -64,6 +65,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('roles', RoleController::class)->except(['show']);
     Route::resource('sales-returns', SalesReturnController::class);
     Route::resource('purchase-returns', PurchaseReturnController::class);
+    Route::resource('announcements', AnnouncementController::class);
 
     // Custom Routes untuk Sales Invoice & Payment
     Route::get('/invoices/create/from-order/{order}', [SalesInvoiceController::class, 'createFromOrder'])->name('invoices.createFromOrder');
@@ -83,15 +85,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Custom Routes untuk Client
     Route::patch('clients/{client}/approve', [ClientController::class, 'approve'])->name('clients.approve');
-
     Route::patch('clients/{client}/restore', [ClientController::class, 'restore'])
           ->name('clients.restore')
           ->withTrashed();
+    
+    Route::patch('clients/{client}/lock', [ClientController::class, 'lock'])->name('clients.lock');
+    Route::patch('clients/{client}/unlock', [ClientController::class, 'unlock'])->name('clients.unlock');
 
     // ✅ === ROUTE BARU UNTUK APPROVAL USER/STAF ===
     Route::patch('users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
     Route::patch('users/{user}/restore', [UserController::class, 'restore'])
           ->name('users.restore')
+          ->withTrashed();
+
+    Route::patch('announcements/{announcement}/restore', [AnnouncementController::class, 'restore'])
+          ->name('announcements.restore')
+          ->withTrashed();
+    Route::delete('announcements/{announcement}/force-delete', [AnnouncementController::class, 'forceDelete'])
+          ->name('announcements.forceDelete')
           ->withTrashed();
 
     // Pengaturan & Laporan

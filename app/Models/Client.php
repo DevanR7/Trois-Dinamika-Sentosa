@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\Order;
@@ -32,6 +33,7 @@ class Client extends Authenticatable implements CanResetPassword
         'address',
         'phone_number',
         'is_approved',
+        'is_locked',
         'google_id', // Make sure google_id is fillable if you set it during registration/login
     ];
 
@@ -85,5 +87,10 @@ class Client extends Authenticatable implements CanResetPassword
     public function clientOrders(): HasMany
     {
         return $this->hasMany(Order::class, 'client_id', 'client_id')->where('order_source', 'client');
+    }
+
+    public function announcements(): BelongsToMany
+    {
+        return $this->belongsToMany(Announcement::class, 'announcement_client', 'client_id', 'announcement_id');
     }
 }

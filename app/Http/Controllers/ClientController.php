@@ -115,4 +115,36 @@ class ClientController extends Controller
         }
         return back()->with('error', 'Klien tidak terhapus.');
     }
+
+    /**
+     * ✅ TAMBAHKAN METHOD INI
+     * Mengunci akun klien.
+     */
+    public function lock(Client $client): RedirectResponse
+    {
+        // TODO: Tambahkan otorisasi jika perlu (misal via Policy)
+        // $this->authorize('lock', $client); 
+
+        if (!$client->trashed()) { // Hanya kunci akun yang aktif
+            $client->update(['is_locked' => true]);
+            return back()->with('success', 'Akun klien ' . $client->client_name . ' telah dikunci.');
+        }
+        return back()->with('error', 'Tidak dapat mengunci akun yang sudah diarsipkan.');
+    }
+
+    /**
+     * ✅ TAMBAHKAN METHOD INI
+     * Membuka kunci akun klien.
+     */
+    public function unlock(Client $client): RedirectResponse
+    {
+        // TODO: Tambahkan otorisasi jika perlu
+        // $this->authorize('unlock', $client);
+
+         if (!$client->trashed()) { // Hanya buka kunci akun yang aktif
+            $client->update(['is_locked' => false]);
+            return back()->with('success', 'Kunci akun klien ' . $client->client_name . ' telah dibuka.');
+        }
+         return back()->with('error', 'Tidak dapat membuka kunci akun yang sudah diarsipkan.');
+    }
 }

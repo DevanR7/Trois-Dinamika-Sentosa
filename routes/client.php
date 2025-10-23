@@ -14,6 +14,7 @@ use App\Http\Controllers\MidtransController;
 use App\Http\Controllers\Client\Auth\ForgotPasswordController;
 use App\Http\Controllers\Client\Auth\ResetPasswordController;
 use App\Http\Controllers\Client\Auth\RegisteredClientController;
+use App\Http\Middleware\CheckClientLockStatus;
 
 Route::prefix('client')->name('client.')->group(function () {
 
@@ -35,7 +36,7 @@ Route::prefix('client')->name('client.')->group(function () {
     });
 
     // === SUDAH LOGIN ===
-    Route::middleware('auth:client')->group(function () {
+    Route::middleware(['auth:client', CheckClientLockStatus::class])->group(function () {
         Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
         Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');

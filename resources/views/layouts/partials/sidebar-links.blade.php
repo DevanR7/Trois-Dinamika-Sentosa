@@ -246,3 +246,19 @@
         </li>
     </ul>
 @endcan
+
+@can("manage-announcements") {{-- Gunakan permission yang sesuai --}}
+    <div class="menu_title flex">
+        <span class="title">Komunikasi</span> {{-- Atau nama grup lain --}}
+        <span class="line"></span>
+    </div>
+    <ul class="menu_item">
+         <li class="item">
+            {{-- Arahkan ke route index announcements --}}
+            <a class="link flex {{ request()->routeIs("announcements.*") ? "active" : "" }}" href="{{ route("announcements.index") }}">
+                <i class='bx bxs-megaphone'></i> {{-- Ikon pengumuman --}}
+                <span>Manajemen Pengumuman</span>
+            </a>
+        </li>
+    </ul>
+@endcan

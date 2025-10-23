@@ -16,6 +16,7 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password')->nullable();
             $table->boolean('is_approved')->default(false);
+            $table->boolean('is_locked')->default(false);
             $table->rememberToken();
             $table->string('person_in_charge', 100)->nullable();
             $table->text('address')->nullable();

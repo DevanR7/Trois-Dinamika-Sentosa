@@ -36,7 +36,7 @@
                             <th>Email</th>
                             <th>Penanggung Jawab</th>
                             <th>No. Telepon</th>
-                            <th class="text-center">Status</th>
+                            <th class="text-center">Status Akun</th>
                             <th class="text-center">Aksi</th>
                         </tr>
                     </thead>
@@ -49,10 +49,13 @@
                             <td>{{ $client->person_in_charge ?? '-' }}</td>
                             <td>{{ $client->phone_number ?? '-' }}</td>
                             <td class="text-center">
+                                {{-- ✅ LOGIKA STATUS BARU --}}
                                 @if($client->trashed())
-                                    <span class="badge bg-danger">Telah Dihapus</span>
+                                    <span class="badge bg-danger">Diarsipkan</span>
+                                @elseif($client->is_locked)
+                                    <span class="badge bg-secondary"><i class="bi bi-lock-fill me-1"></i> Dikunci</span>
                                 @elseif($client->is_approved)
-                                    <span class="badge bg-success">Disetujui</span>
+                                    <span class="badge bg-success">Aktif & Disetujui</span>
                                 @else
                                     <span class="badge bg-warning text-dark">Menunggu Persetujuan</span>
                                 @endif
@@ -76,6 +79,24 @@
                                             @method('PATCH')
                                             <button type="submit" class="btn btn-sm btn-success" data-name="{{ $client->client_name }}">Setujui</button>
                                         </form>
+                                        @endif
+
+                                        @if($client->is_locked)
+                                            {{-- Tombol Buka Kunci --}}
+                                            <form action="{{ route('clients.unlock', $client->client_id) }}" method="POST" class="form-unlock d-inline">
+                                                @csrf @method('PATCH')
+                                                <button type="submit" class="btn btn-sm btn-warning" data-name="{{ $client->client_name }}" title="Buka Kunci Akun">
+                                                    <i class="bi bi-unlock-fill"></i>
+                                                </button>
+                                            </form>
+                                        @else
+                                            {{-- Tombol Kunci --}}
+                                            <form action="{{ route('clients.lock', $client->client_id) }}" method="POST" class="form-lock d-inline">
+                                                @csrf @method('PATCH')
+                                                <button type="submit" class="btn btn-sm btn-secondary" data-name="{{ $client->client_name }}" title="Kunci Akun">
+                                                    <i class="bi bi-lock-fill"></i>
+                                                </button>
+                                            </form>
                                         @endif
                                     
                                         <a href="{{ route('clients.edit', $client->client_id) }}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil-square"></i></a>
@@ -207,6 +228,41 @@
                         this.submit(); // Lanjutkan submit
                     }
                 });
+            });
+        });
+
+        document.querySelectorAll('.form-lock').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault(); 
+                const clientName = this.querySelector('button').dataset.name;
+                Swal.fire({
+                    title: 'Kunci Akun Ini?',
+                    text: `Klien "${clientName}" tidak akan bisa login atau mengakses portal.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#6c757d', // Abu-abu
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Ya, Kunci!',
+                    cancelButtonText: 'Batal'
+                }).then((result) => { if (result.isConfirmed) { this.submit(); } });
+            });
+        });
+
+        // --- ✅ 6. KONFIRMASI BUKA KUNCI AKUN ---
+        document.querySelectorAll('.form-unlock').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault(); 
+                const clientName = this.querySelector('button').dataset.name;
+                Swal.fire({
+                    title: 'Buka Kunci Akun Ini?',
+                    text: `Klien "${clientName}" akan bisa login dan mengakses portal kembali.`,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ffc107', // Kuning
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Ya, Buka Kunci!',
+                    cancelButtonText: 'Batal'
+                }).then((result) => { if (result.isConfirmed) { this.submit(); } });
             });
         });
 
