@@ -85,6 +85,14 @@
             <a class="link flex {{ request()->routeIs('sales-orders.*') ? 'active' : '' }}" href="{{ route('sales-orders.index') }}">
                 <i class="bx bxs-file-doc"></i>
                 <span>Pesanan (dari Sales)</span>
+
+                {{-- ✅ INI SUDAH BENAR --}}
+                @if(isset($pendingSalesOrderCount) && $pendingSalesOrderCount > 0)
+                    <span class="badge bg-danger rounded-pill ms-auto"> 
+                        {{ $pendingSalesOrderCount }}
+                    </span>
+                @endif
+                {{-- ✅ AKHIR BAGIAN BADGE --}}
             </a>
         </li>
         @endcan
