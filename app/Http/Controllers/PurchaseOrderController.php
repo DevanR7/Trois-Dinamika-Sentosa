@@ -353,7 +353,6 @@
     {
         $this->authorize('receive', $purchaseOrder);
 
-        // Pastikan pesanan belum pernah diterima sebelumnya
         if ($purchaseOrder->status !== 'draft' && $purchaseOrder->status !== 'ordered') {
             return back()->with('error', 'Pesanan ini sudah diproses sebelumnya.');
         }
@@ -361,12 +360,42 @@
         try {
             DB::beginTransaction();
 
-            // Loop melalui setiap item di dalam pesanan pembelian
+            // Loop melalui setiap item di dalam PO
             foreach ($purchaseOrder->items as $item) {
-                $product = Product::find($item->product_id);
+                
+                // Kunci produk untuk update (mencegah race condition)
+                $product = Product::lockForUpdate()->find($item->product_id);
+                
                 if ($product) {
-                    // Tambah stok produk
-                    $product->stock_quantity += $item->quantity;
+                    
+                    // --- LOGIKA HPP RATA-RATA (AVERAGE COST) ---
+                    
+                    // 1. Dapatkan harga beli bersih (HPP) per unit dari item PO ini
+                    // Kita ambil dari subtotal item / quantity item
+                    // Ini adalah HPP paling akurat karena sudah termasuk diskon berlipat
+                    $netPricePerUnit = $item->subtotal / $item->quantity;
+                    
+                    // 2. Dapatkan data stok & HPP saat ini
+                    $oldStock = $product->stock_quantity;
+                    $oldAvgCost = $product->average_cost;
+                    
+                    // 3. Dapatkan data barang yang masuk
+                    $newStock = $item->quantity;
+                    $newPurchaseCost = $netPricePerUnit;
+                    
+                    // 4. Hitung total stok baru
+                    $totalStock = $oldStock + $newStock;
+                    
+                    // 5. Hitung HPP rata-rata baru (Weighted Average)
+                    // Rumus: ((StokLama * HppLama) + (StokBaru * HppBaru)) / TotalStok
+                    $newAvgCost = 0;
+                    if ($totalStock > 0) {
+                        $newAvgCost = (($oldStock * $oldAvgCost) + ($newStock * $newPurchaseCost)) / $totalStock;
+                    }
+                    
+                    // 6. Update stok dan HPP rata-rata baru
+                    $product->stock_quantity = $totalStock;
+                    $product->average_cost = $newAvgCost;
                     $product->save();
                 }
             }
@@ -377,7 +406,7 @@
 
             DB::commit();
             return redirect()->route('purchase-orders.index')
-                    ->with('success', 'Barang untuk pesanan #' . ($purchaseOrder->po_number ?? $purchaseOrder->po_id) . ' telah diterima dan stok diperbarui.');
+                ->with('success', 'Barang untuk pesanan #' . ($purchaseOrder->po_number ?? $purchaseOrder->po_id) . ' telah diterima. Stok dan HPP rata-rata diperbarui.');
 
         } catch (\Exception $e) {
             DB::rollBack();

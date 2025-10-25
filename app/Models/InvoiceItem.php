@@ -12,11 +12,19 @@ class InvoiceItem extends Model
 
     protected $primaryKey = 'item_id';
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
+    // [UPDATED] Menambahkan hpp dan quantity_returned
     protected $fillable = [
         'invoice_id',
         'product_id',
         'quantity',
+        'quantity_returned', // <-- DARI MIGRASI
         'price_per_unit',
+        'hpp',               // <-- DARI MIGRASI KITA
         'subtotal',
     ];
 
@@ -25,14 +33,35 @@ class InvoiceItem extends Model
      *
      * @var array
      */
+    // [UPDATED] Menambahkan hpp dan quantity_returned
     protected $casts = [
         'quantity' => 'integer',
+        'quantity_returned' => 'integer', // <-- DARI MIGRASI
         'price_per_unit' => 'float',
+        'hpp' => 'float',               // <-- DARI MIGRASI KITA
         'subtotal' => 'float',
     ];
 
+    // =================================================================
+    // RELASI-RELASI
+    // =================================================================
+
+    /**
+     * ✅ [FIX] INI ADALAH RELASI YANG HILANG
+     * Mendapatkan invoice induk (SalesInvoice) dari item ini.
+     */
+    public function salesInvoice(): BelongsTo
+    {
+        return $this->belongsTo(SalesInvoice::class, 'invoice_id', 'invoice_id');
+    }
+
+    /**
+     * Relasi ke Product (Sudah ada, saya tambahkan withTrashed)
+     */
     public function product(): BelongsTo
     {
-        return $this->belongsTo(Product::class, 'product_id', 'product_id');
+        // withTrashed() adalah best practice jika produk dihapus
+        // agar data di invoice lama tidak error.
+        return $this->belongsTo(Product::class, 'product_id', 'product_id')->withTrashed();
     }
 }

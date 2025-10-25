@@ -16,6 +16,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->decimal('purchase_price', 15, 2)->nullable();
             $table->decimal('selling_price', 15, 2)->nullable();
+            $table->decimal('average_cost', 15, 2)->nullable()->default(0.00);
             $table->integer('stock_quantity')->nullable();
             $table->foreignId('unit_id')->nullable()->constrained('units', 'unit_id');
             $table->softDeletes();

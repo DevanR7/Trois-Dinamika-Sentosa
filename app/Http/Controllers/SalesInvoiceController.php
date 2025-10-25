@@ -123,60 +123,65 @@ class SalesInvoiceController extends Controller
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,client_id',
             'order_date' => 'required|date',
-            'due_date' => 'required|date', 
-            'sales_order_id' => 'nullable|exists:orders,order_id', 
+            'due_date' => 'required|date',
+            'sales_order_id' => 'nullable|exists:orders,order_id',
             'products' => 'required|array|min:1',
             'products.*.product_id' => 'required|exists:products,product_id',
             'products.*.quantity' => 'required|integer|min:1',
-            'discount_percentage' => 'nullable|numeric|min:0|max:100', 
+            'discount_percentage' => 'nullable|numeric|min:0|max:100',
             'taxes' => 'nullable|array',
             'taxes.*' => 'exists:taxes,id',
             'notes' => 'nullable|string',
             'user_id_sales' => 'nullable|exists:users,user_id',
         ]);
-        
-        $itemsToDecrementStock = []; // Tampung data stok yang perlu dikurangi
+
+        $itemsToDecrementStock = [];
 
         try {
             DB::beginTransaction();
-            
-            // Cek apakah invoice ini dibuat dari order
+
             $originOrder = $request->filled('sales_order_id') ? Order::find($request->sales_order_id) : null;
 
             // 1. Hitung Subtotal dan siapkan item
             $subtotal = 0;
             $productsToSave = [];
             foreach ($validated['products'] as $productData) {
-                $product = Product::find($productData['product_id']);
+                // Kunci produk untuk memastikan data stok & HPP akurat
+                $product = Product::lockForUpdate()->find($productData['product_id']); 
                 if (!$product) {
                     throw new \Exception("Produk dengan ID {$productData['product_id']} tidak ditemukan.");
                 }
 
-                // Cek Stok:
-                // HANYA kurangi stok jika ini BUKAN dari 'client order'
-                // (Karena 'client order' sudah kurangi stok saat checkout/approve)
-                $isFromClientOrder = $originOrder && $originOrder->order_source === 'client';
+                $quantity = $productData['quantity'];
                 
+                // Cek Stok:
+                $isFromClientOrder = $originOrder && $originOrder->order_source === 'client';
+
                 if (!$isFromClientOrder) {
-                    if ($product->stock_quantity < $productData['quantity']) {
-                         throw new \Exception("Stok untuk produk '{$product->product_name}' tidak mencukupi. Sisa stok: {$product->stock_quantity}.");
+                    if ($product->stock_quantity < $quantity) {
+                        throw new \Exception("Stok untuk produk '{$product->product_name}' tidak mencukupi. Sisa stok: {$product->stock_quantity}.");
                     }
-                    // Tandai untuk dikurangi nanti
                     $itemsToDecrementStock[] = [
-                        'product_id' => $product->product_id, // Simpan ID
-                        'quantity' => $productData['quantity']
+                        'product_id' => $product->product_id,
+                        'quantity' => $quantity
                     ];
                 }
 
-                $price = $product->purchase_price ?? 0; 
-                $quantity = $productData['quantity'];
+                // Ambil harga jual (berdasarkan purchase_price)
+                $price = $product->purchase_price ?? 0;
                 $itemSubtotal = $quantity * $price;
                 $subtotal += $itemSubtotal;
+
+                // =============================================
+                // ✅ LOGIKA BARU: Simpan HPP saat penjualan
+                // =============================================
+                $hppSaatIni = $product->average_cost ?? 0;
 
                 $productsToSave[] = [
                     'product_id' => $product->product_id,
                     'quantity' => $quantity,
-                    'price_per_unit' => $price,
+                    'price_per_unit' => $price, // Ini harga jual per unit
+                    'hpp' => $hppSaatIni,       // Ini HPP (modal) per unit
                     'subtotal' => $itemSubtotal,
                 ];
             }
@@ -201,29 +206,24 @@ class SalesInvoiceController extends Controller
                     ];
                 }
             }
-            
+
             // 4. Hitung Total Akhir
             $totalAmount = $subtotalAfterDiscount + $totalTaxAmount;
 
-            // ✅ ===== LOGIKA PENENTUAN NOMOR INVOICE (PINDAH KE ATAS) =====
+            // 5. Logika Penentuan Nomor Invoice
             $salesUserId = $request->input('user_id_sales');
-            $orderSource = 'sales'; // Default 'sales'
-
+            $orderSource = 'sales'; 
             if ($originOrder) {
-                 $orderSource = $originOrder->order_source;
-                 if (empty($salesUserId) && $originOrder->user_id_sales) {
-                     $salesUserId = $originOrder->user_id_sales;
-                 }
+                $orderSource = $originOrder->order_source;
+                if (empty($salesUserId) && $originOrder->user_id_sales) {
+                    $salesUserId = $originOrder->user_id_sales;
+                }
             }
-            // ==============================================================
 
-            // 5. Simpan data utama ke tabel sales_invoices
+            // 6. Simpan data utama ke tabel sales_invoices
             $invoice = SalesInvoice::create([
                 'client_id' => $validated['client_id'],
-                
-                // ✅ Panggil dengan variabel yang sudah didefinisikan
                 'invoice_number' => SalesInvoice::generateInvoiceNumber($salesUserId, $orderSource),
-                
                 'order_date' => $validated['order_date'],
                 'due_date' => $validated['due_date'],
                 'subtotal' => $subtotal,
@@ -231,26 +231,26 @@ class SalesInvoiceController extends Controller
                 'discount_amount' => $discountAmount,
                 'total_amount' => $totalAmount,
                 'status' => 'unpaid',
-                'user_id_sales' => $salesUserId, // Gunakan $salesUserId yang sudah pasti
+                'user_id_sales' => $salesUserId,
                 'amount_paid' => 0,
                 'notes' => $request->input('notes'),
             ]);
 
-            // 6. Lampirkan Pajak dan Item
+            // 7. Lampirkan Pajak dan Item (yang sekarang sudah berisi HPP)
             $invoice->taxes()->attach($taxesToAttach);
             $invoice->items()->createMany($productsToSave);
 
-            // 7. Update status Order jika dibuat dari order
+            // 8. Update status Order jika dibuat dari order
             if ($originOrder) {
                 $originOrder->status = 'invoiced';
                 $originOrder->invoice_id = $invoice->invoice_id;
                 $originOrder->save();
             }
-            
-            // 8. Kurangi Stok (HANYA jika perlu)
+
+            // 9. Kurangi Stok (HANYA jika perlu)
             foreach ($itemsToDecrementStock as $item) {
-                // Lock produk sebelum decrement
-                Product::where('product_id', $item['product_id'])->lockForUpdate()->decrement('stock_quantity', $item['quantity']);
+                // Kita tidak perlu lock lagi karena sudah di-lock di atas
+                Product::where('product_id', $item['product_id'])->decrement('stock_quantity', $item['quantity']);
             }
 
             DB::commit();
@@ -259,7 +259,6 @@ class SalesInvoiceController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            // Tidak perlu kembalikan stok karena kita belum commit decrement
             return back()->with('error', 'Gagal membuat invoice: ' . $e->getMessage())->withInput();
         }
     }

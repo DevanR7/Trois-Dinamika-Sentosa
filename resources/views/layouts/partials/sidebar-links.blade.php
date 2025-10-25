@@ -188,6 +188,30 @@
                 <span>Laporan Keuangan</span>
             </a>
         </li>
+        <li class="item">
+            <a class="link flex {{ request()->routeIs('expenses.*') ? 'active' : '' }}" href="{{ route('expenses.index') }}">
+                <i class="bi bi-wallet-fill me-2"></i>
+                <span>Beban Operasional</span>
+            </a>
+        </li>
+        <li class="item">
+            <a class="link flex {{ request()->routeIs('fixed-assets.*') ? 'active' : '' }}" href="{{ route('fixed-assets.index') }}">
+            <i class="bi bi-building me-2"></i>
+            <span>Aset Tetap</span>
+        </a>
+        </li>
+        <li class="item">
+            <a class="link flex {{ request()->routeIs('equity-transactions.*') ? 'active' : '' }}" href="{{ route('equity-transactions.index') }}">
+            <i class="bi bi-cash-coin me-2"></i>
+            <span>Transaksi Modal</span>
+        </a>
+        </li>
+        <li class="item">
+            <a class="link flex {{ request()->routeIs('loans.*') ? 'active' : '' }}" href="{{ route('loans.index') }}">
+            <i class="bi bi-bank me-2"></i>
+           <span>Pinjaman</span>
+        </a>
+        </li>
     </ul>
 @endcan
 

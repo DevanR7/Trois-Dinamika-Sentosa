@@ -21,10 +21,14 @@ use App\Http\Controllers\PurchaseReturnController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\MidtransController;
-// ✅ TAMBAHKAN USE STATEMENT UNTUK CONTROLLER BARU
 use App\Http\Controllers\OrderChangeRequestController;
 use App\Http\Controllers\ClientOrderReviewController;
 use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\FixedAssetController;
+use App\Http\Controllers\EquityTransactionController;
+use App\Http\Controllers\LoanController;
+use App\Http\Controllers\LoanPaymentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -125,7 +129,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{changeRequest}/process', [OrderChangeRequestController::class, 'process'])->name('process');
     });
     // ==========================================================
+    Route::resource('expenses', ExpenseController::class);
+    Route::resource('fixed-assets', FixedAssetController::class);
+    Route::resource('equity-transactions', EquityTransactionController::class);
 
+    Route::resource('loans', LoanController::class);
+    Route::resource('loans.payments', LoanPaymentController::class)
+     ->only(['create', 'store', 'destroy'])
+     ->scoped();
 });
 
 require __DIR__.'/auth.php';
