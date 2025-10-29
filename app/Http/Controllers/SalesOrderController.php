@@ -120,7 +120,7 @@ class SalesOrderController extends Controller
                 $product = Product::find($productData['product_id']);
                 
                 // ✅ Sesuai permintaan Anda: menggunakan 'purchase_price'
-                $subtotal = $productData['quantity'] * $product->purchase_price; 
+                $subtotal = $productData['quantity'] * $product->selling_price;
                 $totalAmount += $subtotal;
             }
             $order->total_amount = $totalAmount;
@@ -135,8 +135,8 @@ class SalesOrderController extends Controller
                     'product_id' => $productData['product_id'],
                     'quantity' => $productData['quantity'],
                     // ✅ Sesuai permintaan Anda: menggunakan 'purchase_price'
-                    'price_per_unit' => $product->purchase_price, 
-                    'subtotal' => $productData['quantity'] * $product->purchase_price,
+                    'price_per_unit' => $product->selling_price,
+                    'subtotal' => $productData['quantity'] * $product->selling_price,
                 ]);
             }
 
@@ -226,7 +226,7 @@ class SalesOrderController extends Controller
                     'order_id' => $order->order_id,
                     'product_id' => $productData['product_id'],
                     'quantity' => $productData['quantity'],
-                    'price_per_unit' => $product->purchase_price,
+                    'price_per_unit' => $product->selling_price,
                     'subtotal' => $subtotal,
                 ]);
             }

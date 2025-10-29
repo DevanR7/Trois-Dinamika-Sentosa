@@ -9,7 +9,13 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\Rule;
 
 class UnitController extends Controller
-{
+{   
+    public function __construct()
+    {
+        // [PERBAIKAN] Menambahkan proteksi route sesuai seeder
+        $this->middleware('can:manage-settings');
+    }
+    
     public function index(): View
     {
         $units = Unit::latest('unit_id')->paginate(10);

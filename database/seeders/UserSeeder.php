@@ -19,7 +19,7 @@ class UserSeeder extends Seeder
             'full_name'  => 'Trois Dinamika Sentosa', // Ganti namanya
             'username'   => 'superadmin', // Ganti username
             'email'      => 'troisdinamikasentosa@gmail.com', // <-- PAKAI EMAIL ASLI DI SINI
-            'password'   => Hash::make('PasswordSuperAman123!'), // Password lokal (opsional)
+            'password'   => Hash::make('password'), // Password lokal (opsional)
             'sales_code' => null,
             'is_approved' => true,
         ]);

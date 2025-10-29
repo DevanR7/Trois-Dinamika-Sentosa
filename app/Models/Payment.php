@@ -19,6 +19,7 @@
          */
         protected $fillable = [
             'invoice_id',
+            'batch_payment_id',
             'payment_date',
             'amount',
             'payment_method',
@@ -54,4 +55,9 @@
         {
             return $this->belongsTo(User::class, 'received_by_user_id', 'user_id');
         }
-    }
+
+        public function batchPayment(): BelongsTo
+        {
+        return $this->belongsTo(BatchPayment::class, 'batch_payment_id', 'batch_payment_id');
+        }
+}

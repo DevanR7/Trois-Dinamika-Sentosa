@@ -168,7 +168,7 @@ class SalesInvoiceController extends Controller
                 }
 
                 // Ambil harga jual (berdasarkan purchase_price)
-                $price = $product->purchase_price ?? 0;
+                $price = $product->selling_price ?? 0;
                 $itemSubtotal = $quantity * $price;
                 $subtotal += $itemSubtotal;
 
@@ -319,7 +319,7 @@ class SalesInvoiceController extends Controller
                 $product = Product::find($productData['product_id']);
                 
                 // ✅ Sesuai permintaan Anda: Tetap menggunakan purchase_price
-                $price = $product->purchase_price ?? 0;
+                $price = $product->selling_price ?? 0;
                 $quantity = $productData['quantity'];
                 $itemSubtotal = $quantity * $price;
                 $subtotal += $itemSubtotal;

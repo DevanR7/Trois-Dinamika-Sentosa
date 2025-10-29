@@ -6,7 +6,13 @@ use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 
 class SettingController extends Controller
-{
+{   
+    public function __construct()
+    {
+        // [PERBAIKAN] Menambahkan proteksi route sesuai seeder
+        $this->middleware('can:manage-settings');
+    }
+    
     // Menampilkan halaman form pengaturan
     public function index()
     {

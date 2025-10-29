@@ -11,13 +11,9 @@ use Illuminate\View\View;
 class AnnouncementController extends Controller
 {
     public function __construct()
-{
-    // Otorisasi SEMUA method resource KECUALI index & show (jika ada)
-    $this->authorizeResource(Announcement::class, 'announcement');
-    // Jika perlu otorisasi method custom (restore, forceDelete)
-    // $this->middleware('can:restore,announcement')->only('restore');
-    // $this->middleware('can:forceDelete,announcement')->only('forceDelete');
-}
+    {
+        $this->middleware('can:manage-announcements');
+    }
 
     /**
      * Menampilkan daftar pengumuman (termasuk arsip).

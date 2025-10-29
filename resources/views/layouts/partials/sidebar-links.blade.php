@@ -7,7 +7,8 @@
     <ul class="menu_item">
         <li class="item">
             <a class="link flex {{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}">
-                <i class="bx bx-home-alt"></i>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">space_dashboard</i>
                 <span>Dashboard</span>
             </a>
         </li>
@@ -23,7 +24,8 @@
     <ul class="menu_item">
         <li class="item">
             <a class="link flex {{ request()->routeIs('clients.*') ? 'active' : '' }}" href="{{ route('clients.index') }}">
-                <i class="bx bxs-user-account"></i>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">account_circle</i>
                 <span>Klien</span>
             </a>
         </li>
@@ -39,7 +41,8 @@
     <ul class="menu_item">
         <li class="item">
             <a class="link flex {{ request()->routeIs('products.*') ? 'active' : '' }}" href="{{ route('products.index') }}">
-                <i class="bx bxs-box"></i>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">inventory_2</i>
                 <span>Produk</span>
             </a>
         </li>
@@ -56,7 +59,8 @@
         @can('view-suppliers')
         <li class="item">
             <a class="link flex {{ request()->routeIs('suppliers.*') ? 'active' : '' }}" href="{{ route('suppliers.index') }}">
-                <i class="bx bxs-truck"></i>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">local_shipping</i>
                 <span>Supplier</span>
             </a>
         </li>
@@ -64,7 +68,8 @@
         @can('view-purchase-orders')
         <li class="item">
             <a class="link flex {{ request()->routeIs('purchase-orders.*') ? 'active' : '' }}" href="{{ route('purchase-orders.index') }}">
-                <i class="bx bxs-cart-add"></i>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">add_shopping_cart</i>
                 <span>Pesanan Pembelian</span>
             </a>
         </li>
@@ -73,7 +78,6 @@
 @endif
 
 {{-- 5. Transaksi Sales & Klien --}}
-{{-- ✅ Kondisi @if diperbarui --}}
 @if(Auth::user()->canany(['view-sales-orders', 'review-client-orders', 'review-order-change-requests']))
     <div class="menu_title flex">
         <span class="title">Transaksi Sales & Klien</span>
@@ -83,47 +87,44 @@
         @can('view-sales-orders')
         <li class="item">
             <a class="link flex {{ request()->routeIs('sales-orders.*') ? 'active' : '' }}" href="{{ route('sales-orders.index') }}">
-                <i class="bx bxs-file-doc"></i>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">description</i>
                 <span>Pesanan (dari Sales)</span>
 
-                {{-- ✅ INI SUDAH BENAR --}}
                 @if(isset($pendingSalesOrderCount) && $pendingSalesOrderCount > 0)
                     <span class="badge bg-danger rounded-pill ms-auto"> 
                         {{ $pendingSalesOrderCount }}
                     </span>
                 @endif
-                {{-- ✅ AKHIR BAGIAN BADGE --}}
             </a>
         </li>
         @endcan
 
-        {{-- ✅ MENU BARU: Review Pesanan Klien --}}
         @can('review-client-orders')
         <li class="item">
             <a class="link flex {{ request()->routeIs('client-order-reviews.*') ? 'active' : '' }}" href="{{ route('client-order-reviews.index') }}">
-                <i class='bx bxs-user-voice position-relative'></i> {{-- Ganti ikon --}}
+                {{-- ✅ Ikon diganti (tetap pertahankan position-relative jika ada) --}}
+                <i class='material-icons position-relative'>reviews</i>
                 <span>Review Pesanan Klien</span>
-                {{-- Badge Notifikasi Pending --}}
                 @php $pendingClientOrdersCount = \App\Models\Order::where('order_source', 'client')->where('status', 'pending_review')->count(); @endphp
                 @if($pendingClientOrdersCount > 0)
-                    <span class="badge bg-danger rounded-pill ms-auto"> {{-- ms-auto agar di kanan --}}
+                    <span class="badge bg-danger rounded-pill ms-auto">
                         {{ $pendingClientOrdersCount }}
                     </span>
                 @endif
             </a>
         </li>
         @endcan
-        {{-- =================================== --}}
 
         @can('review-order-change-requests')
         <li class="item">
             <a class="link flex {{ request()->routeIs('order-change-requests.*') ? 'active' : '' }}" href="{{ route('order-change-requests.index') }}">
-                <i class="bx bxs-bell-ring position-relative"></i>
+                {{-- ✅ Ikon diganti (tetap pertahankan position-relative jika ada) --}}
+                <i class="material-icons position-relative">edit_notifications</i>
                 <span>Permintaan Perubahan</span>
-                 {{-- Badge notifikasi --}}
                 @php $pendingRequestsCount = \App\Models\OrderChangeRequest::where('status', 'pending')->count(); @endphp
                 @if($pendingRequestsCount > 0)
-                    <span class="badge bg-danger rounded-pill ms-auto"> {{-- ms-auto agar di kanan --}}
+                    <span class="badge bg-danger rounded-pill ms-auto">
                         {{ $pendingRequestsCount }}
                     </span>
                 @endif
@@ -133,21 +134,34 @@
     </ul>
 @endif
 
-{{-- 6. Invoices --}}
-@can("view-invoices")
+{{-- 6. Invoices & Piutang --}}
+@if(Auth::user()->canany(["view-invoices", "create-batch-payments"]))
     <div class="menu_title flex">
-        <span class="title">Invoices</span>
+        <span class="title">Invoices & Piutang</span>
         <span class="line"></span>
     </div>
     <ul class="menu_item">
+        @can("view-invoices")
         <li class="item">
             <a class="link flex {{ request()->routeIs('invoices.*') ? 'active' : '' }}" href="{{ route('invoices.index') }}">
-                <i class="bx bx-receipt"></i>
-                <span>Invoice</span>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">receipt_long</i>
+                <span>Daftar Invoice</span>
             </a>
         </li>
+        @endcan
+        
+        @can("create-batch-payments")
+        <li class="item">
+            <a class="link flex {{ request()->routeIs('batch-payments.*') ? 'active' : '' }}" href="{{ route('batch-payments.create') }}">
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">payments</i>
+                <span>Pembayaran Piutang</span>
+            </a>
+        </li>
+        @endcan
     </ul>
-@endcan
+@endif
 
 {{-- 7. Retur/ Pengembalian Barang --}}
 @if(Auth::user()->canany(['view-sales-returns', 'view-purchase-returns']))
@@ -159,7 +173,8 @@
         @can('view-sales-returns')
         <li class="item">
             <a class="link flex {{ request()->routeIs("sales-returns.*") ? "active" : "" }}" href="{{ route('sales-returns.index') }}">
-                <i class="bx bx-archive-in"></i>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">move_to_inbox</i>
                 <span>Retur Penjualan</span>
             </a>
         </li>
@@ -167,7 +182,8 @@
         @can('view-purchase-returns')
         <li class="item">
             <a class="link flex {{ request()->routeIs("purchase-returns.*") ? "active" : "" }}" href="{{ route('purchase-returns.index') }}">
-                <i class="bx bx-archive-out"></i>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">outbox</i>
                 <span>Retur Pembelian</span>
             </a>
         </li>
@@ -184,33 +200,38 @@
     <ul class="menu_item">
         <li class="item">
             <a class="link flex {{ request()->routeIs("reports.index") ? "active" : "" }}" href="{{ route("reports.index") }}">
-                <i class="bx bxs-file-blank"></i>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">analytics</i>
                 <span>Laporan Keuangan</span>
             </a>
         </li>
         <li class="item">
             <a class="link flex {{ request()->routeIs('expenses.*') ? 'active' : '' }}" href="{{ route('expenses.index') }}">
-                <i class="bi bi-wallet-fill me-2"></i>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">account_balance_wallet</i>
                 <span>Beban Operasional</span>
             </a>
         </li>
         <li class="item">
             <a class="link flex {{ request()->routeIs('fixed-assets.*') ? 'active' : '' }}" href="{{ route('fixed-assets.index') }}">
-            <i class="bi bi-building me-2"></i>
-            <span>Aset Tetap</span>
-        </a>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">apartment</i>
+                <span>Aset Tetap</span>
+            </a>
         </li>
         <li class="item">
             <a class="link flex {{ request()->routeIs('equity-transactions.*') ? 'active' : '' }}" href="{{ route('equity-transactions.index') }}">
-            <i class="bi bi-cash-coin me-2"></i>
-            <span>Transaksi Modal</span>
-        </a>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">savings</i>
+                <span>Transaksi Modal</span>
+            </a>
         </li>
         <li class="item">
             <a class="link flex {{ request()->routeIs('loans.*') ? 'active' : '' }}" href="{{ route('loans.index') }}">
-            <i class="bi bi-bank me-2"></i>
-           <span>Pinjaman</span>
-        </a>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">account_balance</i>
+                <span>Pinjaman</span>
+            </a>
         </li>
     </ul>
 @endcan
@@ -224,13 +245,15 @@
     <ul class="menu_item">
         <li class="item">
             <a class="link flex {{ request()->routeIs("units.*") ? "active" : "" }}" href="{{ route("units.index") }}">
-                <i class="bx bx-ruler"></i>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">straighten</i>
                 <span>Pengaturan Satuan</span>
             </a>
         </li>
          <li class="item">
             <a class="link flex {{ request()->routeIs("taxes.*") ? "active" : "" }}" href="{{ route("taxes.index") }}">
-                <i class="bx bx-file-blank"></i> {{-- Pertimbangkan ganti ikon % --}}
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">percent</i>
                 <span>Pengaturan Pajak</span>
             </a>
         </li>
@@ -247,7 +270,8 @@
         @can("manage-users")
         <li class="item">
             <a class="link flex {{ request()->routeIs("users.*") ? "active" : "" }}" href="{{ route("users.index") }}">
-                <i class="bx bxs-group"></i>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">group</i>
                 <span>Manajemen User</span>
             </a>
         </li>
@@ -255,7 +279,8 @@
         @can("manage-roles")
         <li class="item">
             <a class="link flex {{ request()->routeIs("roles.*") ? "active" : "" }}" href="{{ route("roles.index") }}">
-                <i class="bx bxs-key"></i>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">vpn_key</i>
                 <span>Manajemen Role</span>
             </a>
         </li>
@@ -272,23 +297,24 @@
     <ul class="menu_item">
          <li class="item">
             <a class="link flex {{ request()->routeIs("settings.*") ? "active" : "" }}" href="{{ route("settings.index") }}">
-                <i class="bx bxs-buildings"></i>
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">business</i>
                 <span>Pengaturan Perusahaan</span>
             </a>
         </li>
     </ul>
 @endcan
 
-@can("manage-announcements") {{-- Gunakan permission yang sesuai --}}
+@can("manage-announcements")
     <div class="menu_title flex">
-        <span class="title">Komunikasi</span> {{-- Atau nama grup lain --}}
+        <span class="title">Komunikasi</span>
         <span class="line"></span>
     </div>
     <ul class="menu_item">
          <li class="item">
-            {{-- Arahkan ke route index announcements --}}
             <a class="link flex {{ request()->routeIs("announcements.*") ? "active" : "" }}" href="{{ route("announcements.index") }}">
-                <i class='bx bxs-megaphone'></i> {{-- Ikon pengumuman --}}
+                {{-- ✅ Ikon diganti --}}
+                <i class="material-icons">campaign</i>
                 <span>Manajemen Pengumuman</span>
             </a>
         </li>

@@ -13,7 +13,14 @@ use Illuminate\Http\RedirectResponse;
 use Carbon\Carbon;
 
 class OrderChangeRequestController extends Controller
-{
+{   
+    public function __construct()
+    {
+        // Ini akan memproteksi SEMUA method di controller ini
+        // menggunakan permission 'review-order-change-requests' dari Seeder Anda.
+        $this->middleware('can:review-order-change-requests');
+    }
+    
     /**
      * Menampilkan daftar permintaan perubahan yang pending.
      */

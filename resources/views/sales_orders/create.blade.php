@@ -83,7 +83,7 @@
                 <option></option>
                 @foreach ($products as $product)
                     {{-- PERUBAHAN DI SINI --}}
-                    <option value="{{ $product->product_id }}" data-price="{{ $product->purchase_price ?? 0 }}">
+                    <option value="{{ $product->product_id }}" data-price="{{ $product->selling_price ?? 0 }}">
                         {{ $product->product_name }}
                     </option>
                 @endforeach

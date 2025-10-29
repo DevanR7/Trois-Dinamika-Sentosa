@@ -10,7 +10,13 @@ use Spatie\Permission\Models\Permission;
 use Illuminate\Validation\Rule;
 
 class RoleController extends Controller
-{
+{   
+    public function __construct()
+    {
+        // [PERBAIKAN] Menambahkan proteksi route sesuai seeder
+        $this->middleware('can:manage-roles');
+    }
+    
     public function index(): View
     {
         $roles = Role::with('permissions')->paginate(10);

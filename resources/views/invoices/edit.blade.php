@@ -130,7 +130,7 @@
             <select class="form-select form-select-sm product-select" required>
                 <option value="" data-price="0" disabled selected>-- Pilih Produk --</option>
                 @foreach ($products as $product)
-                    <option value="{{ $product->product_id }}" data-price="{{ $product->purchase_price ?? 0 }}">{{ $product->product_name }}</option>
+                    <option value="{{ $product->product_id }}" data-price="{{ $product->selling_price ?? 0 }}"> {{ $product->product_name }}
                 @endforeach
             </select>
         </td>

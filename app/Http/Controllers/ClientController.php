@@ -12,7 +12,18 @@ use Illuminate\Validation\Rules;
 use Illuminate\Validation\Rules\Password;
 
 class ClientController extends Controller
-{
+{   
+    public function __construct()
+    {
+        // [PERBAIKAN] Menambahkan proteksi route sesuai seeder
+        $this->middleware('can:view-clients')->only(['index', 'show']);
+        $this->middleware('can:create-clients')->only(['create', 'store']);
+        // Asumsi 'edit-clients' mencakup approve, lock, unlock
+        $this->middleware('can:edit-clients')->only(['edit', 'update', 'approve', 'lock', 'unlock']); 
+        // Asumsi 'delete-clients' mencakup restore
+        $this->middleware('can:delete-clients')->only(['destroy', 'restore']);
+    }
+    
     // ✅ UBAH METHOD INDEX INI
     public function index(Request $request): View
     {

@@ -21,7 +21,7 @@ class ClientOrderReviewController extends Controller
      */
     public function index(Request $request): View
     {
-        // $this->authorize('review-client-orders');
+        $this->authorize('review-client-orders');
 
         // --- 1. Get View Filter ---
         $view = $request->input('view', 'pending'); // 'pending' atau 'history'
@@ -104,7 +104,7 @@ class ClientOrderReviewController extends Controller
      */
     public function show(Order $order): View|RedirectResponse
     {
-         // $this->authorize('review-client-orders');
+        $this->authorize('review-client-orders');
 
         if ($order->order_source !== 'client' || $order->status !== 'pending_review') {
              return redirect()->route('client-order-reviews.index') // Pastikan nama route benar
@@ -121,7 +121,7 @@ class ClientOrderReviewController extends Controller
      */
     public function approve(Order $order): RedirectResponse
     {
-        // $this->authorize('approve-client-orders');
+        $this->authorize('approve-client-orders');
 
          if ($order->order_source !== 'client' || $order->status !== 'pending_review') {
              return back()->with('error', 'Pesanan ini tidak dapat disetujui.');
@@ -218,7 +218,7 @@ class ClientOrderReviewController extends Controller
      */
     public function reject(Request $request, Order $order): RedirectResponse
     {
-        // $this->authorize('reject-client-orders');
+        $this->authorize('reject-client-orders');
 
         if ($order->order_source !== 'client' || $order->status !== 'pending_review') {
              return back()->with('error', 'Pesanan ini tidak dapat ditolak.');

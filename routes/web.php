@@ -12,7 +12,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchaseOrderPaymentController;
-use App\Http\Controllers\ClientController;
+use App\Http\Controllers\ClientController; // Pastikan ini ada
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\GoogleAuthController;
@@ -29,6 +29,7 @@ use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\EquityTransactionController;
 use App\Http\Controllers\LoanController;
 use App\Http\Controllers\LoanPaymentController;
+use App\Http\Controllers\BatchPaymentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -56,15 +57,38 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('users', UserController::class);
     Route::resource('products', ProductController::class);
     Route::resource('sales-orders', SalesOrderController::class)
-          ->parameters(['sales-orders' => 'order']); // <-- Ini sudah benar
+          ->parameters(['sales-orders' => 'order']);
     Route::resource('invoices', SalesInvoiceController::class);
     Route::resource('taxes', TaxController::class)->except(['show']);
     Route::resource('suppliers', SupplierController::class);
     Route::patch('suppliers/{supplier}/restore', [SupplierController::class, 'restore'])
-      ->name('suppliers.restore')
-      ->withTrashed();
+          ->name('suppliers.restore')
+          ->withTrashed();
     Route::resource('purchase-orders', PurchaseOrderController::class);
-    Route::resource('clients', ClientController::class);
+    // 
+    // --- Rute Klien (SUDAH DIPERBAIKI) ---
+    // 1. Daftarkan resource, KECUALI 'show'
+    Route::resource('clients', ClientController::class)->except(['show']);
+
+    // 2. Buat grup untuk rute kustom Klien
+    Route::controller(ClientController::class)->prefix('clients')->name('clients.')->group(function () {
+        // Rute kustom untuk aksi
+        Route::patch('/{client}/approve', 'approve')->name('approve');
+        Route::patch('/{client}/lock', 'lock')->name('lock');
+        Route::patch('/{client}/unlock', 'unlock')->name('unlock');
+        
+        // Rute kustom yang perlu ->withTrashed()
+        Route::patch('/{client}/restore', 'restore')
+             ->name('restore')
+             ->withTrashed(); 
+
+        // Rute 'show' yang dibuat manual dengan ->withTrashed()
+        Route::get('/{client}', 'show')
+             ->name('show')
+             ->withTrashed(); 
+    });
+    // --- Akhir Rute Klien ---
+    //
     Route::resource('units', UnitController::class)->except(['show']);
     Route::resource('roles', RoleController::class)->except(['show']);
     Route::resource('sales-returns', SalesReturnController::class);
@@ -87,21 +111,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/purchase-orders/{purchaseOrder}/add-supplier-invoice', [PurchaseOrderController::class, 'addSupplierInvoice'])->name('purchase-orders.addSupplierInvoice');
     Route::get('/purchase-orders/{purchaseOrder}/download-pdf', [PurchaseOrderController::class, 'downloadPDF'])->name('purchase-orders.pdf');
 
-    // Custom Routes untuk Client
-    Route::patch('clients/{client}/approve', [ClientController::class, 'approve'])->name('clients.approve');
-    Route::patch('clients/{client}/restore', [ClientController::class, 'restore'])
-          ->name('clients.restore')
-          ->withTrashed();
-    
-    Route::patch('clients/{client}/lock', [ClientController::class, 'lock'])->name('clients.lock');
-    Route::patch('clients/{client}/unlock', [ClientController::class, 'unlock'])->name('clients.unlock');
-
-    // ✅ === ROUTE BARU UNTUK APPROVAL USER/STAF ===
+    // Custom Routes untuk User
     Route::patch('users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
     Route::patch('users/{user}/restore', [UserController::class, 'restore'])
           ->name('users.restore')
           ->withTrashed();
 
+    // Custom Routes untuk Announcement
     Route::patch('announcements/{announcement}/restore', [AnnouncementController::class, 'restore'])
           ->name('announcements.restore')
           ->withTrashed();
@@ -114,21 +130,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 
-    Route::prefix('client-order-reviews')->name('client-order-reviews.')->group(function() { // Tambah prefix admin. jika perlu
-        Route::get('/', [ClientOrderReviewController::class, 'index'])->name('index'); // admin.client-order-reviews.index
-        Route::get('/{order}', [ClientOrderReviewController::class, 'show'])->name('show'); // admin.client-order-reviews.show
-        Route::post('/{order}/approve', [ClientOrderReviewController::class, 'approve'])->name('approve'); // admin.client-order-reviews.approve
-        Route::post('/{order}/reject', [ClientOrderReviewController::class, 'reject'])->name('reject'); // admin.client-order-reviews.reject
+    // Review Order Klien
+    Route::prefix('client-order-reviews')->name('client-order-reviews.')->group(function() {
+        Route::get('/', [ClientOrderReviewController::class, 'index'])->name('index'); 
+        Route::get('/{order}', [ClientOrderReviewController::class, 'show'])->name('show'); 
+        Route::post('/{order}/approve', [ClientOrderReviewController::class, 'approve'])->name('approve'); 
+        Route::post('/{order}/reject', [ClientOrderReviewController::class, 'reject'])->name('reject'); 
     });
 
-    // ✅ === ROUTE BARU UNTUK ADMIN REVIEW REQUEST PERUBAHAN ORDER ===
-    // (Anda bisa pindahkan grup ini ke mana saja di dalam middleware group)
+    // Review Request Perubahan Order
     Route::prefix('order-change-requests')->name('order-change-requests.')->group(function() {
         Route::get('/', [OrderChangeRequestController::class, 'index'])->name('index');
-        Route::get('/{changeRequest}', [OrderChangeRequestController::class, 'show'])->name('show'); // Opsional
+        Route::get('/{changeRequest}', [OrderChangeRequestController::class, 'show'])->name('show');
         Route::post('/{changeRequest}/process', [OrderChangeRequestController::class, 'process'])->name('process');
     });
-    // ==========================================================
+    
+    // Keuangan Lanjutan (Beban, Aset, Modal, Pinjaman)
     Route::resource('expenses', ExpenseController::class);
     Route::resource('fixed-assets', FixedAssetController::class);
     Route::resource('equity-transactions', EquityTransactionController::class);
@@ -137,6 +154,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('loans.payments', LoanPaymentController::class)
      ->only(['create', 'store', 'destroy'])
      ->scoped();
+
+    // Batch Payment (Piutang)
+    Route::get('batch-payments/create', [BatchPaymentController::class, 'create'])->name('batch-payments.create');
+    Route::post('batch-payments', [BatchPaymentController::class, 'store'])->name('batch-payments.store');
+
+    // API Endpoints untuk Batch Payment (dilindungi auth web)
+    Route::get('/api/clients/{client}/unpaid-invoices', [BatchPaymentController::class, 'getUnpaidInvoicesApi'])->name('api.clients.unpaid-invoices');
+
+    // ==========================================================
+    // ✅ PINDAHKAN ROUTE DETAIL KLIEN KE SINI
+    // ==========================================================
+    Route::get('/api/clients/{client}/details', function (App\Models\Client $client) {
+        return response()->json([
+            'client_id' => $client->client_id,
+            'client_name' => $client->client_name,
+            'credit_balance' => $client->credit_balance ?? 0,
+        ]);
+    })->name('api.clients.details');
 });
 
 require __DIR__.'/auth.php';

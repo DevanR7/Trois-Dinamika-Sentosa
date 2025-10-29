@@ -37,6 +37,7 @@
                             <th>Penanggung Jawab</th>
                             <th>No. Telepon</th>
                             <th class="text-center">Status Akun</th>
+                            <th class="text-end">Saldo Kredit</th>
                             <th class="text-center">Aksi</th>
                         </tr>
                     </thead>
@@ -60,57 +61,77 @@
                                     <span class="badge bg-warning text-dark">Menunggu Persetujuan</span>
                                 @endif
                             </td>
-                            <td class="text-center">
-                                <div class="d-flex justify-content-center gap-1">
-                                
-                                    @if($client->trashed())
-                                        {{-- ✅ TOMBOL RESTORE (DIPERBARUI) --}}
-                                        <form action="{{ route('clients.restore', $client->client_id) }}" method="POST" class="form-restore d-inline">
-                                            @csrf
-                                            @method('PATCH')
-                                            <button type="submit" class="btn btn-sm btn-info" data-name="{{ $client->client_name }}">Pulihkan</button>
-                                        </form>
-                                    @else
-                                        {{-- JIKA AKTIF: Tampilkan tombol seperti biasa --}}
-                                        @if(!$client->is_approved)
-                                        {{-- ✅ TOMBOL APPROVE (DIPERBARUI) --}}
-                                        <form action="{{ route('clients.approve', $client->client_id) }}" method="POST" class="form-approve d-inline">
-                                            @csrf
-                                            @method('PATCH')
-                                            <button type="submit" class="btn btn-sm btn-success" data-name="{{ $client->client_name }}">Setujui</button>
-                                        </form>
-                                        @endif
-
-                                        @if($client->is_locked)
-                                            {{-- Tombol Buka Kunci --}}
-                                            <form action="{{ route('clients.unlock', $client->client_id) }}" method="POST" class="form-unlock d-inline">
-                                                @csrf @method('PATCH')
-                                                <button type="submit" class="btn btn-sm btn-warning" data-name="{{ $client->client_name }}" title="Buka Kunci Akun">
-                                                    <i class="bi bi-unlock-fill"></i>
-                                                </button>
-                                            </form>
-                                        @else
-                                            {{-- Tombol Kunci --}}
-                                            <form action="{{ route('clients.lock', $client->client_id) }}" method="POST" class="form-lock d-inline">
-                                                @csrf @method('PATCH')
-                                                <button type="submit" class="btn btn-sm btn-secondary" data-name="{{ $client->client_name }}" title="Kunci Akun">
-                                                    <i class="bi bi-lock-fill"></i>
-                                                </button>
-                                            </form>
-                                        @endif
-                                    
-                                        <a href="{{ route('clients.edit', $client->client_id) }}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil-square"></i></a>
-                                        
-                                        {{-- ✅ TOMBOL DELETE (DIPERBARUI) --}}
-                                        <form action="{{ route('clients.destroy', $client->client_id) }}" method="POST" class="form-delete d-inline">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus" data-name="{{ $client->client_name }}"><i class="bi bi-trash"></i></button>
-                                        </form>
-                                    @endif
-
-                                </div>
+                            <td class="text-end">
+                                @if($client->credit_balance > 0)
+                                    <span class="text-success fw-bold">
+                                        Rp {{ number_format($client->credit_balance, 0, ',', '.') }}
+                                    </span>
+                                @else
+                                    Rp 0
+                                @endif
                             </td>
+                            <td class="text-center">
+    <div class="d-flex justify-content-center gap-1">
+    
+        @if($client->trashed())
+            {{-- ✅ TOMBOL LIHAT (BARU) --}}
+            <a href="{{ route('clients.show', $client->client_id) }}" class="btn btn-sm btn-outline-primary" title="Lihat Detail">
+                <i class="bi bi-eye"></i>
+            </a>
+
+            {{-- TOMBOL RESTORE (SUDAH ADA) --}}
+            <form action="{{ route('clients.restore', $client->client_id) }}" method="POST" class="form-restore d-inline">
+                @csrf
+                @method('PATCH')
+                <button type="submit" class="btn btn-sm btn-info" data-name="{{ $client->client_name }}">Pulihkan</button>
+            </form>
+
+        @else
+            {{-- JIKA AKTIF: Tampilkan tombol seperti biasa --}}
+            @if(!$client->is_approved)
+            <form action="{{ route('clients.approve', $client->client_id) }}" method="POST" class="form-approve d-inline">
+                @csrf
+                @method('PATCH')
+                <button type="submit" class="btn btn-sm btn-success" data-name="{{ $client->client_name }}">Setujui</button>
+            </form>
+            @endif
+
+            @if($client->is_locked)
+                <form action="{{ route('clients.unlock', $client->client_id) }}" method="POST" class="form-unlock d-inline">
+                    @csrf @method('PATCH')
+                    <button type="submit" class="btn btn-sm btn-warning" data-name="{{ $client->client_name }}" title="Buka Kunci Akun">
+                        <i class="bi bi-unlock-fill"></i>
+                    </button>
+                </form>
+            @else
+                <form action="{{ route('clients.lock', $client->client_id) }}" method="POST" class="form-lock d-inline">
+                    @csrf @method('PATCH')
+                    <button type="submit" class="btn btn-sm btn-secondary" data-name="{{ $client->client_name }}" title="Kunci Akun">
+                        <i class="bi bi-lock-fill"></i>
+                    </button>
+                </form>
+            @endif
+        
+            {{-- ✅ TOMBOL LIHAT (BARU) --}}
+            <a href="{{ route('clients.show', $client->client_id) }}" class="btn btn-sm btn-outline-primary" title="Lihat Detail">
+                <i class="bi bi-eye"></i>
+            </a>
+
+            {{-- TOMBOL EDIT (SUDAH ADA) --}}
+            <a href="{{ route('clients.edit', $client->client_id) }}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                <i class="bi bi-pencil-square"></i>
+            </a>
+            
+            {{-- TOMBOL DELETE (SUDAH ADA) --}}
+            <form action="{{ route('clients.destroy', $client->client_id) }}" method="POST" class="form-delete d-inline">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus" data-name="{{ $client->client_name }}"><i class="bi bi-trash"></i></button>
+            </form>
+        @endif
+
+    </div>
+</td>
                         </tr>
                         @empty
                         <tr><td colspan="7" class="text-center">Tidak ada data klien.</td></tr>
