@@ -140,7 +140,7 @@ class BatchPaymentController extends Controller
                 $client->refresh();
             }
 
-            // 2. Buat record t
+            // 2. Buat record BatchPayment
             $metodeBatch = '';
             if ($kreditAkanDigunakan > 0) $metodeBatch .= 'Kredit Klien';
             if ($danaInputAkanDigunakan > 0) {
