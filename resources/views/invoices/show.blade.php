@@ -380,23 +380,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 amountFormattedInput.disabled = false;
                 amountFormattedInput.required = true;
                 paymentMethodSelect.disabled = false;
-                // Metode wajib jika dana > 0
                 paymentMethodSelect.required = inputAmountValue > 0 || remainingBalance > 0; 
                 if (paymentMethodSelect.required && !paymentMethodSelect.value) paymentMethodSelect.value = "manual_transfer";
             }
-            // Perbarui nilai max
-            autoNumericInstance.update({ maximumValue: remainingBalance });
+            // 🛑 HAPUS BATASAN MAXIMUM VALUE
+            // autoNumericInstance.update({ maximumValue: remainingBalance }); 
         }
 
         // Listener saat tombol "Catat Pembayaran" diklik
         if (addPaymentBtn) {
             addPaymentBtn.addEventListener('click', function() {
-                // Auto-centang jika ada kredit
                 if (useCreditCheckbox) {
-                    useCreditCheckbox.checked = true;
+                    useCreditCheckbox.checked = true; // Auto-centang
                 }
-                toggleRequiredFields(); // Atur state awal
+                toggleRequiredFields();
                 amountError.textContent = '';
+                // 🛑 HAPUS BATASAN MAXIMUM VALUE
+                // autoNumericInstance.update({ maximumValue: remainingBalance }); 
             });
         }
 
@@ -415,10 +415,13 @@ document.addEventListener('DOMContentLoaded', function() {
                  paymentMethodSelect.required = parseFloat(rawValue || 0) > 0;
             }
 
-            // Cek overpayment
+            // 🛑 HAPUS LOGIKA ERROR "TIDAK BOLEH MELEBIHI"
+            // Kita ingin mengizinkan overpayment
             const totalPayment = (useCreditCheckbox && useCreditCheckbox.checked ? currentCreditBalance : 0) + parseFloat(rawValue || 0);
             if (totalPayment > remainingBalance) {
-                amountError.textContent = 'Total pembayaran (termasuk kredit) melebihi sisa tagihan!';
+                amountError.textContent = 'Info: Kelebihan bayar akan jadi saldo kredit.';
+                amountError.classList.remove('text-danger');
+                amountError.classList.add('text-success'); // Ganti jadi info
             } else {
                 amountError.textContent = '';
             }

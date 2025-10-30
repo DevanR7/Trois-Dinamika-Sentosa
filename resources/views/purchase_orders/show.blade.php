@@ -26,12 +26,12 @@
                 <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-gear"></i> Opsi</button>
                 <ul class="dropdown-menu dropdown-menu-end">
                     @if (in_array($purchaseOrder->status, ['draft', 'ordered']))
-        <li>
-            <a class="dropdown-item" href="{{ route('purchase-orders.edit', $purchaseOrder->po_id) }}">
-                <i class="bi bi-pencil-square me-2"></i> Edit Pesanan
-            </a>
-        </li>
-        @endif
+                    <li>
+                        <a class="dropdown-item" href="{{ route('purchase-orders.edit', $purchaseOrder->po_id) }}">
+                            <i class="bi bi-pencil-square me-2"></i> Edit Pesanan
+                        </a>
+                    </li>
+                    @endif
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" href="{{ route('purchase-orders.pdf', $purchaseOrder->po_id) }}"><i class="bi bi-file-earmark-pdf me-2"></i> Download PDF</a></li> 
                     @can('cancel', $purchaseOrder)
@@ -171,7 +171,7 @@
         </div>
     </div>
 
-    
+    {{-- Riwayat Pembayaran --}}
     @if($purchaseOrder->payments->isNotEmpty())
     <div class="card shadow-sm border-0 mt-4">
         <div class="card-header">
@@ -207,76 +207,9 @@
     @endif
 </div>
 
-{{-- MODAL UNTUK TAMBAH PEMBAYARAN --}}
-<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="paymentModalLabel">Catat Pembayaran Baru</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form action="{{ route('purchase-orders.payments.store', $purchaseOrder->po_id) }}" method="POST">
-                @csrf
-                <div class="modal-body">
-                    @php
-                        $sisaTagihan = $purchaseOrder->total_amount - $purchaseOrder->total_returned - $purchaseOrder->amount_paid;
-                    @endphp
-                    <div class="alert alert-info">
-                        <div class="d-flex justify-content-between">
-                            <span class="fw-medium">Total Tagihan:</span>
-                            <span>Rp {{ number_format($purchaseOrder->total_amount, 0, ',', '.') }}</span>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <span class="fw-medium">Total Retur:</span>
-                            <span>(-) Rp {{ number_format($purchaseOrder->total_returned, 0, ',', '.') }}</span>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <span class="fw-medium">Sudah Dibayar:</span>
-                            <span>(+) Rp {{ number_format($purchaseOrder->amount_paid, 0, ',', '.') }}</span>
-                        </div>
-                        <hr class="my-1">
-                        <div class="d-flex justify-content-between fw-bold">
-                            <span>Sisa Tagihan:</span>
-                            <span>Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</span>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="payment_date" class="form-label">Tanggal Pembayaran</label>
-                        <input type="date" class="form-control" id="payment_date" name="payment_date" value="{{ now()->format('Y-m-d') }}" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="amount-formatted" class="form-label">Jumlah Pembayaran (Rp)</label>
-                        <input type="text" class="form-control" id="amount-formatted" required>
-                        <input type="hidden" name="amount" id="amount">
-                        <div id="amount-error" class="text-danger small mt-1"></div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="payment_method" class="form-label">Metode Pembayaran</label>
-                        <select class="form-select" id="payment_method" name="payment_method" required>
-                            <option value="manual_transfer">Transfer Manual</option>
-                            <option value="cash">Tunai (Cash)</option>
-                            <option value="other">Lainnya</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="notes" class="form-label">Catatan (Opsional)</label>
-                        <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary">Simpan Pembayaran</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-{{-- Modal untuk Input Nomor Faktur Supplier --}}
+{{-- ========================================================== --}}
+{{-- MODAL UNTUK TAMBAH PEMBAYARAN (SUDAH DIPERBARUI) --}}
+{{-- ========================================================== --}}
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -305,7 +238,7 @@
 
                     {{-- Info Saldo Deposit --}}
                     @if($saldoDepositSupplier > 0)
-                    <div id="debit-info-container" class="alert alert-success"> {{-- Ganti jadi success/info --}}
+                    <div id="debit-info-container" class="alert alert-success">
                         <div class="d-flex justify-content-between fw-bold">
                             <span>Saldo Deposit Tersedia:</span>
                             <span id="modal-debit-balance-display">Rp {{ number_format($saldoDepositSupplier, 0, ',', '.') }}</span>
@@ -319,18 +252,18 @@
                     
                     {{-- Form Input --}}
                     <div class="mb-3">
-                        <label for="amount-formatted" class="form-label">Jumlah Dibayar (Non-Deposit)</label>
-                        <input type="text" class="form-control" id="amount-formatted-po" required> {{-- Ganti ID --}}
-                        <input type="hidden" name="amount" id="amount-po"> {{-- Ganti ID --}}
-                        <div id="amount-error-po" class="text-danger small mt-1"></div> {{-- Ganti ID --}}
+                        <label for="amount-formatted-po" class="form-label">Jumlah Dibayar (Non-Deposit)</label>
+                        <input type="text" class="form-control" id="amount-formatted-po" required>
+                        <input type="hidden" name="amount" id="amount-po">
+                        <div id="amount-error-po" class="text-danger small mt-1"></div>
                     </div>
                     <div class="mb-3">
                         <label for="payment_date" class="form-label">Tanggal Pembayaran</label>
                         <input type="date" class="form-control" id="payment_date" name="payment_date" value="{{ now()->format('Y-m-d') }}" required>
                     </div>
                     <div class="mb-3">
-                        <label for="payment_method" class="form-label">Metode Pembayaran (Non-Deposit)</label>
-                        <select class="form-select" id="payment_method_po" name="payment_method" required> {{-- Ganti ID --}}
+                        <label for="payment_method_po" class="form-label">Metode Pembayaran (Non-Deposit)</label>
+                        <select class="form-select" id="payment_method_po" name="payment_method" required>
                             <option value="">-- Pilih Metode --</option>
                             <option value="manual_transfer">Transfer Manual</option>
                             <option value="cash">Tunai (Cash)</option>
@@ -350,8 +283,37 @@
         </div>
     </div>
 </div>
+
+{{-- Modal untuk Input Nomor Faktur Supplier --}}
+<div class="modal fade" id="supplierInvoiceModal" tabindex="-1" aria-labelledby="supplierInvoiceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="supplierInvoiceModalLabel">Input Nomor Faktur Supplier</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('purchase-orders.addSupplierInvoice', $purchaseOrder->po_id) }}" method="POST">
+                @csrf
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="supplier_invoice_number" class="form-label">No. Faktur dari Supplier</label>
+                        <input type="text" class="form-control" id="supplier_invoice_number" name="supplier_invoice_number" value="{{ $purchaseOrder->supplier_invoice_number }}" required>
+                        <div class="form-text">Masukkan nomor yang tertera di surat jalan atau faktur dari supplier.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection
 
+{{-- ========================================================== --}}
+{{-- SCRIPT (SUDAH DIPERBARUI) --}}
+{{-- ========================================================== --}}
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script>
@@ -361,7 +323,6 @@
         // =======================================================
         const receiveGoodsForm = document.getElementById('receive-goods-form');
         if (receiveGoodsForm) {
-            // ... (Kode SweetAlert 'receive' Anda tetap sama)
             receiveGoodsForm.addEventListener('submit', function(event) {
                 event.preventDefault(); 
                 Swal.fire({
@@ -412,6 +373,7 @@
 
                 if (useDebit) {
                     if (debitIsSufficient) {
+                        // Deposit cukup: dana input 0, nonaktif, tidak wajib
                         autoNumericInstancePO.set(0);
                         amountFormattedInputPO.disabled = true;
                         amountFormattedInputPO.required = false;
@@ -419,6 +381,7 @@
                         paymentMethodSelectPO.required = false;
                         paymentMethodSelectPO.value = "";
                     } else {
+                        // Deposit kurang: isi kekurangan, aktif, wajib
                         const shortfall = remainingBalancePO - currentDebitBalancePO;
                         autoNumericInstancePO.set(shortfall);
                         amountFormattedInputPO.disabled = false;
@@ -428,6 +391,7 @@
                         if (!paymentMethodSelectPO.value) paymentMethodSelectPO.value = "manual_transfer";
                     }
                 } else {
+                    // Tidak pakai deposit: isi penuh, aktif, wajib
                     autoNumericInstancePO.set(remainingBalancePO);
                     amountFormattedInputPO.disabled = false;
                     amountFormattedInputPO.required = true;
@@ -435,7 +399,8 @@
                     paymentMethodSelectPO.required = inputAmountValue > 0 || remainingBalancePO > 0;
                     if (paymentMethodSelectPO.required && !paymentMethodSelectPO.value) paymentMethodSelectPO.value = "manual_transfer";
                 }
-                autoNumericInstancePO.update({ maximumValue: remainingBalancePO });
+                // 🛑 HAPUS BATASAN MAXIMUM VALUE (DARI PERBAIKAN SEBELUMNYA)
+                // autoNumericInstancePO.update({ maximumValue: remainingBalancePO }); // <-- Baris ini seharusnya sudah dihapus
             }
 
             // Listener saat tombol "Catat Pembayaran" diklik
@@ -446,6 +411,8 @@
                     }
                     toggleRequiredFieldsPO(); // Atur state awal
                     amountErrorPO.textContent = '';
+                    // 🛑 HAPUS BATASAN MAXIMUM VALUE (DARI PERBAIKAN SEBELUMNYA)
+                    // autoNumericInstancePO.update({ maximumValue: remainingBalancePO }); // <-- Baris ini seharusnya sudah dihapus
                 });
             }
 
@@ -463,9 +430,12 @@
                     paymentMethodSelectPO.required = parseFloat(rawValue || 0) > 0;
                 }
 
+                // Info overpayment
                 const totalPayment = (useDebitCheckboxPO && useDebitCheckboxPO.checked ? currentDebitBalancePO : 0) + parseFloat(rawValue || 0);
                 if (totalPayment > remainingBalancePO) {
-                    amountErrorPO.textContent = 'Total pembayaran (termasuk deposit) melebihi sisa tagihan!';
+                    amountErrorPO.textContent = 'Info: Kelebihan bayar akan jadi saldo deposit.';
+                    amountErrorPO.classList.remove('text-danger');
+                    amountErrorPO.classList.add('text-success'); // Ganti jadi info
                 } else {
                     amountErrorPO.textContent = '';
                 }

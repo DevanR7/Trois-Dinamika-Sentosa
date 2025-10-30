@@ -400,9 +400,16 @@ class SalesInvoiceController extends Controller
     public function cancel(SalesInvoice $invoice): RedirectResponse
     {
         $this->authorize('cancel', $invoice);
-        if ($invoice->status == 'paid') {
-            return back()->with('error', 'Invoice yang sudah lunas tidak bisa dibatalkan.');
+
+        // ✅ PERBAIKAN: Cek status 'paid' ATAU 'partially_paid'
+        if (in_array($invoice->status, ['paid', 'partially_paid'])) {
+             return back()->with('error', 'Invoice yang sudah lunas atau dicicil tidak bisa dibatalkan.');
         }
+        
+        // Alternatif (lebih aman): Cek langsung ke 'amount_paid'
+        // if ($invoice->amount_paid > 0) {
+        //     return back()->with('error', 'Invoice yang sudah memiliki pembayaran (meski cicil) tidak bisa dibatalkan.');
+        // }
 
         $invoice->status = 'cancelled';
         $invoice->save();
