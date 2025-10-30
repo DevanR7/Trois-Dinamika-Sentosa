@@ -32,6 +32,7 @@ class RoleAndPermissionSeeder extends Seeder
         Permission::updateOrCreate(['name' => 'cancel-purchase-orders']);
         Permission::updateOrCreate(['name' => 'receive-purchase-orders']);
         Permission::updateOrCreate(['name' => 'pay-purchase-orders']);
+        Permission::updateOrCreate(['name' => 'create-batch-purchase-payments']);
 
         // Products
         Permission::updateOrCreate(['name' => 'view-products']);
@@ -120,9 +121,7 @@ class RoleAndPermissionSeeder extends Seeder
             'view-clients', 'create-clients', 'edit-clients', 'delete-clients',
             'view-sales-orders', 'create-sales-orders', 'edit-sales-orders', 'delete-sales-orders',
             'view-invoices', 'create-invoices', 'edit-invoices', 'delete-invoices', 'pay-invoices',
-            'manage-settings',
-            'view-purchase-returns',
-            'view-sales-returns',
+            'manage-settings','view-purchase-returns','view-sales-returns','create-batch-purchase-payments',
             // 'create-batch-payments', // <-- Uncomment baris ini jika Kasir boleh
         ]);
 

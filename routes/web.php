@@ -30,6 +30,7 @@ use App\Http\Controllers\EquityTransactionController;
 use App\Http\Controllers\LoanController;
 use App\Http\Controllers\LoanPaymentController;
 use App\Http\Controllers\BatchPaymentController;
+use App\Http\Controllers\BatchPurchasePaymentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -172,6 +173,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'credit_balance' => $client->credit_balance ?? 0,
         ]);
     })->name('api.clients.details');
+
+    Route::prefix('batch-purchase-payments')->name('batch-purchase-payments.')->group(function () {
+        Route::get('/create', [BatchPurchasePaymentController::class, 'create'])->name('create');
+        Route::post('/', [BatchPurchasePaymentController::class, 'store'])->name('store');
+    });
+    // API untuk PO
+    Route::get('/api/suppliers/{supplier}/unpaid-purchase-orders', [BatchPurchasePaymentController::class, 'getUnpaidPurchaseOrdersApi'])
+         ->name('api.suppliers.unpaid-pos');
+    // API untuk detail supplier (deposit)
+    Route::get('/api/suppliers/{supplier}/details', function (App\Models\Supplier $supplier) {
+        return response()->json([
+            'supplier_id' => $supplier->supplier_id,
+            'supplier_name' => $supplier->supplier_name,
+            'debit_balance' => $supplier->debit_balance ?? 0,
+        ]);
+    })->name('api.suppliers.details');
 });
 
 require __DIR__.'/auth.php';

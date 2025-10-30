@@ -21,7 +21,7 @@
         </div>
     </div>
     
-    {{-- ✅ MENGGANTI TABLE DENGAN ACCORDION --}}
+    {{-- MENGGANTI TABLE DENGAN ACCORDION --}}
     <div class="accordion shadow-sm" id="supplierAccordion">
 
         @forelse ($suppliers as $supplier)
@@ -43,13 +43,29 @@
                             </span>
                         </div>
                         
-                        {{-- Kanan: Telepon & Status --}}
+                        {{-- Kanan: Telepon, Saldo Deposit & Status --}}
                         <div class="me-3 d-flex align-items-center">
                             <span class="text-muted me-3 d-none d-md-block">
                                 <i class="bi bi-telephone me-1"></i>
                                 {{ $supplier->phone_number ?? '-' }}
                             </span>
-                            
+
+                            {{-- =================================== --}}
+                            {{-- ✅ SALDO DEPOSIT (TAMPILAN COLLAPSED) --}}
+                            {{-- =================================== --}}
+                            <div class="me-3 d-none d-lg-block">
+                                @if($supplier->debit_balance > 0)
+                                    <span class="text-success fw-bold">
+                                        {{-- Format Rupiah ringkas untuk header --}}
+                                        Rp {{ number_format($supplier->debit_balance, 0, ',', '.') }}
+                                    </span>
+                                @else
+                                    <span class="text-muted">Rp 0</span>
+                                @endif
+                                <small class="d-block text-muted" style="font-size: 0.75rem;">Saldo Deposit</small>
+                            </div>
+                            {{-- =================================== --}}
+
                             @if($supplier->trashed())
                                 <span class="badge bg-danger rounded-pill">Diarsipkan</span>
                             @else
@@ -74,11 +90,23 @@
                             </ul>
                         </div>
                         <div class="col-md-5">
-                            <strong>Detail Bank:</strong>
+                            <strong>Detail Bank & Saldo:</strong>
                             <ul class="list-unstyled mt-2">
                                 <li><i class="bi bi-card-heading me-2 text-muted"></i>NPWP: {{ $supplier->npwp ?? '-' }}</li>
                                 <li><i class="bi bi-bank me-2 text-muted"></i>Bank: {{ $supplier->bank_name ?? '-' }}</li>
                                 <li><i class="bi bi-hash me-2 text-muted"></i>No. Rek: {{ $supplier->account_number ?? '-' }}</li>
+                                
+                                {{-- =================================== --}}
+                                {{-- ✅ SALDO DEPOSIT (TAMPILAN EXPANDED) --}}
+                                {{-- =================================== --}}
+                                <li class="mt-2">
+                                    <i class="bi bi-wallet2 me-2 text-muted"></i>
+                                    Saldo Deposit: 
+                                    <strong class_="{{ $supplier->debit_balance > 0 ? 'text-success' : 'text-dark' }}">
+                                        Rp {{ number_format($supplier->debit_balance, 0, ',', '.') }}
+                                    </strong>
+                                </li>
+                                {{-- =================================== --}}
                             </ul>
                         </div>
                         <div class="col-md-2 d-flex flex-column justify-content-center gap-2">

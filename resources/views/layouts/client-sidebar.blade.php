@@ -72,3 +72,23 @@
     {{-- ✅ END: TOMBOL LONCENG PENGUMUMAN --}}
 
 </nav> {{-- Akhir sidebar nav --}}
+
+{{-- === SCRIPT UNTUK SIMPAN & PULIHKAN POSISI SCROLL SIDEBAR === --}}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const sidebarContainer = document.querySelector('#sidebarScrollContainer');
+
+    if (sidebarContainer) {
+        // === Pulihkan posisi scroll terakhir ===
+        const savedScroll = localStorage.getItem('sidebarScroll');
+        if (savedScroll) {
+            sidebarContainer.scrollTop = parseInt(savedScroll);
+        }
+
+        // === Simpan posisi scroll setiap kali user scroll ===
+        sidebarContainer.addEventListener('scroll', () => {
+            localStorage.setItem('sidebarScroll', sidebarContainer.scrollTop);
+        });
+    }
+});
+</script>

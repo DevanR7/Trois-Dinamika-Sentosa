@@ -74,6 +74,14 @@
             </a>
         </li>
         @endcan
+        @can('create-batch-purchase-payments')
+        <li class="item">
+            <a class="link flex {{ request()->routeIs('batch-purchase-payments.*') ? 'active' : '' }}" href="{{ route('batch-purchase-payments.create') }}">
+                <i class='bx bxs-bank'></i> {{-- Ikon Bank/Pembayaran --}}
+                <span>Pembayaran Hutang</span>
+            </a>
+        </li>
+        @endcan
     </ul>
 @endif
 

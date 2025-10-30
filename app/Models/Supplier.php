@@ -22,6 +22,7 @@ class Supplier extends Model
         'npwp',
         'bank_name',
         'account_number',
+        'debit_balance',
     ];
     /**
      * Mendapatkan semua produk yang disuplai oleh supplier ini.
@@ -37,5 +38,10 @@ class Supplier extends Model
     public function purchaseOrders(): HasMany
     {
         return $this->hasMany(PurchaseOrder::class, 'supplier_id', 'supplier_id');
+    }
+
+    public function batchPurchasePayments(): HasMany
+    {
+        return $this->hasMany(BatchPurchasePayment::class, 'supplier_id', 'supplier_id');
     }
 }

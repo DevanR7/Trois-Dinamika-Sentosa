@@ -277,25 +277,74 @@
 </div>
 
 {{-- Modal untuk Input Nomor Faktur Supplier --}}
-<div class="modal fade" id="supplierInvoiceModal" tabindex="-1" aria-labelledby="supplierInvoiceModalLabel" aria-hidden="true">
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="supplierInvoiceModalLabel">Input Nomor Faktur Supplier</h5>
+                <h5 class="modal-title" id="paymentModalLabel">Catat Pembayaran Baru</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="{{ route('purchase-orders.addSupplierInvoice', $purchaseOrder->po_id) }}" method="POST">
+            <form action="{{ route('purchase-orders.payments.store', $purchaseOrder->po_id) }}" method="POST">
                 @csrf
                 <div class="modal-body">
+                    @php
+                        $sisaTagihanPO = $purchaseOrder->total_amount - $purchaseOrder->total_returned - $purchaseOrder->amount_paid;
+                        $saldoDepositSupplier = $purchaseOrder->supplier->debit_balance ?? 0;
+                    @endphp
+                    
+                    {{-- Info Sisa Tagihan --}}
+                    <div class="alert alert-info">
+                        <div class="d-flex justify-content-between"><span class="fw-medium">Tagihan Bersih:</span><span>Rp {{ number_format($purchaseOrder->total_amount - $purchaseOrder->total_returned, 0, ',', '.') }}</span></div>
+                        <div class="d-flex justify-content-between"><span class="fw-medium">Sudah Dibayar:</span><span>(+) Rp {{ number_format($purchaseOrder->amount_paid, 0, ',', '.') }}</span></div>
+                        <hr class="my-1">
+                        <div class="d-flex justify-content-between fw-bold">
+                            <span>Sisa Utang:</span>
+                            <span id="modal-po-sisa-tagihan-display">Rp {{ number_format($sisaTagihanPO, 0, ',', '.') }}</span>
+                        </div>
+                    </div>
+
+                    {{-- Info Saldo Deposit --}}
+                    @if($saldoDepositSupplier > 0)
+                    <div id="debit-info-container" class="alert alert-success"> {{-- Ganti jadi success/info --}}
+                        <div class="d-flex justify-content-between fw-bold">
+                            <span>Saldo Deposit Tersedia:</span>
+                            <span id="modal-debit-balance-display">Rp {{ number_format($saldoDepositSupplier, 0, ',', '.') }}</span>
+                        </div>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" role="switch" id="modal-use-debit" name="use_debit_balance" value="1">
+                            <label class="form-check-label" for="modal-use-debit">Gunakan Saldo Deposit</label>
+                        </div>
+                    </div>
+                    @endif
+                    
+                    {{-- Form Input --}}
                     <div class="mb-3">
-                        <label for="supplier_invoice_number" class="form-label">No. Faktur dari Supplier</label>
-                        <input type="text" class="form-control" id="supplier_invoice_number" name="supplier_invoice_number" value="{{ $purchaseOrder->supplier_invoice_number }}" required>
-                        <div class="form-text">Masukkan nomor yang tertera di surat jalan atau faktur dari supplier.</div>
+                        <label for="amount-formatted" class="form-label">Jumlah Dibayar (Non-Deposit)</label>
+                        <input type="text" class="form-control" id="amount-formatted-po" required> {{-- Ganti ID --}}
+                        <input type="hidden" name="amount" id="amount-po"> {{-- Ganti ID --}}
+                        <div id="amount-error-po" class="text-danger small mt-1"></div> {{-- Ganti ID --}}
+                    </div>
+                    <div class="mb-3">
+                        <label for="payment_date" class="form-label">Tanggal Pembayaran</label>
+                        <input type="date" class="form-control" id="payment_date" name="payment_date" value="{{ now()->format('Y-m-d') }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="payment_method" class="form-label">Metode Pembayaran (Non-Deposit)</label>
+                        <select class="form-select" id="payment_method_po" name="payment_method" required> {{-- Ganti ID --}}
+                            <option value="">-- Pilih Metode --</option>
+                            <option value="manual_transfer">Transfer Manual</option>
+                            <option value="cash">Tunai (Cash)</option>
+                            <option value="other">Lainnya</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Catatan (Opsional)</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary">Simpan</button>
+                    <button type="submit" class="btn btn-primary">Simpan Pembayaran</button>
                 </div>
             </form>
         </div>
@@ -304,6 +353,7 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // =======================================================
@@ -311,6 +361,7 @@
         // =======================================================
         const receiveGoodsForm = document.getElementById('receive-goods-form');
         if (receiveGoodsForm) {
+            // ... (Kode SweetAlert 'receive' Anda tetap sama)
             receiveGoodsForm.addEventListener('submit', function(event) {
                 event.preventDefault(); 
                 Swal.fire({
@@ -331,47 +382,94 @@
         }
 
         // =======================================================
-        // BAGIAN 2: LOGIKA AUTONUMERIC UNTUK MODAL PEMBAYARAN
+        // BAGIAN 2: LOGIKA AUTONUMERIC UNTUK MODAL PEMBAYARAN (PO)
         // =======================================================
-        const addPaymentBtn = document.getElementById('add-payment-btn');
-        const amountFormattedInput = document.getElementById('amount-formatted');
-        const amountHiddenInput = document.getElementById('amount');
-        const amountError = document.getElementById('amount-error');
+        const addPaymentBtnPO = document.getElementById('add-payment-btn');
+        const amountFormattedInputPO = document.getElementById('amount-formatted-po'); // ID Unik
+        const amountHiddenInputPO = document.getElementById('amount-po'); // ID Unik
+        const amountErrorPO = document.getElementById('amount-error-po'); // ID Unik
+        const useDebitCheckboxPO = document.getElementById('modal-use-debit');
+        const paymentMethodSelectPO = document.getElementById('payment_method_po');
 
-        if (amountFormattedInput) {
-            const autoNumericInstance = new AutoNumeric(amountFormattedInput, {
+        // Nilai-nilai
+        const remainingBalancePO = {{ ($purchaseOrder->total_amount - $purchaseOrder->total_returned - $purchaseOrder->amount_paid) ?? 0 }};
+        const currentDebitBalancePO = {{ $purchaseOrder->supplier->debit_balance ?? 0 }};
+
+        if (amountFormattedInputPO) {
+            // Inisialisasi AutoNumeric (dengan desimal)
+            const autoNumericInstancePO = new AutoNumeric(amountFormattedInputPO, {
                 decimalCharacter: ',',
                 digitGroupSeparator: '.',
-                currencySymbol: '',
-                decimalPlaces: 0,
+                decimalPlaces: 2, // PO mungkin pakai desimal
                 minimumValue: '0'
             });
 
-            if (addPaymentBtn) {
-                addPaymentBtn.addEventListener('click', function() {
-                    @php
-                        $sisaTagihan = $purchaseOrder->total_amount - $purchaseOrder->total_returned - $purchaseOrder->amount_paid;
-                    @endphp
-                     const remainingBalance = {{ ($purchaseOrder->total_amount - $purchaseOrder->total_returned - $purchaseOrder->amount_paid) ?? 0 }};
+            // Fungsi untuk mengatur state input
+            function toggleRequiredFieldsPO() {
+                const useDebit = useDebitCheckboxPO ? useDebitCheckboxPO.checked : false;
+                const debitIsSufficient = currentDebitBalancePO >= remainingBalancePO && remainingBalancePO > 0;
+                const inputAmountValue = parseFloat(amountHiddenInputPO.value || 0);
 
-                    autoNumericInstance.set(remainingBalance);
-                    amountHiddenInput.value = remainingBalance;
-                    autoNumericInstance.update({ maximumValue: remainingBalance });
-                    amountError.textContent = '';
-                });
-
-                amountFormattedInput.addEventListener('autoNumeric:rawValueModified', function(event) {
-                    const rawValue = event.detail.newRawValue;
-                    amountHiddenInput.value = rawValue;
-
-                      const remainingBalance = {{ ($purchaseOrder->total_amount - $purchaseOrder->total_returned - $purchaseOrder->amount_paid) ?? 0 }};
-                    if (parseFloat(rawValue) > remainingBalance) {
-                        amountError.textContent = 'Jumlah pembayaran tidak boleh melebihi sisa tagihan!';
+                if (useDebit) {
+                    if (debitIsSufficient) {
+                        autoNumericInstancePO.set(0);
+                        amountFormattedInputPO.disabled = true;
+                        amountFormattedInputPO.required = false;
+                        paymentMethodSelectPO.disabled = true;
+                        paymentMethodSelectPO.required = false;
+                        paymentMethodSelectPO.value = "";
                     } else {
-                        amountError.textContent = '';
+                        const shortfall = remainingBalancePO - currentDebitBalancePO;
+                        autoNumericInstancePO.set(shortfall);
+                        amountFormattedInputPO.disabled = false;
+                        amountFormattedInputPO.required = true;
+                        paymentMethodSelectPO.disabled = false;
+                        paymentMethodSelectPO.required = true;
+                        if (!paymentMethodSelectPO.value) paymentMethodSelectPO.value = "manual_transfer";
                     }
+                } else {
+                    autoNumericInstancePO.set(remainingBalancePO);
+                    amountFormattedInputPO.disabled = false;
+                    amountFormattedInputPO.required = true;
+                    paymentMethodSelectPO.disabled = false;
+                    paymentMethodSelectPO.required = inputAmountValue > 0 || remainingBalancePO > 0;
+                    if (paymentMethodSelectPO.required && !paymentMethodSelectPO.value) paymentMethodSelectPO.value = "manual_transfer";
+                }
+                autoNumericInstancePO.update({ maximumValue: remainingBalancePO });
+            }
+
+            // Listener saat tombol "Catat Pembayaran" diklik
+            if (addPaymentBtnPO) {
+                addPaymentBtnPO.addEventListener('click', function() {
+                    if (useDebitCheckboxPO) {
+                        useDebitCheckboxPO.checked = true; // Auto-centang
+                    }
+                    toggleRequiredFieldsPO(); // Atur state awal
+                    amountErrorPO.textContent = '';
                 });
             }
+
+            // Listener saat checkbox deposit diganti
+            if (useDebitCheckboxPO) {
+                useDebitCheckboxPO.addEventListener('change', toggleRequiredFieldsPO);
+            }
+
+            // Listener saat input amount diubah
+            amountFormattedInputPO.addEventListener('autoNumeric:rawValueModified', function(event) {
+                const rawValue = event.detail.newRawValue;
+                amountHiddenInputPO.value = rawValue;
+
+                if (useDebitCheckboxPO && !useDebitCheckboxPO.checked) {
+                    paymentMethodSelectPO.required = parseFloat(rawValue || 0) > 0;
+                }
+
+                const totalPayment = (useDebitCheckboxPO && useDebitCheckboxPO.checked ? currentDebitBalancePO : 0) + parseFloat(rawValue || 0);
+                if (totalPayment > remainingBalancePO) {
+                    amountErrorPO.textContent = 'Total pembayaran (termasuk deposit) melebihi sisa tagihan!';
+                } else {
+                    amountErrorPO.textContent = '';
+                }
+            });
         }
     });
 </script>

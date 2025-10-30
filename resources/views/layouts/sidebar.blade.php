@@ -6,15 +6,16 @@
         <span class="logo_name">Internal</span>
 
         <i class="bx bx-lock-alt" id="lock-icon" title="Kunci/Buka Sidebar"></i>
-
         <i class="bx bx-x" id="sidebar-close"></i>
     </div>
 
-    <div class="menu_container">
+    <div class="menu_container" id="sidebarScrollContainer">
         <div class="menu_items">
             @include("layouts.partials.sidebar-links")
         </div>
-    </div> <div class="sidebar_profile flex">
+    </div>
+
+    <div class="sidebar_profile flex">
         <span class="nav_image">
             <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()->full_name) }}&background=4f46e5&color=fff" alt="profil" />
         </span>
@@ -31,9 +32,11 @@
                 <i class='bx bx-dots-vertical-rounded fs-5'></i>
             </a>
             <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
-                <li><a class="dropdown-item" href="{{ route("profile.edit") }}">
-                    <i class="bi bi-person-circle me-2"></i> Profil
-                </a></li>
+                <li>
+                    <a class="dropdown-item" href="{{ route("profile.edit") }}">
+                        <i class="bi bi-person-circle me-2"></i> Profil
+                    </a>
+                </li>
                 <li><hr class="dropdown-divider" /></li>
                 <li>
                     <form method="POST" action="{{ route("logout") }}">
@@ -47,5 +50,24 @@
             </ul>
         </div>
     </div>
-
 </nav>
+
+{{-- === SCRIPT UNTUK SIMPAN & PULIHKAN POSISI SCROLL SIDEBAR === --}}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const sidebarContainer = document.querySelector('#sidebarScrollContainer');
+
+    if (sidebarContainer) {
+        // === Pulihkan posisi scroll terakhir ===
+        const savedScroll = localStorage.getItem('sidebarScroll');
+        if (savedScroll) {
+            sidebarContainer.scrollTop = parseInt(savedScroll);
+        }
+
+        // === Simpan posisi scroll setiap kali user scroll ===
+        sidebarContainer.addEventListener('scroll', () => {
+            localStorage.setItem('sidebarScroll', sidebarContainer.scrollTop);
+        });
+    }
+});
+</script>

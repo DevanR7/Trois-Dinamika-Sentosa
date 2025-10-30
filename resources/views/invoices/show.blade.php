@@ -245,6 +245,9 @@
 </div>
 
 {{-- MODAL PEMBAYARAN --}}
+{{-- ========================================================== --}}
+{{-- 1. GANTI SELURUH MODAL PEMBAYARAN ANDA DENGAN INI --}}
+{{-- ========================================================== --}}
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -255,15 +258,34 @@
                     @php
                         $totalRetur = $invoice->returns->sum('total_amount');
                         $sisaTagihan = $invoice->total_amount - $invoice->amount_paid - $totalRetur;
+                        $saldoKreditKlien = $invoice->client->credit_balance ?? 0;
                     @endphp
+                    
+                    {{-- Info Sisa Tagihan --}}
                     <div class="alert alert-info">
                         <div class="d-flex justify-content-between"><span>Total Tagihan:</span><span>Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span></div>
                         @if($totalRetur > 0)<div class="d-flex justify-content-between"><span>Total Retur:</span><span>(-) Rp {{ number_format($totalRetur, 0, ',', '.') }}</span></div>@endif
                         <div class="d-flex justify-content-between"><span>Sudah Dibayar:</span><span>(+) Rp {{ number_format($invoice->amount_paid, 0, ',', '.') }}</span></div>
-                        <hr class="my-1"><div class="d-flex justify-content-between fw-bold"><span>Sisa Tagihan:</span><span>Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</span></div>
+                        <hr class="my-1"><div class="d-flex justify-content-between fw-bold"><span>Sisa Tagihan:</span><span id="modal-sisa-tagihan-display">Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</span></div>
                     </div>
+
+                    {{-- Info Saldo Kredit --}}
+                    @if($saldoKreditKlien > 0)
+                    <div id="credit-info-container" class="alert alert-success">
+                        <div class="d-flex justify-content-between fw-bold">
+                            <span>Saldo Kredit Tersedia:</span>
+                            <span id="modal-credit-balance-display">Rp {{ number_format($saldoKreditKlien, 0, ',', '.') }}</span>
+                        </div>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" role="switch" id="modal-use-credit" name="use_credit" value="1">
+                            <label class="form-check-label" for="modal-use-credit">Gunakan Saldo Kredit</label>
+                        </div>
+                    </div>
+                    @endif
+
+                    {{-- Form Input --}}
                     <div class="mb-3">
-                        <label for="amount-formatted" class="form-label">Jumlah Dibayar</label>
+                        <label for="amount-formatted" class="form-label">Jumlah Dibayar (Non-Kredit)</label>
                         <input type="text" class="form-control" id="amount-formatted" required>
                         <input type="hidden" name="amount" id="amount">
                         <div id="amount-error" class="text-danger small mt-1"></div>
@@ -273,8 +295,9 @@
                         <input type="date" class="form-control" name="payment_date" id="payment_date" value="{{ now()->format('Y-m-d') }}" required>
                     </div>
                     <div class="mb-3">
-                        <label for="payment_method" class="form-label">Metode Pembayaran</label>
-                        <select name="payment_method" class="form-select" required>
+                        <label for="payment_method" class="form-label">Metode Pembayaran (Non-Kredit)</label>
+                        <select name="payment_method" id="payment_method" class="form-select" required>
+                            <option value="">-- Pilih Metode --</option>
                             <option value="manual_transfer">Transfer Bank</option>
                             <option value="cash">Cash</option>
                             <option value="other">Lainnya</option>
@@ -295,39 +318,111 @@
 </div>
 @endsection
 
+{{-- ========================================================== --}}
+{{-- 2. GANTI SELURUH @push('scripts') ANDA DENGAN INI --}}
+{{-- ========================================================== --}}
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Inisialisasi Popover
+    const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
+    [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl));
+
+    // Elemen Modal
     const addPaymentBtn = document.getElementById('add-payment-btn');
     const amountFormattedInput = document.getElementById('amount-formatted');
     const amountHiddenInput = document.getElementById('amount');
     const amountError = document.getElementById('amount-error');
-    const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
-        [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl));
+    const useCreditCheckbox = document.getElementById('modal-use-credit');
+    const paymentMethodSelect = document.getElementById('payment_method');
+    
+    // Nilai-nilai
+    const remainingBalance = {{ ($invoice->total_amount - $invoice->returns->sum('total_amount') - $invoice->amount_paid) ?? 0 }};
+    const currentCreditBalance = {{ $invoice->client->credit_balance ?? 0 }};
 
     if (amountFormattedInput) {
-        const autoNumericInstance = new AutoNumeric(amountFormattedInput, { decimalPlaces: 0, digitGroupSeparator: '.', decimalCharacter: ',' });
+        // Inisialisasi AutoNumeric
+        const autoNumericInstance = new AutoNumeric(amountFormattedInput, { 
+            decimalPlaces: 0, 
+            digitGroupSeparator: '.', 
+            decimalCharacter: ',' 
+        });
+
+        // Fungsi untuk mengatur state input berdasarkan checkbox kredit
+        function toggleRequiredFields() {
+            const useCredit = useCreditCheckbox ? useCreditCheckbox.checked : false;
+            const creditIsSufficient = currentCreditBalance >= remainingBalance && remainingBalance > 0;
+            const inputAmountValue = parseFloat(amountHiddenInput.value || 0);
+
+            if (useCredit) {
+                if (creditIsSufficient) {
+                    // Kredit cukup: dana input 0, nonaktif, tidak wajib
+                    autoNumericInstance.set(0);
+                    amountFormattedInput.disabled = true;
+                    amountFormattedInput.required = false;
+                    paymentMethodSelect.disabled = true;
+                    paymentMethodSelect.required = false;
+                    paymentMethodSelect.value = "";
+                } else {
+                    // Kredit kurang: isi kekurangan, aktif, wajib
+                    const shortfall = remainingBalance - currentCreditBalance;
+                    autoNumericInstance.set(shortfall);
+                    amountFormattedInput.disabled = false;
+                    amountFormattedInput.required = true;
+                    paymentMethodSelect.disabled = false;
+                    paymentMethodSelect.required = true;
+                    if (!paymentMethodSelect.value) paymentMethodSelect.value = "manual_transfer";
+                }
+            } else {
+                // Tidak pakai kredit: isi penuh, aktif, wajib
+                autoNumericInstance.set(remainingBalance);
+                amountFormattedInput.disabled = false;
+                amountFormattedInput.required = true;
+                paymentMethodSelect.disabled = false;
+                // Metode wajib jika dana > 0
+                paymentMethodSelect.required = inputAmountValue > 0 || remainingBalance > 0; 
+                if (paymentMethodSelect.required && !paymentMethodSelect.value) paymentMethodSelect.value = "manual_transfer";
+            }
+            // Perbarui nilai max
+            autoNumericInstance.update({ maximumValue: remainingBalance });
+        }
+
+        // Listener saat tombol "Catat Pembayaran" diklik
         if (addPaymentBtn) {
             addPaymentBtn.addEventListener('click', function() {
-                const remainingBalance = {{ ($invoice->total_amount - $invoice->returns->sum('total_amount') - $invoice->amount_paid) ?? 0 }};
-                autoNumericInstance.set(remainingBalance);
-                amountHiddenInput.value = remainingBalance;
-                autoNumericInstance.update({ maximumValue: remainingBalance });
+                // Auto-centang jika ada kredit
+                if (useCreditCheckbox) {
+                    useCreditCheckbox.checked = true;
+                }
+                toggleRequiredFields(); // Atur state awal
                 amountError.textContent = '';
             });
-
-            amountFormattedInput.addEventListener('autoNumeric:rawValueModified', function(event) {
-                const rawValue = event.detail.newRawValue;
-                amountHiddenInput.value = rawValue;
-                const remainingBalance = {{ ($invoice->total_amount - $invoice->returns->sum('total_amount') - $invoice->amount_paid) ?? 0 }};
-                if (parseFloat(rawValue) > remainingBalance) {
-                    amountError.textContent = 'Jumlah pembayaran tidak boleh melebihi sisa tagihan!';
-                } else {
-                    amountError.textContent = '';
-                }
-            });
         }
+
+        // Listener saat checkbox kredit diganti
+        if (useCreditCheckbox) {
+            useCreditCheckbox.addEventListener('change', toggleRequiredFields);
+        }
+
+        // Listener saat input amount diubah
+        amountFormattedInput.addEventListener('autoNumeric:rawValueModified', function(event) {
+            const rawValue = event.detail.newRawValue;
+            amountHiddenInput.value = rawValue;
+            
+            // Atur ulang required untuk metode bayar
+            if (useCreditCheckbox && !useCreditCheckbox.checked) {
+                 paymentMethodSelect.required = parseFloat(rawValue || 0) > 0;
+            }
+
+            // Cek overpayment
+            const totalPayment = (useCreditCheckbox && useCreditCheckbox.checked ? currentCreditBalance : 0) + parseFloat(rawValue || 0);
+            if (totalPayment > remainingBalance) {
+                amountError.textContent = 'Total pembayaran (termasuk kredit) melebihi sisa tagihan!';
+            } else {
+                amountError.textContent = '';
+            }
+        });
     }
 });
 </script>
