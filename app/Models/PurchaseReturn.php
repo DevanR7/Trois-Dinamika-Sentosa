@@ -20,6 +20,7 @@ class PurchaseReturn extends Model
         'purchase_order_id',
         'user_id',
         'return_date',
+        'return_handling_type',
         'notes',
         'total_amount',
     ];

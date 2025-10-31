@@ -65,13 +65,26 @@ class ClientController extends Controller
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
+        $validated['is_approved'] = false;
         Client::create($validated);
         return redirect()->route('clients.index')->with('success', 'Klien baru berhasil ditambahkan.');
     }
 
     public function show(Client $client): View
     {
-        return view('clients.show', compact('client'));
+        // $this->authorize('view', $client);
+
+        // Load relasi ledgers dengan paginasi, urutkan dari yg terbaru
+        // Kita beri nama 'ledger_page' agar tidak bentrok jika ada paginasi lain
+        $ledgers = $client->ledgers()
+                         ->latest('transaction_date')
+                         ->latest('ledger_id') // Urutan kedua untuk transaksi di hari yg sama
+                         ->paginate(10, ['*'], 'ledger_page'); 
+
+        // Anda tidak perlu memuat $recentInvoices di sini karena
+        // view Anda sudah melakukannya dengan: $client->salesInvoices()->...
+                         
+        return view('clients.show', compact('client', 'ledgers'));
     }
 
     public function edit(Client $client): View

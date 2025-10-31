@@ -15,6 +15,9 @@ return new class extends Migration
             $table->foreignId('sales_invoice_id')->constrained('sales_invoices', 'invoice_id');
             $table->foreignId('user_id')->comment('User yang memproses retur')->constrained('users', 'user_id');
             $table->date('return_date');
+            $table->enum('return_handling_type', ['deduct_invoice', 'store_as_credit'])
+                  ->default('deduct_invoice')
+                  ->comment('Aksi: potong tagihan atau simpan jadi kredit');
             $table->text('notes')->nullable();
             $table->decimal('total_amount', 15, 2);
             $table->timestamps();

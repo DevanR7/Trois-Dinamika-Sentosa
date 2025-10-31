@@ -85,7 +85,7 @@ class SalesInvoice extends Model
     public function taxes()
     {
         return $this->belongsToMany(Tax::class, 'invoice_tax', 'invoice_id', 'tax_id')
-                        ->withPivot('name', 'rate', 'amount');
+                    ->withPivot('name', 'rate', 'amount');
     }
 
     /**
@@ -147,10 +147,56 @@ class SalesInvoice extends Model
     }
 
     /**
-     * Relasi ke retur penjualan.
+     * Relasi ke SEMUA retur penjualan.
      */
     public function returns(): HasMany
     {
         return $this->hasMany(SalesReturn::class, 'sales_invoice_id', 'invoice_id');
     }
+
+    // ========================================================================
+    // ✅ PERBAIKAN UNTUK KONDISI 1 DIMULAI DI SINI
+    // ========================================================================
+
+    /**
+     * BARU: Relasi HANYA ke SalesReturn yang memotong tagihan (deduct_invoice).
+     * Ini yang akan kita gunakan untuk menghitung sisa tagihan.
+     */
+    public function deductingReturns(): HasMany
+    {
+        return $this->hasMany(SalesReturn::class, 'sales_invoice_id', 'invoice_id')
+                    ->where('return_handling_type', 'deduct_invoice');
+    }
+
+    /**
+     * BARU: Accessor untuk mendapatkan total nilai retur yang HANYA memotong tagihan.
+     * Anda bisa memanggil ini di view/controller dengan: $invoice->total_deducting_returns
+     *
+     * @return float
+     */
+    public function getTotalDeductingReturnsAttribute(): float
+    {
+        // 'deductingReturns' adalah nama relasi yang kita buat di atas.
+        return $this->deductingReturns()->sum('total_amount');
+    }
+    
+    /**
+     * BARU: Accessor untuk mendapatkan sisa tagihan yang belum dibayar.
+     * Ini adalah cara terbaik untuk menampilkan sisa tagihan di view.
+     * Anda bisa memanggil ini di view/controller dengan: $invoice->remaining_balance
+     *
+     * @return float
+     */
+    public function getRemainingBalanceAttribute(): float
+    {
+        // Menggunakan accessor 'total_deducting_returns' yang sudah kita buat.
+        // Logika sisa tagihan sekarang terpusat di sini.
+        $sisaTagihan = $this->total_amount - $this->amount_paid - $this->total_deducting_returns;
+        
+        return $sisaTagihan;
+    }
+
+    // ========================================================================
+    // 🛑 PERBAIKAN UNTUK KONDISI 1 SELESAI
+    // ========================================================================
 }

@@ -45,6 +45,25 @@
                             <label for="notes" class="form-label fw-semibold">Catatan (Alasan Retur)</label>
                             <textarea class="form-control" name="notes" id="notes" rows="3"></textarea>
                         </div>
+                        <div class="mt-4">
+                            <label class="form-label fw-semibold">Aksi Penanganan Retur</label>
+                            <div class="border rounded p-3 bg-light">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="return_handling_type" id="deduct_invoice" value="deduct_invoice" checked>
+                                    <label class="form-check-label" for="deduct_invoice">
+                                        <strong>Potong Tagihan PO</strong>
+                                    </label>
+                                    <div class="form-text mt-0">Nilai retur akan mengurangi sisa hutang pada PO asli. (Pilih ini jika PO belum lunas)</div>
+                                </div>
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="radio" name="return_handling_type" id="store_as_deposit" value="store_as_deposit">
+                                    <label class="form-check-label" for="store_as_deposit">
+                                        <strong>Simpan sebagai Saldo Deposit</strong>
+                                    </label>
+                                    <div class="form-text mt-0">Nilai retur akan ditambahkan ke saldo deposit supplier. (Pilih ini jika PO sudah lunas)</div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="d-flex justify-content-end mt-4">
                             <a href="{{ route('purchase-returns.index') }}" class="btn btn-secondary me-2">Batal</a>
                             <button type="submit" class="btn btn-primary">Simpan Retur</button>
@@ -112,7 +131,6 @@ document.addEventListener('DOMContentLoaded', function () {
                             `;
                             const newRow = $(rowHTML);
 
-                            // Tambahkan event listener untuk validasi real-time
                             newRow.find('.return-qty-input').on('input', function() {
                                 const input = $(this);
                                 const errorMessage = newRow.find('.qty-error-message');
@@ -120,11 +138,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                 const maxValue = parseInt(input.attr('max'), 10);
 
                                 if (currentValue > maxValue) {
-                                    errorMessage.removeClass('d-none'); // Tampilkan error
-                                    input.addClass('is-invalid'); // Tambah border merah
+                                    errorMessage.removeClass('d-none');
+                                    input.addClass('is-invalid');
                                 } else {
-                                    errorMessage.addClass('d-none'); // Sembunyikan error
-                                    input.removeClass('is-invalid'); // Hapus border merah
+                                    errorMessage.addClass('d-none');
+                                    input.removeClass('is-invalid');
                                 }
                             });
                             

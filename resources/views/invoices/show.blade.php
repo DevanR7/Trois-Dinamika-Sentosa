@@ -24,13 +24,13 @@
                      <li><hr class="dropdown-divider"></li>
                      <li><a class="dropdown-item" href="{{ route('invoices.pdf', $invoice->invoice_id) }}"><i class="bi bi-file-earmark-pdf me-2"></i> Download PDF</a></li>
                      @if(!in_array($invoice->status, ['paid', 'cancelled']))
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <form action="{{ route('invoices.cancel', $invoice->invoice_id) }}" method="POST" onsubmit="return confirm('Anda yakin ingin membatalkan invoice ini?');">
-                                @csrf
-                                <button type="submit" class="dropdown-item text-danger"><i class="bi bi-x-circle me-2"></i> Batalkan Invoice</button>
-                            </form>
-                        </li>
+                         <li><hr class="dropdown-divider"></li>
+                         <li>
+                             <form action="{{ route('invoices.cancel', $invoice->invoice_id) }}" method="POST" onsubmit="return confirm('Anda yakin ingin membatalkan invoice ini?');">
+                                 @csrf
+                                 <button type="submit" class="dropdown-item text-danger"><i class="bi bi-x-circle me-2"></i> Batalkan Invoice</button>
+                             </form>
+                         </li>
                      @endif
                 </ul>
             </div>
@@ -226,15 +226,30 @@
                         <div class="d-flex justify-content-between fw-bold"><span>Total Tagihan</span><span>Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span></div>
                         <div class="d-flex justify-content-between text-success"><span>Sudah Dibayar</span><span>Rp {{ number_format($invoice->amount_paid, 0, ',', '.') }}</span></div>
                         @php
-                            $totalRetur = $invoice->returns->sum('total_amount');
-                            $sisaTagihan = $invoice->total_amount - $invoice->amount_paid - $totalRetur;
+                            // ✅ PERBAIKAN: Gunakan Accessor yang sudah kita buat
+                            $totalReturDipotong = $invoice->total_deducting_returns;
+
+                            // Sisa tagihan HANYA dikurangi retur yang dipotong
+                            $sisaTagihan = $invoice->remaining_balance;
+                            
+                            // (Opsional) Hitung retur yang jadi kredit, hanya untuk info
+                            $totalReturKredit = $invoice->returns
+                                ->where('return_handling_type', 'store_as_credit')
+                                ->sum('total_amount');
                         @endphp
-                        @if($totalRetur > 0)
-                            <div class="d-flex justify-content-between text-warning"><span>Total Retur</span><span>(-) Rp {{ number_format($totalRetur, 0, ',', '.') }}</span></div>
+                        
+                        {{-- Tampilkan HANYA retur yang dipotong --}}
+                        @if($totalReturDipotong > 0)
+                            <div class="d-flex justify-content-between text-warning"><span>Total Retur (Potong Tagihan)</span><span>(-) Rp {{ number_format($totalReturDipotong, 0, ',', '.') }}</span></div>
+                        @endif
+                        {{-- Tampilkan info jika ada retur yg jadi kredit --}}
+                        @if($totalReturKredit > 0)
+                            <div class="d-flex justify-content-between text-info small"><span>(Nilai retur jadi kredit: Rp {{ number_format($totalReturKredit, 0, ',', '.') }})</span></div>
                         @endif
                         <hr class="my-1">
                         <div class="d-flex justify-content-between fw-bold fs-5 {{ $sisaTagihan > 0 ? 'text-danger' : 'text-success' }}">
                             <span>Sisa Tagihan</span>
+                            {{-- Tampilkan variabel $sisaTagihan yang sudah benar --}}
                             <span>Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</span>
                         </div>
                     </div>
@@ -244,10 +259,6 @@
     </div>
 </div>
 
-{{-- MODAL PEMBAYARAN --}}
-{{-- ========================================================== --}}
-{{-- 1. GANTI SELURUH MODAL PEMBAYARAN ANDA DENGAN INI --}}
-{{-- ========================================================== --}}
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -255,16 +266,16 @@
             <form action="{{ route('payments.store', $invoice->invoice_id) }}" method="POST">
                 @csrf
                 <div class="modal-body">
-                    @php
-                        $totalRetur = $invoice->returns->sum('total_amount');
-                        $sisaTagihan = $invoice->total_amount - $invoice->amount_paid - $totalRetur;
-                        $saldoKreditKlien = $invoice->client->credit_balance ?? 0;
-                    @endphp
+                @php
+                    $sisaTagihan = $invoice->remaining_balance; 
+                    $saldoKreditKlien = $invoice->client->balance;
+                @endphp
                     
                     {{-- Info Sisa Tagihan --}}
                     <div class="alert alert-info">
                         <div class="d-flex justify-content-between"><span>Total Tagihan:</span><span>Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span></div>
-                        @if($totalRetur > 0)<div class="d-flex justify-content-between"><span>Total Retur:</span><span>(-) Rp {{ number_format($totalRetur, 0, ',', '.') }}</span></div>@endif
+                        {{-- Tampilkan HANYA retur pemotong --}}
+                        @if($totalReturDipotong > 0)<div class="d-flex justify-content-between"><span>Total Retur (Potong):</span><span>(-) Rp {{ number_format($totalReturDipotong, 0, ',', '.') }}</span></div>@endif
                         <div class="d-flex justify-content-between"><span>Sudah Dibayar:</span><span>(+) Rp {{ number_format($invoice->amount_paid, 0, ',', '.') }}</span></div>
                         <hr class="my-1"><div class="d-flex justify-content-between fw-bold"><span>Sisa Tagihan:</span><span id="modal-sisa-tagihan-display">Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</span></div>
                     </div>
@@ -337,9 +348,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const useCreditCheckbox = document.getElementById('modal-use-credit');
     const paymentMethodSelect = document.getElementById('payment_method');
     
-    // Nilai-nilai
-    const remainingBalance = {{ ($invoice->total_amount - $invoice->returns->sum('total_amount') - $invoice->amount_paid) ?? 0 }};
-    const currentCreditBalance = {{ $invoice->client->credit_balance ?? 0 }};
+    // ===============================================
+    // ✅ PERBAIKAN 2 DI SINI
+    // ===============================================
+    
+    // Nilai-nilai (Gunakan accessor 'remaining_balance')
+    const remainingBalance = {{ $invoice->remaining_balance ?? 0 }};
+    const currentCreditBalance = {{ $invoice->client->balance ?? 0 }};
 
     if (amountFormattedInput) {
         // Inisialisasi AutoNumeric

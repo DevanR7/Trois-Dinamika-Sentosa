@@ -42,12 +42,16 @@
                         <dt class="col-sm-4">Tanggal Registrasi</dt>
                         <dd class="col-sm-8">{{ $client->created_at->isoFormat('dddd, D MMMM YYYY') }}</dd>
                         
+                        {{-- =============================================== --}}
+                        {{-- ✅ PERBAIKAN DI SINI: Gunakan Accessor 'balance' --}}
+                        {{-- =============================================== --}}
                         <dt class="col-sm-4 pt-2 border-top mt-2">Saldo Kredit</dt>
                         <dd class="col-sm-8 pt-2 border-top mt-2">
-                            <span class="fw-bold {{ $client->credit_balance > 0 ? 'text-success' : '' }}">
-                                Rp {{ number_format($client->credit_balance ?? 0, 0, ',', '.') }}
+                            <span class="fw-bold {{ $client->balance > 0 ? 'text-success' : '' }}">
+                                Rp {{ number_format($client->balance ?? 0, 0, ',', '.') }}
                             </span>
                         </dd>
+                        {{-- =============================================== --}}
                         
                     </dl>
                 </div>
@@ -109,7 +113,73 @@
                 </div>
                 @endif
             </div>
-        </div>
+
+            {{-- =============================================== --}}
+            {{-- ✅ TAMBAHAN BARU: Card untuk Riwayat Saldo (Ledger) --}}
+            {{-- =============================================== --}}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Riwayat Saldo Kredit (Ledger)</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Deskripsi</th>
+                                    <th class="text-end">Kredit (Masuk)</th>
+                                    <th class="text-end">Debit (Keluar)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($ledgers as $ledger)
+                                    <tr>
+                                        <td>{{ $ledger->transaction_date->format('d M Y') }}</td>
+                                        <td>
+                                            {{ $ledger->description }}
+                                            {{-- Link ke referensi jika ada --}}
+                                            @if($ledger->reference_type === \App\Models\SalesReturn::class && $ledger->reference)
+                                                <a href="{{ route('sales-returns.show', $ledger->reference_id) }}" class="d-block small" target="_blank">Lihat Retur</a>
+                                            @elseif($ledger->reference_type === \App\Models\Payment::class && $ledger->reference)
+                                                <a href="{{ route('invoices.show', $ledger->reference->salesInvoice->invoice_id) }}" class="d-block small" target="_blank">Lihat Invoice #{{ $ledger->reference->salesInvoice->invoice_number }}</a>
+                                            @elseif($ledger->reference_type === \App\Models\BatchPayment::class && $ledger->reference)
+                                                <span class="d-block small text-muted">Ref: Pembayaran Batch #{{ $ledger->reference_id }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-end text-success">
+                                            @if($ledger->type == 'credit' && $ledger->amount > 0)
+                                                Rp {{ number_format($ledger->amount, 0, ',', '.') }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="text-end text-danger">
+                                            @if($ledger->type == 'debit' && $ledger->amount < 0)
+                                                Rp {{ number_format(abs($ledger->amount), 0, ',', '.') }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4" class="text-center py-4">Belum ada riwayat transaksi saldo kredit.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                @if($ledgers->hasPages())
+                <div class="card-footer">
+                    {{-- Tampilkan link paginasi (menggunakan nama 'ledger_page' kustom) --}}
+                    {{ $ledgers->links() }}
+                </div>
+                @endif
+            </div>
+
+        </div> {{-- Tutup col-lg-8 --}}
 
         {{-- Kolom Kanan: Status dan Tombol Tindakan --}}
         <div class="col-lg-4">

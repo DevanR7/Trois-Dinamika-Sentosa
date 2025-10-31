@@ -62,9 +62,9 @@
                                 @endif
                             </td>
                             <td class="text-end">
-                                @if($client->credit_balance > 0)
+                                @if($client->balance > 0)
                                     <span class="text-success fw-bold">
-                                        Rp {{ number_format($client->credit_balance, 0, ',', '.') }}
+                                        Rp {{ number_format($client->balance, 0, ',', '.') }}
                                     </span>
                                 @else
                                     Rp 0

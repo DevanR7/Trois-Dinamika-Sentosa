@@ -20,6 +20,7 @@ class SalesReturn extends Model
         'sales_invoice_id',
         'user_id',
         'return_date',
+        'return_handling_type',
         'notes',
         'total_amount',
     ];

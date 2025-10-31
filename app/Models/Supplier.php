@@ -22,7 +22,6 @@ class Supplier extends Model
         'npwp',
         'bank_name',
         'account_number',
-        'debit_balance',
     ];
     /**
      * Mendapatkan semua produk yang disuplai oleh supplier ini.
@@ -43,5 +42,22 @@ class Supplier extends Model
     public function batchPurchasePayments(): HasMany
     {
         return $this->hasMany(BatchPurchasePayment::class, 'supplier_id', 'supplier_id');
+    }
+
+    public function ledgers(): HasMany
+    {
+        return $this->hasMany(SupplierLedger::class, 'supplier_id', 'supplier_id');
+    }
+
+    /**
+     * Accessor untuk mendapatkan saldo deposit (debit) kita saat ini.
+     * Panggil ini di view/controller: $supplier->balance
+     *
+     * @return float
+     */
+    public function getBalanceAttribute(): float
+    {
+        // Menjumlahkan semua transaksi (kredit positif, debit negatif)
+        return $this->ledgers()->sum('amount');
     }
 }

@@ -93,4 +93,21 @@ class Client extends Authenticatable implements CanResetPassword
     {
         return $this->belongsToMany(Announcement::class, 'announcement_client', 'client_id', 'announcement_id');
     }
+
+    public function ledgers(): HasMany
+    {
+        return $this->hasMany(ClientLedger::class, 'client_id', 'client_id');
+    }
+
+    /**
+     * Accessor untuk mendapatkan saldo kredit saat ini.
+     * Panggil ini di view/controller: $client->balance
+     *
+     * @return float
+     */
+    public function getBalanceAttribute(): float
+    {
+        // Menjumlahkan semua transaksi (kredit positif, debit negatif)
+        return $this->ledgers()->sum('amount');
+    }
 }

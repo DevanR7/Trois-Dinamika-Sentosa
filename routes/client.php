@@ -36,7 +36,8 @@ Route::prefix('client')->name('client.')->group(function () {
     });
 
     // === SUDAH LOGIN ===
-    Route::middleware(['auth:client', CheckClientLockStatus::class])->group(function () {
+    Route::middleware(['auth:client', CheckClientLockStatus::class, 'client.approved'])
+     ->group(function () {
         Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
         Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
