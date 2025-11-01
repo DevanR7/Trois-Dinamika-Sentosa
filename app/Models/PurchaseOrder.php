@@ -124,8 +124,48 @@ class PurchaseOrder extends Model
     return $this->hasMany(PurchaseOrderPayment::class, 'po_id', 'po_id');
     }
 
-public function returns(): HasMany
+    public function returns(): HasMany
     {
         return $this->hasMany(PurchaseReturn::class, 'purchase_order_id', 'po_id');
+    }
+
+    public function deductingReturns(): HasMany
+    {
+        return $this->hasMany(PurchaseReturn::class, 'purchase_order_id', 'po_id')
+                    ->where('return_handling_type', 'deduct_invoice');
+    }
+
+    public function adjustments(): HasMany
+    {
+        return $this->hasMany(PurchaseOrderAdjustment::class, 'purchase_order_id', 'po_id');
+    }
+
+    /**
+     * Accessor untuk mendapatkan sisa utang yang belum dibayar.
+     * Ini adalah SATU-SATUNYA sumber kebenaran untuk sisa utang.
+     *
+     * @return float
+     */
+    public function getRemainingBalanceAttribute(): float
+    {
+        // 1. Mulai dengan total tagihan asli
+        $balance = $this->total_amount;
+
+        // 2. Tambahkan semua Nota Debit (Kita ditagih lebih)
+        $totalDebitNotes = $this->adjustments()->where('type', 'debit_note')->sum('amount');
+        $balance += $totalDebitNotes;
+
+        // 3. Kurangi semua pembayaran
+        $balance -= $this->amount_paid;
+        
+        // 4. Kurangi semua retur yang "Potong Nota"
+        // Kita gunakan $this->total_returned karena controller Anda sudah mengisinya dengan benar
+        $balance -= $this->total_returned; 
+
+        // 5. Kurangi semua Nota Kredit (Kita dapat diskon/potongan)
+        $totalCreditNotes = $this->adjustments()->where('type', 'credit_note')->sum('amount');
+        $balance -= $totalCreditNotes;
+        
+        return max(0, $balance); // Pastikan tidak pernah negatif
     }
 }

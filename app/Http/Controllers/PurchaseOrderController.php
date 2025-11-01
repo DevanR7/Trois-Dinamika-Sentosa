@@ -207,10 +207,22 @@
             }
         }
         
-        public function show(PurchaseOrder $purchaseOrder)
+    public function show(PurchaseOrder $purchaseOrder)
     {
-        $this->authorize('view', $purchaseOrder); // Bisa kita aktifkan nanti
-        $purchaseOrder->load(['supplier', 'requester', 'items.product.unit']);
+        $this->authorize('view', $purchaseOrder);
+        
+        // ======================================================
+        // ✅ PERBAIKAN DI SINI: TAMBAHKAN 'adjustments' dan 'returns'
+        // ======================================================
+        $purchaseOrder->load([
+            'supplier', 
+            'requester', 
+            'items.product.unit', 
+            'adjustments.user', // Muat penyesuaian & user pembuatnya
+            'returns'           // Muat retur (untuk info retur deposit)
+        ]);
+        // ======================================================
+        
         return view('purchase_orders.show', compact('purchaseOrder'));
     }
 

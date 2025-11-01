@@ -1,5 +1,24 @@
 @extends('layouts.app')
 
+{{-- ==================================================================== --}}
+{{-- ✅ BLOK PHP GLOBAL UNTUK SEMUA PERHITUANGAN (WAJIB DI ATAS) --}}
+{{-- ==================================================================== --}}
+@php
+    // Definisikan semua variabel di sini, di bagian atas
+    
+    // 1. Untuk Ringkasan Keuangan
+    $sisaTagihan = $invoice->remaining_balance;
+    $totalReturDipotong = $invoice->total_deducting_returns;
+    $totalReturKredit = $invoice->returns
+        ->where('return_handling_type', 'store_as_credit')
+        ->sum('total_amount');
+    
+    // 2. Untuk Modal Pembayaran
+    $saldoKreditKlien = $invoice->client->balance;
+@endphp
+{{-- ==================================================================== --}}
+
+
 @section('content')
 <div class="container py-4">
     {{-- HEADER HALAMAN DENGAN TOMBOL AKSI --}}
@@ -9,7 +28,8 @@
         <div class="d-flex flex-wrap justify-content-end gap-2">
             <a href="{{ route('invoices.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Kembali</a>
             
-            @if(!in_array($invoice->status, ['paid', 'cancelled']))
+            {{-- Gunakan variabel $sisaTagihan yang sudah didefinisikan di atas --}}
+            @if(!in_array($invoice->status, ['cancelled']) && $sisaTagihan > 0.01)
                 <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal" id="add-payment-btn">
                     <i class="bi bi-cash-coin me-1"></i> Catat Pembayaran
                 </button>
@@ -21,6 +41,12 @@
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
                      <li><a class="dropdown-item" href="{{ route('invoices.edit', $invoice->invoice_id) }}"><i class="bi bi-pencil-square me-2"></i> Edit Invoice</a></li>
+                     <li><hr class="dropdown-divider"></li>
+                     <li>
+                         <a class="dropdown-item" href="{{ route('invoice-adjustments.create', ['sales_invoice_id' => $invoice->invoice_id]) }}">
+                             <i class="bi bi-file-earmark-diff me-2"></i> Buat Penyesuaian
+                         </a>
+                     </li>
                      <li><hr class="dropdown-divider"></li>
                      <li><a class="dropdown-item" href="{{ route('invoices.pdf', $invoice->invoice_id) }}"><i class="bi bi-file-earmark-pdf me-2"></i> Download PDF</a></li>
                      @if(!in_array($invoice->status, ['paid', 'cancelled']))
@@ -90,7 +116,7 @@
             </div>
 
             {{-- =============================================== --}}
-            {{-- BAGIAN BARU: VERIFIKASI BUKTI PEMBAYARAN --}}
+            {{-- VERIFIKASI BUKTI PEMBAYARAN --}}
             {{-- =============================================== --}}
             @php
     $pendingPayments = $invoice->payments->where('status', 'pending_verification');
@@ -120,7 +146,6 @@
                     @if($payment->payment_method == 'manual_transfer' && $payment->proof_of_payment_path)
                         <a href="{{ asset('storage/' . $payment->proof_of_payment_path) }}" target="_blank" class="btn btn-sm btn-outline-info">Lihat Bukti</a>
                     @elseif($payment->payment_method == 'cash' && $payment->receivedBy)
-                        {{-- TOMBOL BARU DENGAN POPOVER --}}
                         <button type="button" class="btn btn-sm btn-outline-secondary" 
                                 data-bs-toggle="popover" 
                                 data-bs-title="Diterima Oleh" 
@@ -150,8 +175,61 @@
 </div>
 @endif
 
+            {{-- ====================================================== --}}
+            {{-- ✅ POSISI BARU: RIWAYAT PENYESUAIAN --}}
+            {{-- ====================================================== --}}
+            @if($invoice->adjustments->isNotEmpty())
+            <h5 class="fw-semibold mt-4">Riwayat Penyesuaian (Koreksi)</h5>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered table-warning">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Tanggal</th>
+                            <th>Tipe</th>
+                            <th class="text-end">Nilai</th>
+                            <th>Alasan</th>
+                            <th>Dibuat Oleh</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($invoice->adjustments as $adjustment)
+                        <tr>
+                            <td>{{ $adjustment->adjustment_date->format('d M Y') }}</td>
+                            <td>
+                                @if($adjustment->type == 'credit_note')
+                                    <span class="badge bg-success">Nota Kredit</span>
+                                @else
+                                    <span class="badge bg-danger">Nota Debit</span>
+                                @endif
+                            </td>
+                            <td class="text-end fw-bold">
+                                Rp {{ number_format($adjustment->amount, 0, ',', '.') }}
+                            </td>
+                            <td>{{ $adjustment->reason }}</td>
+                            <td>{{ $adjustment->user->full_name ?? 'N/A' }}</td>
+                            <td>
+                                <form action="{{ route('invoice-adjustments.destroy', $adjustment->adjustment_id) }}" method="POST" class="form-cancel-adjustment">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-xs btn-danger" title="Batalkan Penyesuaian">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            @endif
+            {{-- ====================================================== --}}
+            {{-- 🛑 AKHIR BLOK PENYESUAIAN --}}
+            {{-- ====================================================== --}}
+
+
             {{-- =============================================== --}}
-            {{-- BAGIAN BARU: RIWAYAT PEMBAYARAN --}}
+            {{-- RIWAYAT PEMBAYARAN --}}
             {{-- =============================================== --}}
             <h5 class="fw-semibold mt-4">Riwayat Pembayaran</h5>
             <div class="table-responsive">
@@ -196,7 +274,7 @@
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="5" class="text-center text-muted">Belum ada riwayat pembayaran.</td>
+                            <td colspan="6" class="text-center text-muted">Belum ada riwayat pembayaran.</td>
                         </tr>
                         @endforelse
                     </tbody>
@@ -224,32 +302,31 @@
                         @endforeach
                         <hr class="my-1">
                         <div class="d-flex justify-content-between fw-bold"><span>Total Tagihan</span><span>Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span></div>
-                        <div class="d-flex justify-content-between text-success"><span>Sudah Dibayar</span><span>Rp {{ number_format($invoice->amount_paid, 0, ',', '.') }}</span></div>
-                        @php
-                            // ✅ PERBAIKAN: Gunakan Accessor yang sudah kita buat
-                            $totalReturDipotong = $invoice->total_deducting_returns;
-
-                            // Sisa tagihan HANYA dikurangi retur yang dipotong
-                            $sisaTagihan = $invoice->remaining_balance;
-                            
-                            // (Opsional) Hitung retur yang jadi kredit, hanya untuk info
-                            $totalReturKredit = $invoice->returns
-                                ->where('return_handling_type', 'store_as_credit')
-                                ->sum('total_amount');
-                        @endphp
                         
-                        {{-- Tampilkan HANYA retur yang dipotong --}}
+                        {{-- Tampilkan HANYA retur yang dipotong (Variabel dari @php di atas) --}}
                         @if($totalReturDipotong > 0)
                             <div class="d-flex justify-content-between text-warning"><span>Total Retur (Potong Tagihan)</span><span>(-) Rp {{ number_format($totalReturDipotong, 0, ',', '.') }}</span></div>
                         @endif
-                        {{-- Tampilkan info jika ada retur yg jadi kredit --}}
+                        {{-- Tampilkan Nota Penyesuaian --}}
+                        @foreach ($invoice->adjustments as $adjustment)
+                             <div class="d-flex justify-content-between {{ $adjustment->type == 'credit_note' ? 'text-success' : 'text-danger' }}">
+                                <span>{{ $adjustment->type == 'credit_note' ? 'Nota Kredit (Potongan)' : 'Nota Debit (Tambahan)' }}</span>
+                                <span>{{ $adjustment->type == 'credit_note' ? '(-)' : '(+)' }} Rp {{ number_format($adjustment->amount, 0, ',', '.') }}</span>
+                             </div>
+                        @endforeach
+
+                        <hr class="my-1">
+                        <div class="d-flex justify-content-between text-success"><span>Sudah Dibayar</span><span>Rp {{ number_format($invoice->amount_paid, 0, ',', '.') }}</span></div>
+                        
+                        {{-- Tampilkan info jika ada retur yg jadi kredit (Variabel dari @php di atas) --}}
                         @if($totalReturKredit > 0)
                             <div class="d-flex justify-content-between text-info small"><span>(Nilai retur jadi kredit: Rp {{ number_format($totalReturKredit, 0, ',', '.') }})</span></div>
                         @endif
                         <hr class="my-1">
-                        <div class="d-flex justify-content-between fw-bold fs-5 {{ $sisaTagihan > 0 ? 'text-danger' : 'text-success' }}">
+                        
+                        {{-- Tampilkan variabel $sisaTagihan (dari @php di atas) --}}
+                        <div class="d-flex justify-content-between fw-bold fs-5 {{ $sisaTagihan > 0.01 ? 'text-danger' : 'text-success' }}">
                             <span>Sisa Tagihan</span>
-                            {{-- Tampilkan variabel $sisaTagihan yang sudah benar --}}
                             <span>Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</span>
                         </div>
                     </div>
@@ -265,19 +342,40 @@
             <div class="modal-header"><h5 class="modal-title">Catat Pembayaran untuk #{{ $invoice->invoice_number }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <form action="{{ route('payments.store', $invoice->invoice_id) }}" method="POST">
                 @csrf
+                
+                {{-- =================================== --}}
+                {{-- ✅ INI ADALAH BAGIAN YANG DIPERBARUI --}}
+                {{-- =================================== --}}
                 <div class="modal-body">
-                @php
-                    $sisaTagihan = $invoice->remaining_balance; 
-                    $saldoKreditKlien = $invoice->client->balance;
-                @endphp
+                    
+                    {{-- Variabel $sisaTagihan, $saldoKreditKlien, dll. --}}
+                    {{-- sudah didefinisikan di blok @php di atas halaman --}}
                     
                     {{-- Info Sisa Tagihan --}}
                     <div class="alert alert-info">
-                        <div class="d-flex justify-content-between"><span>Total Tagihan:</span><span>Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span></div>
-                        {{-- Tampilkan HANYA retur pemotong --}}
-                        @if($totalReturDipotong > 0)<div class="d-flex justify-content-between"><span>Total Retur (Potong):</span><span>(-) Rp {{ number_format($totalReturDipotong, 0, ',', '.') }}</span></div>@endif
-                        <div class="d-flex justify-content-between"><span>Sudah Dibayar:</span><span>(+) Rp {{ number_format($invoice->amount_paid, 0, ',', '.') }}</span></div>
-                        <hr class="my-1"><div class="d-flex justify-content-between fw-bold"><span>Sisa Tagihan:</span><span id="modal-sisa-tagihan-display">Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</span></div>
+                        <div class="d-flex justify-content-between"><span>Total Tagihan Awal:</span><span>Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span></div>
+
+                        {{-- Tampilkan Penyesuaian (jika ada) --}}
+                        @foreach ($invoice->adjustments as $adjustment)
+                            <div class="d-flex justify-content-between {{ $adjustment->type == 'credit_note' ? 'text-success' : 'text-danger' }} small">
+                                <span>{{ $adjustment->type == 'credit_note' ? 'Nota Kredit (Potongan):' : 'Nota Debit (Tambahan):' }}</span>
+                                <span>{{ $adjustment->type == 'credit_note' ? '(-)' : '(+)' }} Rp {{ number_format($adjustment->amount, 0, ',', '.') }}</span>
+                            </div>
+                        @endforeach
+
+                        {{-- Tampilkan Retur Potong Nota (jika ada) --}}
+                        @if($totalReturDipotong > 0)
+                            <div class="d-flex justify-content-between text-warning small"><span>Total Retur (Potong):</span><span>(-) Rp {{ number_format($totalReturDipotong, 0, ',', '.') }}</span></div>
+                        @endif
+
+                        <hr class="my-1">
+                        <div class="d-flex justify-content-between small"><span>Sudah Dibayar:</span><span>(+) Rp {{ number_format($invoice->amount_paid, 0, ',', '.') }}</span></div>
+                        <hr class="my-1">
+                        
+                        <div class="d-flex justify-content-between fw-bold">
+                            <span>Sisa Tagihan:</span>
+                            <span id="modal-sisa-tagihan-display">Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</span>
+                        </div>
                     </div>
 
                     {{-- Info Saldo Kredit --}}
@@ -319,6 +417,10 @@
                         <textarea name="notes" id="notes" class="form-control" rows="2"></textarea>
                     </div>
                 </div>
+                {{-- =================================== --}}
+                {{-- 🛑 AKHIR DARI BAGIAN YANG DIPERBARUI --}}
+                {{-- =================================== --}}
+
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
                     <button type="submit" class="btn btn-primary">Simpan Pembayaran</button>
@@ -329,9 +431,6 @@
 </div>
 @endsection
 
-{{-- ========================================================== --}}
-{{-- 2. GANTI SELURUH @push('scripts') ANDA DENGAN INI --}}
-{{-- ========================================================== --}}
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script>
@@ -348,13 +447,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const useCreditCheckbox = document.getElementById('modal-use-credit');
     const paymentMethodSelect = document.getElementById('payment_method');
     
-    // ===============================================
-    // ✅ PERBAIKAN 2 DI SINI
-    // ===============================================
-    
-    // Nilai-nilai (Gunakan accessor 'remaining_balance')
-    const remainingBalance = {{ $invoice->remaining_balance ?? 0 }};
-    const currentCreditBalance = {{ $invoice->client->balance ?? 0 }};
+    // Nilai-nilai (Gunakan variabel dari @php di atas)
+    const remainingBalance = {{ $sisaTagihan ?? 0 }};
+    const currentCreditBalance = {{ $saldoKreditKlien ?? 0 }};
 
     if (amountFormattedInput) {
         // Inisialisasi AutoNumeric
@@ -398,8 +493,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 paymentMethodSelect.required = inputAmountValue > 0 || remainingBalance > 0; 
                 if (paymentMethodSelect.required && !paymentMethodSelect.value) paymentMethodSelect.value = "manual_transfer";
             }
-            // 🛑 HAPUS BATASAN MAXIMUM VALUE
-            // autoNumericInstance.update({ maximumValue: remainingBalance }); 
         }
 
         // Listener saat tombol "Catat Pembayaran" diklik
@@ -410,8 +503,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 toggleRequiredFields();
                 amountError.textContent = '';
-                // 🛑 HAPUS BATASAN MAXIMUM VALUE
-                // autoNumericInstance.update({ maximumValue: remainingBalance }); 
             });
         }
 
@@ -425,23 +516,45 @@ document.addEventListener('DOMContentLoaded', function() {
             const rawValue = event.detail.newRawValue;
             amountHiddenInput.value = rawValue;
             
-            // Atur ulang required untuk metode bayar
             if (useCreditCheckbox && !useCreditCheckbox.checked) {
                  paymentMethodSelect.required = parseFloat(rawValue || 0) > 0;
             }
 
-            // 🛑 HAPUS LOGIKA ERROR "TIDAK BOLEH MELEBIHI"
-            // Kita ingin mengizinkan overpayment
+            // Info overpayment (akan jadi saldo kredit)
             const totalPayment = (useCreditCheckbox && useCreditCheckbox.checked ? currentCreditBalance : 0) + parseFloat(rawValue || 0);
             if (totalPayment > remainingBalance) {
                 amountError.textContent = 'Info: Kelebihan bayar akan jadi saldo kredit.';
                 amountError.classList.remove('text-danger');
-                amountError.classList.add('text-success'); // Ganti jadi info
+                amountError.classList.add('text-success');
             } else {
                 amountError.textContent = '';
             }
         });
     }
+
+    // Script Swal untuk Batal Penyesuaian
+    const cancelAdjustmentForms = document.querySelectorAll('.form-cancel-adjustment');
+    
+    cancelAdjustmentForms.forEach(form => {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault(); // Hentikan submit form
+            
+            Swal.fire({
+                title: 'Anda Yakin?',
+                text: "Anda akan membatalkan penyesuaian ini. Sisa tagihan invoice akan dihitung ulang.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Batalkan!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    event.target.submit();
+                }
+            });
+        });
+    });
 });
 </script>
 @endpush

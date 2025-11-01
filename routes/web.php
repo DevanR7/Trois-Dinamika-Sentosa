@@ -219,6 +219,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $purchaseOrder->load('items.product.unit');
         return response()->json(['items' => $purchaseOrder->items]);
     });
+
+    Route::get('/invoice-adjustments/create', [App\Http\Controllers\InvoiceAdjustmentController::class, 'create'])
+         ->name('invoice-adjustments.create');
+    Route::post('/invoice-adjustments', [App\Http\Controllers\InvoiceAdjustmentController::class, 'store'])
+         ->name('invoice-adjustments.store');
+    Route::delete('/invoice-adjustments/{invoiceAdjustment}', [App\Http\Controllers\InvoiceAdjustmentController::class, 'destroy'])
+         ->name('invoice-adjustments.destroy');
+
+    Route::get('/purchase-order-adjustments/create', [App\Http\Controllers\PurchaseOrderAdjustmentController::class, 'create'])
+         ->name('purchase-order-adjustments.create');
+    Route::post('/purchase-order-adjustments', [App\Http\Controllers\PurchaseOrderAdjustmentController::class, 'store'])
+         ->name('purchase-order-adjustments.store');
+    Route::delete('/purchase-order-adjustments/{purchaseOrderAdjustment}', [App\Http\Controllers\PurchaseOrderAdjustmentController::class, 'destroy'])
+         ->name('purchase-order-adjustments.destroy');
 });
 
 require __DIR__.'/auth.php';

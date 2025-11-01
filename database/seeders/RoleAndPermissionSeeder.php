@@ -33,6 +33,12 @@ class RoleAndPermissionSeeder extends Seeder
         Permission::updateOrCreate(['name' => 'receive-purchase-orders']);
         Permission::updateOrCreate(['name' => 'pay-purchase-orders']);
         Permission::updateOrCreate(['name' => 'create-batch-purchase-payments']);
+        
+        // ===========================================
+        // ✅ TAMBAHKAN PERMISSION PO ADJUSTMENT DI SINI
+        // ===========================================
+        Permission::updateOrCreate(['name' => 'create-purchase-adjustments']);
+
 
         // Products
         Permission::updateOrCreate(['name' => 'view-products']);
@@ -52,6 +58,8 @@ class RoleAndPermissionSeeder extends Seeder
         Permission::updateOrCreate(['name' => 'edit-sales-orders']);
         Permission::updateOrCreate(['name' => 'delete-sales-orders']);
 
+        
+
         // Order Change Requests (From Client for Sales Orders)
         Permission::updateOrCreate(['name' => 'review-order-change-requests']);
 
@@ -67,12 +75,13 @@ class RoleAndPermissionSeeder extends Seeder
         Permission::updateOrCreate(['name' => 'delete-invoices']);
         Permission::updateOrCreate(['name' => 'cancel-invoices']);
         Permission::updateOrCreate(['name' => 'pay-invoices']);
-
-        // ===========================================
-        // ✅ PERMISSION BARU UNTUK BATCH PAYMENT
-        // ===========================================
         Permission::updateOrCreate(['name' => 'create-batch-payments']);
+        
         // ===========================================
+        // ✅ PINDAHKAN INVOICE ADJUSTMENT KE SINI
+        // ===========================================
+        Permission::updateOrCreate(['name' => 'create-invoice-adjustments']);
+
 
         // Sales Returns
         Permission::updateOrCreate(['name' => 'view-sales-returns']);
@@ -105,14 +114,16 @@ class RoleAndPermissionSeeder extends Seeder
         // === BERIKAN PERMISSION KE SETIAP ROLE ===
 
         // ADMIN & MANAJEMEN: Beri semua permission yang didefinisikan
-        // Karena permission baru sudah dibuat di atas, role ini akan otomatis mendapatkannya
+        // $allDefinedPermissions akan OTOMATIS mengambil 2 permission baru yang kita tambahkan di atas
         $allDefinedPermissions = Permission::pluck('name');
         $superadminRole->syncPermissions($allDefinedPermissions);
         $adminRole->syncPermissions($allDefinedPermissions);
         $manajemenRole->syncPermissions($allDefinedPermissions);
 
         // KASIR
-        // Jika Kasir juga boleh melakukan batch payment, tambahkan 'create-batch-payments' di sini
+        // ===========================================
+        // ✅ TAMBAHKAN 2 PERMISSION BARU KE KASIR
+        // ===========================================
         $kasirRole->syncPermissions([
             'view-dashboard',
             'view-suppliers', 'create-suppliers', 'edit-suppliers', 'delete-suppliers',
@@ -122,7 +133,9 @@ class RoleAndPermissionSeeder extends Seeder
             'view-sales-orders', 'create-sales-orders', 'edit-sales-orders', 'delete-sales-orders',
             'view-invoices', 'create-invoices', 'edit-invoices', 'delete-invoices', 'pay-invoices',
             'manage-settings','view-purchase-returns','view-sales-returns','create-batch-purchase-payments',
-            // 'create-batch-payments', // <-- Uncomment baris ini jika Kasir boleh
+            
+            'create-invoice-adjustments', // <-- TAMBAHKAN INI
+            'create-purchase-adjustments' // <-- TAMBAHKAN INI
         ]);
 
         // SALES

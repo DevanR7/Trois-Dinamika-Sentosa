@@ -9,25 +9,24 @@ use App\Models\Tax; // Pastikan Anda sudah memiliki model Tax
 class TaxSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Jalankan seeder untuk tabel taxes.
      */
     public function run(): void
     {
-        // Gunakan updateOrCreate untuk menghindari duplikat jika seeder dijalankan lagi
-        // Pengecekan akan dilakukan berdasarkan kolom 'name'
-        
+        // PPN 12%
         Tax::updateOrCreate(
-            ['name' => 'PPN 11%'], // Kolom untuk dicek
+            ['name' => 'PPN 12%'],
             [
-                'rate' => 11.00,
+                'rate' => 12.00,
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]
         );
 
+        // Tanpa Pajak
         Tax::updateOrCreate(
-            ['name' => 'Tanpa Pajak'], // Kolom untuk dicek
+            ['name' => 'Tanpa Pajak'],
             [
                 'rate' => 0.00,
                 'is_active' => true,
@@ -35,12 +34,13 @@ class TaxSeeder extends Seeder
                 'updated_at' => now(),
             ]
         );
-        
+
+        // PPh 23 (contoh pajak lain)
         Tax::updateOrCreate(
-            ['name' => 'PPh 23'], // Contoh pajak lain
+            ['name' => 'PPh 23'],
             [
                 'rate' => 2.00,
-                'is_active' => false, // Dibuat tidak aktif sebagai contoh
+                'is_active' => false,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]

@@ -189,14 +189,28 @@ class SalesInvoice extends Model
      */
     public function getRemainingBalanceAttribute(): float
     {
-        // Menggunakan accessor 'total_deducting_returns' yang sudah kita buat.
-        // Logika sisa tagihan sekarang terpusat di sini.
-        $sisaTagihan = $this->total_amount - $this->amount_paid - $this->total_deducting_returns;
+        // 1. Mulai dengan total tagihan asli
+        $balance = $this->total_amount;
+
+        // 2. Tambahkan semua Nota Debit (Kekurangan tagih)
+        $totalDebitNotes = $this->adjustments()->where('type', 'debit_note')->sum('amount');
+        $balance += $totalDebitNotes;
+
+        // 3. Kurangi semua pembayaran
+        $balance -= $this->amount_paid;
         
-        return $sisaTagihan;
+        // 4. Kurangi semua retur yang "Potong Nota"
+        $balance -= $this->total_deducting_returns; // Ini memanggil accessor di atas
+
+        // 5. Kurangi semua Nota Kredit (Kelebihan tagih)
+        $totalCreditNotes = $this->adjustments()->where('type', 'credit_note')->sum('amount');
+        $balance -= $totalCreditNotes;
+        
+        return max(0, $balance); // Pastikan tidak pernah negatif
     }
 
-    // ========================================================================
-    // 🛑 PERBAIKAN UNTUK KONDISI 1 SELESAI
-    // ========================================================================
+    public function adjustments(): HasMany
+    {
+        return $this->hasMany(InvoiceAdjustment::class, 'sales_invoice_id', 'invoice_id');
+    }
 }
