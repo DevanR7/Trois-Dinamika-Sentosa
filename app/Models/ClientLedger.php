@@ -15,11 +15,13 @@ class ClientLedger extends Model
 
     protected $fillable = [
         'client_id',
+        'sales_invoice_id',
         'reference_type',
         'reference_id',
         'transaction_date',
         'type',
         'amount',
+        'status',
         'description',
         'user_id',
     ];
@@ -51,5 +53,10 @@ class ClientLedger extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
+    }
+
+    public function salesInvoice(): BelongsTo
+    {
+        return $this->belongsTo(SalesInvoice::class, 'sales_invoice_id', 'invoice_id');
     }
 }

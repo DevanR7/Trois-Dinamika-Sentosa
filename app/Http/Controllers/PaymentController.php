@@ -38,11 +38,23 @@ class PaymentController extends Controller
         $client = $invoice->client;
         $danaDariInput = (float)($validated['amount'] ?? 0);
         $pakaiKredit = $validated['use_credit'] ?? false;
+        
+        // ✅ DIUBAH: Baca dari accessor 'balance' baru
+        $kreditAwalKlien = $client->balance; 
 
-        $kreditAwalKlien = $client->balance;
-        $totalRetur = $invoice->returns->sum('total_amount');
-
-        $sisaTagihan = $invoice->remaining_balance;
+        // ====================================================================
+        // ✅✅ INI ADALAH PERBAIKAN UTAMA UNTUK BUG ANDA ✅✅
+        // ====================================================================
+        
+        // HAPUS BARIS LAMA:
+        // $totalRetur = $invoice->returns->sum('total_amount');
+        // $sisaTagihan = $invoice->total_amount - $invoice->amount_paid - $totalRetur;
+        
+        // GANTI DENGAN INI:
+        // Gunakan accessor yang sudah benar (hanya menghitung retur potong tagihan)
+        $sisaTagihan = $invoice->remaining_balance; 
+        
+        // ====================================================================
         
         $kreditAkanDigunakan = 0;
         $danaInputAkanDigunakan = 0;
@@ -52,20 +64,33 @@ class PaymentController extends Controller
 
         DB::beginTransaction();
         try {
-            // 1. Hitung alokasi dana (Logika Anda sudah benar)
+            // 1. Hitung alokasi dana
             if ($pakaiKredit && $kreditAwalKlien > 0) {
+                // Berapa kredit yg bisa dipakai (maksimal sisa tagihan)
                 $kreditAkanDigunakan = min($kreditAwalKlien, $sisaTagihan);
             }
-            $sisaTagihanSetelahKredit = max(0, $sisaTagihan - $kreditAkanDigunakan);
-            $danaInputAkanDigunakan = min($danaDariInput, $sisaTagihanSetelahKredit);
-            $totalPembayaran = $kreditAkanDigunakan + $danaInputAkanDigunakan;
-            $sisaDanaInput = max(0, $danaDariInput - $danaInputAkanDigunakan); // Overpayment
 
-            if ($totalPembayaran <= 0.01) {
-                 throw new \Exception("Tidak ada dana (input/kredit) yang dialokasikan.");
+            // Berapa sisa tagihan setelah ditutup kredit
+            $sisaTagihanSetelahKredit = max(0, $sisaTagihan - $kreditAkanDigunakan);
+            
+            // Berapa dana input yg akan dipakai (maksimal sisa tagihan setelah kredit)
+            $danaInputAkanDigunakan = min($danaDariInput, $sisaTagihanSetelahKredit);
+
+            // Hitung total pembayaran
+            $totalPembayaran = $kreditAkanDigunakan + $danaInputAkanDigunakan;
+            
+            // Hitung sisa dana input (jika ada overpayment)
+            $sisaDanaInput = max(0, $danaDariInput - $danaInputAkanDigunakan);
+
+            // Cek jika tidak ada pembayaran sama sekali
+            if ($totalPembayaran <= 0.01 && $sisaDanaInput <= 0.01) {
+                 // Izinkan jika sisa tagihan 0 atau kurang (untuk kasus overpayment)
+                 if ($sisaTagihan > 0.01) {
+                     throw new \Exception("Tidak ada dana (input/kredit) yang dialokasikan.");
+                 }
             }
 
-            // 2. Tentukan log metode pembayaran (Logika Anda sudah benar)
+            // 2. Tentukan log metode pembayaran
             if ($kreditAkanDigunakan > 0) {
                 $metodeLog = ($danaInputAkanDigunakan > 0) ? 'Kredit + ' . $validated['payment_method'] : 'Kredit Klien';
             }
@@ -73,7 +98,6 @@ class PaymentController extends Controller
             // (Catatan log akan di-update di bawah)
 
             // 3. Catat pembayaran di tabel 'payments' DULU
-            // Kita butuh ID pembayaran untuk referensi ledger
             $payment = $invoice->payments()->create([
                 'amount' => $totalPembayaran, // Catat total yg dialokasikan
                 'payment_date' => $validated['payment_date'],
@@ -84,9 +108,6 @@ class PaymentController extends Controller
             ]);
 
             // 4. Proses Database (Ledger)
-            
-            // HAPUS INI: $client->decrement('credit_balance', $kreditAkanDigunakan);
-            // ✅ TAMBAHKAN INI: Buat entri ledger untuk KREDIT YANG DIGUNAKAN
             if ($kreditAkanDigunakan > 0) {
                 ClientLedger::create([
                     'client_id' => $client->client_id,
@@ -101,8 +122,6 @@ class PaymentController extends Controller
                 $catatanLog .= " Credit used: " . number_format($kreditAkanDigunakan);
             }
             
-            // HAPUS INI: $client->increment('credit_balance', $sisaDanaInput);
-            // ✅ TAMBAHKAN INI: Buat entri ledger untuk KELEBIHAN BAYAR (OVERPAYMENT)
             if ($sisaDanaInput > 0.01) {
                 ClientLedger::create([
                     'client_id' => $client->client_id,
@@ -110,26 +129,24 @@ class PaymentController extends Controller
                     'reference_id' => $payment->payment_id,
                     'transaction_date' => $validated['payment_date'],
                     'type' => 'credit',
-                    'amount' => $sisaDanaInput, // Jumlah positif (kredit)
+                    'amount' => $sisaDanaInput,
+                    'status' => 'available', // <-- Kelebihan bayar selalu available
                     'description' => 'Kelebihan bayar dari Invoice #' . $invoice->invoice_number,
                     'user_id' => Auth::id(),
                 ]);
-                $catatanLog .= " Overpayment: " . number_format($sisaDanaInput) . " returned to credit.";
+                $catatanLog .= ". Overpayment: " . number_format($sisaDanaInput) . " returned to credit.";
             }
 
             // Update catatan log di payment
             $payment->update(['notes' => $catatanLog]);
 
             // 5. Update total yang sudah dibayar di invoice terkait
-            // ✅ PERBAIKAN: Gunakan relasi, bukan query baru
             $totalPaid = $invoice->payments()->where('status', 'completed')->sum('amount');
             
             // 6. Cek dan update status invoice
-            // ✅ PERBAIKAN: Gunakan accessor sisaTagihan
-            // $sisaTagihanSetelahBayar = $invoice->total_amount - $totalPaid - $totalRetur;
-            // Kita perlu ambil ulang $invoice->remaining_balance karena amount_paid baru saja berubah
-            $invoice->refresh(); // Ambil data amount_paid terbaru
-            $sisaTagihanSetelahBayar = $invoice->remaining_balance; 
+            // Ambil ulang data retur potong tagihan
+            $totalReturDipotong = $invoice->deductingReturns()->sum('total_amount');
+            $sisaTagihanSetelahBayar = $invoice->total_amount - $totalPaid - $totalReturDipotong;
 
             $status = 'unpaid';
             if ($sisaTagihanSetelahBayar <= 0.01) { // Toleransi pembulatan
@@ -144,6 +161,15 @@ class PaymentController extends Controller
                 'status' => $status,
             ]);
 
+            if ($status == 'paid') {
+                ClientLedger::where('sales_invoice_id', $invoice->invoice_id)
+                            ->where('status', 'pending')
+                            ->update([
+                                'status' => 'available',
+                                'description' => DB::raw("REPLACE(description, ' (Ditahan)', '')") // Hapus tanda (Ditahan)
+                            ]);
+            }
+
             DB::commit();
 
             return redirect()->route('invoices.show', $invoice->invoice_id)
@@ -156,36 +182,49 @@ class PaymentController extends Controller
     }
 
     public function approve(Payment $payment): RedirectResponse
-{
-    if ($payment->status !== 'pending_verification') {
-        return back()->with('error', 'Pembayaran ini tidak sedang dalam status verifikasi.');
-    }
-
-    try {
-        DB::beginTransaction();
-
-        // 1. Ubah status pembayaran menjadi 'completed'
-        $payment->update(['status' => 'completed', 'received_by_user_id' => Auth::id()]);
-
-        // 2. Update invoice terkait
-        $invoice = $payment->salesInvoice;
-        $invoice->amount_paid += $payment->amount;
-
-        // 3. Cek dan update status invoice
-        if ($invoice->amount_paid >= $invoice->total_amount) {
-            $invoice->status = 'paid';
-        } else {
-            $invoice->status = 'partially_paid';
+    {
+        if ($payment->status !== 'pending_verification') {
+            return back()->with('error', 'Pembayaran ini tidak sedang dalam status verifikasi.');
         }
-        $invoice->save();
 
-        DB::commit();
-        return back()->with('success', 'Pembayaran berhasil disetujui.');
+        try {
+            DB::beginTransaction();
 
-    } catch (\Exception $e) {
-        DB::rollBack();
-        return back()->with('error', 'Gagal menyetujui pembayaran: ' . $e->getMessage());
-    }
+            // 1. Ubah status pembayaran menjadi 'completed'
+            $payment->update(['status' => 'completed', 'received_by_user_id' => Auth::id()]);
+
+            // 2. Update invoice terkait
+            $invoice = $payment->salesInvoice;
+            // Ambil total bayar dan retur potong tagihan
+            $totalPaid = $invoice->payments()->where('status', 'completed')->sum('amount');
+            $totalReturDipotong = $invoice->deductingReturns()->sum('total_amount');
+
+            // 3. Cek dan update status invoice
+            $sisaTagihan = $invoice->total_amount - $totalPaid - $totalReturDipotong;
+            if ($sisaTagihan <= 0.01) {
+                $invoice->status = 'paid';
+            } else {
+                $invoice->status = 'partially_paid';
+            }
+            $invoice->amount_paid = $totalPaid; // Update total amount_paid
+            $invoice->save();
+
+            if ($invoice->status == 'paid') {
+                ClientLedger::where('sales_invoice_id', $invoice->invoice_id)
+                            ->where('status', 'pending')
+                            ->update([
+                                'status' => 'available',
+                                'description' => DB::raw("REPLACE(description, ' (Ditahan)', '')")
+                            ]);
+            }
+
+            DB::commit();
+            return back()->with('success', 'Pembayaran berhasil disetujui.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Gagal menyetujui pembayaran: ' . $e->getMessage());
+        }
 }
 
 /**

@@ -15,11 +15,13 @@ class SupplierLedger extends Model
 
     protected $fillable = [
         'supplier_id',
+        'purchase_order_id',
         'reference_type',
         'reference_id',
         'transaction_date',
         'type',
         'amount',
+        'status',
         'description',
         'user_id',
     ];
@@ -51,5 +53,10 @@ class SupplierLedger extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
+    }
+
+    public function purchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id', 'po_id');
     }
 }

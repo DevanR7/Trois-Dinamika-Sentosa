@@ -6,14 +6,15 @@ use App\Models\Supplier;
 use App\Models\PurchaseOrder;
 use App\Models\BatchPurchasePayment;
 use App\Models\PurchaseOrderPayment;
-use App\Models\SupplierLedger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use App\Models\SupplierLedger;
 
 class BatchPurchasePaymentController extends Controller
 {
@@ -34,12 +35,14 @@ class BatchPurchasePaymentController extends Controller
     {
         $purchaseOrders = $supplier->purchaseOrders()
             ->whereIn('payment_status', ['unpaid', 'partially_paid'])
-            ->withSum('returns', 'total_amount')
+            // ✅ Gunakan total_returned yang sudah di-cache (sudah benar)
+            // ->withSum('returns', 'total_amount') // Tidak perlu join
             ->orderBy('due_date', 'asc')
             ->get();
 
         $posWithBalance = $purchaseOrders->map(function ($po) {
-            $totalRetur = $po->returns_sum_total_amount ?? 0;
+            // ✅ Gunakan kolom total_returned yang sudah benar
+            $totalRetur = $po->total_returned ?? 0;
             $sisaTagihan = $po->total_amount - $po->amount_paid - $totalRetur;
 
             return [
@@ -81,46 +84,49 @@ class BatchPurchasePaymentController extends Controller
             $supplier = Supplier::findOrFail($validated['supplier_id']);
             $danaDariInput = (float)($validated['total_amount'] ?? 0);
             $pakaiDeposit = $validated['use_debit_balance'] ?? false;
+            
+            // ✅ 1. BACA SALDO AVAILABLE
+            $depositAwalSupplier = $supplier->balance; // <-- Menggunakan accessor 'balance'
 
-            // ✅ Ganti ke accessor baru
-            $depositAwalSupplier = $supplier->balance;
-
-            // Ambil semua PO yang dipilih
+            // Ambil PO terpilih untuk hitung total tagihan
             $posDipilih = PurchaseOrder::whereIn('po_id', $validated['po_ids'])
-                ->withSum('returns', 'total_amount')
-                ->orderBy('due_date', 'asc')
-                ->get();
+                                // ->withSum('returns', 'total_amount') // Tidak perlu
+                                ->orderBy('due_date', 'asc')
+                                ->get();
 
             $totalTagihanTerpilih = $posDipilih->reduce(function ($carry, $po) {
-                $retur = $po->returns_sum_total_amount ?? 0;
+                // ✅ Gunakan total_returned yang sudah benar
+                $retur = $po->total_returned ?? 0;
                 $sisa = max(0, $po->total_amount - $po->amount_paid - $retur);
                 return $carry + $sisa;
             }, 0.0);
 
             if ($totalTagihanTerpilih <= 0.01) {
-                throw new \Exception("Semua PO terpilih sudah lunas atau tidak valid.");
+                 throw new \Exception("Tidak ada tagihan yang dipilih atau semua PO terpilih sudah lunas.");
             }
 
             // ✅ Hitung alokasi dana
-            $depositAkanDigunakan = ($pakaiDeposit && $depositAwalSupplier > 0)
-                ? min($depositAwalSupplier, $totalTagihanTerpilih)
-                : 0;
-
+            $depositAkanDigunakan = 0;
+            if ($pakaiDeposit && $depositAwalSupplier > 0) {
+                $depositAkanDigunakan = min($depositAwalSupplier, $totalTagihanTerpilih);
+            }
             $sisaTagihanSetelahDeposit = max(0, $totalTagihanTerpilih - $depositAkanDigunakan);
             $danaInputAkanDigunakan = min($danaDariInput, $sisaTagihanSetelahDeposit);
             $totalDanaAlokasi = $depositAkanDigunakan + $danaInputAkanDigunakan;
-            $sisaDanaInput = max(0, $danaDariInput - $danaInputAkanDigunakan);
+            $sisaDanaInput = max(0, $danaDariInput - $danaInputAkanDigunakan); // Overpayment
 
-            if ($totalDanaAlokasi <= 0.01) {
-                throw new \Exception("Tidak ada dana yang dialokasikan (deposit atau input).");
+            if ($totalDanaAlokasi <= 0.01 && $sisaDanaInput <= 0.01) {
+                if ($totalTagihanTerpilih > 0.01) {
+                    throw new \Exception("Tidak ada dana (input/deposit) yang cukup untuk dialokasikan.");
+                }
             }
 
             // ✅ Buat record BatchPurchasePayment
             $metodeBatch = '';
             if ($depositAkanDigunakan > 0) $metodeBatch .= 'Deposit Supplier';
             if ($danaInputAkanDigunakan > 0) {
-                if (!empty($metodeBatch)) $metodeBatch .= ' + ';
-                $metodeBatch .= $validated['payment_method'];
+                 if (!empty($metodeBatch)) $metodeBatch .= ' + ';
+                 $metodeBatch .= $validated['payment_method'];
             }
             if (empty($metodeBatch)) $metodeBatch = 'N/A';
 
@@ -134,8 +140,6 @@ class BatchPurchasePaymentController extends Controller
             ]);
 
             $alokasiLog = [];
-
-            // ✅ 1. Catat penggunaan DEPOSIT via SupplierLedger
             if ($depositAkanDigunakan > 0) {
                 SupplierLedger::create([
                     'supplier_id' => $supplier->supplier_id,
@@ -144,27 +148,31 @@ class BatchPurchasePaymentController extends Controller
                     'transaction_date' => $validated['payment_date'],
                     'type' => 'debit',
                     'amount' => -$depositAkanDigunakan,
-                    'description' => 'Digunakan untuk Batch Payment #' . $batchPayment->batch_payment_id,
+                    'status' => 'available',
+                    'description' => 'Digunakan untuk Pembayaran Hutang Batch #' . $batchPayment->batch_payment_id,
                     'user_id' => Auth::id(),
                 ]);
                 $alokasiLog[] = "Menggunakan deposit Rp " . number_format($depositAkanDigunakan);
             }
+            if ($danaInputAkanDigunakan > 0) $alokasiLog[] = "Menggunakan dana input Rp " . number_format($danaInputAkanDigunakan);
 
-            // ✅ 2. Alokasi ke setiap PO
+            // 3. Alokasikan dana ke PO
             $sisaDepositUntukAlokasi = $depositAkanDigunakan;
             $sisaInputUntukAlokasi = $danaInputAkanDigunakan;
 
             foreach ($posDipilih as $po) {
                 if ($sisaDepositUntukAlokasi <= 0.01 && $sisaInputUntukAlokasi <= 0.01) break;
 
-                $totalRetur = $po->returns_sum_total_amount ?? 0;
+                $totalRetur = $po->total_returned ?? 0;
                 $sisaTagihanPO = max(0, $po->total_amount - $po->amount_paid - $totalRetur);
+
                 if ($sisaTagihanPO <= 0.01) continue;
 
                 $bayarDariDeposit = min($sisaTagihanPO, $sisaDepositUntukAlokasi);
                 $sisaTagihanSetelahDepositPO = max(0, $sisaTagihanPO - $bayarDariDeposit);
                 $bayarDariInput = min($sisaTagihanSetelahDepositPO, $sisaInputUntukAlokasi);
                 $jumlahUntukPOIni = $bayarDariDeposit + $bayarDariInput;
+
                 if ($jumlahUntukPOIni <= 0.01) continue;
 
                 $metodePayment = '';
@@ -184,14 +192,33 @@ class BatchPurchasePaymentController extends Controller
                 ]);
 
                 // Update status PO
-                $totalPaidBaru = $po->payments()->sum('amount');
-                $sisaTagihanBaru = $po->total_amount - $totalPaidBaru - $po->total_returned;
-                $statusBaru = ($sisaTagihanBaru <= 0.01) ? 'paid' : 'partially_paid';
-                $po->update(['amount_paid' => $totalPaidBaru, 'payment_status' => $statusBaru]);
+                $poCurrent = PurchaseOrder::find($po->po_id);
+                $totalPaidBaru = ($poCurrent->amount_paid ?? 0) + $jumlahUntukPOIni;
+                $sisaTagihanBaru = $poCurrent->total_amount - ($poCurrent->total_returned ?? 0) - $totalPaidBaru;
+                
+                $newStatus = ($sisaTagihanBaru <= 0.01) ? 'paid' : 'partially_paid';
+
+                $poCurrent->update([
+                    'amount_paid' => $totalPaidBaru,
+                    'payment_status' => $newStatus,
+                ]);
+
+                // ======================================================
+                // ✅ 3. LEPASKAN DEPOSIT PENDING JIKA PO INI LUNAS
+                // ======================================================
+                if ($newStatus == 'paid') {
+                    SupplierLedger::where('purchase_order_id', $poCurrent->po_id)
+                                ->where('status', 'pending')
+                                ->update([
+                                    'status' => 'available',
+                                    'description' => DB::raw("REPLACE(description, ' (Ditahan)', '')")
+                                ]);
+                }
+                // ======================================================
 
                 $sisaDepositUntukAlokasi -= $bayarDariDeposit;
                 $sisaInputUntukAlokasi -= $bayarDariInput;
-                $alokasiLog[] = "Rp " . number_format($jumlahUntukPOIni) . " dialokasikan ke PO " . $po->po_number;
+                $alokasiLog[] = "Rp " . number_format($jumlahUntukPOIni) . " dialokasikan ke " . $po->po_number;
             }
 
             // ✅ 3. Catat overpayment (sisa dana input) via SupplierLedger
@@ -203,15 +230,16 @@ class BatchPurchasePaymentController extends Controller
                     'transaction_date' => $validated['payment_date'],
                     'type' => 'credit',
                     'amount' => $sisaDanaInput,
-                    'description' => 'Kelebihan dana dari Batch Payment #' . $batchPayment->batch_payment_id,
+                    'status' => 'available', // Kelebihan bayar selalu 'available'
+                    'description' => 'Kelebihan dana dari Pembayaran Hutang Batch #' . $batchPayment->batch_payment_id,
                     'user_id' => Auth::id(),
                 ]);
                 $alokasiLog[] = "Sisa dana input Rp " . number_format($sisaDanaInput) . " disimpan sebagai deposit supplier.";
             }
 
             DB::commit();
-            return redirect()->route('purchase-orders.index')
-                ->with('success', 'Batch payment berhasil. Detail: ' . implode('. ', $alokasiLog));
+            $message = 'Pembayaran hutang berhasil. Detail: ' . implode('. ', $alokasiLog);
+            return redirect()->route('purchase-orders.index')->with('success', $message); // Redirect ke daftar PO
 
         } catch (\Exception $e) {
             DB::rollBack();

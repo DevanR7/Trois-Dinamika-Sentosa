@@ -66,6 +66,20 @@ class SupplierController extends Controller
         return redirect()->route('suppliers.index')->with('success', 'Supplier baru berhasil ditambahkan.');
     }
 
+    public function show(Supplier $supplier): View
+    {
+        // [AUTH] Panggil policy untuk memeriksa permission 'view-suppliers'
+        $this->authorize('view', $supplier);
+
+        // Load relasi ledgers dengan paginasi, urutkan dari yg terbaru
+        $ledgers = $supplier->ledgers()
+                         ->latest('transaction_date')
+                         ->latest('ledger_id') // Urutan kedua
+                         ->paginate(10, ['*'], 'ledger_page');
+        
+        return view('suppliers.show', compact('supplier', 'ledgers'));
+    }
+
     public function edit(Supplier $supplier): View
     {
         // [AUTH] Panggil policy untuk memeriksa permission 'edit-suppliers'

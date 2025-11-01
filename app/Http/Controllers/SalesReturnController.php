@@ -69,7 +69,7 @@ class SalesReturnController extends Controller
         $validated = $request->validate([
             'sales_invoice_id' => 'required|exists:sales_invoices,invoice_id',
             'return_date' => 'required|date',
-            'return_handling_type' => 'required|in:deduct_invoice,store_as_credit', // ✅ Validasi input baru
+            'return_handling_type' => 'required|in:deduct_invoice,store_as_credit',
             'notes' => 'nullable|string',
             'items' => 'required|array',
             'items.*.item_id' => 'required|exists:invoice_items,item_id',
@@ -78,22 +78,17 @@ class SalesReturnController extends Controller
 
         DB::beginTransaction();
         try {
-            $invoice = SalesInvoice::with('client')->findOrFail($validated['sales_invoice_id']);
+            $invoice = SalesInvoice::with('client')->findOrFail($validated['sales_invoice_id']); // Load client
             $discountRate = $invoice->discount_percentage / 100;
             $totalReturnValue = 0;
             $hasReturnedItems = false;
+            $handlingType = $validated['return_handling_type']; // Ambil tipe pilihan user
 
-            $salesReturn = SalesReturn::create([
-                'return_number' => SalesReturn::generateReturnNumber(),
-                'client_id' => $invoice->client_id,
-                'sales_invoice_id' => $invoice->invoice_id,
-                'user_id' => Auth::id(),
-                'return_date' => $validated['return_date'],
-                'return_handling_type' => $validated['return_handling_type'],
-                'notes' => $validated['notes'],
-                'total_amount' => 0, 
-            ]);
-
+            // ======================================================
+            // ✅ LOGIKA BARU UNTUK MENGHITUNG NILAI RETUR DULU
+            // ======================================================
+            
+            // Kita harus hitung total nilai retur DULU
             foreach ($validated['items'] as $itemData) {
                 if (!empty($itemData['quantity']) && $itemData['quantity'] > 0) {
                     $hasReturnedItems = true;
@@ -108,6 +103,41 @@ class SalesReturnController extends Controller
                     $priceAfterDiscount = $originalItem->price_per_unit * (1 - $discountRate);
                     $subtotal = $itemData['quantity'] * $priceAfterDiscount;
                     $totalReturnValue += $subtotal;
+                }
+            }
+
+            if (!$hasReturnedItems) throw new \Exception("Tidak ada item yang dipilih untuk diretur.");
+            
+            // ======================================================
+            // ✅ LOGIKA PERBAIKAN BUG (INVOICE LUNAS)
+            // ======================================================
+
+            // Ambil sisa tagihan invoice SAAT INI (sebelum retur ini dibuat)
+            $sisaTagihanInvoice = $invoice->remaining_balance; 
+
+            if ($handlingType == 'deduct_invoice' && $totalReturnValue > $sisaTagihanInvoice) {
+                $handlingType = 'store_as_credit';
+            }
+            // ======================================================
+            
+            $salesReturn = SalesReturn::create([
+                'return_number' => SalesReturn::generateReturnNumber(),
+                'client_id' => $invoice->client_id,
+                'sales_invoice_id' => $invoice->invoice_id,
+                'user_id' => Auth::id(),
+                'return_date' => $validated['return_date'],
+                'return_handling_type' => $handlingType, // <-- Simpan tipe yang sudah dikoreksi
+                'notes' => $validated['notes'],
+                'total_amount' => $totalReturnValue, // <-- Langsung simpan total
+            ]);
+
+            // Loop kedua untuk simpan item, update stok, dan qty_returned
+            foreach ($validated['items'] as $itemData) {
+                if (!empty($itemData['quantity']) && $itemData['quantity'] > 0) {
+                    $originalItem = InvoiceItem::find($itemData['item_id']);
+                    
+                    $priceAfterDiscount = $originalItem->price_per_unit * (1 - $discountRate);
+                    $subtotal = $itemData['quantity'] * $priceAfterDiscount;
 
                     // Simpan item retur
                     $salesReturn->items()->create([
@@ -128,30 +158,34 @@ class SalesReturnController extends Controller
                 }
             }
 
-            if (!$hasReturnedItems) throw new \Exception("Tidak ada item yang dipilih untuk diretur.");
-
-            // Update total nilai retur
-            $salesReturn->update(['total_amount' => $totalReturnValue]);
-
-            if ($validated['return_handling_type'] == 'store_as_credit') {
-                // Opsi 2: Tampung sebagai Kredit Klien via LEDGER
+            // ======================================================
+            // ✅ LOGIKA BARU BERDASARKAN AKSI
+            // ======================================================
+            if ($handlingType == 'store_as_credit') {
                 
-                // HAPUS INI: $invoice->client->increment('credit_balance', $totalReturnValue);
-                
-                // ✅ TAMBAHKAN INI: Buat entri ledger
+                // Cek status invoice
+                $ledgerStatus = ($invoice->status == 'paid') ? 'available' : 'pending';
+
                 ClientLedger::create([
                     'client_id' => $invoice->client_id,
+                    'sales_invoice_id' => $invoice->invoice_id, // <-- Tautkan ke invoice
                     'reference_type' => SalesReturn::class,
                     'reference_id' => $salesReturn->return_id,
                     'transaction_date' => $validated['return_date'],
                     'type' => 'credit',
-                    'amount' => $totalReturnValue, // Jumlah positif (kredit)
-                    'description' => 'Kredit dari Retur Penjualan #' . $salesReturn->return_number,
+                    'amount' => $totalReturnValue,
+                    'status' => $ledgerStatus, // <-- Atur statusnya
+                    'description' => 'Kredit dari Retur Penjualan #' . $salesReturn->return_number . ($ledgerStatus == 'pending' ? ' (Ditahan)' : ''),
                     'user_id' => Auth::id(),
                 ]);
 
             } else {
+                // Opsi 1: Potong Tagihan
+                // Tidak perlu melakukan apa-apa.
+                // Saat invoice di-load, accessor 'remaining_balance'
+                // akan otomatis menghitung ulang sisa tagihan dengan benar.
             }
+            // ======================================================
 
             DB::commit();
             return redirect()->route('sales-returns.index')->with('success', 'Retur penjualan berhasil disimpan.');

@@ -6,14 +6,15 @@ use App\Models\Client;
 use App\Models\SalesInvoice;
 use App\Models\BatchPayment;
 use App\Models\Payment;
-use App\Models\ClientLedger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use App\Models\ClientLedger;
 
 class BatchPaymentController extends Controller
 {
@@ -85,12 +86,14 @@ class BatchPaymentController extends Controller
 
             // Ambil invoice yang dipilih
             $invoicesDipilih = SalesInvoice::whereIn('invoice_id', $validated['invoice_ids'])
-                ->withSum('returns', 'total_amount')
-                ->orderBy('due_date', 'asc')
-                ->get();
-
+                                // ✅ Gunakan relasi 'deductingReturns' yang sudah kita buat
+                                ->withSum('deductingReturns', 'total_amount')
+                                ->orderBy('due_date', 'asc')
+                                ->get();
+                                
             $totalTagihanTerpilih = $invoicesDipilih->reduce(function ($carry, $invoice) {
-                $retur = $invoice->returns_sum_total_amount ?? 0;
+                // ✅ Gunakan hasil sum yang sudah benar
+                $retur = $invoice->deducting_returns_sum_total_amount ?? 0;
                 $sisa = max(0, $invoice->total_amount - $invoice->amount_paid - $retur);
                 return $carry + $sisa;
             }, 0.0);
@@ -104,14 +107,16 @@ class BatchPaymentController extends Controller
             if ($pakaiKredit && $kreditAwalKlien > 0) {
                 $kreditAkanDigunakan = min($kreditAwalKlien, $totalTagihanTerpilih);
             }
-
             $sisaTagihanSetelahKredit = max(0, $totalTagihanTerpilih - $kreditAkanDigunakan);
             $danaInputAkanDigunakan = min($danaDariInput, $sisaTagihanSetelahKredit);
-
             $totalDanaAlokasi = $kreditAkanDigunakan + $danaInputAkanDigunakan;
-            if ($totalDanaAlokasi <= 0.01) {
-                throw new \Exception("Tidak ada dana (input/kredit) yang cukup untuk dialokasikan.");
-            }
+            $sisaDanaInput = max(0, $danaDariInput - $danaInputAkanDigunakan); // Overpayment
+
+             if ($totalDanaAlokasi <= 0.01 && $sisaDanaInput <= 0.01) {
+                 if ($totalTagihanTerpilih > 0.01) {
+                    throw new \Exception("Tidak ada dana (input/kredit) yang cukup untuk dialokasikan.");
+                 }
+             }
 
             $sisaDanaInput = max(0, $danaDariInput - $danaInputAkanDigunakan);
 
@@ -121,8 +126,8 @@ class BatchPaymentController extends Controller
             $metodeBatch = '';
             if ($kreditAkanDigunakan > 0) $metodeBatch .= 'Kredit Klien';
             if ($danaInputAkanDigunakan > 0) {
-                if (!empty($metodeBatch)) $metodeBatch .= ' + ';
-                $metodeBatch .= $validated['payment_method'];
+                 if (!empty($metodeBatch)) $metodeBatch .= ' + ';
+                 $metodeBatch .= $validated['payment_method'];
             }
             if (empty($metodeBatch)) $metodeBatch = 'N/A';
 
@@ -130,14 +135,12 @@ class BatchPaymentController extends Controller
                 'client_id' => $validated['client_id'],
                 'processed_by_user_id' => Auth::id(),
                 'payment_date' => $validated['payment_date'],
-                'total_amount' => $totalDanaAlokasi,
-                'payment_method' => $metodeBatch,
+                'total_amount' => $totalDanaAlokasi, // Total yang dialokasikan
                 'notes' => $validated['notes'],
+                'payment_method' => $metodeBatch,
             ]);
 
             $alokasiLog = [];
-
-            // 2. Catat pengurangan kredit di ledger (bukan langsung di tabel clients)
             if ($kreditAkanDigunakan > 0) {
                 ClientLedger::create([
                     'client_id' => $client->client_id,
@@ -145,16 +148,14 @@ class BatchPaymentController extends Controller
                     'reference_id' => $batchPayment->batch_payment_id,
                     'transaction_date' => $validated['payment_date'],
                     'type' => 'debit',
-                    'amount' => -$kreditAkanDigunakan, // negatif artinya saldo berkurang
+                    'amount' => -$kreditAkanDigunakan,
+                    'status' => 'available',
                     'description' => 'Digunakan untuk Pembayaran Batch #' . $batchPayment->batch_payment_id,
                     'user_id' => Auth::id(),
                 ]);
                 $alokasiLog[] = "Menggunakan kredit Rp " . number_format($kreditAkanDigunakan);
             }
-
-            if ($danaInputAkanDigunakan > 0) {
-                $alokasiLog[] = "Menggunakan dana input Rp " . number_format($danaInputAkanDigunakan);
-            }
+            if ($danaInputAkanDigunakan > 0) $alokasiLog[] = "Menggunakan dana input Rp " . number_format($danaInputAkanDigunakan);
 
             // 3. Alokasikan ke invoice
             $sisaKreditUntukAlokasi = $kreditAkanDigunakan;
@@ -163,8 +164,10 @@ class BatchPaymentController extends Controller
             foreach ($invoicesDipilih as $invoice) {
                 if ($sisaKreditUntukAlokasi <= 0.01 && $sisaInputUntukAlokasi <= 0.01) break;
 
-                $totalRetur = $invoice->returns_sum_total_amount ?? 0;
+                // Hitung ulang sisa tagihan pakai data yang sudah di-load
+                $totalRetur = $invoice->deducting_returns_sum_total_amount ?? $invoice->deductingReturns->sum('total_amount');
                 $sisaTagihanInvoice = max(0, $invoice->total_amount - $invoice->amount_paid - $totalRetur);
+
                 if ($sisaTagihanInvoice <= 0.01) continue;
 
                 $bayarDariKredit = min($sisaTagihanInvoice, $sisaKreditUntukAlokasi);
@@ -175,11 +178,11 @@ class BatchPaymentController extends Controller
                 if ($jumlahUntukInvoiceIni <= 0.01) continue;
 
                 $metodePayment = '';
-                if ($bayarDariKredit > 0) $metodePayment .= 'Kredit Klien';
-                if ($bayarDariInput > 0) {
-                    if (!empty($metodePayment)) $metodePayment .= ' + ';
-                    $metodePayment .= $validated['payment_method'] ?? 'N/A';
-                }
+                 if ($bayarDariKredit > 0) $metodePayment .= 'Kredit Klien';
+                 if ($bayarDariInput > 0) {
+                     if (!empty($metodePayment)) $metodePayment .= ' + ';
+                     $metodePayment .= $validated['payment_method'] ?? 'N/A';
+                 }
                 if (empty($metodePayment)) $metodePayment = 'N/A';
 
                 $invoice->payments()->create([
@@ -192,14 +195,25 @@ class BatchPaymentController extends Controller
                     'notes' => 'Auto-allocated from Batch Payment #' . $batchPayment->batch_payment_id,
                 ]);
 
-                $invoiceCurrent = SalesInvoice::find($invoice->invoice_id);
+                $invoiceCurrent = SalesInvoice::find($invoice->invoice_id); // Ambil data terbaru
                 $totalPaidBaru = ($invoiceCurrent->amount_paid ?? 0) + $jumlahUntukInvoiceIni;
                 $sisaTagihanBaru = $invoiceCurrent->total_amount - $totalPaidBaru - $totalRetur;
 
+                $newStatus = ($sisaTagihanBaru <= 0.01) ? 'paid' : 'partially_paid';
+
                 $invoiceCurrent->update([
                     'amount_paid' => $totalPaidBaru,
-                    'status' => ($sisaTagihanBaru <= 0.01) ? 'paid' : 'partially_paid',
+                    'status' => $newStatus,
                 ]);
+
+                if ($newStatus == 'paid') {
+                    ClientLedger::where('sales_invoice_id', $invoiceCurrent->invoice_id)
+                                ->where('status', 'pending')
+                                ->update([
+                                    'status' => 'available',
+                                    'description' => DB::raw("REPLACE(description, ' (Ditahan)', '')")
+                                ]);
+                }
 
                 $sisaKreditUntukAlokasi -= $bayarDariKredit;
                 $sisaInputUntukAlokasi -= $bayarDariInput;
@@ -208,21 +222,21 @@ class BatchPaymentController extends Controller
 
             // 4. Jika ada kelebihan dana input, masukkan ke kredit klien via ledger
             if ($sisaDanaInput > 0.01) {
-                ClientLedger::create([
+                 ClientLedger::create([
                     'client_id' => $client->client_id,
                     'reference_type' => BatchPayment::class,
                     'reference_id' => $batchPayment->batch_payment_id,
                     'transaction_date' => $validated['payment_date'],
                     'type' => 'credit',
                     'amount' => $sisaDanaInput,
+                    'status' => 'available', // Kelebihan bayar selalu 'available'
                     'description' => 'Kelebihan dana dari Pembayaran Batch #' . $batchPayment->batch_payment_id,
                     'user_id' => Auth::id(),
-                ]);
+                 ]);
                 $alokasiLog[] = "Sisa dana input Rp " . number_format($sisaDanaInput) . " dikembalikan ke kredit klien.";
             }
 
             DB::commit();
-
             $message = 'Pembayaran batch berhasil. Detail: ' . implode('. ', $alokasiLog);
             return redirect()->route('clients.show', $client->client_id)->with('success', $message);
 

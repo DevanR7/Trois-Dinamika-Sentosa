@@ -13,7 +13,6 @@ return new class extends Migration
             $table->string('google_id')->nullable()->unique();
             $table->string('client_name', 150);
             $table->string('email', 100)->unique()->nullable();
-            $table->decimal('credit_balance', 15, 2)->default(0.00);
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password')->nullable();
             $table->boolean('is_approved')->default(false);

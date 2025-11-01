@@ -1,6 +1,9 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
+use App\Models\SalesInvoice;
+use App\Models\PurchaseOrder;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProductController;
@@ -189,6 +192,33 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'debit_balance' => $supplier->debit_balance ?? 0,
         ]);
     })->name('api.suppliers.details');
+
+    Route::get('/api/invoices/{invoice}/items', function (Request $request, SalesInvoice $invoice) {
+        if ($request->user()->cannot('view', $invoice)) {
+            // Jika policy return false, kirim error 403 Forbidden
+            return response()->json(['message' => 'Anda tidak diizinkan mengakses invoice ini.'], 403);
+        }
+
+        // 2. Jika lolos, lanjutkan
+        $invoice->load('items.product');
+        return response()->json([
+            'invoice' => $invoice,
+            'items' => $invoice->items
+        ]);
+    });
+
+    // ✅ DIPINDAHKAN KE SINI
+    // Sekarang aman dan butuh login
+    Route::get('/api/purchase-orders/{purchaseOrder}/items', function (Request $request, PurchaseOrder $purchaseOrder) {
+        
+        // Otorisasi
+        if ($request->user()->cannot('view', $purchaseOrder)) {
+            return response()->json(['message' => 'Anda tidak diizinkan mengakses PO ini.'], 403);
+        }
+
+        $purchaseOrder->load('items.product.unit');
+        return response()->json(['items' => $purchaseOrder->items]);
+    });
 });
 
 require __DIR__.'/auth.php';

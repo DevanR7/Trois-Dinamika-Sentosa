@@ -50,21 +50,18 @@
                                 {{ $supplier->phone_number ?? '-' }}
                             </span>
 
-                            {{-- =================================== --}}
-                            {{-- ✅ SALDO DEPOSIT (TAMPILAN COLLAPSED) --}}
-                            {{-- =================================== --}}
+                            {{-- Saldo Deposit (Tampilan Collapsed) --}}
                             <div class="me-3 d-none d-lg-block">
-                                @if($supplier->debit_balance > 0)
+                                {{-- Gunakan accessor 'balance' --}}
+                                @if($supplier->balance > 0)
                                     <span class="text-success fw-bold">
-                                        {{-- Format Rupiah ringkas untuk header --}}
-                                        Rp {{ number_format($supplier->debit_balance, 0, ',', '.') }}
+                                        Rp {{ number_format($supplier->balance, 0, ',', '.') }}
                                     </span>
                                 @else
                                     <span class="text-muted">Rp 0</span>
                                 @endif
                                 <small class="d-block text-muted" style="font-size: 0.75rem;">Saldo Deposit</small>
                             </div>
-                            {{-- =================================== --}}
 
                             @if($supplier->trashed())
                                 <span class="badge bg-danger rounded-pill">Diarsipkan</span>
@@ -97,13 +94,14 @@
                                 <li><i class="bi bi-hash me-2 text-muted"></i>No. Rek: {{ $supplier->account_number ?? '-' }}</li>
                                 
                                 {{-- =================================== --}}
-                                {{-- ✅ SALDO DEPOSIT (TAMPILAN EXPANDED) --}}
+                                {{-- ✅ PERBAIKAN BUG DI SINI --}}
                                 {{-- =================================== --}}
                                 <li class="mt-2">
                                     <i class="bi bi-wallet2 me-2 text-muted"></i>
                                     Saldo Deposit: 
-                                    <strong class_="{{ $supplier->debit_balance > 0 ? 'text-success' : 'text-dark' }}">
-                                        Rp {{ number_format($supplier->debit_balance, 0, ',', '.') }}
+                                    {{-- Ganti 'debit_balance' menjadi 'balance' --}}
+                                    <strong class="{{ $supplier->balance > 0 ? 'text-success' : 'text-dark' }}">
+                                        Rp {{ number_format($supplier->balance, 0, ',', '.') }}
                                     </strong>
                                 </li>
                                 {{-- =================================== --}}
@@ -112,6 +110,14 @@
                         <div class="col-md-2 d-flex flex-column justify-content-center gap-2">
                             {{-- Tombol Aksi --}}
                             @if($supplier->trashed())
+                                {{-- =================================== --}}
+                                {{-- ✅ TAMBAHAN BARU DI SINI --}}
+                                {{-- =================================== --}}
+                                <a href="{{ route('suppliers.show', $supplier->supplier_id) }}" class="btn btn-outline-info w-100" title="Lihat Detail">
+                                    <i class="bi bi-eye me-1"></i> Lihat
+                                </a>
+                                {{-- =================================== --}}
+
                                 {{-- JIKA TERHAPUS: Tampilkan tombol RESTORE --}}
                                 <form action="{{ route('suppliers.restore', $supplier->supplier_id) }}" method="POST" class="form-restore d-inline">
                                     @csrf
@@ -121,6 +127,14 @@
                                     </button>
                                 </form>
                             @else
+                                {{-- =================================== --}}
+                                {{-- ✅ TAMBAHAN BARU DI SINI --}}
+                                {{-- =================================== --}}
+                                <a href="{{ route('suppliers.show', $supplier->supplier_id) }}" class="btn btn-outline-info w-100" title="Lihat Detail">
+                                    <i class="bi bi-eye me-1"></i> Lihat
+                                </a>
+                                {{-- =================================== --}}
+
                                 {{-- JIKA AKTIF: Tampilkan tombol Edit & Arsipkan --}}
                                 <a href="{{ route('suppliers.edit', $supplier->supplier_id) }}" class="btn btn-outline-secondary w-100" title="Edit">
                                     <i class="bi bi-pencil-square me-1"></i> Edit

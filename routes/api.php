@@ -33,38 +33,6 @@ Route::middleware('auth:sanctum')->group(function () {
         return $request->user();
     });
 
-    // ✅ DIPINDAHKAN KE SINI
-    // Sekarang aman dan butuh login
-    Route::get('/invoices/{invoice}/items', function (Request $request, SalesInvoice $invoice) {
-        
-        // 1. Otorisasi menggunakan Policy
-        // Ini akan memanggil method 'view' di SalesInvoicePolicy
-        // dan memasukkan $request->user() (bisa User atau Client)
-        // serta $invoice
-        if ($request->user()->cannot('view', $invoice)) {
-            // Jika policy return false, kirim error 403 Forbidden
-            return response()->json(['message' => 'Anda tidak diizinkan mengakses invoice ini.'], 403);
-        }
-
-        // 2. Jika lolos, lanjutkan
-        $invoice->load('items.product');
-        return response()->json([
-            'invoice' => $invoice,
-            'items' => $invoice->items
-        ]);
-    });
-
-    // ✅ DIPINDAHKAN KE SINI
-    // Sekarang aman dan butuh login
-    Route::get('/purchase-orders/{purchaseOrder}/items', function (Request $request, PurchaseOrder $purchaseOrder) {
-        
-        // Otorisasi
-        if ($request->user()->cannot('view', $purchaseOrder)) {
-            return response()->json(['message' => 'Anda tidak diizinkan mengakses PO ini.'], 403);
-        }
-
-        $purchaseOrder->load('items.product.unit');
-        return response()->json(['items' => $purchaseOrder->items]);
-    });
+    
 
 });

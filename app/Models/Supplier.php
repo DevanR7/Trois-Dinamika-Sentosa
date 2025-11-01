@@ -57,7 +57,20 @@ class Supplier extends Model
      */
     public function getBalanceAttribute(): float
     {
-        // Menjumlahkan semua transaksi (kredit positif, debit negatif)
-        return $this->ledgers()->sum('amount');
+        // ✅ DIUBAH: Hanya menjumlahkan yang statusnya 'available'
+        return $this->ledgers()->where('status', 'available')->sum('amount');
+    }
+
+    /**
+     * ✅ BARU: Accessor untuk mendapatkan saldo deposit yang DITAHAN (pending).
+     *
+     * @return float
+     */
+    public function getPendingBalanceAttribute(): float
+    {
+        return $this->ledgers()
+                    ->where('status', 'pending')
+                    ->where('type', 'credit')
+                    ->sum('amount');
     }
 }

@@ -9,22 +9,27 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('client_ledgers', function (Blueprint $table) {
-            $table->id('ledger_id');
-            $table->foreignId('client_id')->constrained('clients', 'client_id')->onDelete('cascade');
-            
-            // Relasi polimorfik opsional untuk melacak SUMBER transaksi
-            $table->morphs('reference'); // Akan membuat reference_type (misal: App\Models\SalesReturn) & reference_id
+    $table->id('ledger_id');
+    $table->foreignId('client_id')->constrained('clients', 'client_id')->onDelete('cascade');
 
-            $table->date('transaction_date');
-            $table->string('type'); // 'credit' (masuk) atau 'debit' (keluar)
-            
-            // Amount: Positif untuk kredit, Negatif untuk debit
-            $table->decimal('amount', 15, 2); 
-            
-            $table->string('description');
-            $table->foreignId('user_id')->nullable()->constrained('users', 'user_id')->comment('User yg memproses');
-            $table->timestamps();
-        });
+    // Relasi ke sumber invoice
+    $table->foreignId('sales_invoice_id')->nullable()
+          ->constrained('sales_invoices', 'invoice_id')->onDelete('set null');
+
+    // Relasi polimorfik opsional untuk melacak sumber transaksi
+    $table->morphs('reference');
+
+    $table->date('transaction_date');
+    $table->string('type'); // 'credit' atau 'debit'
+    $table->decimal('amount', 15, 2);
+    $table->string('status', 20)->default('available'); // langsung dari awal
+
+    $table->string('description');
+    $table->foreignId('user_id')->nullable()->constrained('users', 'user_id')
+          ->comment('User yg memproses');
+    $table->timestamps();
+});
+
     }
 
     public function down(): void
