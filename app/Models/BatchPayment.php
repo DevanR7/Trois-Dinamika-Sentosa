@@ -20,11 +20,14 @@ class BatchPayment extends Model
         'total_amount',
         'payment_method',
         'notes',
+        'status',
+        'details',
     ];
 
     protected $casts = [
         'payment_date' => 'date',
         'total_amount' => 'float',
+        'details' => 'array',
     ];
 
     public function client(): BelongsTo
@@ -37,9 +40,6 @@ class BatchPayment extends Model
         return $this->belongsTo(User::class, 'processed_by_user_id', 'user_id');
     }
 
-    /**
-     * Mendapatkan semua alokasi pembayaran (Payment) yang dihasilkan dari batch ini.
-     */
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class, 'batch_payment_id', 'batch_payment_id');

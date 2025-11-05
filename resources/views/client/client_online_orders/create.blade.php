@@ -73,7 +73,7 @@
                 <option value="" data-price="0" disabled selected>-- Pilih Produk --</option>
                 @foreach ($products as $product)
                     {{-- Tetap pakai purchase_price sesuai request --}}
-                    <option value="{{ $product->product_id }}" data-price="{{ $product->purchase_price ?? 0 }}">{{ $product->product_name }}</option>
+                    <option value="{{ $product->product_id }}" data-price="{{ $product->selling_price ?? 0 }}">{{ $product->product_name }}</option>
                 @endforeach
             </select>
             <input type="hidden" class="price-raw">

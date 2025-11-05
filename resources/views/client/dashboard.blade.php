@@ -5,8 +5,11 @@
     <h2 class="fw-bold mb-1">Selamat Datang, {{ $client->client_name }}!</h2>
     <p class="text-muted mb-4">Berikut adalah ringkasan aktivitas akun Anda.</p>
 
+    {{-- ====================================================== --}}
     {{-- KARTU KPI (4 KOLOM) --}}
+    {{-- ====================================================== --}}
     <div class="row g-4 mb-4">
+        {{-- TOTAL TAGIHAN BELUM LUNAS --}}
         <div class="col-md-6 col-lg-3">
             <div class="card shadow-sm h-100 border-start border-danger border-4">
                 <div class="card-body">
@@ -16,6 +19,25 @@
                 </div>
             </div>
         </div>
+
+        {{-- SALDO KREDIT (BARU) --}}
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm h-100 border-start border-success border-4">
+                <div class="card-body">
+                    <div class="text-muted text-uppercase small">Saldo Kredit (Tersedia)</div>
+                    <h4 class="fw-bold mb-0">Rp {{ number_format($availableBalance, 0, ',', '.') }}</h4>
+                    @if($pendingBalance > 0)
+                        <span class="text-decoration-none small text-muted">
+                            (Tertahan: Rp {{ number_format($pendingBalance, 0, ',', '.') }})
+                        </span>
+                    @else
+                        <span class="text-decoration-none small text-muted">Tidak ada saldo tertahan</span>
+                    @endif
+                </div>
+            </div>
+        </div>
+
+        {{-- PESANAN ONLINE --}}
         <div class="col-md-6 col-lg-3">
             <div class="card shadow-sm h-100 border-start border-info border-4">
                 <div class="card-body">
@@ -25,7 +47,9 @@
                 </div>
             </div>
         </div>
-         <div class="col-md-6 col-lg-3">
+
+        {{-- PESANAN SALES --}}
+        <div class="col-md-6 col-lg-3">
             <div class="card shadow-sm h-100 border-start border-primary border-4">
                 <div class="card-body">
                     <div class="text-muted text-uppercase small">Pesanan Sales (Aktif)</div>
@@ -34,19 +58,14 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-6 col-lg-3">
-            <div class="card shadow-sm h-100 border-start border-warning border-4">
-                <div class="card-body">
-                    <div class="text-muted text-uppercase small">Permintaan Perubahan (Pending)</div>
-                    <h4 class="fw-bold mb-0">{{ $pendingChangeRequestsCount }} <span class="fw-normal fs-6">Request</span></h4>
-                     <a href="{{ route('client.sales-orders.index') }}" class="stretched-link text-decoration-none small text-muted">Lihat di Riwayat Pesanan Sales...</a>
-                </div>
-            </div>
-        </div>
     </div>
 
+    {{-- ====================================================== --}}
+    {{-- BAGIAN UTAMA --}}
+    {{-- ====================================================== --}}
     <div class="row g-4">
-        {{-- KOLOM 1: DAFTAR "PERLU TINDAKAN" --}}
+
+        {{-- KOLOM 1: STATUS PENGAJUAN --}}
         <div class="col-12">
             <div class="card shadow-sm h-100">
                 <div class="card-header bg-white">
@@ -67,37 +86,39 @@
                                 <a href="{{ route('client.sales-orders.show', $activity->order->order_id) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0">
                                     <div>
                                         <span class="fw-semibold">Permintaan Perubahan</span>
-                                        <small class="d-block text-muted">{{ $activity->order->order_number ?? 'N/A' }} ({{ $activity->request_type == 'cancel' ? 'Batal' : 'Modifikasi' }})</small>
+                                        <small class="d-block text-muted">
+                                            {{ $activity->order->order_number ?? 'N/A' }}
+                                            ({{ $activity->request_type == 'cancel' ? 'Batal' : 'Modifikasi' }})
+                                        </small>
                                     </div>
                                     <span class="badge bg-warning text-dark">{{ Str::title($activity->status) }}</span>
                                 </a>
                             @endif
                         @empty
-                             <div class="list-group-item text-center text-muted py-4 px-0">
-                                 Tidak ada aktivitas yang menunggu tindakan.
-                             </div>
+                            <div class="list-group-item text-center text-muted py-4 px-0">
+                                Tidak ada aktivitas yang menunggu tindakan.
+                            </div>
                         @endforelse
                     </div>
                 </div>
             </div>
         </div>
 
-        {{-- KOLOM 2: DAFTAR TAGIHAN BELUM LUNAS --}}
+        {{-- KOLOM 2: TAGIHAN BELUM LUNAS --}}
         <div class="col-12">
             <div class="card shadow-sm h-100">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0 fw-semibold">Tagihan Belum Lunas</h5>
-                     <a href="{{ route('client.invoices.index') }}" class="btn btn-sm btn-outline-primary">Lihat Semua</a>
+                    <a href="{{ route('client.invoices.index') }}" class="btn btn-sm btn-outline-primary">Lihat Semua</a>
                 </div>
                 
-                {{-- ✅ KARTU DIBUAT SCROLLABLE --}}
                 <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
                     <div class="table-responsive">
                         @if($invoicesForCard->isEmpty())
-                             <div class="text-center text-muted p-5">
-                                 <i class="bi bi-check-circle-fill fs-3 text-success"></i>
-                                 <p class="mt-2 mb-0">Luar biasa! Tidak ada tagihan yang belum lunas.</p>
-                             </div>
+                            <div class="text-center text-muted p-5">
+                                <i class="bi bi-check-circle-fill fs-3 text-success"></i>
+                                <p class="mt-2 mb-0">Luar biasa! Tidak ada tagihan yang belum lunas.</p>
+                            </div>
                         @else
                             <table class="table table-hover align-middle mb-0">
                                 <thead class="table-light sticky-top">
@@ -105,7 +126,7 @@
                                         <th>No. Invoice</th>
                                         <th>Jatuh Tempo</th>
                                         <th class="text-end">Sisa Tagihan</th>
-                                        <th class="text-center">Status</th> {{-- ✅ KOLOM STATUS --}}
+                                        <th class="text-center">Status</th>
                                         <th class="text-center">Aksi</th>
                                     </tr>
                                 </thead>
@@ -113,22 +134,23 @@
                                     @php $hasUnpaid = false; @endphp
                                     @foreach($invoicesForCard as $invoice)
                                         @php
-                                            $totalRetur = $invoice->returns->sum('total_amount');
-                                            $sisaTagihan = $invoice->total_amount - $invoice->amount_paid - $totalRetur;
+                                            $sisaTagihan = $invoice->remaining_balance;
                                         @endphp
-                                        
-                                        @if($sisaTagihan > 0)
+
+                                        @if($sisaTagihan > 0.01)
                                             @php $hasUnpaid = true; @endphp
                                             <tr>
                                                 <td>
-                                                    <a href="{{ route('client.invoices.show', $invoice->invoice_id) }}">{{ $invoice->invoice_number }}</a>
+                                                    <a href="{{ route('client.invoices.show', $invoice->invoice_id) }}">
+                                                        {{ $invoice->invoice_number }}
+                                                    </a>
                                                 </td>
                                                 <td class="{{ optional($invoice->due_date)->isPast() ? 'text-danger fw-bold' : '' }}">
                                                     {{ optional($invoice->due_date)->format('d M Y') }}
                                                 </td>
-                                                <td class="text-end fw-bold text-danger">Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</td>
-                                                
-                                                {{-- ✅ KONTEN KOLOM STATUS --}}
+                                                <td class="text-end fw-bold text-danger">
+                                                    Rp {{ number_format($sisaTagihan, 0, ',', '.') }}
+                                                </td>
                                                 <td class="text-center">
                                                     @if($invoice->status == 'partially_paid')
                                                         <span class="badge bg-info text-dark">Cicil</span>
@@ -136,9 +158,8 @@
                                                         <span class="badge bg-warning text-dark">Belum Lunas</span>
                                                     @endif
                                                 </td>
-                                                
                                                 <td class="text-center">
-                                                     <a href="{{ route('client.invoices.show', $invoice->invoice_id) }}" class="btn btn-sm btn-primary">
+                                                    <a href="{{ route('client.invoices.show', $invoice->invoice_id) }}" class="btn btn-sm btn-primary">
                                                         Bayar
                                                     </a>
                                                 </td>
@@ -146,8 +167,8 @@
                                         @endif
                                     @endforeach
 
-                                    @if(!$hasUnpaid) {{-- Jika $invoicesForCard ada tapi sisa tagihannya 0 --}}
-                                         <tr>
+                                    @if(!$hasUnpaid)
+                                        <tr>
                                             <td colspan="5" class="text-center text-muted p-5">
                                                 <i class="bi bi-check-circle-fill fs-3 text-success"></i>
                                                 <p class="mt-2 mb-0">Luar biasa! Tidak ada tagihan yang belum lunas.</p>

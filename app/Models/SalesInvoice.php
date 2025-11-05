@@ -38,6 +38,8 @@ class SalesInvoice extends Model
         'total_amount',
         'amount_paid',
         'status',
+        'pending_snap_token',      
+        'pending_snap_expires_at',
         'notes'
     ];
 
@@ -53,6 +55,7 @@ class SalesInvoice extends Model
         'subtotal' => 'float',
         'discount_percentage' => 'float',
         'discount_amount' => 'float',
+        'pending_snap_expires_at' => 'datetime',
     ];
 
     /**
@@ -212,5 +215,71 @@ class SalesInvoice extends Model
     public function adjustments(): HasMany
     {
         return $this->hasMany(InvoiceAdjustment::class, 'sales_invoice_id', 'invoice_id');
+    }
+
+    public function updatePaymentStatus()
+    {
+        // Jangan update jika sudah dibatalkan
+        if ($this->status == 'cancelled') {
+            return;
+        }
+
+        // 1. Ambil total pembayaran yang sudah selesai
+        $totalPaid = $this->payments()->where('status', 'completed')->sum('amount');
+
+        // 2. Hitung total tagihan yang sebenarnya (setelah koreksi/retur)
+        // Kita tidak bisa pakai remaining_balance karena itu sudah dikurangi amount_paid
+        
+        // Eager load relasi jika belum
+        $this->loadMissing(['adjustments', 'deductingReturns']); 
+        
+        $totalAdjustments = $this->adjustments->sum(function($adj) {
+            return $adj->type == 'debit_note' ? $adj->amount : -$adj->amount;
+        });
+        
+        $totalDeductingReturns = $this->deductingReturns->sum('total_amount');
+        
+        $totalDue = $this->total_amount + $totalAdjustments - $totalDeductingReturns;
+        
+        // Bulatkan untuk menghindari masalah floating point (misal 0.000001)
+        $totalDue = round($totalDue, 2);
+        $totalPaid = round($totalPaid, 2);
+        
+        // 3. Tentukan status baru
+        $newStatus = 'unpaid'; // Default
+        
+        if ($totalPaid >= ($totalDue - 0.01)) { // Toleransi 1 sen
+            $newStatus = 'paid';
+        } elseif ($totalPaid > 0.01) {
+            $newStatus = 'partially_paid';
+        }
+        
+        // 4. Update HANYA jika status berubah
+        if ($this->status != $newStatus) {
+            $this->update([
+                'status' => $newStatus,
+                'amount_paid' => $totalPaid // ✅ Sinkronkan juga amount_paid
+            ]);
+        } elseif ($this->amount_paid != $totalPaid) {
+             // Jika status sama tapi amount_paid beda (misal: pembayaran dihapus)
+             $this->update(['amount_paid' => $totalPaid]);
+        }
+        
+        // 5. Jika Lunas, hapus token pending (jika ada)
+        if ($newStatus == 'paid') {
+            if ($this->pending_snap_token) {
+                $this->update([
+                    'pending_snap_token' => null,
+                    'pending_snap_expires_at' => null
+                ]);
+            }
+            // Lepaskan kredit pending
+            ClientLedger::where('sales_invoice_id', $this->invoice_id)
+                        ->where('status', 'pending')
+                        ->update([
+                            'status' => 'available',
+                            'description' => DB::raw("REPLACE(description, ' (Ditahan)', '')")
+                        ]);
+        }
     }
 }

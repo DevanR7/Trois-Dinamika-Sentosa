@@ -39,10 +39,14 @@
                                     @endforeach
                                 </select>
                             </div>
-                            {{-- Area Baru: Menampilkan Saldo Kredit Klien --}}
+                            {{-- =================================== --}}
+                            {{-- ✅ AREA SALDO KLIEN YANG DIPERBARUI --}}
+                            {{-- =================================== --}}
                             <div class="col-md-6 align-self-end">
                                 <div id="client-credit-info" class="alert alert-info py-2 d-none">
-                                    Saldo Kredit Tersedia: <strong id="client-credit-balance">Rp 0</strong>
+                                    Saldo Tersedia: <strong id="client-credit-balance">Rp 0</strong>
+                                    <br>
+                                    <small class="text-muted">Saldo Tertahan: <strong id="client-pending-balance">Rp 0</strong></small>
                                 </div>
                             </div>
                         </div>
@@ -62,8 +66,8 @@
                             {{-- Input Dana Diterima (Non-Kredit) --}}
                             <div class="col-md-4">
                                 <label for="total_amount_formatted" class="form-label">Total Dana Diterima (Non-Kredit)</label>
-                                <input type="text" class="form-control" id="total_amount_formatted"> {{-- 'required' diatur oleh JS --}}
-                                <input type="hidden" name="total_amount" id="total_amount" value="0"> {{-- Default value 0 --}}
+                                <input type="text" class="form-control" id="total_amount_formatted">
+                                <input type="hidden" name="total_amount" id="total_amount" value="0">
                             </div>
                             {{-- Input Tanggal Bayar --}}
                             <div class="col-md-4">
@@ -73,11 +77,11 @@
                             {{-- Input Metode Bayar --}}
                             <div class="col-md-4">
                                 <label for="payment_method" class="form-label">Metode Bayar (Non-Kredit)</label>
-                                <select name="payment_method" id="payment_method" class="form-select"> {{-- 'required' diatur oleh JS --}}
+                                <select name="payment_method" id="payment_method" class="form-select">
                                      <option value="">-- Pilih Metode --</option>
                                      <option value="manual_transfer">Transfer Bank</option>
-                                    <option value="cash">Cash</option>
-                                    <option value="other">Lainnya</option>
+                                     <option value="cash">Cash</option>
+                                     <option value="other">Lainnya</option>
                                 </select>
                             </div>
                             {{-- Input Catatan --}}
@@ -122,7 +126,6 @@
 </div>
 @endsection
 
-{{-- Menambahkan Skrip Javascript --}}
 @push('scripts')
 {{-- Include Select2 & AutoNumeric JS --}}
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
@@ -141,6 +144,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const amountHiddenInput = document.getElementById('total_amount');
     const creditInfoDiv = document.getElementById('client-credit-info');
     const creditBalanceSpan = document.getElementById('client-credit-balance');
+    const pendingBalanceSpan = document.getElementById('client-pending-balance'); // ✅ BARU
     const useCreditContainer = document.getElementById('use-credit-container');
     const useCreditCheckbox = document.getElementById('use_credit');
     const paymentMethodSelect = document.getElementById('payment_method');
@@ -198,7 +202,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (creditIsSufficient) {
                 // Kredit cukup: dana input tidak perlu & nonaktif
                 if (!amountFormattedInput.disabled) { // Hanya set ke 0 jika sebelumnya aktif
-                     autoNumericInstance.set(0);
+                    autoNumericInstance.set(0);
                 }
                 amountFormattedInput.required = false;
                 amountFormattedInput.disabled = true;
@@ -211,7 +215,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 amountFormattedInput.disabled = false;
                 paymentMethodSelect.required = true; // Metode juga wajib
                 paymentMethodSelect.disabled = false;
-                 if (!paymentMethodSelect.value) paymentMethodSelect.value = "manual_transfer"; // Default jika kosong
+                if (!paymentMethodSelect.value) paymentMethodSelect.value = "manual_transfer"; // Default jika kosong
             }
         } else {
             // Tidak pakai kredit: dana input perlu & aktif
@@ -278,20 +282,27 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         try {
-            // 1. Fetch data Klien (termasuk saldo kredit)
+            // =================================== --}}
+            // ✅ PERBAIKAN FETCH API (Menggunakan 'balance' dan 'pending_balance') --}}
+            // =================================== --}}
             const clientResponse = await fetch(`/api/clients/${clientId}/details`);
             if (!clientResponse.ok) throw new Error('Gagal ambil data klien');
             const clientData = await clientResponse.json();
-            currentCreditBalance = parseFloat(clientData.credit_balance) || 0;
+            
+            // Gunakan 'balance' (available)
+            currentCreditBalance = parseFloat(clientData.balance) || 0; 
+            const pendingBalance = parseFloat(clientData.pending_balance) || 0;
 
-            // Tampilkan info kredit & checkbox jika ada saldo
+            creditBalanceSpan.textContent = formatRupiah(currentCreditBalance);
+            pendingBalanceSpan.textContent = formatRupiah(pendingBalance);
+            creditInfoDiv.classList.remove('d-none'); // Selalu tampilkan info, meski 0
+
             if (currentCreditBalance > 0) {
-                creditBalanceSpan.textContent = formatRupiah(currentCreditBalance);
-                creditInfoDiv.classList.remove('d-none');
-                useCreditContainer.style.display = 'block'; // Tampilkan container checkbox
+                useCreditContainer.style.display = 'block'; // Tampilkan checkbox
             }
+            // =================================== --}}
 
-            // 2. Fetch data Invoice yang belum lunas
+            // Fetch Invoices (API Anda sudah diperbarui di langkah sebelumnya)
             const invoiceResponse = await fetch(`/api/clients/${clientId}/unpaid-invoices`);
             if (!invoiceResponse.ok) throw new Error('Gagal mengambil data invoice');
             const invoices = await invoiceResponse.json();

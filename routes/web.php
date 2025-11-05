@@ -163,6 +163,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('batch-payments/create', [BatchPaymentController::class, 'create'])->name('batch-payments.create');
     Route::post('batch-payments', [BatchPaymentController::class, 'store'])->name('batch-payments.store');
 
+    Route::get('batch-payments/pending', [BatchPaymentController::class, 'pending'])
+         ->name('batch-payments.pending');
+    Route::get('batch-payments/pending/{batchPayment}', [BatchPaymentController::class, 'showPending'])
+         ->name('batch-payments.showPending');
+    Route::post('batch-payments/pending/{batchPayment}/approve', [BatchPaymentController::class, 'approve'])
+         ->name('batch-payments.approve');
+    Route::post('batch-payments/pending/{batchPayment}/reject', [BatchPaymentController::class, 'reject'])
+         ->name('batch-payments.reject');
+         
     // API Endpoints untuk Batch Payment (dilindungi auth web)
     Route::get('/api/clients/{client}/unpaid-invoices', [BatchPaymentController::class, 'getUnpaidInvoicesApi'])->name('api.clients.unpaid-invoices');
 
@@ -170,10 +179,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ✅ PINDAHKAN ROUTE DETAIL KLIEN KE SINI
     // ==========================================================
     Route::get('/api/clients/{client}/details', function (App\Models\Client $client) {
+        // Ambil data menggunakan accessor baru
         return response()->json([
             'client_id' => $client->client_id,
             'client_name' => $client->client_name,
-            'credit_balance' => $client->credit_balance ?? 0,
+            'balance' => $client->balance, // Menggunakan accessor 'balance' (available)
+            'pending_balance' => $client->pending_balance, // Menggunakan accessor 'pending_balance'
         ]);
     })->name('api.clients.details');
 
@@ -186,10 +197,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
          ->name('api.suppliers.unpaid-pos');
     // API untuk detail supplier (deposit)
     Route::get('/api/suppliers/{supplier}/details', function (App\Models\Supplier $supplier) {
+        // Ambil data menggunakan accessor baru
         return response()->json([
             'supplier_id' => $supplier->supplier_id,
             'supplier_name' => $supplier->supplier_name,
-            'debit_balance' => $supplier->debit_balance ?? 0,
+            'balance' => $supplier->balance, // Menggunakan accessor 'balance' (available)
+            'pending_balance' => $supplier->pending_balance, // Menggunakan accessor 'pending_balance'
         ]);
     })->name('api.suppliers.details');
 
@@ -220,12 +233,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return response()->json(['items' => $purchaseOrder->items]);
     });
 
-    Route::get('/invoice-adjustments/create', [App\Http\Controllers\InvoiceAdjustmentController::class, 'create'])
-         ->name('invoice-adjustments.create');
-    Route::post('/invoice-adjustments', [App\Http\Controllers\InvoiceAdjustmentController::class, 'store'])
-         ->name('invoice-adjustments.store');
-    Route::delete('/invoice-adjustments/{invoiceAdjustment}', [App\Http\Controllers\InvoiceAdjustmentController::class, 'destroy'])
-         ->name('invoice-adjustments.destroy');
+    Route::prefix('invoice-adjustments')->name('invoice-adjustments.')->group(function () {
+        // Halaman Pilihan: Tampilkan pilihan "Manual" atau "Otomatis"
+        Route::get('/create', [App\Http\Controllers\InvoiceAdjustmentController::class, 'create']) // Hapus {invoice}
+         ->name('create');
+
+        // Alur 1: Manual (Input Nominal)
+        Route::get('/create-manual/{invoice}', [App\Http\Controllers\InvoiceAdjustmentController::class, 'createManual'])
+             ->name('create.manual');
+        Route::post('/store-manual', [App\Http\Controllers\InvoiceAdjustmentController::class, 'storeManual'])
+             ->name('store.manual');
+
+        // Alur 2: Otomatis (Revisi Invoice)
+        Route::get('/create-auto/{invoice}', [App\Http\Controllers\InvoiceAdjustmentController::class, 'createAuto'])
+             ->name('create.auto');
+        Route::post('/store-auto/{invoice}', [App\Http\Controllers\InvoiceAdjustmentController::class, 'storeAuto'])
+             ->name('store.auto');
+
+        // Hapus Penyesuaian
+        Route::delete('/{invoiceAdjustment}', [App\Http\Controllers\InvoiceAdjustmentController::class, 'destroy'])
+             ->name('destroy');
+    });
 
     Route::get('/purchase-order-adjustments/create', [App\Http\Controllers\PurchaseOrderAdjustmentController::class, 'create'])
          ->name('purchase-order-adjustments.create');

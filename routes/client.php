@@ -51,6 +51,16 @@ Route::prefix('client')->name('client.')->group(function () {
 
             // Invoices
             Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+            Route::get('invoices/batch-pay', [InvoiceController::class, 'showBatchPay'])
+                 ->name('invoices.batchPay.create');
+            
+            Route::post('invoices/batch-pay-midtrans', [MidtransController::class, 'payBatch'])
+                 ->name('invoices.batchPay.storeMidtrans'); // Ganti nama agar unik
+            
+            // ✅ TAMBAHKAN RUTE BARU INI
+            Route::post('invoices/batch-pay-manual', [InvoiceController::class, 'storeBatchProof'])
+                 ->name('invoices.batchPay.storeManual');
+
             Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
             Route::post('invoices/{invoice}/upload-proof', [InvoiceController::class, 'uploadProof'])->name('invoices.uploadProof');
 

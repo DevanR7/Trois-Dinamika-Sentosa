@@ -147,8 +147,8 @@
 {{-- ======================================================================== --}}
 
 {{-- 6. Invoices & Piutang --}}
-{{-- Saya tambahkan permission 'create-invoice-adjustments' ke 'canany' --}}
-@if(Auth::user()->canany(["view-invoices", "create-batch-payments", "create-invoice-adjustments"]))
+{{-- Tambahkan 'review-batch-payments' ke canany --}}
+@if(Auth::user()->canany(["view-invoices", "create-invoice-adjustments", "create-batch-payments", "review-batch-payments"]))
     <div class="menu_title flex">
         <span class="title">Invoices & Piutang</span>
         <span class="line"></span>
@@ -163,22 +163,38 @@
         </li>
         @endcan
         
-        {{-- ✅ INI LINK BARU ANDA --}}
-        @can("create-invoice-adjustments") {{-- (Pastikan Anda membuat permission ini) --}}
+        {{-- Pindahkan Penyesuaian ke sini agar logis --}}
+        @can("create-invoice-adjustments") 
         <li class="item">
-            <a class="link flex {{ request()->routeIs('invoice-adjustments.*') ? 'active' : '' }}" href="{{ route('invoice-adjustments.create') }}">
-                <i class="material-icons">edit_note</i>
-                <span>Penyesuaian Invoice</span>
-            </a>
-        </li>
+    {{-- BENAR: Tidak perlu parameter --}}
+    <a class="link flex {{ request()->routeIs('invoice-adjustments.*') ? 'active' : '' }}" href="{{ route('invoice-adjustments.create') }}">
+        <i class="material-icons">edit_note</i>
+        <span>Penyesuaian Invoice</span>
+    </a>
+</li>
         @endcan
-        {{-- ✅ AKHIR DARI LINK BARU --}}
         
         @can("create-batch-payments")
         <li class="item">
-            <a class="link flex {{ request()->routeIs('batch-payments.*') ? 'active' : '' }}" href="{{ route('batch-payments.create') }}">
+            <a class="link flex {{ (request()->routeIs('batch-payments.*') && !request()->routeIs('batch-payments.pending') && !request()->routeIs('batch-payments.showPending')) ? 'active' : '' }}" href="{{ route('batch-payments.create') }}">
                 <i class="material-icons">payments</i>
-                <span>Pembayaran Piutang</span>
+                <span>Buat Pembayaran Batch</span>
+            </a>
+        </li>
+        @endcan
+
+        @can("review-batch-payments")
+        <li class="item">
+            <a class="link flex {{ request()->routeIs('batch-payments.pending') || request()->routeIs('batch-payments.showPending') ? 'active' : '' }}" href="{{ route('batch-payments.pending') }}">
+                <i class="material-icons">fact_check</i>
+                <span>Verifikasi Pembayaran</span>
+                
+                @php
+                    $pendingBatchCount = \App\Models\BatchPayment::where('status', 'pending_verification')->count();
+                @endphp
+                @if($pendingBatchCount > 0)
+                    <span class="badge bg-danger rounded-pill ms-auto">{{ $pendingBatchCount }}</span>
+                @endif
             </a>
         </li>
         @endcan

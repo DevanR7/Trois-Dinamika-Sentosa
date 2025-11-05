@@ -81,6 +81,7 @@ class RoleAndPermissionSeeder extends Seeder
         // ✅ PINDAHKAN INVOICE ADJUSTMENT KE SINI
         // ===========================================
         Permission::updateOrCreate(['name' => 'create-invoice-adjustments']);
+        Permission::updateOrCreate(['name' => 'review-batch-payments']);
 
 
         // Sales Returns

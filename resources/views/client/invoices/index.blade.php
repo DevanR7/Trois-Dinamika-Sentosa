@@ -2,8 +2,20 @@
 
 @section('content')
     <h2 class="fw-bold mb-4">Riwayat Invoice</h2>
+    
+    {{-- Notifikasi (dari redirect pembayaran Midtrans) --}}
+    @if(request()->has('payment_success'))
+        <div class="alert alert-success">
+            Pembayaran Anda berhasil dan sedang diproses. Status akan segera diperbarui.
+        </div>
+    @endif
+    @if(request()->has('payment_pending'))
+        <div class="alert alert-info">
+            Pembayaran Anda tertunda (pending). Kami akan memperbarui status invoice setelah pembayaran Anda selesai.
+        </div>
+    @endif
 
-    {{-- ✅ FORM FILTER BARU --}}
+    {{-- FORM FILTER --}}
     <div class="card shadow-sm mb-4">
         <div class="card-body">
             <form action="{{ route('client.invoices.index') }}" method="GET" class="row g-3 align-items-end">
@@ -73,11 +85,14 @@
                     </thead>
                     <tbody>
                         @forelse($invoices as $invoice)
+                            {{-- ====================================================== --}}
+                            {{-- ✅ INI ADALAH BLOK YANG HILANG DI FILE ANDA --}}
+                            {{-- ====================================================== --}}
                             @php
-                                // Hitung sisa tagihan (termasuk retur jika ada)
-                                $totalRetur = $invoice->returns->sum('total_amount');
-                                $sisaTagihan = $invoice->total_amount - $invoice->amount_paid - $totalRetur;
+                                // Gunakan accessor yang sudah benar (sudah di-load oleh controller)
+                                $sisaTagihan = $invoice->remaining_balance;
                             @endphp
+                            {{-- ====================================================== --}}
                             <tr>
                                 <td>{{ $invoice->invoice_number }}</td>
                                 <td>{{ optional($invoice->order_date)->format('d M Y') }}</td>
@@ -85,7 +100,7 @@
                                     {{ optional($invoice->due_date)->format('d M Y') }}
                                 </td>
                                 <td class="text-end">Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</td>
-                                <td class="text-end fw-bold {{ $sisaTagihan > 0 ? 'text-danger' : '' }}">
+                                <td class="text-end fw-bold {{ $sisaTagihan > 0.01 ? 'text-danger' : '' }}">
                                     Rp {{ number_format($sisaTagihan, 0, ',', '.') }}
                                 </td>
                                 <td class="text-center">
@@ -114,7 +129,7 @@
                 </table>
             </div>
             <div class="mt-3 d-flex justify-content-center">
-                {{-- Tambahkan appends agar filter tetap ada saat ganti halaman --}}
+                {{-- appends() akan meneruskan semua parameter filter, termasuk 'sort' --}}
                 {{ $invoices->appends(request()->query())->links() }}
             </div>
         </div>

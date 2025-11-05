@@ -43,7 +43,7 @@
                      <li><a class="dropdown-item" href="{{ route('invoices.edit', $invoice->invoice_id) }}"><i class="bi bi-pencil-square me-2"></i> Edit Invoice</a></li>
                      <li><hr class="dropdown-divider"></li>
                      <li>
-                         <a class="dropdown-item" href="{{ route('invoice-adjustments.create', ['sales_invoice_id' => $invoice->invoice_id]) }}">
+                         <a class="dropdown-item" href="{{ route('invoice-adjustments.create', $invoice->invoice_id) }}">
                              <i class="bi bi-file-earmark-diff me-2"></i> Buat Penyesuaian
                          </a>
                      </li>

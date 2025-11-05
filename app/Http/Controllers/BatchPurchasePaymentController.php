@@ -18,9 +18,6 @@ use App\Models\SupplierLedger;
 
 class BatchPurchasePaymentController extends Controller
 {
-    /**
-     * Tampilkan halaman form untuk membuat batch payment.
-     */
     public function create(): View
     {
         $this->authorize('create-batch-purchase-payments');
@@ -28,42 +25,34 @@ class BatchPurchasePaymentController extends Controller
         return view('batch_purchase_payments.create', compact('suppliers'));
     }
 
-    /**
-     * [API] Ambil data PO yang belum lunas milik supplier.
-     */
     public function getUnpaidPurchaseOrdersApi(Supplier $supplier): JsonResponse
     {
         $purchaseOrders = $supplier->purchaseOrders()
             ->whereIn('payment_status', ['unpaid', 'partially_paid'])
-            // ✅ Gunakan total_returned yang sudah di-cache (sudah benar)
-            // ->withSum('returns', 'total_amount') // Tidak perlu join
+            // ✅ Eager load relasi yang diperlukan untuk accessor
+            ->with(['deductingReturns', 'adjustments'])
             ->orderBy('due_date', 'asc')
             ->get();
 
         $posWithBalance = $purchaseOrders->map(function ($po) {
-            // ✅ Gunakan kolom total_returned yang sudah benar
-            $totalRetur = $po->total_returned ?? 0;
-            $sisaTagihan = $po->total_amount - $po->amount_paid - $totalRetur;
+            // ✅ Gunakan accessor 'remaining_balance'
+            $sisaTagihan = $po->remaining_balance;
 
             return [
                 'po_id' => $po->po_id,
                 'po_number' => $po->po_number,
                 'due_date_formatted' => optional($po->due_date)->format('d M Y') ?? 'N/A',
-                'sisa_tagihan' => max(0, $sisaTagihan),
+                'sisa_tagihan' => $sisaTagihan,
             ];
         })->filter(fn($po) => $po['sisa_tagihan'] > 0.01);
 
         return response()->json($posWithBalance);
     }
 
-    /**
-     * Simpan batch payment dan alokasikan ke beberapa PO.
-     */
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create-batch-purchase-payments');
-
-        // ✅ Validasi tetap sama
+        
         $validated = $request->validate([
             'supplier_id' => 'required|exists:suppliers,supplier_id',
             'payment_date' => 'required|date',
@@ -85,19 +74,17 @@ class BatchPurchasePaymentController extends Controller
             $danaDariInput = (float)($validated['total_amount'] ?? 0);
             $pakaiDeposit = $validated['use_debit_balance'] ?? false;
             
-            // ✅ 1. BACA SALDO AVAILABLE
-            $depositAwalSupplier = $supplier->balance; // <-- Menggunakan accessor 'balance'
+            $depositAwalSupplier = $supplier->balance; // <-- Sudah benar (menggunakan accessor)
 
-            // Ambil PO terpilih untuk hitung total tagihan
             $posDipilih = PurchaseOrder::whereIn('po_id', $validated['po_ids'])
-                                // ->withSum('returns', 'total_amount') // Tidak perlu
+                                // ✅ Eager load relasi
+                                ->with(['deductingReturns', 'adjustments'])
                                 ->orderBy('due_date', 'asc')
                                 ->get();
 
             $totalTagihanTerpilih = $posDipilih->reduce(function ($carry, $po) {
-                // ✅ Gunakan total_returned yang sudah benar
-                $retur = $po->total_returned ?? 0;
-                $sisa = max(0, $po->total_amount - $po->amount_paid - $retur);
+                // ✅ Gunakan accessor
+                $sisa = $po->remaining_balance;
                 return $carry + $sisa;
             }, 0.0);
 
@@ -105,7 +92,7 @@ class BatchPurchasePaymentController extends Controller
                  throw new \Exception("Tidak ada tagihan yang dipilih atau semua PO terpilih sudah lunas.");
             }
 
-            // ✅ Hitung alokasi dana
+            // ... (Logika $depositAkanDigunakan, $danaInputAkanDigunakan, dll. Anda sudah benar) ...
             $depositAkanDigunakan = 0;
             if ($pakaiDeposit && $depositAwalSupplier > 0) {
                 $depositAkanDigunakan = min($depositAwalSupplier, $totalTagihanTerpilih);
@@ -113,15 +100,18 @@ class BatchPurchasePaymentController extends Controller
             $sisaTagihanSetelahDeposit = max(0, $totalTagihanTerpilih - $depositAkanDigunakan);
             $danaInputAkanDigunakan = min($danaDariInput, $sisaTagihanSetelahDeposit);
             $totalDanaAlokasi = $depositAkanDigunakan + $danaInputAkanDigunakan;
-            $sisaDanaInput = max(0, $danaDariInput - $danaInputAkanDigunakan); // Overpayment
+            $sisaDanaInput = max(0, $danaDariInput - $danaInputAkanDigunakan);
 
             if ($totalDanaAlokasi <= 0.01 && $sisaDanaInput <= 0.01) {
-                if ($totalTagihanTerpilih > 0.01) {
+                 if ($totalTagihanTerpilih > 0.01) {
                     throw new \Exception("Tidak ada dana (input/deposit) yang cukup untuk dialokasikan.");
-                }
+                 }
             }
 
-            // ✅ Buat record BatchPurchasePayment
+            // --- Mulai Proses Database ---
+
+            // 1. Buat BatchPurchasePayment (Logika ini sudah benar)
+            // ... (Logika $metodeBatch) ...
             $metodeBatch = '';
             if ($depositAkanDigunakan > 0) $metodeBatch .= 'Deposit Supplier';
             if ($danaInputAkanDigunakan > 0) {
@@ -139,6 +129,7 @@ class BatchPurchasePaymentController extends Controller
                 'notes' => $validated['notes'],
             ]);
 
+            // 2. Buat entri Ledger (Logika ini sudah benar)
             $alokasiLog = [];
             if ($depositAkanDigunakan > 0) {
                 SupplierLedger::create([
@@ -156,6 +147,7 @@ class BatchPurchasePaymentController extends Controller
             }
             if ($danaInputAkanDigunakan > 0) $alokasiLog[] = "Menggunakan dana input Rp " . number_format($danaInputAkanDigunakan);
 
+
             // 3. Alokasikan dana ke PO
             $sisaDepositUntukAlokasi = $depositAkanDigunakan;
             $sisaInputUntukAlokasi = $danaInputAkanDigunakan;
@@ -163,8 +155,8 @@ class BatchPurchasePaymentController extends Controller
             foreach ($posDipilih as $po) {
                 if ($sisaDepositUntukAlokasi <= 0.01 && $sisaInputUntukAlokasi <= 0.01) break;
 
-                $totalRetur = $po->total_returned ?? 0;
-                $sisaTagihanPO = max(0, $po->total_amount - $po->amount_paid - $totalRetur);
+                // ✅ Gunakan accessor
+                $sisaTagihanPO = $po->remaining_balance;
 
                 if ($sisaTagihanPO <= 0.01) continue;
 
@@ -175,14 +167,14 @@ class BatchPurchasePaymentController extends Controller
 
                 if ($jumlahUntukPOIni <= 0.01) continue;
 
+                // ... (Logika $metodePayment Anda sudah benar) ...
                 $metodePayment = '';
                 if ($bayarDariDeposit > 0) $metodePayment .= 'Deposit Supplier';
                 if ($bayarDariInput > 0) {
-                    if (!empty($metodePayment)) $metodePayment .= ' + ';
-                    $metodePayment .= $validated['payment_method'] ?? 'N/A';
+                     if (!empty($metodePayment)) $metodePayment .= ' + ';
+                     $metodePayment .= $validated['payment_method'] ?? 'N/A';
                 }
 
-                // Simpan payment PO
                 $po->payments()->create([
                     'batch_purchase_payment_id' => $batchPayment->batch_payment_id,
                     'payment_date' => $validated['payment_date'],
@@ -191,11 +183,17 @@ class BatchPurchasePaymentController extends Controller
                     'received_by_user_id' => Auth::id(),
                 ]);
 
-                // Update status PO
+                // Update status PurchaseOrder
                 $poCurrent = PurchaseOrder::find($po->po_id);
                 $totalPaidBaru = ($poCurrent->amount_paid ?? 0) + $jumlahUntukPOIni;
-                $sisaTagihanBaru = $poCurrent->total_amount - ($poCurrent->total_returned ?? 0) - $totalPaidBaru;
                 
+                // ✅ Hitung sisa tagihan baru dengan benar
+                $totalRetur = $poCurrent->deductingReturns()->sum('total_amount');
+                $totalAdjustments = $poCurrent->adjustments()->sum(DB::raw("CASE WHEN type = 'debit_note' THEN amount ELSE -amount END"));
+                $totalTagihanAktual = $poCurrent->total_amount + $totalAdjustments - $totalRetur;
+
+                $sisaTagihanBaru = $totalTagihanAktual - $totalPaidBaru;
+
                 $newStatus = ($sisaTagihanBaru <= 0.01) ? 'paid' : 'partially_paid';
 
                 $poCurrent->update([
@@ -203,9 +201,7 @@ class BatchPurchasePaymentController extends Controller
                     'payment_status' => $newStatus,
                 ]);
 
-                // ======================================================
-                // ✅ 3. LEPASKAN DEPOSIT PENDING JIKA PO INI LUNAS
-                // ======================================================
+                // ✅ Lepaskan kredit pending (Logika ini sudah benar)
                 if ($newStatus == 'paid') {
                     SupplierLedger::where('purchase_order_id', $poCurrent->po_id)
                                 ->where('status', 'pending')
@@ -214,14 +210,13 @@ class BatchPurchasePaymentController extends Controller
                                     'description' => DB::raw("REPLACE(description, ' (Ditahan)', '')")
                                 ]);
                 }
-                // ======================================================
 
                 $sisaDepositUntukAlokasi -= $bayarDariDeposit;
                 $sisaInputUntukAlokasi -= $bayarDariInput;
                 $alokasiLog[] = "Rp " . number_format($jumlahUntukPOIni) . " dialokasikan ke " . $po->po_number;
             }
 
-            // ✅ 3. Catat overpayment (sisa dana input) via SupplierLedger
+            // 4. Catat overpayment (Logika ini sudah benar)
             if ($sisaDanaInput > 0.01) {
                 SupplierLedger::create([
                     'supplier_id' => $supplier->supplier_id,
@@ -230,7 +225,7 @@ class BatchPurchasePaymentController extends Controller
                     'transaction_date' => $validated['payment_date'],
                     'type' => 'credit',
                     'amount' => $sisaDanaInput,
-                    'status' => 'available', // Kelebihan bayar selalu 'available'
+                    'status' => 'available',
                     'description' => 'Kelebihan dana dari Pembayaran Hutang Batch #' . $batchPayment->batch_payment_id,
                     'user_id' => Auth::id(),
                 ]);

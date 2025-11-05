@@ -91,7 +91,7 @@ class ClientOnlineOrderController extends Controller
     public function create(): View
     {
         $products = Product::where('stock_quantity', '>', 0)
-                            ->whereNotNull('purchase_price') // Tetap pakai purchase_price
+                            ->whereNotNull('selling_price') // Tetap pakai purchase_price
                             ->orderBy('product_name')
                             ->get();
 
@@ -128,7 +128,7 @@ class ClientOnlineOrderController extends Controller
                 }
 
                 $quantity = $productData['quantity'];
-                $price = $product->purchase_price ?? 0;
+                $price = $product->selling_price ?? 0;
                 $subtotal = $quantity * $price;
                 $totalAmount += $subtotal;
 
