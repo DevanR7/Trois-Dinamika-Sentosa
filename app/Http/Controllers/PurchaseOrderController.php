@@ -478,4 +478,5 @@
         return back()->with('success', 'Nomor Faktur Supplier berhasil disimpan.');
     }
 
+    
 }

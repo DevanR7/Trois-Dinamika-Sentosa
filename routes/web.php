@@ -255,12 +255,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
              ->name('destroy');
     });
 
-    Route::get('/purchase-order-adjustments/create', [App\Http\Controllers\PurchaseOrderAdjustmentController::class, 'create'])
-         ->name('purchase-order-adjustments.create');
-    Route::post('/purchase-order-adjustments', [App\Http\Controllers\PurchaseOrderAdjustmentController::class, 'store'])
-         ->name('purchase-order-adjustments.store');
-    Route::delete('/purchase-order-adjustments/{purchaseOrderAdjustment}', [App\Http\Controllers\PurchaseOrderAdjustmentController::class, 'destroy'])
-         ->name('purchase-order-adjustments.destroy');
-});
+    Route::prefix('purchase-order-adjustments')->name('purchase-order-adjustments.')->group(function () {
+        // Halaman Pilihan: Tampilkan pilihan "Manual" atau "Otomatis"
+        Route::get('/create', [App\Http\Controllers\PurchaseOrderAdjustmentController::class, 'create'])
+             ->name('create');
 
+        // Alur 1: Manual (Input Nominal)
+        Route::get('/create-manual/{purchaseOrder}', [App\Http\Controllers\PurchaseOrderAdjustmentController::class, 'createManual'])
+             ->name('create.manual');
+        Route::post('/store-manual', [App\Http\Controllers\PurchaseOrderAdjustmentController::class, 'storeManual'])
+             ->name('store.manual');
+
+        // Alur 2: Otomatis (Revisi PO)
+        Route::get('/create-auto/{purchaseOrder}', [App\Http\Controllers\PurchaseOrderAdjustmentController::class, 'createAuto'])
+             ->name('create.auto');
+        Route::post('/store-auto/{purchaseOrder}', [App\Http\Controllers\PurchaseOrderAdjustmentController::class, 'storeAuto'])
+             ->name('store.auto');
+             
+        // Hapus Penyesuaian (Tetap sama)
+        Route::delete('/{purchaseOrderAdjustment}', [App\Http\Controllers\PurchaseOrderAdjustmentController::class, 'destroy'])
+             ->name('destroy');
+    });
+});
 require __DIR__.'/auth.php';

@@ -57,7 +57,7 @@
                     @endif
                     <li><hr class="dropdown-divider"></li>
 
-                    {{-- Tombol Buat Penyesuaian PO --}}
+                    {{-- ✅ Link Penyesuaian PO Baru --}}
                     <li>
                         <a class="dropdown-item" href="{{ route('purchase-order-adjustments.create', ['purchase_order_id' => $purchaseOrder->po_id]) }}">
                             <i class="bi bi-file-earmark-diff me-2"></i> Buat Penyesuaian PO
@@ -191,7 +191,7 @@
                             <td class="text-end fw-bold">
                                 Rp {{ number_format($adjustment->amount, 0, ',', '.') }}
                             </td>
-                            <td>{{ $adjustment->reason }}</td>
+                            <td style="white-space: pre-wrap; word-break: break-word;">{{ $adjustment->reason }}</td>
                             <td>{{ $adjustment->user->full_name ?? 'N/A' }}</td>
                             <td>
                                 <form action="{{ route('purchase-order-adjustments.destroy', $adjustment->adjustment_id) }}" method="POST" class="form-cancel-po-adjustment">

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB; // <-- Pastikan baris ini ada
+use Illuminate\Support\Facades\Log;
 
 class PurchaseOrder extends Model
 {
@@ -167,5 +168,63 @@ class PurchaseOrder extends Model
         $balance -= $totalCreditNotes;
         
         return max(0, $balance); // Pastikan tidak pernah negatif
+    }
+
+    public function updatePaymentStatus()
+    {
+        // Jangan update jika sudah dibatalkan
+        if ($this->status == 'cancelled') {
+            return;
+        }
+
+        // 1. Ambil total pembayaran
+        $totalPaid = $this->payments()->sum('amount');
+
+        // 2. Hitung total tagihan yang sebenarnya (setelah koreksi/retur)
+        $this->loadMissing(['adjustments', 'deductingReturns']); 
+        
+        $totalAdjustments = $this->adjustments->sum(function($adj) {
+            return $adj->type == 'debit_note' ? $adj->amount : -$adj->amount;
+        });
+        
+        $totalDeductingReturns = $this->deductingReturns->sum('total_amount');
+        
+        $totalDue = $this->total_amount + $totalAdjustments - $totalDeductingReturns;
+        
+        $totalDue = round($totalDue, 2);
+        $totalPaid = round($totalPaid, 2);
+        
+        // 3. Tentukan status baru
+        $newStatus = 'unpaid'; // Default
+        
+        if ($totalPaid >= ($totalDue - 0.01)) { // Toleransi 1 sen
+            $newStatus = 'paid';
+        } elseif ($totalPaid > 0.01) {
+            $newStatus = 'partially_paid';
+        }
+        
+        // 4. Update HANYA jika status berubah atau amount_paid tidak sinkron
+        if ($this->payment_status != $newStatus || $this->amount_paid != $totalPaid) {
+            $this->update([
+                'payment_status' => $newStatus,
+                'amount_paid' => $totalPaid
+            ]);
+        }
+        
+        // 5. Jika Lunas, lepaskan deposit pending
+        if ($newStatus == 'paid') {
+            // (Kita asumsikan SupplierLedger ada, berdasarkan controller Anda)
+            try {
+                SupplierLedger::where('purchase_order_id', $this->po_id)
+                            ->where('status', 'pending')
+                            ->update([
+                                'status' => 'available',
+                                'description' => DB::raw("REPLACE(description, ' (Ditahan)', '')")
+                            ]);
+            } catch (\Exception $e) {
+                // Tangani jika model SupplierLedger tidak ada
+                Log::error("Gagal melepaskan SupplierLedger: " . $e->getMessage());
+            }
+        }
     }
 }
