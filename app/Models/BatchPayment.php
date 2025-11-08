@@ -13,12 +13,14 @@ class BatchPayment extends Model
 
     protected $primaryKey = 'batch_payment_id';
 
+    // ✅ PERBAIKAN: Sesuaikan dengan skema database baru
     protected $fillable = [
         'client_id',
         'processed_by_user_id',
         'payment_date',
         'total_amount',
-        'payment_method',
+        'payment_method_id',
+        'company_bank_account_id', 
         'notes',
         'status',
         'details',
@@ -43,5 +45,16 @@ class BatchPayment extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class, 'batch_payment_id', 'batch_payment_id');
+    }
+
+    // ✅ PERBAIKAN: Tambahkan relasi ke PaymentMethod
+    public function paymentMethod(): BelongsTo
+    {
+        return $this->belongsTo(PaymentMethod::class, 'payment_method_id', 'payment_method_id');
+    }
+
+    public function companyBankAccount(): BelongsTo
+    {
+        return $this->belongsTo(CompanyBankAccount::class, 'company_bank_account_id', 'company_bank_account_id');
     }
 }

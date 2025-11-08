@@ -11,8 +11,8 @@
     <div class="row justify-content-center">
         <div class="col-lg-10">
             <div class="card shadow-sm border-0">
-                <div class="card-header bg-success text-white">
-                    <h4 class="mb-0">Catat Pembayaran Klien (Batch) 💶</h4>
+                <div class="card-header bg-danger text-white"> {{-- Ubah warna jadi merah untuk hutang --}}
+                    <h4 class="mb-0">Catat Pembayaran Hutang (Batch) 💸</h4>
                 </div>
                 <div class="card-body p-4">
 
@@ -26,27 +26,26 @@
                     </div>
                     @endif
 
-                    <form action="{{ route('batch-payments.store') }}" method="POST" id="batch-payment-form">
+                    <form action="{{ route('batch-purchase-payments.store') }}" method="POST" id="batch-payment-form">
                         @csrf
-                        {{-- Bagian 1: Pilih Klien --}}
+                        {{-- Bagian 1: Pilih Supplier --}}
                         <div class="row mb-3">
                             <div class="col-md-6">
-                                <label for="client_id" class="form-label fw-semibold">1. Pilih Klien</label>
-                                <select name="client_id" id="client_id" class="form-select" required>
-                                    <option value="" disabled selected>-- Cari Klien --</option>
-                                    @foreach ($clients as $client)
-                                    <option value="{{ $client->client_id }}">{{ $client->client_name }}</option>
+                                <label for="supplier_id" class="form-label fw-semibold">1. Pilih Supplier</label>
+                                <select name="supplier_id" id="supplier_id" class="form-select" required>
+                                    <option value="" disabled selected>-- Cari Supplier --</option>
+                                    @foreach ($suppliers as $supplier)
+                                    <option value="{{ $supplier->supplier_id }}">{{ $supplier->supplier_name }}</option>
                                     @endforeach
                                 </select>
                             </div>
-                            {{-- =================================== --}}
-                            {{-- ✅ AREA SALDO KLIEN YANG DIPERBARUI --}}
-                            {{-- =================================== --}}
+                            {{-- Area Baru: Menampilkan Saldo Deposit --}}
                             <div class="col-md-6 align-self-end">
-                                <div id="client-credit-info" class="alert alert-info py-2 d-none">
-                                    Saldo Tersedia: <strong id="client-credit-balance">Rp 0</strong>
+                                <div id="supplier-debit-info" class="alert alert-info py-2 d-none">
+                                    Saldo Tersedia: <strong id="supplier-debit-balance">Rp 0</strong>
+                                    {{-- ✅ TAMBAHAN: Tampilkan Saldo Tertahan --}}
                                     <br>
-                                    <small class="text-muted">Saldo Tertahan: <strong id="client-pending-balance">Rp 0</strong></small>
+                                    <small class="text-muted">Saldo Tertahan: <strong id="supplier-pending-balance">Rp 0</strong></small>
                                 </div>
                             </div>
                         </div>
@@ -56,16 +55,16 @@
                         {{-- Bagian 2: Detail Pembayaran --}}
                         <h5 class="fw-semibold">2. Detail Pembayaran</h5>
                         <div class="row mb-3 g-3">
-                             {{-- Checkbox Baru: Gunakan Saldo Kredit --}}
+                             {{-- Checkbox Baru: Gunakan Saldo Deposit --}}
                             <div class="col-12 mb-2">
-                                <div class="form-check form-switch" id="use-credit-container" style="display: none;">
-                                    <input class="form-check-input" type="checkbox" role="switch" id="use_credit" name="use_credit" value="1">
-                                    <label class="form-check-label" for="use_credit">Gunakan Saldo Kredit untuk pembayaran ini?</label>
+                                <div class="form-check form-switch" id="use-debit-container" style="display: none;">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="use_debit_balance" name="use_debit_balance" value="1">
+                                    <label class="form-check-label" for="use_debit_balance">Gunakan Saldo Deposit untuk pembayaran ini?</label>
                                 </div>
                             </div>
-                            {{-- Input Dana Diterima (Non-Kredit) --}}
+                            {{-- Input Dana Dibayar (Non-Deposit) --}}
                             <div class="col-md-4">
-                                <label for="total_amount_formatted" class="form-label">Total Dana Diterima (Non-Kredit)</label>
+                                <label for="total_amount_formatted" class="form-label">Total Dana Dibayar (Non-Deposit)</label>
                                 <input type="text" class="form-control" id="total_amount_formatted">
                                 <input type="hidden" name="total_amount" id="total_amount" value="0">
                             </div>
@@ -74,18 +73,37 @@
                                 <label for="payment_date" class="form-label">Tanggal Bayar</label>
                                 <input type="date" class="form-control" name="payment_date" value="{{ now()->format('Y-m-d') }}" required>
                             </div>
-                            {{-- Input Metode Bayar --}}
+                            
+                            {{-- =================================== --}}
+                            {{-- ✅ PERBAIKAN: Dropdown Metode Pembayaran --}}
+                            {{-- =================================== --}}
                             <div class="col-md-4">
-                                <label for="payment_method" class="form-label">Metode Bayar (Non-Kredit)</label>
-                                <select name="payment_method" id="payment_method" class="form-select">
+                                <label for="payment_method_id" class="form-label">Metode Bayar (Non-Deposit)</label>
+                                <select name="payment_method_id" id="payment_method_id" class="form-select">
                                      <option value="">-- Pilih Metode --</option>
-                                     <option value="manual_transfer">Transfer Bank</option>
-                                     <option value="cash">Cash</option>
-                                     <option value="other">Lainnya</option>
+                                     {{-- Loop dari variabel controller --}}
+                                     @foreach ($paymentMethods as $method)
+                                     <option value="{{ $method->payment_method_id }}" data-type="{{ $method->type }}">
+                                         {{ $method->name }}
+                                     </option>
+                                     @endforeach
                                 </select>
                             </div>
+
+                            <div class="col-md-4">
+    <label for="company_bank_account_id_batch" class="form-label">Setor ke Akun <span class="text-danger">*</span></label>
+    <select name="company_bank_account_id" id="company_bank_account_id_batch" class="form-select">
+        <option value="">-- Pilih Akun Bank/Kas --</option>
+        @foreach($companyBankAccounts as $account)
+            <option value="{{ $account->company_bank_account_id }}">
+                {{ $account->bank_name }} - {{ $account->account_number ?? $account->account_name }}
+            </option>
+        @endforeach
+    </select>
+</div>
+                            
                             {{-- Input Catatan --}}
-                            <div class="col-12">
+                            <div class="col-md-4">
                                 <label for="notes" class="form-label">Catatan (Opsional)</label>
                                 <textarea name="notes" class="form-control" rows="2"></textarea>
                             </div>
@@ -93,22 +111,22 @@
 
                         <hr>
 
-                        {{-- Bagian 3: Alokasi ke Invoice --}}
-                        <h5 class="fw-semibold">3. Alokasi ke Invoice (Diurutkan dari paling lama)</h5>
-                        <p class="text-muted small">Pilih invoice yang akan dibayar. Sistem akan melunasi invoice dari urutan teratas (paling lama) terlebih dahulu menggunakan saldo kredit (jika dipilih) dan dana diterima.</p>
-                        <div id="invoice-list-container" class="border rounded p-3" style="max-height: 400px; overflow-y: auto; background-color: #f8f9fa;">
-                            <p class="text-center text-muted" id="invoice-placeholder">Silakan pilih klien untuk melihat daftar invoice.</p>
-                            <table class="table table-sm table-hover d-none" id="invoice-table">
+                        {{-- Bagian 3: Alokasi ke Purchase Order --}}
+                        <h5 class="fw-semibold">3. Alokasi ke Purchase Order (Diurutkan dari paling lama)</h5>
+                        <p class="text-muted small">Pilih PO yang akan dibayar. Sistem akan melunasi PO dari urutan teratas (paling lama) terlebih dahulu.</p>
+                        <div id="po-list-container" class="border rounded p-3" style="max-height: 400px; overflow-y: auto; background-color: #f8f9fa;">
+                            <p class="text-center text-muted" id="po-placeholder">Silakan pilih supplier untuk melihat daftar PO.</p>
+                            <table class="table table-sm table-hover d-none" id="po-table">
                                 <thead>
                                     <tr>
-                                        <th><input type="checkbox" id="check-all-invoices" class="form-check-input"></th>
-                                        <th>No. Invoice</th>
+                                        <th><input type="checkbox" id="check-all-pos" class="form-check-input"></th>
+                                        <th>No. Purchase Order</th>
                                         <th>Jatuh Tempo</th>
                                         <th class="text-end">Sisa Tagihan</th>
                                     </tr>
                                 </thead>
-                                <tbody id="invoice-list-body">
-                                    {{-- Daftar invoice akan di-load di sini oleh Javascript --}}
+                                <tbody id="po-list-body">
+                                    {{-- Daftar PO akan di-load di sini oleh Javascript --}}
                                 </tbody>
                             </table>
                         </div>
@@ -116,7 +134,7 @@
                         {{-- Footer: Total Dipilih dan Tombol Simpan --}}
                         <div class="d-flex justify-content-between align-items-center bg-light p-3 mt-3 rounded">
                             <h5 class="mb-0">Total Tagihan Dipilih: <span id="total-selected-display" class="fw-bold text-danger">Rp 0</span></h5>
-                            <button type="submit" class="btn btn-success btn-lg">Simpan Pembayaran Batch</button>
+                            <button type="submit" class="btn btn-danger btn-lg">Simpan Pembayaran Hutang</button> {{-- Ubah jadi merah --}}
                         </div>
                     </form>
                 </div>
@@ -126,6 +144,7 @@
 </div>
 @endsection
 
+{{-- Menambahkan Skrip Javascript --}}
 @push('scripts')
 {{-- Include Select2 & AutoNumeric JS --}}
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
@@ -134,220 +153,230 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     // Inisialisasi Elemen DOM
-    const clientSelect = $('#client_id');
-    const invoiceTable = document.getElementById('invoice-table');
-    const invoiceListBody = document.getElementById('invoice-list-body');
-    const invoicePlaceholder = document.getElementById('invoice-placeholder');
-    const checkAll = document.getElementById('check-all-invoices');
+    const supplierSelect = $('#supplier_id');
+    const poTable = document.getElementById('po-table');
+    const poListBody = document.getElementById('po-list-body');
+    const poPlaceholder = document.getElementById('po-placeholder');
+    const checkAll = document.getElementById('check-all-pos');
     const totalSelectedDisplay = document.getElementById('total-selected-display');
     const amountFormattedInput = document.getElementById('total_amount_formatted');
     const amountHiddenInput = document.getElementById('total_amount');
-    const creditInfoDiv = document.getElementById('client-credit-info');
-    const creditBalanceSpan = document.getElementById('client-credit-balance');
-    const pendingBalanceSpan = document.getElementById('client-pending-balance'); // ✅ BARU
-    const useCreditContainer = document.getElementById('use-credit-container');
-    const useCreditCheckbox = document.getElementById('use_credit');
-    const paymentMethodSelect = document.getElementById('payment_method');
-    let currentCreditBalance = 0;
+    const debitInfoDiv = document.getElementById('supplier-debit-info');
+    const debitBalanceSpan = document.getElementById('supplier-debit-balance');
+    const pendingBalanceSpan = document.getElementById('supplier-pending-balance'); // ✅ TAMBAHAN
+    const useDebitContainer = document.getElementById('use-debit-container');
+    const useDebitCheckbox = document.getElementById('use_debit_balance');
+    
+    // ✅ PERBAIKAN: Ganti ID selector
+    const paymentMethodSelect = document.getElementById('payment_method_id');
+    const bankAccountSelect = document.getElementById('company_bank_account_id_batch');
+    let currentDebitBalance = 0;
+    
+    // ✅ PERBAIKAN: Ambil ID default dari PHP
+    const defaultPaymentMethodId = "{{ $paymentMethods->first()->payment_method_id ?? '' }}";
 
-    // Inisialisasi AutoNumeric untuk input jumlah
+    // Inisialisasi AutoNumeric
     const autoNumericInstance = new AutoNumeric(amountFormattedInput, {
-        decimalPlaces: 0,
         digitGroupSeparator: '.',
         decimalCharacter: ',',
-        minimumValue: 0 // Pastikan minimal 0
-    });
-    // Update hidden input saat nilai berubah
-    amountFormattedInput.addEventListener('autoNumeric:rawValueModified', (e) => {
-        amountHiddenInput.value = e.detail.newRawValue || 0; // Default ke 0 jika kosong
-        toggleRequiredFields(); // Panggil toggle saat amount berubah
+        decimalCharacterAlternative: '.',
+        decimalPlaces: 0, // Dibuat 0 agar konsisten dengan batch payment klien
+        minimumValue: 0
     });
 
-    // Inisialisasi Select2 untuk dropdown klien
-    clientSelect.select2({
+    // Update hidden input saat nilai berubah
+    amountFormattedInput.addEventListener('autoNumeric:rawValueModified', (e) => {
+        amountHiddenInput.value = e.detail.newRawValue || 0;
+        toggleRequiredFields();
+    });
+
+    // Inisialisasi Select2
+    supplierSelect.select2({
         theme: 'bootstrap-5',
-        placeholder: '-- Cari Klien --'
+        placeholder: '-- Cari Supplier --'
     });
 
     // Fungsi helper format Rupiah
     function formatRupiah(number) {
         if (isNaN(number)) return 'Rp 0';
         return new Intl.NumberFormat('id-ID', {
-            style: 'currency', currency: 'IDR', minimumFractionDigits: 0
+            style: 'currency', 
+            currency: 'IDR', 
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2
         }).format(number);
     }
 
-    // Fungsi untuk menghitung total sisa tagihan dari invoice yang dipilih
+    // Fungsi untuk menghitung total sisa tagihan dari PO yang dipilih
     function calculateTotalSelected() {
         let total = 0;
-        document.querySelectorAll('.invoice-checkbox:checked').forEach(checkbox => {
-            total += parseFloat(checkbox.dataset.balance || 0); // Ambil dari data-balance
+        document.querySelectorAll('.po-checkbox:checked').forEach(checkbox => {
+            total += parseFloat(checkbox.dataset.balance || 0);
         });
         totalSelectedDisplay.textContent = formatRupiah(total);
-        // Panggil toggle required karena total terpilih mungkin berubah
-        toggleRequiredFields();
+        toggleRequiredFields(); // Panggil toggle saat total berubah
     }
 
     // Fungsi untuk mengatur required dan state input/select
     function toggleRequiredFields() {
-        // Ambil nilai numerik total tagihan terpilih
-        const selectedInvoicesBalanceString = totalSelectedDisplay.textContent || 'Rp 0';
-        const selectedInvoicesBalance = parseFloat(selectedInvoicesBalanceString.replace(/[^0-9,-]+/g,"").replace(",", ".")) || 0;
+        const selectedPOBalanceString = totalSelectedDisplay.textContent || 'Rp 0';
+        const selectedPOBalance = parseFloat(selectedPOBalanceString.replace(/[^0-9,-]+/g,"").replace(",", ".")) || 0;
 
-        const useCreditIsChecked = useCreditCheckbox.checked;
+        const useDebitIsChecked = useDebitCheckbox.checked;
         const inputAmountValue = parseFloat(amountHiddenInput.value || 0);
-        const creditIsSufficient = currentCreditBalance >= selectedInvoicesBalance && selectedInvoicesBalance > 0;
+        const debitIsSufficient = currentDebitBalance >= selectedPOBalance && selectedPOBalance > 0;
 
-        if (useCreditIsChecked) {
-            if (creditIsSufficient) {
-                // Kredit cukup: dana input tidak perlu & nonaktif
-                if (!amountFormattedInput.disabled) { // Hanya set ke 0 jika sebelumnya aktif
-                    autoNumericInstance.set(0);
+        if (useDebitIsChecked) {
+            if (debitIsSufficient) {
+                // Deposit cukup: dana input tidak perlu & nonaktif
+                if (!amountFormattedInput.disabled) {
+                     autoNumericInstance.set(0); // Set ke 0
                 }
                 amountFormattedInput.required = false;
                 amountFormattedInput.disabled = true;
                 paymentMethodSelect.required = false;
-                paymentMethodSelect.disabled = true; // Nonaktifkan juga metode
-                paymentMethodSelect.value = ""; // Kosongkan
+                paymentMethodSelect.disabled = true;
+                paymentMethodSelect.value = "";
+
+                bankAccountSelect.required = false; // ✅ 2. TAMBAHKAN INI
+                bankAccountSelect.disabled = true; // ✅ 3. TAMBAHKAN INI
+                bankAccountSelect.value = ""; // ✅ 4. TAMBAHKAN INI
             } else {
-                // Kredit kurang: dana input perlu & aktif
-                amountFormattedInput.required = true; // Wajib input kekurangan
+                // Deposit kurang: dana input perlu & aktif
+                amountFormattedInput.required = true;
                 amountFormattedInput.disabled = false;
-                paymentMethodSelect.required = true; // Metode juga wajib
+                paymentMethodSelect.required = true;
                 paymentMethodSelect.disabled = false;
-                if (!paymentMethodSelect.value) paymentMethodSelect.value = "manual_transfer"; // Default jika kosong
+                // ✅ PERBAIKAN: Gunakan ID
+                if (!paymentMethodSelect.value) paymentMethodSelect.value = defaultPaymentMethodId;
+                bankAccountSelect.required = true; // ✅ 5. TAMBAHKAN INI
+                bankAccountSelect.disabled = false; // ✅ 6. TAMBAHKAN INI
             }
         } else {
-            // Tidak pakai kredit: dana input perlu & aktif
+            // Tidak pakai deposit: dana input perlu & aktif
             amountFormattedInput.required = true;
             amountFormattedInput.disabled = false;
             // Metode wajib jika ada dana input > 0
             paymentMethodSelect.required = inputAmountValue > 0;
             paymentMethodSelect.disabled = false;
-             if (paymentMethodSelect.required && !paymentMethodSelect.value) {
-                paymentMethodSelect.value = "manual_transfer";
-            } else if (!paymentMethodSelect.required) {
-                 paymentMethodSelect.value = ""; // Kosongkan jika dana input 0
+             // ✅ PERBAIKAN: Gunakan ID
+            if (paymentMethodSelect.required && !paymentMethodSelect.value) {
+                paymentMethodSelect.value = defaultPaymentMethodId;
+            } 
+            bankAccountSelect.required = inputAmountValue > 0;
+            bankAccountSelect.disabled = false;
+            
+            else if (!paymentMethodSelect.required) {
+                 paymentMethodSelect.value = "";
             }
         }
     }
 
-    // Event listener untuk checkbox 'Use Credit'
-     useCreditCheckbox.addEventListener('change', toggleRequiredFields);
+    // Event listener untuk checkbox 'Use Deposit'
+     useDebitCheckbox.addEventListener('change', toggleRequiredFields);
 
     // Event listener untuk checkbox 'Check All'
     checkAll.addEventListener('change', function () {
-        document.querySelectorAll('.invoice-checkbox').forEach(checkbox => {
+        document.querySelectorAll('.po-checkbox').forEach(checkbox => {
             checkbox.checked = this.checked;
         });
         calculateTotalSelected(); // Hitung ulang total & panggil toggleRequired
     });
 
-    // Fungsi untuk menambahkan event listener ke checkbox invoice individual
-    function addInvoiceCheckboxListeners() {
-        document.querySelectorAll('.invoice-checkbox').forEach(cb => {
-            // Hapus listener lama jika ada (mencegah duplikasi)
-            cb.removeEventListener('change', handleInvoiceCheckboxChange);
-            // Tambah listener baru
-            cb.addEventListener('change', handleInvoiceCheckboxChange);
+    // Fungsi untuk menambahkan event listener ke checkbox PO individual
+    function addPOCheckboxListeners() {
+        document.querySelectorAll('.po-checkbox').forEach(cb => {
+            cb.removeEventListener('change', handlePOCheckboxChange); // Cegah duplikat
+            cb.addEventListener('change', handlePOCheckboxChange);
         });
     }
 
-    // Handler untuk perubahan checkbox invoice individual
-    function handleInvoiceCheckboxChange() {
-        calculateTotalSelected(); // calculateTotalSelected sudah memanggil toggleRequiredFields
+    // Handler untuk perubahan checkbox PO individual
+    function handlePOCheckboxChange() {
+        calculateTotalSelected(); // Panggil fungsi utama
     }
 
+    // Event listener utama saat supplier dipilih
+    supplierSelect.on('change', async function () {
+        const supplierId = this.value;
 
-    // Event listener utama saat klien dipilih
-    clientSelect.on('change', async function () {
-        const clientId = this.value;
-
-        // Reset tampilan & state sebelum fetch data baru
-        creditInfoDiv.classList.add('d-none');
-        useCreditContainer.style.display = 'none';
-        useCreditCheckbox.checked = false;
-        currentCreditBalance = 0;
-        invoicePlaceholder.textContent = 'Memuat data...';
-        invoiceTable.classList.add('d-none');
-        invoiceListBody.innerHTML = '';
+        // Reset tampilan
+        debitInfoDiv.classList.add('d-none');
+        useDebitContainer.style.display = 'none';
+        useDebitCheckbox.checked = false;
+        currentDebitBalance = 0;
+        poPlaceholder.textContent = 'Memuat data...';
+        poTable.classList.add('d-none');
+        poListBody.innerHTML = '';
         checkAll.checked = false;
         autoNumericInstance.set(0); // Reset input amount jadi 0
 
-        if (!clientId) {
-            invoicePlaceholder.textContent = 'Silakan pilih klien untuk melihat daftar invoice.';
-            calculateTotalSelected(); // Reset total terpilih jadi 0
-            toggleRequiredFields(); // Panggil untuk reset required
-            return; // Hentikan jika tidak ada klien dipilih
+        if (!supplierId) {
+            poPlaceholder.textContent = 'Silakan pilih supplier untuk melihat daftar PO.';
+            calculateTotalSelected(); // Reset total jadi 0
+            toggleRequiredFields(); // Reset field required
+            return;
         }
 
         try {
-            // =================================== --}}
-            // ✅ PERBAIKAN FETCH API (Menggunakan 'balance' dan 'pending_balance') --}}
-            // =================================== --}}
-            const clientResponse = await fetch(`/api/clients/${clientId}/details`);
-            if (!clientResponse.ok) throw new Error('Gagal ambil data klien');
-            const clientData = await clientResponse.json();
+            // 1. Fetch data Supplier (termasuk saldo deposit)
+            const supplierResponse = await fetch(`/api/suppliers/${supplierId}/details`);
+            if (!supplierResponse.ok) throw new Error('Gagal ambil data supplier');
+            const supplierData = await supplierResponse.json();
             
-            // Gunakan 'balance' (available)
-            currentCreditBalance = parseFloat(clientData.balance) || 0; 
-            const pendingBalance = parseFloat(clientData.pending_balance) || 0;
+            // ✅ PERBAIKAN: Baca 'balance' dan 'pending_balance' dari API
+            currentDebitBalance = parseFloat(supplierData.balance) || 0;
+            const pendingBalance = parseFloat(supplierData.pending_balance) || 0;
 
-            creditBalanceSpan.textContent = formatRupiah(currentCreditBalance);
-            pendingBalanceSpan.textContent = formatRupiah(pendingBalance);
-            creditInfoDiv.classList.remove('d-none'); // Selalu tampilkan info, meski 0
+            debitBalanceSpan.textContent = formatRupiah(currentDebitBalance);
+            pendingBalanceSpan.textContent = formatRupiah(pendingBalance); // ✅ Tampilkan
+            debitInfoDiv.classList.remove('d-none'); // Selalu tampilkan
 
-            if (currentCreditBalance > 0) {
-                useCreditContainer.style.display = 'block'; // Tampilkan checkbox
+            if (currentDebitBalance > 0) {
+                useDebitContainer.style.display = 'block';
             }
-            // =================================== --}}
 
-            // Fetch Invoices (API Anda sudah diperbarui di langkah sebelumnya)
-            const invoiceResponse = await fetch(`/api/clients/${clientId}/unpaid-invoices`);
-            if (!invoiceResponse.ok) throw new Error('Gagal mengambil data invoice');
-            const invoices = await invoiceResponse.json();
+            // 2. Fetch data PO yang belum lunas
+            const poResponse = await fetch(`/api/suppliers/${supplierId}/unpaid-purchase-orders`);
+            if (!poResponse.ok) throw new Error('Gagal mengambil data PO');
+            const pos = await poResponse.json();
 
-            // Tampilkan daftar invoice atau pesan jika kosong
-            if (invoices.length === 0) {
-                invoicePlaceholder.textContent = 'Klien ini tidak memiliki tagihan.';
+            // Tampilkan daftar PO atau pesan jika kosong
+            if (pos.length === 0) {
+                poPlaceholder.textContent = 'Supplier ini tidak memiliki tagihan PO.';
             } else {
-                invoices.forEach(invoice => {
-                    // Buat baris tabel untuk setiap invoice
+                pos.forEach(po => {
+                    // Buat baris tabel untuk setiap PO
                     const row = `
                         <tr>
                             <td>
-                                <input class="form-check-input invoice-checkbox"
+                                <input class="form-check-input po-checkbox"
                                        type="checkbox"
-                                       name="invoice_ids[]"
-                                       value="${invoice.invoice_id}"
-                                       data-balance="${invoice.sisa_tagihan}">
+                                       name="po_ids[]"
+                                       value="${po.po_id}"
+                                       data-balance="${po.sisa_tagihan}">
                             </td>
-                            <td>${invoice.invoice_number}</td>
-                            <td>${invoice.due_date_formatted}</td>
-                            <td class="text-end">${formatRupiah(invoice.sisa_tagihan)}</td>
+                            <td>${po.po_number}</td>
+                            <td>${po.due_date_formatted}</td>
+                            <td class="text-end">${formatRupiah(po.sisa_tagihan)}</td>
                         </tr>
                     `;
-                    // Masukkan baris ke dalam tbody
-                    invoiceListBody.insertAdjacentHTML('beforeend', row);
+                    poListBody.insertAdjacentHTML('beforeend', row);
                 });
-                invoicePlaceholder.textContent = ''; // Hapus pesan placeholder
-                invoiceTable.classList.remove('d-none'); // Tampilkan tabel
-
-                // Tambahkan event listener ke setiap checkbox invoice baru
-                addInvoiceCheckboxListeners();
+                poPlaceholder.textContent = '';
+                poTable.classList.remove('d-none');
+                addPOCheckboxListeners(); // Tambahkan listener ke checkbox baru
             }
 
         } catch (error) {
-            // Tangani error jika fetch gagal
-            invoicePlaceholder.textContent = 'Gagal memuat data. Silakan coba lagi.';
+            poPlaceholder.textContent = 'Gagal memuat data. Silakan coba lagi.';
             console.error('Error fetching data:', error);
-            // Sembunyikan info kredit jika terjadi error
-            creditInfoDiv.classList.add('d-none');
-            useCreditContainer.style.display = 'none';
+            debitInfoDiv.classList.add('d-none');
+            useDebitContainer.style.display = 'none';
         }
 
-        calculateTotalSelected(); // Hitung total terpilih (awalnya mungkin 0)
-        toggleRequiredFields(); // Panggil setelah data client dan invoice ter-load
+        calculateTotalSelected(); // Hitung total (akan 0 jika tidak ada PO)
+        toggleRequiredFields(); // Atur state field di akhir
     });
 
     // Panggil sekali di awal untuk set state required awal

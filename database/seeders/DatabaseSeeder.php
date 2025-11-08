@@ -48,6 +48,7 @@ class DatabaseSeeder extends Seeder
             UnitSeeder::class,
             ProductSeeder::class, 
             TaxSeeder::class, 
+            PaymentMethodSeeder::class,
             // SalesInvoiceSeeder dan InvoiceItemSeeder bisa Anda nonaktifkan jika ingin data invoice kosong
             // SalesInvoiceSeeder::class,
             // InvoiceItemSeeder::class,

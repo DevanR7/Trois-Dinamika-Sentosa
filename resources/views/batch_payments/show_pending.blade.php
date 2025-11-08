@@ -29,10 +29,11 @@
                     <dl class="row">
                         <dt class="col-sm-4">Metode Pembayaran</dt>
                         <dd class="col-sm-8">
-                            @if($batchPayment->payment_method == 'cash')
-                                <span class="badge bg-success fs-6">Cash (via Sales)</span>
+                            {{-- ✅ PERBAIKAN: Tampilkan nama metode dari relasi --}}
+                            @if($batchPayment->paymentMethod)
+                                <span class="badge bg-primary fs-6">{{ $batchPayment->paymentMethod->name }}</span>
                             @else
-                                <span class="badge bg-primary fs-6">Transfer Bank</span>
+                                <span class="badge bg-secondary fs-6">N/A</span>
                             @endif
                         </dd>
 
@@ -46,9 +47,9 @@
                         <dd class="col-sm-8">{{ $details['notes'] ?? '-' }}</dd>
 
                         {{-- ====================================================== --}}
-                        {{-- ✅ INI ADALAH BAGIAN BUKTI PEMBAYARAN YANG ANDA MINTA --}}
+                        {{-- ✅ PERBAIKAN: Logika if untuk Bukti/Sales --}}
                         {{-- ====================================================== --}}
-                        @if($batchPayment->payment_method == 'cash')
+                        @if($batchPayment->paymentMethod && str_contains(strtolower($batchPayment->paymentMethod->name), 'cash'))
                             <dt class="col-sm-4">Diterima Sales</dt>
                             <dd class="col-sm-8">{{ $salesUser->full_name ?? 'N/A' }}</dd>
                         @else
@@ -69,9 +70,7 @@
                 </div>
             </div>
             
-            {{-- ====================================================== --}}
-            {{-- ✅ INI ADALAH BAGIAN DAFTAR INVOICE YANG ANDA MINTA --}}
-            {{-- ====================================================== --}}
+            {{-- Daftar Invoice --}}
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-white">
                     <h5 class="mb-0 fw-semibold">Invoice yang Akan Dibayar</h5>
@@ -109,8 +108,6 @@
                     </div>
                 </div>
             </div>
-            {{-- ====================================================== --}}
-
         </div>
 
         {{-- Kolom Kanan: Ringkasan Alokasi & Aksi --}}
@@ -156,13 +153,34 @@
                     <hr>
                     <div class="d-grid gap-2 mt-4">
                         <form action="{{ route('batch-payments.approve', $batchPayment->batch_payment_id) }}" method="POST" id="form-approve">
-                            @csrf
-                            <button type="submit" class="btn btn-success btn-lg w-100">Setujui & Alokasikan</button>
-                        </form>
-                        <form action="{{ route('batch-payments.reject', $batchPayment->batch_payment_id) }}" method="POST" id="form-reject">
-                            @csrf
-                            <button type="submit" class="btn btn-danger w-100">Tolak Pembayaran</button>
-                        </form>
+        @csrf
+        
+        {{-- ✅ 2. TAMBAHKAN DROPDOWN INI --}}
+        <div class="mb-3">
+            <label for="company_bank_account_id" class="form-label fw-semibold">Setor ke Akun <span class="text-danger">*</span></label>
+            <select name="company_bank_account_id" id="company_bank_account_id" class="form-select @error('company_bank_account_id') is-invalid @enderror" required>
+                <option value="">-- Pilih Akun Bank/Kas --</option>
+                @foreach($companyBankAccounts as $account)
+                    <option value="{{ $account->company_bank_account_id }}">
+                        {{ $account->bank_name }} - {{ $account->account_number ?? $account->account_name }}
+                    </option>
+                @endforeach
+            </select>
+            @error('company_bank_account_id')
+                <div class="invalid-feedback">{{ $message }}</div>
+            @enderror
+        </div>
+        {{-- ------------------------------ --}}
+
+        <div class="d-grid gap-2 mt-4">
+            <button type="submit" class="btn btn-success btn-lg w-100">Setujui & Alokasikan</button>
+        </div>
+    </form>
+    
+    <form action="{{ route('batch-payments.reject', $batchPayment->batch_payment_id) }}" method="POST" id="form-reject" class="d-grid gap-2 mt-2">
+        @csrf
+        <button type="submit" class="btn btn-danger w-100">Tolak Pembayaran</button>
+    </form>
                     </div>
                 </div>
             </div>
@@ -173,6 +191,7 @@
 
 @push('scripts')
 {{-- Script SweetAlert --}}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     

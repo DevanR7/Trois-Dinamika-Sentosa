@@ -6,11 +6,13 @@ use App\Models\Payment;
 use App\Models\SalesInvoice;
 use App\Models\ClientLedger;
 use App\Models\Client;
+use App\Models\PaymentMethod; // ✅ Pastikan ini ada
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Log; // ✅ Pastikan ini ada
 
 class PaymentController extends Controller
 {
@@ -19,95 +21,82 @@ class PaymentController extends Controller
      */
     public function store(Request $request, SalesInvoice $invoice): RedirectResponse
     {
-        // Validasi
+        // 1. Validasi
         $validated = $request->validate([
-            'amount' => 'required|numeric|min:0', // Boleh 0 jika bayar pakai kredit
+            'amount' => 'required|numeric|min:0',
             'payment_date' => 'required|date',
-            'payment_method' => [
-                // Wajib KECUALI jika amount 0 DAN use_credit dicentang
+            'payment_method_id' => [ // ✅ Gunakan payment_method_id
                 Rule::requiredIf(function () use ($request) {
                     return $request->input('amount', 0) > 0 || !$request->has('use_credit');
                 }),
-                'string',
                 'nullable',
+                'exists:payment_methods,payment_method_id',
             ],
+            'company_bank_account_id' => 'required|exists:company_bank_accounts,company_bank_account_id',
             'notes' => 'nullable|string',
-            'use_credit' => 'nullable|boolean', // Ambil data checkbox
+            'use_credit' => 'nullable|boolean',
         ]);
 
         $client = $invoice->client;
         $danaDariInput = (float)($validated['amount'] ?? 0);
         $pakaiKredit = $validated['use_credit'] ?? false;
-        
-        // ✅ DIUBAH: Baca dari accessor 'balance' baru
         $kreditAwalKlien = $client->balance; 
-
-        // ====================================================================
-        // ✅✅ INI ADALAH PERBAIKAN UTAMA UNTUK BUG ANDA ✅✅
-        // ====================================================================
-        
-        // HAPUS BARIS LAMA:
-        // $totalRetur = $invoice->returns->sum('total_amount');
-        // $sisaTagihan = $invoice->total_amount - $invoice->amount_paid - $totalRetur;
-        
-        // GANTI DENGAN INI:
-        // Gunakan accessor yang sudah benar (hanya menghitung retur potong tagihan)
         $sisaTagihan = $invoice->remaining_balance; 
-        
-        // ====================================================================
         
         $kreditAkanDigunakan = 0;
         $danaInputAkanDigunakan = 0;
         $sisaDanaInput = 0;
-        $metodeLog = $validated['payment_method'] ?? 'N/A';
         $catatanLog = $validated['notes'] ?? '';
 
         DB::beginTransaction();
         try {
-            // 1. Hitung alokasi dana
+            // 2. Hitung alokasi dana
             if ($pakaiKredit && $kreditAwalKlien > 0) {
-                // Berapa kredit yg bisa dipakai (maksimal sisa tagihan)
                 $kreditAkanDigunakan = min($kreditAwalKlien, $sisaTagihan);
             }
-
-            // Berapa sisa tagihan setelah ditutup kredit
             $sisaTagihanSetelahKredit = max(0, $sisaTagihan - $kreditAkanDigunakan);
-            
-            // Berapa dana input yg akan dipakai (maksimal sisa tagihan setelah kredit)
             $danaInputAkanDigunakan = min($danaDariInput, $sisaTagihanSetelahKredit);
-
-            // Hitung total pembayaran
             $totalPembayaran = $kreditAkanDigunakan + $danaInputAkanDigunakan;
-            
-            // Hitung sisa dana input (jika ada overpayment)
             $sisaDanaInput = max(0, $danaDariInput - $danaInputAkanDigunakan);
 
-            // Cek jika tidak ada pembayaran sama sekali
             if ($totalPembayaran <= 0.01 && $sisaDanaInput <= 0.01) {
-                 // Izinkan jika sisa tagihan 0 atau kurang (untuk kasus overpayment)
                  if ($sisaTagihan > 0.01) {
                      throw new \Exception("Tidak ada dana (input/kredit) yang dialokasikan.");
                  }
             }
 
-            // 2. Tentukan log metode pembayaran
+            // 3. Tentukan log metode pembayaran & status
+            $paymentMethodName = 'N/A';
+            $paymentMethodType = 'direct';
+            if (!empty($validated['payment_method_id'])) {
+                $method = PaymentMethod::find($validated['payment_method_id']);
+                if ($method) {
+                    $paymentMethodName = $method->name;
+                    $paymentMethodType = $method->type;
+                }
+            }
+
+            $metodeLog = $paymentMethodName;
             if ($kreditAkanDigunakan > 0) {
-                $metodeLog = ($danaInputAkanDigunakan > 0) ? 'Kredit + ' . $validated['payment_method'] : 'Kredit Klien';
+                $metodeLog = ($danaInputAkanDigunakan > 0) ? 'Kredit Klien + ' . $paymentMethodName : 'Kredit Klien';
             }
             if (!empty($catatanLog)) $catatanLog .= " | ";
-            // (Catatan log akan di-update di bawah)
+            
+            // ✅ Tentukan status baru (untuk Giro/Cek)
+            $newPaymentStatus = ($paymentMethodType == 'pending') ? 'pending_clearance' : 'completed';
 
-            // 3. Catat pembayaran di tabel 'payments' DULU
+            // 4. Catat pembayaran di tabel 'payments'
             $payment = $invoice->payments()->create([
-                'amount' => $totalPembayaran, // Catat total yg dialokasikan
-                'payment_date' => $validated['payment_date'],
-                'payment_method' => $metodeLog,
-                'notes' => $validated['notes'], // Catatan awal
-                'received_by_user_id' => Auth::id(),
-                'status' => 'completed',
-            ]);
+            'amount' => $totalPembayaran,
+            'payment_date' => $validated['payment_date'],
+            'payment_method_id' => $validated['payment_method_id'],
+            'company_bank_account_id' => $validated['company_bank_account_id'], // ✅ Simpan
+            'status' => $newPaymentStatus,
+            'notes' => $validated['notes'],
+            'received_by_user_id' => Auth::id(),
+        ]);
 
-            // 4. Proses Database (Ledger)
+            // 5. Proses Database (Ledger)
             if ($kreditAkanDigunakan > 0) {
                 ClientLedger::create([
                     'client_id' => $client->client_id,
@@ -115,7 +104,8 @@ class PaymentController extends Controller
                     'reference_id' => $payment->payment_id,
                     'transaction_date' => $validated['payment_date'],
                     'type' => 'debit',
-                    'amount' => -$kreditAkanDigunakan, // Jumlah negatif (debit)
+                    'amount' => -$kreditAkanDigunakan,
+                    'status' => 'available',
                     'description' => 'Digunakan untuk membayar Invoice #' . $invoice->invoice_number,
                     'user_id' => Auth::id(),
                 ]);
@@ -130,7 +120,7 @@ class PaymentController extends Controller
                     'transaction_date' => $validated['payment_date'],
                     'type' => 'credit',
                     'amount' => $sisaDanaInput,
-                    'status' => 'available', // <-- Kelebihan bayar selalu available
+                    'status' => 'available',
                     'description' => 'Kelebihan bayar dari Invoice #' . $invoice->invoice_number,
                     'user_id' => Auth::id(),
                 ]);
@@ -140,36 +130,11 @@ class PaymentController extends Controller
             // Update catatan log di payment
             $payment->update(['notes' => $catatanLog]);
 
-            // 5. Update total yang sudah dibayar di invoice terkait
-            $totalPaid = $invoice->payments()->where('status', 'completed')->sum('amount');
+            // ======================================================
+            // ✅ 6. Panggil fungsi update status dari Model
+            // ======================================================
+            $invoice->updatePaymentStatus(); 
             
-            // 6. Cek dan update status invoice
-            // Ambil ulang data retur potong tagihan
-            $totalReturDipotong = $invoice->deductingReturns()->sum('total_amount');
-            $sisaTagihanSetelahBayar = $invoice->total_amount - $totalPaid - $totalReturDipotong;
-
-            $status = 'unpaid';
-            if ($sisaTagihanSetelahBayar <= 0.01) { // Toleransi pembulatan
-                $status = 'paid';
-            } elseif ($totalPaid > 0) {
-                $status = 'partially_paid';
-            }
-            
-            // Update amount_paid dan status
-            $invoice->update([
-                'amount_paid' => $totalPaid,
-                'status' => $status,
-            ]);
-
-            if ($status == 'paid') {
-                ClientLedger::where('sales_invoice_id', $invoice->invoice_id)
-                            ->where('status', 'pending')
-                            ->update([
-                                'status' => 'available',
-                                'description' => DB::raw("REPLACE(description, ' (Ditahan)', '')") // Hapus tanda (Ditahan)
-                            ]);
-            }
-
             DB::commit();
 
             return redirect()->route('invoices.show', $invoice->invoice_id)
@@ -177,10 +142,14 @@ class PaymentController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Gagal mencatat pembayaran: ' . $e->getMessage());
             return back()->with('error', 'Gagal mencatat pembayaran: ' . $e->getMessage());
         }
     }
 
+    /**
+     * Menyetujui pembayaran yang sedang diverifikasi (dari klien).
+     */
     public function approve(Payment $payment): RedirectResponse
     {
         if ($payment->status !== 'pending_verification') {
@@ -195,28 +164,9 @@ class PaymentController extends Controller
 
             // 2. Update invoice terkait
             $invoice = $payment->salesInvoice;
-            // Ambil total bayar dan retur potong tagihan
-            $totalPaid = $invoice->payments()->where('status', 'completed')->sum('amount');
-            $totalReturDipotong = $invoice->deductingReturns()->sum('total_amount');
-
-            // 3. Cek dan update status invoice
-            $sisaTagihan = $invoice->total_amount - $totalPaid - $totalReturDipotong;
-            if ($sisaTagihan <= 0.01) {
-                $invoice->status = 'paid';
-            } else {
-                $invoice->status = 'partially_paid';
-            }
-            $invoice->amount_paid = $totalPaid; // Update total amount_paid
-            $invoice->save();
-
-            if ($invoice->status == 'paid') {
-                ClientLedger::where('sales_invoice_id', $invoice->invoice_id)
-                            ->where('status', 'pending')
-                            ->update([
-                                'status' => 'available',
-                                'description' => DB::raw("REPLACE(description, ' (Ditahan)', '')")
-                            ]);
-            }
+            
+            // ✅ PANGGIL FUNGSI INI
+            $invoice->updatePaymentStatus();
 
             DB::commit();
             return back()->with('success', 'Pembayaran berhasil disetujui.');
@@ -225,20 +175,20 @@ class PaymentController extends Controller
             DB::rollBack();
             return back()->with('error', 'Gagal menyetujui pembayaran: ' . $e->getMessage());
         }
-}
-
-/**
- * Menolak pembayaran yang sedang diverifikasi.
- */
-public function reject(Payment $payment): RedirectResponse
-{
-    if ($payment->status !== 'pending_verification') {
-        return back()->with('error', 'Pembayaran ini tidak sedang dalam status verifikasi.');
     }
 
-    // Cukup ubah status pembayaran menjadi 'failed'
-    $payment->update(['status' => 'failed', 'received_by_user_id' => Auth::id()]);
+    /**
+     * Menolak pembayaran yang sedang diverifikasi.
+     */
+    public function reject(Payment $payment): RedirectResponse
+    {
+        if ($payment->status !== 'pending_verification') {
+            return back()->with('error', 'Pembayaran ini tidak sedang dalam status verifikasi.');
+        }
 
-    return back()->with('success', 'Bukti pembayaran telah ditolak.');
-}
+        // Cukup ubah status pembayaran menjadi 'failed'
+        $payment->update(['status' => 'failed', 'received_by_user_id' => Auth::id()]);
+
+        return back()->with('success', 'Bukti pembayaran telah ditolak.');
+    }
 }

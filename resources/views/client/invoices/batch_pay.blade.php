@@ -6,6 +6,17 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
 @endpush
 
+{{-- ==================================================================== --}}
+{{-- ✅ BLOK PHP BARU UNTUK MENGAMBIL ID METODE --}}
+{{-- ==================================================================== --}}
+@php
+    // Asumsi $paymentMethods dikirim dari Client/InvoiceController@showBatchPay
+    $transferMethodId = $paymentMethods->firstWhere(fn($m) => str_contains(strtolower($m->name), 'transfer'))->payment_method_id ?? null;
+    $cashMethodId = $paymentMethods->firstWhere(fn($m) => str_contains(strtolower($m->name), 'cash'))->payment_method_id ?? null;
+@endphp
+{{-- ==================================================================== --}}
+
+
 @section('content')
 <div class="container-fluid py-4">
     <h2 class="fw-bold mb-4">Pembayaran Tagihan (Batch)</h2>
@@ -140,7 +151,9 @@
     </form>
 </div>
 
-{{-- MODAL UNTUK TRANSFER MANUAL & CASH BATCH --}}
+{{-- ========================================================== --}}
+{{-- ✅ MODAL MANUAL (DIPERBARUI) --}}
+{{-- ========================================================== --}}
 <div class="modal fade" id="batchManualPaymentModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -150,7 +163,9 @@
             </div>
             <form id="batch-manual-form" action="{{ route('client.invoices.batchPay.storeManual') }}" method="POST" enctype="multipart/form-data">
                 @csrf
-                <input type="hidden" name="payment_method" id="batch_payment_method_input">
+                
+                {{-- ✅ PERBAIKAN: Ganti name="payment_method" menjadi "payment_method_id" --}}
+                <input type="hidden" name="payment_method_id" id="batch_payment_method_id_input">
                 <input type="hidden" name="use_credit" id="batch-manual-use-credit-hidden">
                 
                 <div class="modal-body">
@@ -170,6 +185,8 @@
                             <select name="user_id_sales" id="batch_user_id_sales" class="form-select select2-in-modal">
                                 <option value="" disabled selected>-- Pilih Sales --</option>
                                 @php
+                                    // Pindahkan query ke controller jika memungkinkan,
+                                    // tapi untuk sekarang ini tidak apa-apa
                                     $salesUsers = \App\Models\User::role('sales')->get();
                                 @endphp
                                 @foreach($salesUsers as $sales)
@@ -207,7 +224,7 @@
 </div>
 
 
-{{-- MODAL MIDTRANS --}}
+{{-- MODAL MIDTRANS (Tidak Berubah) --}}
 <div class="modal fade" id="batchMidtransPaymentModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -243,7 +260,7 @@
 
 @push('scripts')
 {{-- Select2 & AutoNumeric JS --}}
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> 
+{{-- <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> --}} {{-- Asumsi jQuery sudah di-load di layouts/client.blade.php --}}
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script type="text/javascript"
@@ -267,6 +284,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const amountDisplay = document.getElementById('batch-amount-formatted');
     const amountError = document.getElementById('batch-amount-error');
+    
+    // ✅ PERBAIKAN: Ambil ID dari PHP
+    const transferMethodId = "{{ $transferMethodId }}";
+    const cashMethodId = "{{ $cashMethodId }}";
     
     const autoNumericInstance = new AutoNumeric(amountDisplay, {
         decimalPlaces: 0, 
@@ -395,9 +416,12 @@ document.addEventListener('DOMContentLoaded', function () {
     
     calculateTotal(); // Panggil saat memuat
 
-    // === Logika Modal Manual ===
+    // ======================================================
+    // ✅ LOGIKA MODAL MANUAL (DIPERBARUI)
+    // ======================================================
     const manualTitle = document.getElementById('batchManualPaymentModalTitle');
-    const manualMethodInput = document.getElementById('batch_payment_method_input');
+    // ✅ PERBAIKAN: Target ID input yang baru
+    const manualMethodInput = document.getElementById('batch_payment_method_id_input');
     const manualCashFields = document.getElementById('batch-cash-fields');
     const manualTransferFields = document.getElementById('batch-transfer-fields');
     const manualSalesSelect = document.getElementById('batch_user_id_sales');
@@ -411,6 +435,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const manualSisaBayar = document.getElementById('batch-modal-sisa-bayar');
     const manualUseCreditHidden = document.getElementById('batch-manual-use-credit-hidden');
     
+    // Inisialisasi Select2 di dalam modal
     $('.select2-in-modal').select2({
         theme: 'bootstrap-5',
         dropdownParent: $('#batchManualPaymentModal')
@@ -452,7 +477,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     btnManual.addEventListener('click', function() {
         manualTitle.textContent = 'Upload Bukti Transfer Batch';
-        manualMethodInput.value = 'manual_transfer';
+        
+        // ✅ PERBAIKAN: Set value ke ID
+        manualMethodInput.value = transferMethodId; 
+        
         manualCashFields.classList.add('d-none');
         manualTransferFields.classList.remove('d-none');
         manualProofInput.required = (currentTotalDitagih > 0);
@@ -470,7 +498,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     btnCash.addEventListener('click', function() {
         manualTitle.textContent = 'Lapor Bayar Tunai Batch';
-        manualMethodInput.value = 'cash';
+        
+        // ✅ PERBAIKAN: Set value ke ID
+        manualMethodInput.value = cashMethodId; 
+        
         manualTransferFields.classList.add('d-none');
         manualCashFields.classList.remove('d-none');
         manualSalesSelect.required = true;

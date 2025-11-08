@@ -34,6 +34,9 @@ use App\Http\Controllers\LoanController;
 use App\Http\Controllers\LoanPaymentController;
 use App\Http\Controllers\BatchPaymentController;
 use App\Http\Controllers\BatchPurchasePaymentController;
+use App\Http\Controllers\PaymentMethodController;
+use App\Http\Controllers\PaymentClearanceController;
+use App\Http\Controllers\CompanyBankAccountController;
 
 /*
 |--------------------------------------------------------------------------
@@ -95,6 +98,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     //
     Route::resource('units', UnitController::class)->except(['show']);
     Route::resource('roles', RoleController::class)->except(['show']);
+    Route::resource('payment-methods', PaymentMethodController::class)->except(['show']);
     Route::resource('sales-returns', SalesReturnController::class);
     Route::resource('purchase-returns', PurchaseReturnController::class);
     Route::resource('announcements', AnnouncementController::class);
@@ -106,7 +110,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('payments.store');
     Route::post('/payments/{payment}/approve', [PaymentController::class, 'approve'])->name('payments.approve');
     Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
-
+    Route::post('/invoices/{invoice}/confirm', [SalesInvoiceController::class, 'confirm'])->name('invoices.confirm');
+    
     // Custom Routes untuk Purchase Order
     Route::post('/purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase-orders.cancel');
     Route::post('/purchase-orders/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->name('purchase-orders.receive');
@@ -192,6 +197,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/create', [BatchPurchasePaymentController::class, 'create'])->name('create');
         Route::post('/', [BatchPurchasePaymentController::class, 'store'])->name('store');
     });
+
+    Route::middleware(['permission:manage-payment-clearance'])->prefix('payment-clearance')->name('payment-clearance.')->group(function () {
+        Route::get('/', [PaymentClearanceController::class, 'index'])->name('index');
+        
+        // Rute untuk Piutang (Sales Payment)
+        Route::post('/sales/{payment}/approve', [PaymentClearanceController::class, 'approveSalesPayment'])->name('sales.approve');
+        Route::post('/sales/{payment}/reject', [PaymentClearanceController::class, 'rejectSalesPayment'])->name('sales.reject');
+        
+        // Rute untuk Hutang (Purchase Payment)
+        Route::post('/purchase/{purchaseOrderPayment}/approve', [PaymentClearanceController::class, 'approvePurchasePayment'])->name('purchase.approve');
+        Route::post('/purchase/{purchaseOrderPayment}/reject', [PaymentClearanceController::class, 'rejectPurchasePayment'])->name('purchase.reject');
+    });
+
     // API untuk PO
     Route::get('/api/suppliers/{supplier}/unpaid-purchase-orders', [BatchPurchasePaymentController::class, 'getUnpaidPurchaseOrdersApi'])
          ->name('api.suppliers.unpaid-pos');
@@ -276,5 +294,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/{purchaseOrderAdjustment}', [App\Http\Controllers\PurchaseOrderAdjustmentController::class, 'destroy'])
              ->name('destroy');
     });
+
+    Route::resource('company-bank-accounts', CompanyBankAccountController::class)
+        ->except(['show'])
+        ->middleware('permission:manage-bank-accounts');
 });
 require __DIR__.'/auth.php';

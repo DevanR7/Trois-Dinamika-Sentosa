@@ -18,6 +18,8 @@
     // 2. Untuk Modal Pembayaran
     $sisaTagihanPO = $sisaUtang; // Sama dengan sisa utang
     $saldoDepositSupplier = $purchaseOrder->supplier->balance ?? 0;
+    
+    // 3. $paymentMethods sekarang dikirim dari PurchaseOrderController@show
 @endphp
 {{-- ==================================================================== --}}
 
@@ -59,7 +61,7 @@
 
                     {{-- ✅ Link Penyesuaian PO Baru --}}
                     <li>
-                        <a class="dropdown-item" href="{{ route('purchase-order-adjustments.create', ['purchase_order_id' => $purchaseOrder->po_id]) }}">
+                        <a class="dropdown-item" href="{{ route('purchase-order-adjustments.create.manual', $purchaseOrder->po_id) }}"> {{-- Asumsi ke manual --}}
                             <i class="bi bi-file-earmark-diff me-2"></i> Buat Penyesuaian PO
                         </a>
                     </li>
@@ -219,6 +221,7 @@
                         <tr>
                             <th>Tanggal Bayar</th>
                             <th>Metode</th>
+                            <th>Status</th> {{-- ✅ KOLOM BARU --}}
                             <th class="text-end">Jumlah</th>
                             <th>Catatan</th>
                             <th>Dicatat Oleh</th>
@@ -228,7 +231,25 @@
                         @foreach($purchaseOrder->payments as $payment)
                         <tr>
                             <td>{{ $payment->payment_date->format('d M Y') }}</td>
-                            <td>{{ Str::title(str_replace('_', ' ', $payment->payment_method)) }}</td>
+                            
+                            {{-- ✅ PERBAIKAN: Tampilkan nama metode dari relasi --}}
+                            <td>
+                                {{ $payment->paymentMethod->name ?? ($payment->notes && str_contains($payment->notes, 'Deposit') ? 'Deposit' : 'N/A') }}
+                            </td>
+                            
+                            {{-- ✅ PERBAIKAN: Tampilkan status --}}
+                            <td>
+                                @if($payment->status == 'completed')
+                                    <span class="badge bg-success">Completed</span>
+                                @elseif($payment->status == 'pending_clearance')
+                                    <span class="badge bg-info text-dark">Pending Kliring</span>
+                                @elseif($payment->status == 'failed')
+                                    <span class="badge bg-danger">Failed</span>
+                                @else
+                                    <span class="badge bg-secondary">{{ $payment->status }}</span>
+                                @endif
+                            </td>
+                            
                             <td class="text-end">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
                             <td>{{ $payment->notes }}</td>
                             <td>{{ $payment->receivedBy->full_name ?? 'N/A' }}</td>
@@ -309,12 +330,9 @@
             <form action="{{ route('purchase-orders.payments.store', $purchaseOrder->po_id) }}" method="POST">
                 @csrf
                 
-                {{-- =================================== --}}
-                {{-- ✅ INI ADALAH BAGIAN YANG DIPERBARUI --}}
-                {{-- =================================== --}}
                 <div class="modal-body">
                     
-                    {{-- Variabel $sisaTagihanPO, $saldoDepositSupplier, $totalDebitNotesPO, dll. --}}
+                    {{-- Variabel $sisaTagihanPO, $saldoDepositSupplier, dll. --}}
                     {{-- sudah didefinisikan di blok @php di atas halaman --}}
                     
                     {{-- Info Sisa Tagihan --}}
@@ -366,23 +384,35 @@
                         <label for="payment_date" class="form-label">Tanggal Pembayaran</label>
                         <input type="date" class="form-control" id="payment_date" name="payment_date" value="{{ now()->format('Y-m-d') }}" required>
                     </div>
+                    
+                    {{-- ✅ PERBAIKAN: Dropdown Metode Pembayaran --}}
                     <div class="mb-3">
-                        <label for="payment_method_po" class="form-label">Metode Pembayaran (Non-Deposit)</label>
-                        <select class="form-select" id="payment_method_po" name="payment_method" required>
+                        <label for="payment_method_id_po" class="form-label">Metode Pembayaran (Non-Deposit)</label>
+                        <select class="form-select" id="payment_method_id_po" name="payment_method_id" required>
                             <option value="">-- Pilih Metode --</option>
-                            <option value="manual_transfer">Transfer Manual</option>
-                            <option value="cash">Tunai (Cash)</option>
-                            <option value="other">Lainnya</option>
+                            @foreach($paymentMethods as $method)
+                                <option value="{{ $method->payment_method_id }}">{{ $method->name }}</option>
+                            @endforeach
                         </select>
                     </div>
+
+                    <div class="mb-3">
+    <label for="company_bank_account_id_po" class="form-label">Setor ke Akun <span class="text-danger">*</span></label>
+    <select class="form-select" id="company_bank_account_id_po" name="company_bank_account_id" required>
+        <option value="">-- Pilih Akun Bank/Kas --</option>
+        @foreach($companyBankAccounts as $account)
+            <option value="{{ $account->company_bank_account_id }}">
+                {{ $account->bank_name }} - {{ $account->account_number ?? $account->account_name }}
+            </option>
+        @endforeach
+    </select>
+</div>
+                    
                     <div class="mb-3">
                         <label for="notes" class="form-label">Catatan (Opsional)</label>
                         <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
                     </div>
                 </div>
-                {{-- =================================== --}}
-                {{-- 🛑 AKHIR DARI BAGIAN YANG DIPERBARUI --}}
-                {{-- =================================== --}}
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
@@ -421,7 +451,6 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // SweetAlert untuk Receive Goods
@@ -452,18 +481,24 @@
         const amountHiddenInputPO = document.getElementById('amount-po');
         const amountErrorPO = document.getElementById('amount-error-po');
         const useDebitCheckboxPO = document.getElementById('modal-use-debit');
-        const paymentMethodSelectPO = document.getElementById('payment_method_po');
+        
+        // ✅ PERBAIKAN: Target ID select yang baru
+        const paymentMethodSelectPO = document.getElementById('payment_method_id_po');
+        const bankAccountSelectPO = document.getElementById('company_bank_account_id_po');
 
-        {{-- ✅ PERBAIKAN: Gunakan variabel $sisaTagihanPO dan $saldoDepositSupplier dari @php di atas --}}
+        {{-- Gunakan variabel $sisaTagihanPO dan $saldoDepositSupplier dari @php di atas --}}
         const remainingBalancePO = {{ $sisaTagihanPO ?? 0 }};
         const currentDebitBalancePO = {{ $saldoDepositSupplier ?? 0 }};
+        
+        // ✅ PERBAIKAN: Ambil ID metode pertama sebagai default
+        const defaultPaymentMethodIdPO = "{{ $paymentMethods->first()->payment_method_id ?? '' }}";
 
 
         if (amountFormattedInputPO) {
             const autoNumericInstancePO = new AutoNumeric(amountFormattedInputPO, {
                 decimalCharacter: ',',
                 digitGroupSeparator: '.',
-                decimalPlaces: 2, // PO mungkin pakai desimal
+                decimalPlaces: 0, // Dibuat 0 agar konsisten dengan invoice
                 minimumValue: '0'
             });
 
@@ -480,6 +515,10 @@
                         paymentMethodSelectPO.disabled = true;
                         paymentMethodSelectPO.required = false;
                         paymentMethodSelectPO.value = "";
+
+                        bankAccountSelectPO.disabled = true; // ✅ 2. TAMBAHKAN INI
+                bankAccountSelectPO.required = false; // ✅ 3. TAMBAHKAN INI
+                bankAccountSelectPO.value = "";
                     } else {
                         const shortfall = remainingBalancePO - currentDebitBalancePO;
                         autoNumericInstancePO.set(shortfall);
@@ -487,15 +526,22 @@
                         amountFormattedInputPO.required = true;
                         paymentMethodSelectPO.disabled = false;
                         paymentMethodSelectPO.required = true;
-                        if (!paymentMethodSelectPO.value) paymentMethodSelectPO.value = "manual_transfer";
-                    }
+                        // ✅ PERBAIKAN: Gunakan ID
+                        if (!paymentMethodSelectPO.value) paymentMethodSelectPO.value = defaultPaymentMethodIdPO;
+                        bankAccountSelectPO.disabled = false; // ✅ 5. TAMBAHKAN INI
+                bankAccountSelectPO.required = true; // ✅ 6. TAMBAHKAN INI
+                    }   
                 } else {
                     autoNumericInstancePO.set(remainingBalancePO);
                     amountFormattedInputPO.disabled = false;
                     amountFormattedInputPO.required = true;
                     paymentMethodSelectPO.disabled = false;
                     paymentMethodSelectPO.required = inputAmountValue > 0 || remainingBalancePO > 0;
-                    if (paymentMethodSelectPO.required && !paymentMethodSelectPO.value) paymentMethodSelectPO.value = "manual_transfer";
+                    // ✅ PERBAIKAN: Gunakan ID
+                    if (paymentMethodSelectPO.required && !paymentMethodSelectPO.value) paymentMethodSelectPO.value = defaultPaymentMethodIdPO;
+                    bankAccountSelectPO.disabled = false; // ✅ 7. TAMBAHKAN INI
+            // ✅ 8. Atur required berdasarkan kondisi yang sama
+            bankAccountSelectPO.required = inputAmountValue > 0 || remainingBalancePO > 0;
                 }
             }
 

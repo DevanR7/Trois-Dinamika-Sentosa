@@ -13,12 +13,14 @@ class BatchPurchasePayment extends Model
 
     protected $primaryKey = 'batch_payment_id';
 
+    // ✅ PERBAIKAN: Sesuaikan dengan skema database baru
     protected $fillable = [
         'supplier_id',
         'processed_by_user_id',
         'payment_date',
         'total_amount',
-        'payment_method',
+        'payment_method_id',
+        'company_bank_account_id', // <-- PERBAIKAN: Dari 'payment_method'
         'notes',
     ];
 
@@ -37,11 +39,19 @@ class BatchPurchasePayment extends Model
         return $this->belongsTo(User::class, 'processed_by_user_id', 'user_id');
     }
 
-    /**
-     * Mendapatkan semua alokasi pembayaran (Payment) yang dihasilkan dari batch ini.
-     */
     public function payments(): HasMany
     {
         return $this->hasMany(PurchaseOrderPayment::class, 'batch_purchase_payment_id', 'batch_payment_id');
+    }
+
+    // ✅ PERBAIKAN: Tambahkan relasi ke PaymentMethod
+    public function paymentMethod(): BelongsTo
+    {
+        return $this->belongsTo(PaymentMethod::class, 'payment_method_id', 'payment_method_id');
+    }
+
+    public function companyBankAccount(): BelongsTo
+    {
+        return $this->belongsTo(CompanyBankAccount::class, 'company_bank_account_id', 'company_bank_account_id');
     }
 }

@@ -8,33 +8,31 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // 1. Buat tabel master untuk batch pembayaran pembelian
         Schema::create('batch_purchase_payments', function (Blueprint $table) {
             $table->id('batch_payment_id');
             $table->foreignId('supplier_id')->constrained('suppliers', 'supplier_id');
             $table->foreignId('processed_by_user_id')->constrained('users', 'user_id');
             $table->date('payment_date');
             $table->decimal('total_amount', 15, 2);
-            $table->string('payment_method', 100);
+
+            // PERBAIKAN: ->after() DIHAPUS
+            $table->foreignId('payment_method_id')->nullable()
+                  ->constrained('payment_methods', 'payment_method_id')
+                  ->onDelete('set null');
+            
+            // DITAMBAHKAN DARI add_bank_account_id_to_payment_tables
+            $table->foreignId('company_bank_account_id')
+                  ->nullable()
+                  ->constrained('company_bank_accounts', 'company_bank_account_id')
+                  ->nullOnDelete();
+            
             $table->text('notes')->nullable();
             $table->timestamps();
-        });
-
-        // 2. Tambahkan kolom foreign key ke tabel 'purchase_order_payments'
-        Schema::table('purchase_order_payments', function (Blueprint $table) {
-            $table->foreignId('batch_purchase_payment_id')->nullable()->after('po_id')
-                  ->constrained('batch_purchase_payments', 'batch_payment_id')
-                  ->onDelete('set null');
         });
     }
 
     public function down(): void
     {
-        Schema::table('purchase_order_payments', function (Blueprint $table) {
-            $table->dropForeign(['batch_purchase_payment_id']);
-            $table->dropColumn('batch_purchase_payment_id');
-        });
-        
         Schema::dropIfExists('batch_purchase_payments');
     }
 };

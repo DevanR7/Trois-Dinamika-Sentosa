@@ -83,6 +83,8 @@ class RoleAndPermissionSeeder extends Seeder
         Permission::updateOrCreate(['name' => 'create-invoice-adjustments']);
         Permission::updateOrCreate(['name' => 'review-batch-payments']);
 
+        //KLIRING
+        Permission::updateOrCreate(['name' => 'manage-payment-clearance']);
 
         // Sales Returns
         Permission::updateOrCreate(['name' => 'view-sales-returns']);
@@ -101,6 +103,9 @@ class RoleAndPermissionSeeder extends Seeder
         Permission::updateOrCreate(['name' => 'manage-users']);
         Permission::updateOrCreate(['name' => 'manage-roles']);
         Permission::updateOrCreate(['name' => 'manage-settings']);
+        Permission::updateOrCreate(['name' => 'manage-bank-accounts']);
+
+        Permission::updateOrCreate(['name' => 'manage-payment-methods']);
 
         // Announcements
         Permission::updateOrCreate(['name' => 'manage-announcements']);

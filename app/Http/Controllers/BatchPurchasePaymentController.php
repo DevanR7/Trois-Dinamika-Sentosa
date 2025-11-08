@@ -6,6 +6,8 @@ use App\Models\Supplier;
 use App\Models\PurchaseOrder;
 use App\Models\BatchPurchasePayment;
 use App\Models\PurchaseOrderPayment;
+use App\Models\PaymentMethod; // ✅ IMPORT MODEL
+use App\Models\CompanyBankAccount;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -22,7 +24,17 @@ class BatchPurchasePaymentController extends Controller
     {
         $this->authorize('create-batch-purchase-payments');
         $suppliers = Supplier::orderBy('supplier_name')->get();
-        return view('batch_purchase_payments.create', compact('suppliers'));
+        
+        $paymentMethods = PaymentMethod::where('is_active', true)
+                            ->whereIn('type', ['direct', 'pending'])
+                            ->orderBy('name')
+                            ->get();
+                            
+        // ✅ 2. Tambahkan query ini
+        $companyBankAccounts = CompanyBankAccount::where('is_active', true)->orderBy('bank_name')->get();
+
+        // ✅ 3. Tambahkan 'companyBankAccounts' ke compact()
+        return view('batch_purchase_payments.create', compact('suppliers', 'paymentMethods', 'companyBankAccounts'));
     }
 
     public function getUnpaidPurchaseOrdersApi(Supplier $supplier): JsonResponse
@@ -53,14 +65,21 @@ class BatchPurchasePaymentController extends Controller
     {
         $this->authorize('create-batch-purchase-payments');
         
+        // ✅ UPDATE VALIDASI
         $validated = $request->validate([
             'supplier_id' => 'required|exists:suppliers,supplier_id',
             'payment_date' => 'required|date',
             'total_amount' => 'required|numeric|min:0',
-            'payment_method' => [
+            'payment_method_id' => [
                 'required_unless:total_amount,0',
                 'nullable',
-                'string',
+                'exists:payment_methods,payment_method_id',
+            ],
+            // TAMBAHKAN VALIDASI INI
+            'company_bank_account_id' => [
+                'required_unless:total_amount,0',
+                'nullable',
+                'exists:company_bank_accounts,company_bank_account_id',
             ],
             'notes' => 'nullable|string',
             'po_ids' => 'required|array|min:1',
@@ -74,13 +93,13 @@ class BatchPurchasePaymentController extends Controller
             $danaDariInput = (float)($validated['total_amount'] ?? 0);
             $pakaiDeposit = $validated['use_debit_balance'] ?? false;
             
-            $depositAwalSupplier = $supplier->balance; // <-- Sudah benar (menggunakan accessor)
+            $depositAwalSupplier = $supplier->balance; // <-- Menggunakan accessor
 
             $posDipilih = PurchaseOrder::whereIn('po_id', $validated['po_ids'])
-                                // ✅ Eager load relasi
-                                ->with(['deductingReturns', 'adjustments'])
-                                ->orderBy('due_date', 'asc')
-                                ->get();
+                                        // ✅ Eager load relasi
+                                        ->with(['deductingReturns', 'adjustments'])
+                                        ->orderBy('due_date', 'asc')
+                                        ->get();
 
             $totalTagihanTerpilih = $posDipilih->reduce(function ($carry, $po) {
                 // ✅ Gunakan accessor
@@ -92,7 +111,6 @@ class BatchPurchasePaymentController extends Controller
                  throw new \Exception("Tidak ada tagihan yang dipilih atau semua PO terpilih sudah lunas.");
             }
 
-            // ... (Logika $depositAkanDigunakan, $danaInputAkanDigunakan, dll. Anda sudah benar) ...
             $depositAkanDigunakan = 0;
             if ($pakaiDeposit && $depositAwalSupplier > 0) {
                 $depositAkanDigunakan = min($depositAwalSupplier, $totalTagihanTerpilih);
@@ -110,22 +128,26 @@ class BatchPurchasePaymentController extends Controller
 
             // --- Mulai Proses Database ---
 
-            // 1. Buat BatchPurchasePayment (Logika ini sudah benar)
-            // ... (Logika $metodeBatch) ...
-            $metodeBatch = '';
-            if ($depositAkanDigunakan > 0) $metodeBatch .= 'Deposit Supplier';
-            if ($danaInputAkanDigunakan > 0) {
-                 if (!empty($metodeBatch)) $metodeBatch .= ' + ';
-                 $metodeBatch .= $validated['payment_method'];
+            // ✅ AMBIL DATA METODE PEMBAYARAN & TENTUKAN STATUS
+            $paymentMethodType = 'direct';
+            if ($validated['payment_method_id']) {
+                $method = PaymentMethod::find($validated['payment_method_id']);
+                if ($method) {
+                    $paymentMethodType = $method->type;
+                }
             }
-            if (empty($metodeBatch)) $metodeBatch = 'N/A';
+            $newPaymentStatus = ($paymentMethodType == 'pending') ? 'pending_clearance' : 'completed';
 
+
+            // ✅ 1. Buat BatchPurchasePayment (INDUK) dengan ID dan Status
             $batchPayment = BatchPurchasePayment::create([
                 'supplier_id' => $validated['supplier_id'],
                 'processed_by_user_id' => Auth::id(),
                 'payment_date' => $validated['payment_date'],
                 'total_amount' => $totalDanaAlokasi,
-                'payment_method' => $metodeBatch,
+                'payment_method_id' => $validated['payment_method_id'],
+                'company_bank_account_id' => $validated['company_bank_account_id'] ?? null, // <-- TAMBAHKAN
+                'status' => $newPaymentStatus,
                 'notes' => $validated['notes'],
             ]);
 
@@ -167,49 +189,20 @@ class BatchPurchasePaymentController extends Controller
 
                 if ($jumlahUntukPOIni <= 0.01) continue;
 
-                // ... (Logika $metodePayment Anda sudah benar) ...
-                $metodePayment = '';
-                if ($bayarDariDeposit > 0) $metodePayment .= 'Deposit Supplier';
-                if ($bayarDariInput > 0) {
-                     if (!empty($metodePayment)) $metodePayment .= ' + ';
-                     $metodePayment .= $validated['payment_method'] ?? 'N/A';
-                }
-
+                // ✅ 6. BUAT PAYMENT (ANAK) DENGAN ID DAN STATUS
                 $po->payments()->create([
                     'batch_purchase_payment_id' => $batchPayment->batch_payment_id,
                     'payment_date' => $validated['payment_date'],
                     'amount' => $jumlahUntukPOIni,
-                    'payment_method' => $metodePayment,
+                    'payment_method_id' => $validated['payment_method_id'],
+                    'company_bank_account_id' => $validated['company_bank_account_id'] ?? null, // <-- TAMBAHKAN
+                    'status' => $newPaymentStatus,
                     'received_by_user_id' => Auth::id(),
                 ]);
 
-                // Update status PurchaseOrder
-                $poCurrent = PurchaseOrder::find($po->po_id);
-                $totalPaidBaru = ($poCurrent->amount_paid ?? 0) + $jumlahUntukPOIni;
-                
-                // ✅ Hitung sisa tagihan baru dengan benar
-                $totalRetur = $poCurrent->deductingReturns()->sum('total_amount');
-                $totalAdjustments = $poCurrent->adjustments()->sum(DB::raw("CASE WHEN type = 'debit_note' THEN amount ELSE -amount END"));
-                $totalTagihanAktual = $poCurrent->total_amount + $totalAdjustments - $totalRetur;
-
-                $sisaTagihanBaru = $totalTagihanAktual - $totalPaidBaru;
-
-                $newStatus = ($sisaTagihanBaru <= 0.01) ? 'paid' : 'partially_paid';
-
-                $poCurrent->update([
-                    'amount_paid' => $totalPaidBaru,
-                    'payment_status' => $newStatus,
-                ]);
-
-                // ✅ Lepaskan kredit pending (Logika ini sudah benar)
-                if ($newStatus == 'paid') {
-                    SupplierLedger::where('purchase_order_id', $poCurrent->po_id)
-                                ->where('status', 'pending')
-                                ->update([
-                                    'status' => 'available',
-                                    'description' => DB::raw("REPLACE(description, ' (Ditahan)', '')")
-                                ]);
-                }
+                // ✅ Panggil fungsi update status dari Model PO
+                // Pastikan Anda memiliki fungsi ini di model PurchaseOrder
+                $po->updatePaymentStatus();
 
                 $sisaDepositUntukAlokasi -= $bayarDariDeposit;
                 $sisaInputUntukAlokasi -= $bayarDariInput;

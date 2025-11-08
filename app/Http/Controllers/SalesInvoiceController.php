@@ -8,6 +8,8 @@ use App\Models\SalesInvoice;
 use App\Models\InvoiceItem;
 use App\Models\Order;
 use App\Models\Tax;
+use App\Models\PaymentMethod;
+use App\Models\CompanyBankAccount;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -80,11 +82,19 @@ class SalesInvoiceController extends Controller
     public function show(SalesInvoice $invoice): View
     {
         $this->authorize('view', $invoice);
-        $invoice->load(['client', 'sales', 'payments.receivedBy', 'items.product' => function ($query) {
+        $invoice->load(['client', 'sales', 'payments.receivedBy', 'payments.paymentMethod', 'items.product' => function ($query) { // ✅ 'payments.paymentMethod'
             $query->withTrashed();
-        }, 'taxes']);
+        }, 'taxes', 'adjustments', 'returns']); // ✅ 'adjustments' & 'returns'
 
-        return view('invoices.show', compact('invoice'));
+        // ✅ TAMBAHKAN INI
+        $paymentMethods = PaymentMethod::where('is_active', true)
+                            ->whereIn('type', ['direct', 'pending'])
+                            ->orderBy('name')
+                            ->get();
+
+       $companyBankAccounts = CompanyBankAccount::where('is_active', true)->orderBy('bank_name')->get();
+
+       return view('invoices.show', compact('invoice', 'paymentMethods', 'companyBankAccounts'));
     }
 
     public function create(): View
@@ -147,7 +157,7 @@ class SalesInvoiceController extends Controller
             $productsToSave = [];
             foreach ($validated['products'] as $productData) {
                 // Kunci produk untuk memastikan data stok & HPP akurat
-                $product = Product::lockForUpdate()->find($productData['product_id']); 
+                $product = Product::find($productData['product_id']); 
                 if (!$product) {
                     throw new \Exception("Produk dengan ID {$productData['product_id']} tidak ditemukan.");
                 }
@@ -158,9 +168,11 @@ class SalesInvoiceController extends Controller
                 $isFromClientOrder = $originOrder && $originOrder->order_source === 'client';
 
                 if (!$isFromClientOrder) {
+                    /*
                     if ($product->stock_quantity < $quantity) {
                         throw new \Exception("Stok untuk produk '{$product->product_name}' tidak mencukupi. Sisa stok: {$product->stock_quantity}.");
                     }
+                    */
                     $itemsToDecrementStock[] = [
                         'product_id' => $product->product_id,
                         'quantity' => $quantity
@@ -230,12 +242,11 @@ class SalesInvoiceController extends Controller
                 'discount_percentage' => $discountPercentage,
                 'discount_amount' => $discountAmount,
                 'total_amount' => $totalAmount,
-                'status' => 'unpaid',
+                'status' => 'draft', // ✅ PERUBAHAN UTAMA DI SINI
                 'user_id_sales' => $salesUserId,
                 'amount_paid' => 0,
                 'notes' => $request->input('notes'),
             ]);
-
             // 7. Lampirkan Pajak dan Item (yang sekarang sudah berisi HPP)
             $invoice->taxes()->attach($taxesToAttach);
             $invoice->items()->createMany($productsToSave);
@@ -248,10 +259,10 @@ class SalesInvoiceController extends Controller
             }
 
             // 9. Kurangi Stok (HANYA jika perlu)
-            foreach ($itemsToDecrementStock as $item) {
+            /*foreach ($itemsToDecrementStock as $item) {
                 // Kita tidak perlu lock lagi karena sudah di-lock di atas
                 Product::where('product_id', $item['product_id'])->decrement('stock_quantity', $item['quantity']);
-            }
+            }*/
 
             DB::commit();
 
@@ -260,6 +271,56 @@ class SalesInvoiceController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Gagal membuat invoice: ' . $e->getMessage())->withInput();
+        }
+    }
+
+    public function confirm(SalesInvoice $invoice): RedirectResponse
+    {
+        $this->authorize('update', $invoice); // Gunakan permission 'update' yang ada
+
+        if ($invoice->status !== 'draft') {
+            return back()->with('error', 'Hanya invoice DRAFT yang bisa dikonfirmasi.');
+        }
+
+        try {
+            DB::beginTransaction();
+            
+            // 1. Kunci dan Cek Stok (LOGIKA PINDAHAN DARI STORE)
+            $itemsToDecrement = [];
+            foreach ($invoice->items as $item) {
+                $product = Product::lockForUpdate()->find($item->product_id);
+                if (!$product) {
+                    throw new \Exception("Produk '{$item->product_name}' tidak ditemukan lagi.");
+                }
+
+                // Ini adalah pengecekan stok yang sebenarnya, terjadi saat konfirmasi
+                /*
+                // Ini adalah pengecekan stok yang sebenarnya, terjadi saat konfirmasi
+                if ($product->stock_quantity < $item->quantity) {
+                    throw new \Exception("Stok untuk produk '{$product->product_name}' tidak mencukupi. Sisa stok: {$product->stock_quantity}.");
+                }
+                */
+                
+                $itemsToDecrement[] = [
+                    'product_id' => $product->product_id,
+                    'quantity' => $item->quantity
+                ];
+            }
+
+            // 2. Jika semua stok aman, kurangi stok
+            foreach ($itemsToDecrement as $item) {
+                Product::where('product_id', $item['product_id'])->decrement('stock_quantity', $item['quantity']);
+            }
+
+            // 3. Ubah status invoice
+            $invoice->update(['status' => 'unpaid']);
+
+            DB::commit();
+            return redirect()->route('invoices.show', $invoice->invoice_id)->with('success', 'Invoice berhasil dikonfirmasi. Stok telah dikurangi.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Gagal konfirmasi invoice: ' . $e->getMessage());
         }
     }
 

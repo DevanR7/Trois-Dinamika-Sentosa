@@ -72,16 +72,31 @@
                             </div>
                             {{-- Input Metode Bayar --}}
                             <div class="col-md-4">
-                                <label for="payment_method" class="form-label">Metode Bayar (Non-Deposit)</label>
-                                <select name="payment_method" id="payment_method" class="form-select">
-                                     <option value="">-- Pilih Metode --</option>
-                                     <option value="manual_transfer">Transfer Bank</option>
-                                     <option value="cash">Cash</option>
-                                     <option value="other">Lainnya</option>
-                                </select>
-                            </div>
+    <label for="payment_method_id" class="form-label">Metode Bayar (Non-Deposit)</label>
+    {{-- ✅ 1. UBAH ID & NAME ke 'payment_method_id' --}}
+    <select name="payment_method_id" id="payment_method_id" class="form-select">
+         <option value="">-- Pilih Metode --</option>
+         @foreach ($paymentMethods as $method)
+         <option value="{{ $method->payment_method_id }}" data-type="{{ $method->type }}">
+             {{ $method->name }}
+         </option>
+         @endforeach
+    </select>
+</div>
+
+<div class="col-md-4">
+    <label for="company_bank_account_id_batch_purchase" class="form-label">Keluar dari Akun <span class="text-danger">*</span></label>
+    <select name="company_bank_account_id" id="company_bank_account_id_batch_purchase" class="form-select">
+        <option value="">-- Pilih Akun Bank/Kas --</option>
+        @foreach($companyBankAccounts as $account)
+            <option value="{{ $account->company_bank_account_id }}">
+                {{ $account->bank_name }} - {{ $account->account_number ?? $account->account_name }}
+            </option>
+        @endforeach
+    </select>
+</div>
                             {{-- Input Catatan --}}
-                            <div class="col-12">
+                            <div class="col-md-4">
                                 <label for="notes" class="form-label">Catatan (Opsional)</label>
                                 <textarea name="notes" class="form-control" rows="2"></textarea>
                             </div>
@@ -143,7 +158,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const debitBalanceSpan = document.getElementById('supplier-debit-balance');
     const useDebitContainer = document.getElementById('use-debit-container');
     const useDebitCheckbox = document.getElementById('use_debit_balance');
-    const paymentMethodSelect = document.getElementById('payment_method');
+    const paymentMethodSelect = document.getElementById('payment_method_id'); // <-- Pastikan ID ini benar
+    const bankAccountSelect = document.getElementById('company_bank_account_id_batch_purchase'); // <-- TAMBAHKAN INI
+    const defaultPaymentMethodId = "{{ $paymentMethods->first()->payment_method_id ?? '' }}";
     let currentDebitBalance = 0;
 
     // Inisialisasi AutoNumeric dengan format Indonesia (titik ribuan, koma desimal)
@@ -208,6 +225,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 paymentMethodSelect.required = false;
                 paymentMethodSelect.disabled = true;
                 paymentMethodSelect.value = "";
+
+                bankAccountSelect.required = false; // ✅ 3. TAMBAHKAN INI
+                bankAccountSelect.disabled = true; // ✅ 4. TAMBAHKAN INI
+                bankAccountSelect.value = ""; // ✅ 5. TAMBAHKAN INI
             } else {
                 // Deposit kurang: dana input perlu & aktif
                 amountFormattedInput.required = true;
@@ -215,6 +236,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 paymentMethodSelect.required = true;
                 paymentMethodSelect.disabled = false;
                  if (!paymentMethodSelect.value) paymentMethodSelect.value = "manual_transfer";
+                 bankAccountSelect.required = true; // ✅ 7. TAMBAHKAN INI
+                bankAccountSelect.disabled = false; // ✅ 8. TAMBAHKAN INI
             }
         } else {
             // Tidak pakai deposit: dana input perlu & aktif
@@ -224,8 +247,11 @@ document.addEventListener('DOMContentLoaded', function () {
             paymentMethodSelect.required = inputAmountValue > 0;
             paymentMethodSelect.disabled = false;
              if (paymentMethodSelect.required && !paymentMethodSelect.value) {
-                paymentMethodSelect.value = "manual_transfer";
-            } else if (!paymentMethodSelect.required) {
+                 paymentMethodSelect.value = defaultPaymentMethodId;
+            } 
+            bankAccountSelect.required = inputAmountValue > 0;
+            bankAccountSelect.disabled = false;
+            else if (!paymentMethodSelect.required) {
                  paymentMethodSelect.value = "";
             }
         }

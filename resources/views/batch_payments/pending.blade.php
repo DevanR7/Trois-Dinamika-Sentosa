@@ -23,13 +23,17 @@
                             <tr>
                                 <td>{{ $batch->created_at->format('d M Y H:i') }}</td>
                                 <td>{{ $batch->client->client_name ?? 'N/A' }}</td>
+                                
+                                {{-- ✅ PERBAIKAN: Tampilkan nama metode dari relasi --}}
                                 <td>
-                                    @if($batch->payment_method == 'cash')
-                                        <span class="badge bg-success">Cash</span>
+                                    @if($batch->paymentMethod)
+                                        <span class="badge bg-primary">{{ $batch->paymentMethod->name }}</span>
                                     @else
-                                        <span class="badge bg-primary">Transfer Bank</span>
+                                        {{-- Fallback jika ID null (misal: data lama) --}}
+                                        <span class="badge bg-secondary">{{ $batch->payment_method ?? 'N/A' }}</span>
                                     @endif
                                 </td>
+                                
                                 <td class="text-end fw-bold">Rp {{ number_format($batch->total_amount, 0, ',', '.') }}</td>
                                 <td class="text-center">
                                     <span class="badge bg-warning text-dark">{{ Str::title(str_replace('_', ' ', $batch->status)) }}</span>

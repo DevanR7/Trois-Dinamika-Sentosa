@@ -8,7 +8,9 @@
     use App\Models\Product;
     use App\Models\User;
     use App\Models\PurchaseOrderItemDiscount;
+    use App\Models\CompanyBankAccount;
     use App\Services\PurchaseOrderCalculator;
+    use App\Models\PaymentMethod;
     use Illuminate\Http\Request;
     use Illuminate\Support\Facades\DB;
     use Illuminate\Support\Facades\Auth;
@@ -211,19 +213,23 @@
     {
         $this->authorize('view', $purchaseOrder);
         
-        // ======================================================
-        // ✅ PERBAIKAN DI SINI: TAMBAHKAN 'adjustments' dan 'returns'
-        // ======================================================
         $purchaseOrder->load([
             'supplier', 
             'requester', 
             'items.product.unit', 
             'adjustments.user', // Muat penyesuaian & user pembuatnya
-            'returns'           // Muat retur (untuk info retur deposit)
+            'returns',          // Muat retur (untuk info retur deposit)
+            'payments.receivedBy',
+            'payments.paymentMethod', // ✅ PERBAIKAN: Eager load relasi ini
         ]);
-        // ======================================================
-        
-        return view('purchase_orders.show', compact('purchaseOrder'));
+
+        $paymentMethods = PaymentMethod::where('is_active', true)
+                            ->whereIn('type', ['direct', 'pending'])
+                            ->orderBy('name')
+                            ->get();
+        $companyBankAccounts = CompanyBankAccount::where('is_active', true)->orderBy('bank_name')->get();
+        // ✅ PERBAIKAN: Tambahkan 'paymentMethods' ke compact()
+        return view('purchase_orders.show', compact('purchaseOrder', 'paymentMethods', 'companyBankAccounts'));
     }
 
     public function edit(PurchaseOrder $purchaseOrder)

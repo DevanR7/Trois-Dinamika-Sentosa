@@ -25,6 +25,11 @@
 
     // 4. Untuk Modal Midtrans
     $amountToPayMidtrans = max(0, $sisaTagihan - $saldoKreditKlien);
+    
+    // 5. ✅ PERBAIKAN: Ambil ID untuk metode manual
+    // Asumsi $paymentMethods dikirim dari Client/InvoiceController@show
+    $transferMethodId = $paymentMethods->firstWhere(fn($m) => str_contains(strtolower($m->name), 'transfer'))->payment_method_id ?? null;
+    $cashMethodId = $paymentMethods->firstWhere(fn($m) => str_contains(strtolower($m->name), 'cash'))->payment_method_id ?? null;
 @endphp
 {{-- ==================================================================== --}}
 
@@ -121,15 +126,16 @@
                         </div>
                         <div class="d-flex gap-3 align-items-center">
                             <div class="text-center">
-                                @if($payment->payment_method == 'manual_transfer' && $payment->proof_of_payment_path)
-                                    <a href="{{ asset('storage/' . $payment->proof_of_payment_path) }}" target="_blank" class="btn btn-sm btn-outline-info">Lihat Bukti</a>
-                                @elseif($payment->payment_method == 'cash' && $payment->receivedBy)
+                                {{-- ✅ PERBAIKAN: Cek berdasarkan relasi paymentMethod --}}
+                                @if($payment->paymentMethod && str_contains(strtolower($payment->paymentMethod->name), 'cash') && $payment->receivedBy)
                                     <button type="button" class="btn btn-sm btn-outline-secondary" 
                                             data-bs-toggle="popover" 
                                             data-bs-title="Diterima Oleh" 
                                             data-bs-content="{{ $payment->receivedBy->full_name }}">
                                         Cash
                                     </button>
+                                @elseif($payment->proof_of_payment_path)
+                                    <a href="{{ asset('storage/' . $payment->proof_of_payment_path) }}" target="_blank" class="btn btn-sm btn-outline-info">Lihat Bukti</a>
                                 @else
                                     <span class="text-muted">-</span>
                                 @endif
@@ -241,28 +247,45 @@
                         <tr>
                             <td>{{ $payment->payment_date->format('d M Y') }}</td>
                             <td class="text-end">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
-                            <td>{{ Str::title(str_replace('_', ' ', $payment->payment_method)) }}</td>
+                            
+                            {{-- ✅ PERBAIKAN: Tampilkan nama metode dari relasi --}}
+                            <td>
+                                {{ $payment->paymentMethod->name ?? ($payment->transaction_id ? 'Gateway / Kredit' : 'Kredit Klien') }}
+                            </td>
+                            
+                            {{-- ✅ PERBAIKAN: Tambahkan status 'pending_clearance' --}}
                             <td>
                                 @if($payment->status == 'completed')
                                     <span class="badge bg-success">Completed</span>
                                 @elseif($payment->status == 'pending_verification')
-                                    <span class="badge bg-warning text-dark">Pending</span>
-                                @else
+                                    <span class="badge bg-warning text-dark">Pending Verifikasi</span>
+                                @elseif($payment->status == 'pending_clearance')
+                                    <span class="badge bg-info text-dark">Pending Kliring</span>
+                                @elseif($payment->status == 'failed')
                                     <span class="badge bg-danger">Failed</span>
+                                @else
+                                    <span class="badge bg-secondary">{{ $payment->status }}</span>
                                 @endif
                             </td>
+                            
                             <td>{{ $payment->receivedBy->full_name ?? '-' }}</td>
+                            
+                             {{-- ✅ PERBAIKAN: Logika untuk penerima/bukti --}}
                              <td>
-                    @if($payment->payment_method == 'cash' && $payment->receivedBy)
-                        {{ $payment->receivedBy->full_name }} (Sales)
-                    @elseif($payment->proof_of_payment_path)
-                        <a href="{{ asset('storage/' . $payment->proof_of_payment_path) }}" target="_blank" class="btn btn-sm btn-outline-info">
-                            Lihat Bukti
-                        </a>
-                    @else
-                        -
-                    @endif
-                </td>
+                                @if($payment->paymentMethod && str_contains(strtolower($payment->paymentMethod->name), 'cash') && $payment->receivedBy)
+                                    {{ $payment->receivedBy->full_name }} (Sales)
+                                @elseif($payment->proof_of_payment_path)
+                                    <a href="{{ asset('storage/' . $payment->proof_of_payment_path) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                        Lihat Bukti
+                                    </a>
+                                @elseif($payment->transaction_id)
+                                    <span class="text-muted" data-bs-toggle="tooltip" title="TX ID: {{ $payment->transaction_id }}">
+                                        Gateway / Kredit
+                                    </span>
+                                @else
+                                    -
+                                @endif
+                            </td>
                         </tr>
                         @empty
                         <tr>
@@ -375,7 +398,9 @@
             </div>
             <form action="{{ route('client.invoices.uploadProof', $invoice->invoice_id) }}" method="POST" enctype="multipart/form-data" id="manual-payment-form">
                 @csrf
-                <input type="hidden" name="payment_method" id="payment_method_input">
+                
+                {{-- ✅ PERBAIKAN: Ganti name="payment_method" menjadi "payment_method_id" --}}
+                <input type="hidden" name="payment_method_id" id="payment_method_id_input">
                 <input type="hidden" name="use_credit" id="manual-use-credit-hidden" value="0"> {{-- Hidden input untuk JS --}}
                 
                 <div class="modal-body">
@@ -393,7 +418,6 @@
                             <span>Rp {{ number_format($saldoKreditKlien, 0, ',', '.') }}</span>
                         </div>
                         <div class="form-check form-switch mt-2">
-                            {{-- ✅ HAPUS 'name' DARI CHECKBOX --}}
                             <input class="form-check-input" type="checkbox" role="switch" id="manual-use-credit" value="1">
                             <label class="form-check-label" for="manual-use-credit">Gunakan Saldo Kredit</label>
                         </div>
@@ -444,7 +468,7 @@
 
 
 {{-- ========================================================== --}}
-{{-- MODAL MIDTRANS (Sudah Benar) --}}
+{{-- MODAL MIDTRANS (Tidak Berubah) --}}
 {{-- ========================================================== --}}
 <div class="modal fade" id="midtransPaymentModal" tabindex="-1">
     <div class="modal-dialog">
@@ -507,10 +531,16 @@
     // Ambil variabel dari @php di atas
     const remainingBalance = parseFloat("{{ $sisaTagihan }}");
     const currentCreditBalance = parseFloat("{{ $saldoKreditKlien }}");
+    
+    // ✅ PERBAIKAN: Ambil ID metode dari @php
+    const transferMethodId = "{{ $transferMethodId }}";
+    const cashMethodId = "{{ $cashMethodId }}";
 
     document.addEventListener('DOMContentLoaded', function() {
         const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
         [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl));
+        const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+        [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
 
         const paymentMethodModal = new bootstrap.Modal(document.getElementById('paymentMethodModal'));
         const manualPaymentModal = new bootstrap.Modal(document.getElementById('manualPaymentModal'));
@@ -523,7 +553,10 @@
         const manualPaymentForm = document.querySelector('#manualPaymentModal form');
         if (manualPaymentForm) {
             const titleEl = document.getElementById('manualPaymentModalTitle');
-            const methodInput = document.getElementById('payment_method_input');
+            
+            // ✅ PERBAIKAN: Target ID input yang baru
+            const methodInput = document.getElementById('payment_method_id_input'); 
+            
             const cashFields = document.getElementById('cash-fields');
             const transferFields = document.getElementById('transfer-fields');
             const salesSelect = document.getElementById('user_id_sales');
@@ -534,8 +567,6 @@
             const amountHidden = document.getElementById('payment_amount');
             const amountError = document.getElementById('amount-error');
             const useCreditCheck = document.getElementById('manual-use-credit');
-            
-            // ✅ PERBAIKAN: Gunakan hidden input yang sudah ada di HTML
             const useCreditHidden = document.getElementById('manual-use-credit-hidden');
 
             const autoNumericInstance = new AutoNumeric(amountDisplay, { 
@@ -545,7 +576,7 @@
                 currencySymbol: 'Rp ',
                 currencySymbolPlacement: 'p',
                 minimumValue: 0,
-                maximumValue: remainingBalance 
+                // maximumValue: remainingBalance // Hapus max value agar bisa overpayment (jika ada)
             });
 
             // --- Fungsi Baru untuk Modal Manual (Meniru Logika Midtrans) ---
@@ -584,23 +615,25 @@
                      isValid = false;
                 }
                 
-                if (useCredit && totalPaymentValue > (remainingBalance + 0.01)) {
-                    isValid = false;
-                    errorMessage = 'Jumlah bayar + saldo kredit melebihi sisa tagihan.';
+                // Cek overpayment
+                if (totalPaymentValue > (remainingBalance + 0.01)) {
+                    // Ini diizinkan (overpayment akan jadi kredit), tapi kita beri info
+                    // isValid = false; // Tetap true, overpayment boleh
+                    errorMessage = 'Info: Jumlah bayar melebihi sisa tagihan. Kelebihan akan jadi saldo kredit.';
                 }
-                if (!useCredit && parseFloat(rawValue) > (remainingBalance + 0.01)) {
-                    isValid = false;
-                    errorMessage = 'Jumlah bayar melebihi sisa tagihan.';
-                }
+                // Cek underpayment (jika tidak ada kredit dan tidak ada input)
                 if (totalPaymentValue <= 0.01 && remainingBalance > 0.01) {
                     isValid = false;
                     errorMessage = 'Jumlah pembayaran harus lebih dari 0.';
                 }
 
                 submitBtn.disabled = !isValid;
-                if (!isValid && totalPaymentValue > 0.01) {
+                
+                if (errorMessage) {
                     amountError.textContent = errorMessage;
                     amountError.classList.remove('d-none');
+                    amountError.classList.toggle('text-danger', !isValid); // Merah jika error
+                    amountError.classList.toggle('text-success', isValid); // Hijau jika info
                 } else {
                     amountError.classList.add('d-none');
                 }
@@ -618,7 +651,10 @@
             document.getElementById('pay-manual-transfer-btn').addEventListener('click', function() {
                 paymentMethodModal.hide();
                 titleEl.textContent = 'Konfirmasi Pembayaran Transfer Bank';
-                methodInput.value = 'manual_transfer';
+                
+                // ✅ PERBAIKAN: Set value ke ID
+                methodInput.value = transferMethodId; 
+                
                 cashFields.classList.add('d-none');
                 transferFields.classList.remove('d-none');
                 proofInput.required = true;
@@ -631,7 +667,10 @@
             document.getElementById('pay-cash-btn').addEventListener('click', function() {
                 paymentMethodModal.hide();
                 titleEl.textContent = 'Konfirmasi Pembayaran Cash';
-                methodInput.value = 'cash';
+                
+                // ✅ PERBAIKAN: Set value ke ID
+                methodInput.value = cashMethodId; 
+                
                 transferFields.classList.add('d-none');
                 cashFields.classList.remove('d-none');
                 salesSelect.required = true;
@@ -667,7 +706,7 @@
                 currencySymbol: 'Rp ',
                 currencySymbolPlacement: 'p',
                 minimumValue: 0,
-                maximumValue: remainingBalance
+                // maximumValue: remainingBalance // Hapus max value
             });
 
             function toggleMidtransFields() {
@@ -706,14 +745,10 @@
                      isValid = false;
                 }
                 
-                if (useCredit && totalPaymentValue > (remainingBalance + 0.01)) {
-                    isValid = false;
-                    errorMessage = 'Jumlah bayar + saldo kredit melebihi sisa tagihan.';
-                }
-                
-                if (!useCredit && parseFloat(rawValue) > (remainingBalance + 0.01)) {
-                    isValid = false;
-                    errorMessage = 'Jumlah bayar melebihi sisa tagihan.';
+                // Cek overpayment
+                if (totalPaymentValue > (remainingBalance + 0.01)) {
+                    // isValid = false; // Overpayment diizinkan di controller
+                    errorMessage = 'Info: Jumlah bayar melebihi sisa tagihan.';
                 }
 
                 if (totalPaymentValue <= 0.01 && remainingBalance > 0.01) {
@@ -722,9 +757,11 @@
                 }
 
                 midtransSubmitBtn.disabled = !isValid;
-                if (!isValid && totalPaymentValue > 0.01) {
+                if (errorMessage) {
                     midtransAmountError.textContent = errorMessage;
                     midtransAmountError.classList.remove('d-none');
+                    midtransAmountError.classList.toggle('text-danger', !isValid);
+                    midtransAmountError.classList.toggle('text-success', isValid);
                 } else {
                     midtransAmountError.classList.add('d-none');
                 }
@@ -779,11 +816,9 @@
                                 payButton.innerHTML = 'Lanjutkan ke Pembayaran';
                             },
                             onClose: function(){
-                                // Dipanggil saat user menutup pop-up
                                 console.log('Snap pop-up ditutup oleh user.');
                                 payButton.disabled = false;
                                 payButton.innerHTML = 'Lanjutkan ke Pembayaran';
-                                // Kita tidak me-reload, biarkan user di halaman detail
                             }
                         });
                     } else {

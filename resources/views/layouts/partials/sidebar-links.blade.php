@@ -148,7 +148,7 @@
 
 {{-- 6. Invoices & Piutang --}}
 {{-- Tambahkan 'review-batch-payments' ke canany --}}
-@if(Auth::user()->canany(["view-invoices", "create-invoice-adjustments", "create-batch-payments", "review-batch-payments"]))
+@if(Auth::user()->canany(["view-invoices", "create-invoice-adjustments", "create-batch-payments", "review-batch-payments", "manage-payment-clearance"]))
     <div class="menu_title flex">
         <span class="title">Invoices & Piutang</span>
         <span class="line"></span>
@@ -163,15 +163,13 @@
         </li>
         @endcan
         
-        {{-- Pindahkan Penyesuaian ke sini agar logis --}}
         @can("create-invoice-adjustments") 
         <li class="item">
-    {{-- BENAR: Tidak perlu parameter --}}
-    <a class="link flex {{ request()->routeIs('invoice-adjustments.*') ? 'active' : '' }}" href="{{ route('invoice-adjustments.create') }}">
-        <i class="material-icons">edit_note</i>
-        <span>Penyesuaian Invoice</span>
-    </a>
-</li>
+            <a class="link flex {{ request()->routeIs('invoice-adjustments.*') ? 'active' : '' }}" href="{{ route('invoice-adjustments.create') }}">
+                <i class="material-icons">edit_note</i>
+                <span>Penyesuaian Invoice</span>
+            </a>
+        </li>
         @endcan
         
         @can("create-batch-payments")
@@ -198,13 +196,29 @@
             </a>
         </li>
         @endcan
+        
+        {{-- ====================================================== --}}
+        {{-- ✅ LINK MENU BARU DITAMBAHKAN DI SINI --}}
+        {{-- ====================================================== --}}
+        @can("manage-payment-clearance")
+        <li class="item">
+            <a class="link flex {{ request()->routeIs('payment-clearance.*') ? 'active' : '' }}" href="{{ route('payment-clearance.index') }}">
+                <i class="material-icons">pending_actions</i>
+                <span>Kliring Pembayaran</span>
+                
+                @php
+                    $pendingClearanceSales = \App\Models\Payment::where('status', 'pending_clearance')->count();
+                    $pendingClearancePurchase = \App\Models\PurchaseOrderPayment::where('status', 'pending_clearance')->count();
+                    $totalPendingClearance = $pendingClearanceSales + $pendingClearancePurchase;
+                @endphp
+                @if($totalPendingClearance > 0)
+                    <span class="badge bg-warning text-dark rounded-pill ms-auto">{{ $totalPendingClearance }}</span>
+                @endif
+            </a>
+        </li>
+        @endcan
     </ul>
 @endif
-
-{{-- ======================================================================== --}}
-{{-- ✅ PERUBAHAN SELESAI --}}
-{{-- ======================================================================== --}}
-
 
 {{-- 7. Retur/ Pengembalian Barang --}}
 @if(Auth::user()->canany(['view-sales-returns', 'view-purchase-returns']))
@@ -273,26 +287,47 @@
 @endcan
 
 {{-- 9. Pengaturan Satuan dan Pajak --}}
-@can("manage-settings")
+@if(Auth::user()->canany(["manage-settings", "manage-payment-methods"]))
     <div class="menu_title flex">
-        <span class="title">Satuan & Pajak</span>
+        <span class="title">Pengaturan</span>
         <span class="line"></span>
     </div>
     <ul class="menu_item">
+        @can("manage-settings")
         <li class="item">
             <a class="link flex {{ request()->routeIs("units.*") ? "active" : "" }}" href="{{ route("units.index") }}">
                 <i class="material-icons">straighten</i>
                 <span>Pengaturan Satuan</span>
             </a>
         </li>
-         <li class="item">
+        <li class="item">
             <a class="link flex {{ request()->routeIs("taxes.*") ? "active" : "" }}" href="{{ route("taxes.index") }}">
                 <i class="material-icons">percent</i>
                 <span>Pengaturan Pajak</span>
             </a>
         </li>
-    </ul>
+        @endcan
+        
+        {{-- ✅ TAMBAHKAN BLOK LI BARU INI --}}
+        @can("manage-payment-methods")
+        <li class="item">
+            <a class="link flex {{ request()->routeIs("payment-methods.*") ? "active" : "" }}" href="{{ route("payment-methods.index") }}">
+                <i class="material-icons">payment</i>
+                <span>Metode Pembayaran</span>
+            </a>
+        </li>
+        @endcan
+
+        @can("manage-bank-accounts")
+<li class="item">
+    <a class="link flex {{ request()->routeIs("company-bank-accounts.*") ? "active" : "" }}" href="{{ route("company-bank-accounts.index") }}">
+        <i class="material-icons">account_balance</i>
+        <span>Akun Bank Perusahaan</span>
+    </a>
+</li>
 @endcan
+    </ul>
+@endif
 
 {{-- 10. Manajemen Sistem --}}
 @if(Auth::user()->canany(['manage-users', 'manage-roles']))

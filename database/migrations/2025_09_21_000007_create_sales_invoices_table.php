@@ -20,7 +20,7 @@ return new class extends Migration
             $table->decimal('discount_amount', 15, 2)->default(0);
             $table->decimal('total_amount', 15, 2)->default(0.00);
             $table->decimal('amount_paid', 15, 2)->default(0.00);
-            $table->enum('status', ['unpaid', 'partially_paid', 'paid', 'overdue', 'cancelled'])->default('unpaid');
+            $table->enum('status', ['draft','unpaid', 'partially_paid', 'paid', 'overdue', 'cancelled'])->default('draft');
             $table->string('pending_snap_token')->nullable();
             $table->timestamp('pending_snap_expires_at')->nullable();
             $table->text('notes')->nullable();

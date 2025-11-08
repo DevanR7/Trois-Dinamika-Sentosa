@@ -12,7 +12,6 @@
     {{-- FORM FILTER --}}
     <div class="card shadow-sm mb-4">
         <div class="card-body">
-            {{-- Letakkan kode form filter Anda di sini jika ada file partial --}}
             <form action="{{ route("invoices.index") }}" method="GET" class="row g-3 align-items-center">
                 <div class="col-md-3"><input type="text" name="search" class="form-control" placeholder="Cari No. Invoice / Klien..." value="{{ request("search") }}"></div>
                 <div class="col-md-2"><input type="date" name="start_date" class="form-control" value="{{ request("start_date") }}" title="Tanggal Mulai"></div>
@@ -20,6 +19,8 @@
                 <div class="col-md-2">
                     <select name="status" class="form-select">
                         <option value="">-- Semua Status --</option>
+                        {{-- ✅ TAMBAHKAN OPSI 'DRAFT' DI FILTER --}}
+                        <option value="draft" @selected(request("status") == "draft")>Draft</option>
                         <option value="unpaid" @selected(request("status") == "unpaid")>Belum Lunas</option>
                         <option value="partially_paid" @selected(request("status") == "partially_paid")>Cicil</option>
                         <option value="paid" @selected(request("status") == "paid")>Lunas</option>
@@ -39,8 +40,9 @@
     <div class="list-group">
         @forelse ($invoices as $invoice)
             @php
-                $totalRetur = $invoice->returns->sum('total_amount');
-                $sisaPiutang = $invoice->total_amount - $invoice->amount_paid - $totalRetur;
+                // ✅ Gunakan Accessor 'remaining_balance' yang sudah ada
+                $sisaPiutang = $invoice->remaining_balance;
+                $totalRetur = $invoice->returns->sum('total_amount'); // Ini hanya untuk info
             @endphp
             <div class="list-group-item list-group-item-action mb-2 shadow-sm border-0 rounded">
                 {{-- Bagian Header yang Selalu Terlihat --}}
@@ -61,10 +63,19 @@
                             <small class="d-block text-muted">Jatuh Tempo</small>
                         </div>
                         <div class="col-md-3 col-6 text-md-end">
-                            @if($invoice->status == 'paid') <span class="badge bg-success">Lunas</span>
-                            @elseif($invoice->status == 'partially_paid') <span class="badge bg-info text-dark">Cicil</span>
-                            @elseif($invoice->status == 'cancelled') <span class="badge bg-dark">Dibatalkan</span>
-                            @else <span class="badge bg-warning text-dark">Belum Lunas</span>
+                            {{-- Badge status Anda sudah benar --}}
+                            @if($invoice->status == 'paid')
+                                <span class="badge bg-success">Lunas</span>
+                            @elseif($invoice->status == 'partially_paid')
+                                <span class="badge bg-info text-dark">Cicil</span>
+                            @elseif($invoice->status == 'cancelled')
+                                <span class="badge bg-danger">Dibatalkan</span>
+                            @elseif($invoice->status == 'unpaid')
+                                <span class="badge bg-warning text-dark">Belum Lunas</span>
+                            @elseif($invoice->status == 'draft')
+                                <span class="badge bg-secondary">Draft</span>
+                            @else
+                                <span class="badge bg-secondary">{{ $invoice->status }}</span>
                             @endif
                         </div>
                     </div>
@@ -89,20 +100,40 @@
                                     <small class="text-muted d-block">Total Retur</small>
                                 </div>
                                 <div class="col">
-                                    <h6 class="fw-bold {{ $sisaPiutang > 0 ? 'text-danger' : 'text-success' }}">Rp {{ number_format($sisaPiutang, 0, ',', '.') }}</h6>
+                                    <h6 class="fw-bold {{ $sisaPiutang > 0.01 ? 'text-danger' : 'text-success' }}">Rp {{ number_format($sisaPiutang, 0, ',', '.') }}</h6>
                                     <small class="text-muted d-block">Sisa Piutang</small>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="d-flex justify-content-end gap-1 mt-3">
+                        
+                        {{-- ====================================================== --}}
+                        {{-- ✅ TOMBOL KONFIRMASI BARU DITAMBAHKAN DI SINI --}}
+                        {{-- ====================================================== --}}
+                        @if($invoice->status == 'draft')
+                            <form class="confirm-form" action="{{ route('invoices.confirm', $invoice->invoice_id) }}" method="POST">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-primary fw-bold" title="Konfirmasi Invoice">
+                                    <i class="bi bi-check-circle-fill"></i> Konfirmasi
+                                </button>
+                            </form>
+                        @endif
+                        
                         <a href="{{ route('invoices.show', $invoice->invoice_id) }}" class="btn btn-sm btn-outline-info" title="Detail"><i class="bi bi-eye"></i> Detail Lengkap</a>
+                        
+                        {{-- ✅ PERBAIKI LOGIKA @if --}}
+                        {{-- Tombol Edit/Batal hanya muncul jika BUKAN Lunas atau Batal --}}
                         @if(!in_array($invoice->status, ['paid', 'cancelled']))
                             <a href="{{ route('invoices.edit', $invoice->invoice_id) }}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil-square"></i> Edit</a>
-                            <form class="cancel-form" action="{{ route('invoices.cancel', $invoice->invoice_id) }}" method="POST">
-                                @csrf
-                                <button type="submit" class="btn btn-sm btn-outline-warning" title="Batalkan"><i class="bi bi-x-circle"></i> Batalkan</button>
-                            </form>
+                            
+                            {{-- Tombol Batal hanya muncul jika BUKAN Draft --}}
+                            @if($invoice->status != 'draft')
+                                <form class="cancel-form" action="{{ route('invoices.cancel', $invoice->invoice_id) }}" method="POST">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Batalkan"><i class="bi bi-x-circle"></i> Batalkan</button>
+                                </form>
+                            @endif
                         @endif
                     </div>
                 </div>
@@ -123,6 +154,7 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Script untuk Tombol Batal (Cancel)
     const cancelForms = document.querySelectorAll('.cancel-form');
     cancelForms.forEach(form => {
         form.addEventListener('submit', function(event) {
@@ -136,6 +168,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 cancelButtonColor: '#6c757d',
                 confirmButtonText: 'Ya, Batalkan!',
                 cancelButtonText: 'Tidak'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    event.target.submit();
+                }
+            });
+        });
+    });
+
+    // ======================================================
+    // ✅ SCRIPT BARU UNTUK TOMBOL KONFIRMASI
+    // ======================================================
+    const confirmForms = document.querySelectorAll('.confirm-form');
+    confirmForms.forEach(form => {
+        form.addEventListener('submit', function(event) {
+            event.preventDefault();
+            Swal.fire({
+                title: 'Konfirmasi Invoice Ini?',
+                text: "Stok akan diperiksa dan dikurangi. Status akan berubah menjadi 'Belum Lunas'.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#198754', // Warna hijau
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Konfirmasi!',
+                cancelButtonText: 'Batal'
             }).then((result) => {
                 if (result.isConfirmed) {
                     event.target.submit();
