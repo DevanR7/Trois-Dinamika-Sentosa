@@ -99,6 +99,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('units', UnitController::class)->except(['show']);
     Route::resource('roles', RoleController::class)->except(['show']);
     Route::resource('payment-methods', PaymentMethodController::class)->except(['show']);
+    Route::prefix('archived-payment-methods')->name('payment-methods.archived.')->middleware('permission:manage-payment-methods')->group(function () {
+    Route::get('/', [PaymentMethodController::class, 'archivedIndex'])->name('index');
+    Route::post('/{id}/restore', [PaymentMethodController::class, 'restore'])->name('restore');
+    Route::delete('/{id}/force-delete', [PaymentMethodController::class, 'forceDelete'])->name('forceDelete');
+});
     Route::resource('sales-returns', SalesReturnController::class);
     Route::resource('purchase-returns', PurchaseReturnController::class);
     Route::resource('announcements', AnnouncementController::class);

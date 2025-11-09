@@ -14,16 +14,9 @@ return new class extends Migration
         Schema::create('payment_methods', function (Blueprint $table) {
             $table->id('payment_method_id'); // Kita buat nama PK-nya agar konsisten
             $table->string('name'); // Misal: "Cash", "BCA Transfer", "Giro Mundur"
-            
-            // Tipe:
-            // 'direct' = Langsung lunas (Cash, Transfer)
-            // 'pending' = Perlu kliring (Giro, Cek)
-            // 'gateway' = Ditangani callback (Midtrans)
             $table->enum('type', ['direct', 'pending', 'gateway'])->default('direct');
-            
-            // Kolom untuk admin mengaktifkan/menonaktifkan
             $table->boolean('is_active')->default(true);
-            
+            $table->softDeletes();
             $table->timestamps();
         });
     }

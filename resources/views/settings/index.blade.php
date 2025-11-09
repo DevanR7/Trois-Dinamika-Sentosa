@@ -37,6 +37,17 @@
                         <label for="company_npwp" class="form-label fw-semibold">NPWP</label>
                         <input type="text" class="form-control" id="company_npwp" name="company_npwp" value="{{ $settings['company_npwp'] ?? '' }}">
                     </div>
+
+                    {{-- =============================================== --}}
+                    {{-- ✅ TAMBAHKAN BLOK KODE INI --}}
+                    {{-- =============================================== --}}
+                    <div class="col-md-6">
+                        <label for="system_version" class="form-label fw-semibold">Versi Sistem</label>
+                        <input type="text" class="form-control" id="system_version" name="system_version" 
+                               value="{{ $settings['system_version'] ?? '1.0.0' }}" placeholder="Contoh: 1.0.1">
+                    </div>
+                    {{-- =============================================== --}}
+
                 </div>
                 <div class="d-flex justify-content-end mt-4">
                     <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
