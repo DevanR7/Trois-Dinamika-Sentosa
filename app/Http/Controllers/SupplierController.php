@@ -10,26 +10,22 @@ use Illuminate\Validation\Rule;
 
 class SupplierController extends Controller
 {
-    public function __construct()
-    {
-        // Kosongkan constructor ini. 
-        // Kita akan pindahkan pemeriksaan hak akses ke setiap method.
-    }
-
+    /**
+     * Menampilkan daftar supplier dengan opsi pencarian dan filter arsip.
+     */
     public function index(Request $request): View
     {
         $this->authorize('viewAny', Supplier::class);
 
         $query = Supplier::query();
 
-        // Logika untuk melihat arsip (data terhapus)
         if ($request->get('status') === 'deleted') {
             $query->onlyTrashed();
         }
 
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('supplier_name', 'like', "%{$search}%")
                   ->orWhere('person_in_charge', 'like', "%{$search}%")
                   ->orWhere('phone_number', 'like', "%{$search}%");
@@ -40,14 +36,18 @@ class SupplierController extends Controller
         return view('suppliers.index', compact('suppliers'));
     }
 
+    /**
+     * Menampilkan formulir untuk membuat supplier baru.
+     */
     public function create(): View
     {
-        // [AUTH] Panggil policy untuk memeriksa permission 'create-suppliers'
         $this->authorize('create', Supplier::class);
-
         return view('suppliers.create');
     }
 
+    /**
+     * Menyimpan supplier baru ke database.
+     */
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', Supplier::class);
@@ -63,31 +63,37 @@ class SupplierController extends Controller
         ]);
 
         Supplier::create($request->all());
+
         return redirect()->route('suppliers.index')->with('success', 'Supplier baru berhasil ditambahkan.');
     }
 
+    /**
+     * Menampilkan detail supplier beserta riwayat ledger-nya.
+     */
     public function show(Supplier $supplier): View
     {
-        // [AUTH] Panggil policy untuk memeriksa permission 'view-suppliers'
         $this->authorize('view', $supplier);
 
-        // Load relasi ledgers dengan paginasi, urutkan dari yg terbaru
         $ledgers = $supplier->ledgers()
-                         ->latest('transaction_date')
-                         ->latest('ledger_id') // Urutan kedua
-                         ->paginate(10, ['*'], 'ledger_page');
-        
+            ->latest('transaction_date')
+            ->latest('ledger_id')
+            ->paginate(10, ['*'], 'ledger_page');
+
         return view('suppliers.show', compact('supplier', 'ledgers'));
     }
 
+    /**
+     * Menampilkan formulir edit untuk supplier yang ada.
+     */
     public function edit(Supplier $supplier): View
     {
-        // [AUTH] Panggil policy untuk memeriksa permission 'edit-suppliers'
         $this->authorize('update', $supplier);
-
         return view('suppliers.edit', compact('supplier'));
     }
 
+    /**
+     * Memperbarui data supplier yang ada.
+     */
     public function update(Request $request, Supplier $supplier): RedirectResponse
     {
         $this->authorize('update', $supplier);
@@ -103,9 +109,13 @@ class SupplierController extends Controller
         ]);
 
         $supplier->update($request->all());
+
         return redirect()->route('suppliers.index')->with('success', 'Supplier berhasil diupdate.');
     }
 
+    /**
+     * Mengarsipkan (soft delete) supplier dengan validasi integritas data.
+     */
     public function destroy(Supplier $supplier): RedirectResponse
     {
         $this->authorize('delete', $supplier);
@@ -114,18 +124,23 @@ class SupplierController extends Controller
             return back()->with('error', 'Supplier ini tidak bisa dihapus karena sudah memiliki data Pesanan Pembelian.');
         }
 
-        $supplier->delete(); // Ini akan soft delete
-        return redirect()->route('suppliers.index')->with('success', 'Supplier berhasil diarsipkan.'); // Ganti pesan
+        $supplier->delete();
+
+        return redirect()->route('suppliers.index')->with('success', 'Supplier berhasil diarsipkan.');
     }
 
+    /**
+     * Memulihkan supplier yang sebelumnya diarsipkan.
+     */
     public function restore(Supplier $supplier): RedirectResponse
     {
-        $this->authorize('restore', $supplier); // Asumsi Anda punya policy 'restore'
+        $this->authorize('restore', $supplier);
 
         if ($supplier->trashed()) {
             $supplier->restore();
             return back()->with('success', 'Supplier ' . $supplier->supplier_name . ' telah dipulihkan.');
         }
+
         return back()->with('error', 'Supplier tidak terhapus.');
     }
 }

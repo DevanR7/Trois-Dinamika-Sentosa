@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\ClientLedger;
 use App\Models\InvoiceAdjustment;
 use App\Models\SalesInvoice;
-use App\Models\Product; 
-use App\Models\Tax;  
+use App\Models\Product;
+use App\Models\Tax;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -17,29 +17,27 @@ use Illuminate\Support\Facades\Log;
 
 class InvoiceAdjustmentController extends Controller
 {
-    // (Anda bisa menambahkan middleware permission di sini nanti)
-
     /**
-     * Tampilkan halaman PILIHAN (Manual vs Otomatis)
+     * Menampilkan halaman pilihan metode penyesuaian: manual atau otomatis.
      */
     public function create(Request $request): View
     {
         $preselectedInvoiceId = $request->query('invoice_id');
-        
-        // ✅ Ambil invoice yang BISA disesuaikan (tidak dibatalkan)
+
+        // Ambil invoice yang belum dibatalkan untuk ditampilkan sebagai opsi
         $invoices = SalesInvoice::where('status', '!=', 'cancelled')
             ->orderBy('order_date', 'desc')
             ->get();
-            
+
         return view('invoice_adjustments.create', compact('invoices', 'preselectedInvoiceId'));
     }
 
     // ======================================================
-    // ALUR 1: MANUAL
+    // ALUR 1: PENYESUAIAN MANUAL
     // ======================================================
 
     /**
-     * Tampilkan form input nominal MANUAL
+     * Menampilkan formulir penyesuaian manual untuk invoice tertentu.
      */
     public function createManual(SalesInvoice $invoice): View
     {
@@ -47,7 +45,7 @@ class InvoiceAdjustmentController extends Controller
     }
 
     /**
-     * Simpan penyesuaian MANUAL
+     * Menyimpan penyesuaian manual (credit note atau debit note).
      */
     public function storeManual(Request $request): RedirectResponse
     {
@@ -60,7 +58,7 @@ class InvoiceAdjustmentController extends Controller
         ]);
 
         $invoice = SalesInvoice::findOrFail($validated['sales_invoice_id']);
-        if ($invoice->status == 'cancelled') {
+        if ($invoice->status === 'cancelled') {
             return back()->with('error', 'Invoice yang sudah dibatalkan tidak dapat disesuaikan.');
         }
 
@@ -74,18 +72,15 @@ class InvoiceAdjustmentController extends Controller
                 'amount' => (float) $validated['amount'],
                 'reason' => $validated['reason'],
             ]);
-            
-            // ======================================================
-            // ✅ PERBAIKAN: Panggil fungsi update status
-            // ======================================================
+
+            // Perbarui status pembayaran invoice setelah penyesuaian
             $invoice->updatePaymentStatus();
-            // ======================================================
 
             DB::commit();
 
+            $noteType = $validated['type'] === 'credit_note' ? 'Kredit' : 'Debit';
             return redirect()->route('invoices.show', $invoice->invoice_id)
-                         ->with('success', 'Penyesuaian (Nota ' . ($validated['type'] == 'credit_note' ? 'Kredit' : 'Debit') . ') berhasil disimpan.');
-
+                ->with('success', "Penyesuaian (Nota {$noteType}) berhasil disimpan.");
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Gagal menyimpan penyesuaian: ' . $e->getMessage())->withInput();
@@ -93,31 +88,31 @@ class InvoiceAdjustmentController extends Controller
     }
 
     // ======================================================
-    // ALUR 2: OTOMATIS (REVISI)
+    // ALUR 2: PENYESUAIAN OTOMATIS (REVISI DETAIL INVOICE)
     // ======================================================
 
     /**
-     * Tampilkan form revisi OTOMATIS
-     * (Meniru SalesInvoiceController@edit)
+     * Menampilkan formulir revisi otomatis yang meniru tampilan edit invoice.
      */
     public function createAuto(SalesInvoice $invoice): View
     {
         $invoice->load('items.product', 'taxes');
-        
+
         $products = Product::orderBy('product_name')->get();
         $taxes = Tax::where('is_active', true)->get();
-        $clients = null; // Tidak perlu
-        $salesUsers = null; // Tidak perlu
+
+        // Variabel ini disertakan untuk kompatibilitas dengan view, meski tidak digunakan
+        $clients = null;
+        $salesUsers = null;
 
         return view('invoice_adjustments.create_auto', compact('invoice', 'products', 'taxes', 'clients', 'salesUsers'));
     }
 
     /**
-     * Simpan penyesuaian OTOMATIS
+     * Menyimpan penyesuaian otomatis berdasarkan perubahan struktur invoice.
      */
     public function storeAuto(Request $request, SalesInvoice $invoice): RedirectResponse
     {
-        // 1. Validasi input
         $validated = $request->validate([
             'products' => 'required|array|min:1',
             'products.*.product_id' => 'required|exists:products,product_id',
@@ -125,24 +120,25 @@ class InvoiceAdjustmentController extends Controller
             'discount_percentage' => 'nullable|numeric|min:0|max:100',
             'taxes' => 'nullable|array',
             'taxes.*' => 'exists:taxes,id',
-            'notes' => 'required|string|min:5|max:1000', // Alasan wajib diisi
+            'notes' => 'required|string|min:5|max:1000',
         ]);
 
         DB::beginTransaction();
         try {
-            // Load relasi lama untuk perbandingan
             $invoice->load('items.product', 'taxes');
 
-            // 2. Hitung TOTAL BARU
+            // Hitung total baru berdasarkan input revisi
             $subtotalProducts = 0;
-            foreach ($validated['products'] as $p) {
-                $product = Product::find($p['product_id']);
-                $price = $product->selling_price ?? 0;
-                $subtotalProducts += $price * $p['quantity'];
+            foreach ($validated['products'] as $item) {
+                $product = Product::find($item['product_id']);
+                $price = $product?->selling_price ?? 0;
+                $subtotalProducts += $price * $item['quantity'];
             }
-            $discountRate = (float)($validated['discount_percentage'] ?? 0);
+
+            $discountRate = (float) ($validated['discount_percentage'] ?? 0);
             $discountAmount = $subtotalProducts * ($discountRate / 100);
             $subtotalAfterDiscount = $subtotalProducts - $discountAmount;
+
             $totalTaxAmount = 0;
             if (!empty($validated['taxes'])) {
                 $taxes = Tax::whereIn('id', $validated['taxes'])->get();
@@ -150,44 +146,35 @@ class InvoiceAdjustmentController extends Controller
                     $totalTaxAmount += $subtotalAfterDiscount * ($tax->rate / 100);
                 }
             }
+
             $newTotalAmount = $subtotalAfterDiscount + $totalTaxAmount;
-            
-            // 3. Hitung Selisih
             $oldTotalAmount = $invoice->total_amount;
-            $diff = $oldTotalAmount - $newTotalAmount; // (Lama - Baru)
+            $diff = $oldTotalAmount - $newTotalAmount;
 
-            $adjustmentType = null;
-            $adjustmentAmount = 0;
-
-            if ($diff > 0.01) { // LAMA > BARU (Kelebihan tagih)
-                $adjustmentType = 'credit_note';
-                $adjustmentAmount = $diff;
-            } elseif ($diff < -0.01) { // LAMA < BARU (Kurang tagih)
-                $adjustmentType = 'debit_note';
-                $adjustmentAmount = abs($diff);
-            } else {
-                return redirect()->route('invoices.show', $invoice->invoice_id)->with('info', 'Tidak ada perubahan nominal. Penyesuaian tidak dibuat.');
+            // Tentukan jenis penyesuaian berdasarkan selisih
+            if (abs($diff) <= 0.01) {
+                return redirect()->route('invoices.show', $invoice->invoice_id)
+                    ->with('info', 'Tidak ada perubahan nominal. Penyesuaian tidak dibuat.');
             }
 
-            // ======================================================
-            // ✅ 4. Buat Alasan Otomatis
-            // ======================================================
+            $adjustmentType = $diff > 0 ? 'credit_note' : 'debit_note';
+            $adjustmentAmount = abs($diff);
+
+            // Bangun alasan sistematis berdasarkan perubahan data
             $reasonDetails = [];
-            
-            // Cek diskon global
+
+            // Perubahan diskon global
             $oldDiscount = (float) $invoice->discount_percentage;
-            $newDiscount = $discountRate;
-            if (abs($oldDiscount - $newDiscount) > 0.001) {
-                $reasonDetails[] = "Diskon global diubah dari {$oldDiscount}% menjadi {$newDiscount}%.";
+            if (abs($oldDiscount - $discountRate) > 0.001) {
+                $reasonDetails[] = "Diskon global diubah dari {$oldDiscount}% menjadi {$discountRate}%.";
             }
 
-            // Cek item
+            // Perubahan item
             $oldItems = $invoice->items->keyBy('product_id');
-            $newItems = collect($validated['products'])->mapWithKeys(function ($item) {
-                return [$item['product_id'] => ['quantity' => (int) $item['quantity']]];
-            });
+            $newItems = collect($validated['products'])->mapWithKeys(fn ($item) => [
+                $item['product_id'] => ['quantity' => (int) $item['quantity']],
+            ]);
 
-            // Cek item yg diubah/dihapus
             foreach ($oldItems as $pid => $oldItem) {
                 if (!$newItems->has($pid)) {
                     $reasonDetails[] = "Item DIHAPUS: " . Str::limit($oldItem->product->product_name, 20) . " (Qty {$oldItem->quantity}).";
@@ -195,44 +182,46 @@ class InvoiceAdjustmentController extends Controller
                     $reasonDetails[] = "Qty " . Str::limit($oldItem->product->product_name, 20) . " diubah: {$oldItem->quantity} -> {$newItems[$pid]['quantity']}.";
                 }
             }
-            // Cek item yg ditambah
+
             foreach ($newItems as $pid => $newItem) {
                 if (!$oldItems->has($pid)) {
-                    $productName = Product::find($pid)->product_name ?? 'Produk ??';
+                    $productName = Product::find($pid)?->product_name ?? 'Produk ??';
                     $reasonDetails[] = "Item DITAMBAH: " . Str::limit($productName, 20) . " (Qty {$newItem['quantity']}).";
                 }
             }
-            
-            // Cek pajak
+
+            // Perubahan pajak
             $oldTaxes = $invoice->taxes->pluck('id')->sort()->values()->all();
-            $newTaxes = collect($validated['taxes'] ?? [])->map(fn($id) => (int) $id)->sort()->values()->all();
+            $newTaxes = collect($validated['taxes'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();
             if ($oldTaxes !== $newTaxes) {
                 $reasonDetails[] = "Komponen pajak diubah.";
             }
 
-            // Gabungkan alasan
-            $finalReason = $validated['notes']; // Alasan manual dari admin
+            // Gabungkan alasan manual dan sistem
+            $finalReason = $validated['notes'];
             if (!empty($reasonDetails)) {
                 $finalReason .= "\n\n[LOG SISTEM OTOMATIS]:\n- " . implode("\n- ", $reasonDetails);
             }
-            // ======================================================
 
-            // 5. Buat InvoiceAdjustment
+            // Simpan penyesuaian
             InvoiceAdjustment::create([
                 'sales_invoice_id' => $invoice->invoice_id,
                 'user_id' => Auth::id(),
                 'adjustment_date' => now(),
                 'type' => $adjustmentType,
                 'amount' => $adjustmentAmount,
-                'reason' => $finalReason, // <-- Gunakan alasan baru yang detail
+                'reason' => $finalReason,
             ]);
 
+            // Perbarui status pembayaran
             $invoice->updatePaymentStatus();
-            
+
             DB::commit();
-            
+
+            $formattedAmount = number_format($adjustmentAmount, 0, ',', '.');
+            $noteType = $adjustmentType === 'credit_note' ? 'Kredit' : 'Debit';
             return redirect()->route('invoices.show', $invoice->invoice_id)
-                         ->with('success', 'Koreksi otomatis berhasil. Nota ' . ($adjustmentType == 'credit_note' ? 'Kredit' : 'Debit') . ' senilai Rp ' . number_format($adjustmentAmount, 0, ',', '.') . ' telah dibuat.');
+                ->with('success', "Koreksi otomatis berhasil. Nota {$noteType} senilai Rp {$formattedAmount} telah dibuat.");
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -241,35 +230,26 @@ class InvoiceAdjustmentController extends Controller
         }
     }
 
-
     /**
-     * Membatalkan penyesuaian (Sudah Benar)
+     * Membatalkan (menghapus) penyesuaian yang telah dibuat.
      */
-    public function destroy(InvoiceAdjustment $invoiceAdjustment)
+    public function destroy(InvoiceAdjustment $invoiceAdjustment): RedirectResponse
     {
         DB::beginTransaction();
         try {
-            $invoice_id = $invoiceAdjustment->sales_invoice_id;
-            
-            // Ambil invoice SEBELUM dihapus
-            $invoice = SalesInvoice::find($invoice_id);
+            $invoiceId = $invoiceAdjustment->sales_invoice_id;
+            $invoice = SalesInvoice::find($invoiceId);
 
-            // Hapus dokumen penyesuaian
             $invoiceAdjustment->delete();
-            
-            // ======================================================
-            // ✅ PERBAIKAN: Panggil fungsi update status
-            // ======================================================
+
             if ($invoice) {
                 $invoice->updatePaymentStatus();
             }
-            // ======================================================
-            
+
             DB::commit();
 
-            return redirect()->route('invoices.show', $invoice_id)
-                         ->with('success', 'Penyesuaian invoice berhasil dibatalkan.');
-                         
+            return redirect()->route('invoices.show', $invoiceId)
+                ->with('success', 'Penyesuaian invoice berhasil dibatalkan.');
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Gagal membatalkan penyesuaian: ' . $e->getMessage());

@@ -10,23 +10,27 @@ use Illuminate\Validation\Rule;
 
 class PaymentMethodController extends Controller
 {
+    /**
+     * Terapkan middleware permission agar hanya user tertentu bisa mengakses.
+     */
     public function __construct()
     {
         $this->middleware('permission:manage-payment-methods');
     }
 
     /**
-     * Tampilkan daftar (HANYA YANG AKTIF / non-archived).
+     * Menampilkan daftar metode pembayaran aktif (tidak diarsip).
      */
     public function index(): View
     {
-        // ✅ Model akan otomatis HANYA mengambil yang tidak di-soft-delete
+        // Model otomatis hanya mengambil yang belum di-soft delete
         $paymentMethods = PaymentMethod::orderBy('name')->get();
+
         return view('payment_methods.index', compact('paymentMethods'));
     }
 
     /**
-     * Tampilkan form untuk membuat metode baru.
+     * Menampilkan form untuk membuat metode pembayaran baru.
      */
     public function create(): View
     {
@@ -34,24 +38,26 @@ class PaymentMethodController extends Controller
     }
 
     /**
-     * Simpan metode pembayaran baru.
+     * Menyimpan metode pembayaran baru ke database.
      */
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:payment_methods,name',
             'type' => 'required|in:direct,pending,gateway',
+            'required_fields_config' => 'required|in:none,proof_only,reference_only,proof_and_reference',
             'is_active' => 'required|boolean',
         ]);
 
         PaymentMethod::create($validated);
 
-        // Notifikasi SweetAlert akan ditangani oleh layout Anda
-        return redirect()->route('payment-methods.index')->with('success', 'Metode pembayaran baru berhasil dibuat.');
+        return redirect()
+            ->route('payment-methods.index')
+            ->with('success', 'Metode pembayaran baru berhasil dibuat.');
     }
 
     /**
-     * Tampilkan form untuk mengedit metode.
+     * Menampilkan form untuk mengedit metode pembayaran yang ada.
      */
     public function edit(PaymentMethod $paymentMethod): View
     {
@@ -59,7 +65,7 @@ class PaymentMethodController extends Controller
     }
 
     /**
-     * Update metode pembayaran yang ada.
+     * Memperbarui data metode pembayaran yang ada di database.
      */
     public function update(Request $request, PaymentMethod $paymentMethod): RedirectResponse
     {
@@ -68,68 +74,87 @@ class PaymentMethodController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('payment_methods')->ignore($paymentMethod->payment_method_id, 'payment_method_id'),
+                Rule::unique('payment_methods')->ignore(
+                    $paymentMethod->payment_method_id,
+                    'payment_method_id'
+                ),
             ],
             'type' => 'required|in:direct,pending,gateway',
+            'required_fields_config' => 'required|in:none,proof_only,reference_only,proof_and_reference',
             'is_active' => 'required|boolean',
         ]);
 
         $paymentMethod->update($validated);
 
-        // Notifikasi SweetAlert akan ditangani oleh layout Anda
-        return redirect()->route('payment-methods.index')->with('success', 'Metode pembayaran berhasil diperbarui.');
+        return redirect()
+            ->route('payment-methods.index')
+            ->with('success', 'Metode pembayaran berhasil diperbarui.');
     }
 
     /**
-     * ✅ PERUBAHAN: 'destroy' sekarang berarti 'Arsip' (Soft Delete).
+     * Mengarsip (soft delete) metode pembayaran.
      */
     public function destroy(PaymentMethod $paymentMethod): RedirectResponse
     {
         try {
-            // Karena model menggunakan SoftDeletes, ->delete() akan mengisi 'deleted_at'
-            $paymentMethod->delete(); 
-            return redirect()->route('payment-methods.index')->with('success', 'Metode pembayaran berhasil diarsip.');
+            $paymentMethod->delete(); // Soft delete
+            return redirect()
+                ->route('payment-methods.index')
+                ->with('success', 'Metode pembayaran berhasil diarsip.');
         } catch (\Exception $e) {
-            return redirect()->route('payment-methods.index')->with('error', 'Gagal mengarsip metode: ' . $e->getMessage());
+            return redirect()
+                ->route('payment-methods.index')
+                ->with('error', 'Gagal mengarsip metode: ' . $e->getMessage());
         }
     }
 
     /**
-     * ✅ BARU: Menampilkan daftar metode yang diarsip.
+     * Menampilkan daftar metode pembayaran yang sudah diarsip (soft deleted).
      */
     public function archivedIndex(): View
     {
-        $archivedMethods = PaymentMethod::onlyTrashed()->orderBy('deleted_at', 'desc')->get();
+        $archivedMethods = PaymentMethod::onlyTrashed()
+            ->orderBy('deleted_at', 'desc')
+            ->get();
+
         return view('payment_methods.archive', compact('archivedMethods'));
     }
 
     /**
-     * ✅ BARU: Memulihkan metode yang diarsip.
+     * Memulihkan metode pembayaran yang diarsip.
      */
     public function restore($id): RedirectResponse
     {
         try {
             $method = PaymentMethod::onlyTrashed()->findOrFail($id);
             $method->restore();
-            return redirect()->route('payment-methods.archived.index')->with('success', 'Metode pembayaran berhasil dipulihkan.');
+
+            return redirect()
+                ->route('payment-methods.archived.index')
+                ->with('success', 'Metode pembayaran berhasil dipulihkan.');
         } catch (\Exception $e) {
-            return redirect()->route('payment-methods.archived.index')->with('error', 'Gagal memulihkan: ' . $e->getMessage());
+            return redirect()
+                ->route('payment-methods.archived.index')
+                ->with('error', 'Gagal memulihkan: ' . $e->getMessage());
         }
     }
 
     /**
-     * ✅ BARU: Menghapus permanen metode yang diarsip.
+     * Menghapus permanen metode pembayaran dari database.
      */
     public function forceDelete($id): RedirectResponse
     {
         try {
             $method = PaymentMethod::onlyTrashed()->findOrFail($id);
-            // Cek relasi jika perlu (tapi karena sudah nullOnDelete, seharusnya aman)
-            // ...
             $method->forceDelete();
-            return redirect()->route('payment-methods.archived.index')->with('success', 'Metode pembayaran berhasil dihapus permanen.');
+
+            return redirect()
+                ->route('payment-methods.archived.index')
+                ->with('success', 'Metode pembayaran berhasil dihapus permanen.');
         } catch (\Exception $e) {
-            return redirect()->route('payment-methods.archived.index')->with('error', 'Gagal menghapus permanen: ' . $e->getMessage());
+            return redirect()
+                ->route('payment-methods.archived.index')
+                ->with('error', 'Gagal menghapus permanen: ' . $e->getMessage());
         }
     }
 }

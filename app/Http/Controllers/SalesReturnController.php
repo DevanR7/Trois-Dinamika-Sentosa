@@ -5,62 +5,79 @@ namespace App\Http\Controllers;
 use App\Models\SalesReturn;
 use App\Models\SalesInvoice;
 use App\Models\Product;
+use App\Models\InvoiceItem;
+use App\Models\ClientLedger;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
-use App\Models\InvoiceItem;
-use App\Models\ClientLedger;
-use Illuminate\Support\Facades\Log;
 
 class SalesReturnController extends Controller
 {
-     public function index(Request $request): View
+    /**
+     * ===========================================================
+     *  MENAMPILKAN DAFTAR RETUR PENJUALAN
+     * ===========================================================
+     * - Menampilkan daftar retur dengan filter pencarian & tanggal
+     * - Dapat diakses sesuai izin policy pengguna
+     */
+    public function index(Request $request): View
     {
-        // [AUTH] Panggil policy untuk memeriksa permission 'view-sales-returns'
         $this->authorize('viewAny', SalesReturn::class);
 
         $query = SalesReturn::with(['client', 'salesInvoice']);
 
-        // Logika untuk Pencarian Umum (No. Retur / Klien / No. Invoice)
-    if ($request->filled('search')) {
-        $search = $request->search;
-        $query->where(function($q) use ($search) {
-            $q->where('return_number', 'like', "%{$search}%")
-              ->orWhereHas('client', function($q_client) use ($search) {
-                  $q_client->where('client_name', 'like', "%{$search}%");
-              })
-              ->orWhereHas('salesInvoice', function($q_invoice) use ($search) {
-                  $q_invoice->where('invoice_number', 'like', "%{$search}%");
-              });
-        });
-    }
+        // Filter pencarian berdasarkan nomor retur, nama klien, atau nomor invoice
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('return_number', 'like', "%{$search}%")
+                    ->orWhereHas('client', function ($q_client) use ($search) {
+                        $q_client->where('client_name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('salesInvoice', function ($q_invoice) use ($search) {
+                        $q_invoice->where('invoice_number', 'like', "%{$search}%");
+                    });
+            });
+        }
 
-    // Logika untuk Filter Tanggal
-    if ($request->filled('return_date')) {
-        $query->whereDate('return_date', $request->return_date);
-    }
+        // Filter berdasarkan tanggal retur
+        if ($request->filled('return_date')) {
+            $query->whereDate('return_date', $request->return_date);
+        }
 
-        $salesReturns = $query->latest('return_date')->paginate(15)->appends($request->query());
-            
+        $salesReturns = $query->latest('return_date')
+            ->paginate(15)
+            ->appends($request->query());
+
         return view('sales_returns.index', compact('salesReturns'));
     }
 
+    /**
+     * ===========================================================
+     *  FORM PEMBUATAN RETUR PENJUALAN BARU
+     * ===========================================================
+     * - Menampilkan daftar invoice yang valid untuk diretur
+     */
     public function create(): View
     {
-        // [AUTH] Panggil policy untuk memeriksa permission 'create-sales-returns'
         $this->authorize('create', SalesReturn::class);
 
         $invoices = SalesInvoice::whereNotIn('status', ['draft', 'cancelled'])
             ->orderBy('order_date', 'desc')
             ->get();
-            
+
         return view('sales_returns.create', compact('invoices'));
     }
 
     /**
-     * Menyimpan data retur penjualan baru.
+     * ===========================================================
+     *  MENYIMPAN RETUR PENJUALAN BARU
+     * ===========================================================
+     * - Validasi data retur
+     * - Hitung nilai retur dan stok
+     * - Simpan data secara transaksional
      */
     public function store(Request $request): RedirectResponse
     {
@@ -77,6 +94,7 @@ class SalesReturnController extends Controller
         ]);
 
         DB::beginTransaction();
+
         try {
             $invoice = SalesInvoice::with('client')->findOrFail($validated['sales_invoice_id']);
             $discountRate = $invoice->discount_percentage / 100;
@@ -84,7 +102,11 @@ class SalesReturnController extends Controller
             $hasReturnedItems = false;
             $handlingType = $validated['return_handling_type'];
 
-            // Hitung total nilai retur DULU
+            /**
+             * -----------------------------------------------------------
+             * Tahap 1: Validasi item dan hitung total nilai retur
+             * -----------------------------------------------------------
+             */
             foreach ($validated['items'] as $itemData) {
                 if (!empty($itemData['quantity']) && $itemData['quantity'] > 0) {
                     $hasReturnedItems = true;
@@ -101,14 +123,25 @@ class SalesReturnController extends Controller
                 }
             }
 
-            if (!$hasReturnedItems) throw new \Exception("Tidak ada item yang dipilih untuk diretur.");
-            
-            // Logika koreksi tipe handling (Sudah benar)
-            $sisaTagihanInvoice = $invoice->remaining_balance; 
+            if (!$hasReturnedItems) {
+                throw new \Exception("Tidak ada item yang dipilih untuk diretur.");
+            }
+
+            /**
+             * -----------------------------------------------------------
+             * Tahap 2: Koreksi tipe handling jika nilai retur melebihi sisa tagihan
+             * -----------------------------------------------------------
+             */
+            $sisaTagihanInvoice = $invoice->remaining_balance;
             if ($handlingType == 'deduct_invoice' && $totalReturnValue > $sisaTagihanInvoice) {
                 $handlingType = 'store_as_credit';
             }
-            
+
+            /**
+             * -----------------------------------------------------------
+             * Tahap 3: Simpan data retur utama
+             * -----------------------------------------------------------
+             */
             $salesReturn = SalesReturn::create([
                 'return_number' => SalesReturn::generateReturnNumber(),
                 'client_id' => $invoice->client_id,
@@ -120,11 +153,15 @@ class SalesReturnController extends Controller
                 'total_amount' => $totalReturnValue,
             ]);
 
-            // Loop kedua untuk simpan item, update stok, dan qty_returned
+            /**
+             * -----------------------------------------------------------
+             * Tahap 4: Simpan item retur dan update stok
+             * -----------------------------------------------------------
+             */
             foreach ($validated['items'] as $itemData) {
                 if (!empty($itemData['quantity']) && $itemData['quantity'] > 0) {
                     $originalItem = InvoiceItem::find($itemData['item_id']);
-                    
+
                     $priceAfterDiscount = $originalItem->price_per_unit * (1 - $discountRate);
                     $subtotal = $itemData['quantity'] * $priceAfterDiscount;
 
@@ -135,6 +172,7 @@ class SalesReturnController extends Controller
                         'subtotal' => $subtotal,
                     ]);
 
+                    // Update jumlah retur dan stok produk
                     $originalItem->increment('quantity_returned', $itemData['quantity']);
 
                     $product = Product::find($originalItem->product_id);
@@ -144,7 +182,11 @@ class SalesReturnController extends Controller
                 }
             }
 
-            // Logika aksi berdasarkan tipe handling (Sudah benar)
+            /**
+             * -----------------------------------------------------------
+             * Tahap 5: Catat kredit jika handling = "store_as_credit"
+             * -----------------------------------------------------------
+             */
             if ($handlingType == 'store_as_credit') {
                 $ledgerStatus = ($invoice->status == 'paid') ? 'available' : 'pending';
                 ClientLedger::create([
@@ -156,84 +198,100 @@ class SalesReturnController extends Controller
                     'type' => 'credit',
                     'amount' => $totalReturnValue,
                     'status' => $ledgerStatus,
-                    'description' => 'Kredit dari Retur Penjualan #' . $salesReturn->return_number . ($ledgerStatus == 'pending' ? ' (Ditahan)' : ''),
+                    'description' => 'Kredit dari Retur Penjualan #' . $salesReturn->return_number
+                        . ($ledgerStatus == 'pending' ? ' (Ditahan)' : ''),
                     'user_id' => Auth::id(),
                 ]);
             }
-            
-            // ======================================================
-            // ✅ TAMBAHKAN PEMANGGILAN UPDATE STATUS DI SINI
-            // ======================================================
-            // Panggil fungsi ini SETELAH semua logika retur selesai
+
+            /**
+             * -----------------------------------------------------------
+             * Tahap 6: Perbarui status invoice
+             * -----------------------------------------------------------
+             */
             $invoice->updatePaymentStatus();
-            // ======================================================
 
             DB::commit();
-            return redirect()->route('sales-returns.index')->with('success', 'Retur penjualan berhasil disimpan.');
 
+            return redirect()
+                ->route('sales-returns.index')
+                ->with('success', 'Retur penjualan berhasil disimpan.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Gagal menyimpan retur: ' . $e->getMessage())->withInput();
+            return back()
+                ->with('error', 'Gagal menyimpan retur: ' . $e->getMessage())
+                ->withInput();
         }
     }
 
+    /**
+     * ===========================================================
+     *  DETAIL RETUR PENJUALAN
+     * ===========================================================
+     * - Menampilkan informasi lengkap retur dan relasinya
+     */
     public function show(SalesReturn $salesReturn): View
-{
-    // [AUTH] Panggil policy untuk memeriksa permission 'view-sales-returns'
-    $this->authorize('view', $salesReturn);
+    {
+        $this->authorize('view', $salesReturn);
 
-    // Load semua relasi yang dibutuhkan oleh view
-    $salesReturn->load(['client', 'salesInvoice', 'user', 'items.product.unit']);
-    
-    return view('sales_returns.show', compact('salesReturn'));
-}
+        $salesReturn->load(['client', 'salesInvoice', 'user', 'items.product.unit']);
 
+        return view('sales_returns.show', compact('salesReturn'));
+    }
+
+    /**
+     * ===========================================================
+     *  MENGHAPUS RETUR PENJUALAN
+     * ===========================================================
+     * - Mengembalikan stok dan kuantitas item
+     * - Menghapus ledger (jika ada)
+     * - Memperbarui status invoice
+     */
     public function destroy(SalesReturn $salesReturn): RedirectResponse
     {
         $this->authorize('delete', $salesReturn);
-        
+
         DB::beginTransaction();
+
         try {
-            
-            // Ambil invoice ID SEBELUM $salesReturn dihapus
             $invoice_id = $salesReturn->sales_invoice_id;
 
+            // Hapus entri ledger jika tipe handling adalah kredit
             if ($salesReturn->return_handling_type == 'store_as_credit') {
                 ClientLedger::where('reference_type', SalesReturn::class)
-                            ->where('reference_id', $salesReturn->return_id)
-                            ->delete();
-            } else {
-                // Logika cek status Anda sudah benar
+                    ->where('reference_id', $salesReturn->return_id)
+                    ->delete();
             }
 
-            // Kembalikan stok dan kuantitas
+            // Kembalikan stok dan kuantitas yang diretur
             foreach ($salesReturn->items as $item) {
                 $product = Product::find($item->product_id);
                 if ($product) {
                     $product->decrement('stock_quantity', $item->quantity);
                 }
+
                 $originalItem = InvoiceItem::where('invoice_id', $salesReturn->sales_invoice_id)
-                                        ->where('product_id', $item->product_id)
-                                        ->first();
+                    ->where('product_id', $item->product_id)
+                    ->first();
+
                 if ($originalItem) {
                     $originalItem->decrement('quantity_returned', $item->quantity);
                 }
             }
-            
-            $salesReturn->delete(); // Hapus retur
-            
-            // ======================================================
-            // ✅ TAMBAHKAN PEMANGGILAN UPDATE STATUS DI SINI
-            // ======================================================
+
+            $salesReturn->delete();
+
+            // Perbarui status invoice setelah retur dihapus
             $invoice = SalesInvoice::find($invoice_id);
             if ($invoice) {
                 $invoice->updatePaymentStatus();
             }
-            // ======================================================
-            
+
             DB::commit();
-            return redirect()->route('sales-returns.index')->with('success', 'Retur penjualan berhasil dibatalkan.');
-        
+
+            return redirect()
+                ->route('sales-returns.index')
+                ->with('success', 'Retur penjualan berhasil dibatalkan.');
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Gagal membatalkan retur: ' . $e->getMessage());

@@ -2,23 +2,19 @@
 
 namespace App\Http\Controllers;
 
-// ✅ TAMBAHKAN USE STATEMENT INI
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password as PasswordRules;
-// ------------------------------
-
-use App\Http\Requests\ProfileUpdateRequest; // Hapus/biarkan, tidak akan dipakai
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password as PasswordRules;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
 {
     /**
-     * Display the user's profile form.
+     * Menampilkan formulir profil pengguna.
      */
     public function edit(Request $request): View
     {
@@ -28,14 +24,12 @@ class ProfileController extends Controller
     }
 
     /**
-     * Update the user's profile information.
+     * Memperbarui informasi profil pengguna (bukan password).
      */
-    // ✅ KITA UBAH METHOD UPDATE INI
     public function update(Request $request): RedirectResponse
     {
         $user = $request->user();
 
-        // Validasi data profil
         $validatedData = $request->validate([
             'full_name' => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'max:255', Rule::unique('users')->ignore($user->user_id, 'user_id')],
@@ -45,10 +39,9 @@ class ProfileController extends Controller
             'phone_number' => ['nullable', 'string', 'max:20'],
         ]);
 
-        // Isi data yang divalidasi
         $user->fill($validatedData);
 
-        // Jika email diubah, reset status verifikasi
+        // Reset verifikasi email jika alamat email diubah
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;
         }
@@ -57,10 +50,9 @@ class ProfileController extends Controller
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
-    
-    // ✅ KITA TAMBAHKAN METHOD KHUSUS UNTUK UPDATE PASSWORD
+
     /**
-     * Update the user's password.
+     * Memperbarui password pengguna secara terpisah.
      */
     public function updatePassword(Request $request): RedirectResponse
     {
@@ -76,9 +68,8 @@ class ProfileController extends Controller
         return back()->with('status', 'password-updated');
     }
 
-
     /**
-     * Delete the user's account.
+     * Menghapus akun pengguna secara permanen setelah verifikasi password.
      */
     public function destroy(Request $request): RedirectResponse
     {

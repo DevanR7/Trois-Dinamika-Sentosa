@@ -1,8 +1,5 @@
 @extends('layouts.client')
 
-{{-- ==================================================================== --}}
-{{-- ✅ BLOK PHP GLOBAL UNTUK SEMUA PERHITUNGAN --}}
-{{-- ==================================================================== --}}
 @php
     $client = Auth::guard('client')->user();
     $allPayments = $invoice->payments; // Ambil 1x untuk efisiensi
@@ -26,17 +23,14 @@
     // 4. Untuk Modal Midtrans
     $amountToPayMidtrans = max(0, $sisaTagihan - $saldoKreditKlien);
     
-    // 5. ✅ PERBAIKAN: Ambil ID untuk metode manual
-    // Asumsi $paymentMethods dikirim dari Client/InvoiceController@show
+    // 5. ✅ TAMBAHKAN 2 BARIS INI
+    // Ini mengasumsikan $paymentMethods sudah dikirim dari Client/InvoiceController@show
     $transferMethodId = $paymentMethods->firstWhere(fn($m) => str_contains(strtolower($m->name), 'transfer'))->payment_method_id ?? null;
     $cashMethodId = $paymentMethods->firstWhere(fn($m) => str_contains(strtolower($m->name), 'cash'))->payment_method_id ?? null;
 @endphp
-{{-- ==================================================================== --}}
-
 
 @section('content')
 <div class="container-fluid">
-    {{-- HEADER DENGAN TOMBOL AKSI --}}
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <a href="{{ route('client.invoices.index') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Kembali ke Daftar
@@ -51,10 +45,8 @@
         </div>
     </div>
 
-    {{-- KARTU DETAIL INVOICE --}}
     <div class="card shadow-sm border-0">
         <div class="card-body p-5">
-            {{-- Header Invoice --}}
             <div class="row mb-4">
                 <div class="col-md-6">
                     <h2 class="fw-bold mb-1">INVOICE</h2>
@@ -108,7 +100,6 @@
                 </table>
             </div>
 
-            {{-- VERIFIKASI BUKTI PEMBAYARAN --}}
             @if($pendingPayments->isNotEmpty())
             <div class="card my-4 border-warning">
                 <div class="card-header bg-warning text-dark">
@@ -126,7 +117,6 @@
                         </div>
                         <div class="d-flex gap-3 align-items-center">
                             <div class="text-center">
-                                {{-- ✅ PERBAIKAN: Cek berdasarkan relasi paymentMethod --}}
                                 @if($payment->paymentMethod && str_contains(strtolower($payment->paymentMethod->name), 'cash') && $payment->receivedBy)
                                     <button type="button" class="btn btn-sm btn-outline-secondary" 
                                             data-bs-toggle="popover" 
@@ -147,7 +137,6 @@
             </div>
             @endif
 
-            {{-- RIWAYAT PENYESUAIAN --}}
             @if($invoice->adjustments->isNotEmpty())
             <h5 class="fw-semibold mt-4">Riwayat Penyesuaian (Koreksi)</h5>
             <div class="table-responsive">
@@ -184,7 +173,6 @@
             </div>
             @endif
 
-            {{-- RIWAYAT RETUR --}}
             @if($invoice->returns->isNotEmpty())
             <h5 class="fw-semibold mt-4">Riwayat Retur</h5>
             <div class="table-responsive">
@@ -227,8 +215,7 @@
             </div>
             @endif
 
-            {{-- RIWAYAT PEMBAYARAN --}}
-            @if($invoice->payments->isNotEmpty())
+            @if($allPayments->isNotEmpty())
             <h5 class="fw-semibold mt-4">Riwayat Pembayaran</h5>
             <div class="table-responsive">
                 <table class="table table-sm table-bordered">
@@ -238,22 +225,18 @@
                             <th class="text-end">Jumlah</th>
                             <th>Metode</th>
                             <th>Status</th>
-                            <th>Diverifikasi oleh</th>
+                            <th>Catatan / Ref.</th>
                             <th>Penerima / Bukti</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse ($invoice->payments as $payment)
+                        @forelse ($allPayments as $payment)
                         <tr>
                             <td>{{ $payment->payment_date->format('d M Y') }}</td>
                             <td class="text-end">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
-                            
-                            {{-- ✅ PERBAIKAN: Tampilkan nama metode dari relasi --}}
                             <td>
                                 {{ $payment->paymentMethod->name ?? ($payment->transaction_id ? 'Gateway / Kredit' : 'Kredit Klien') }}
                             </td>
-                            
-                            {{-- ✅ PERBAIKAN: Tambahkan status 'pending_clearance' --}}
                             <td>
                                 @if($payment->status == 'completed')
                                     <span class="badge bg-success">Completed</span>
@@ -267,10 +250,12 @@
                                     <span class="badge bg-secondary">{{ $payment->status }}</span>
                                 @endif
                             </td>
-                            
-                            <td>{{ $payment->receivedBy->full_name ?? '-' }}</td>
-                            
-                             {{-- ✅ PERBAIKAN: Logika untuk penerima/bukti --}}
+                            <td>
+                                {{ $payment->notes }}
+                                @if($payment->reference_number)
+                                    <strong class="d-block">Ref: {{ $payment->reference_number }}</strong>
+                                @endif
+                            </td>
                              <td>
                                 @if($payment->paymentMethod && str_contains(strtolower($payment->paymentMethod->name), 'cash') && $payment->receivedBy)
                                     {{ $payment->receivedBy->full_name }} (Sales)
@@ -309,7 +294,6 @@
                     <div class="border rounded p-3">
                         <div class="d-flex justify-content-between fw-bold"><span>Total Tagihan Awal</span><span>Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span></div>
                         
-                        {{-- Tampilkan Penyesuaian --}}
                         @foreach ($invoice->adjustments as $adjustment)
                              <div class="d-flex justify-content-between {{ $adjustment->type == 'credit_note' ? 'text-success' : 'text-danger' }} small">
                                 <span>{{ $adjustment->type == 'credit_note' ? 'Nota Kredit (Potongan)' : 'Nota Debit (Tambahan)' }}</span>
@@ -346,9 +330,6 @@
     </div>
 </div>
 
-{{-- ========================================================== --}}
-{{-- MODAL PEMILIHAN METODE (Tidak Berubah) --}}
-{{-- ========================================================== --}}
 <div class="modal fade" id="paymentMethodModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -362,8 +343,8 @@
                     <button class="btn btn-outline-primary p-3" id="pay-manual-transfer-btn">
                         <i class="bi bi-bank2 fs-4 me-2"></i>
                         <div>
-                            <span class="fw-bold">Transfer Bank</span><br>
-                            <small>Upload bukti transfer manual.</small>
+                            <span class="fw-bold">Transfer Bank / Lainnya</span><br>
+                            <small>Upload bukti transfer manual, foto giro, dll.</small>
                         </div>
                     </button>
                     <button class="btn btn-outline-success p-3" id="pay-cash-btn">
@@ -386,9 +367,6 @@
     </div>
 </div>
 
-{{-- ========================================================== --}}
-{{-- ✅ MODAL MANUAL (DIPERBARUI) --}}
-{{-- ========================================================== --}}
 <div class="modal fade" id="manualPaymentModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -398,10 +376,7 @@
             </div>
             <form action="{{ route('client.invoices.uploadProof', $invoice->invoice_id) }}" method="POST" enctype="multipart/form-data" id="manual-payment-form">
                 @csrf
-                
-                {{-- ✅ PERBAIKAN: Ganti name="payment_method" menjadi "payment_method_id" --}}
-                <input type="hidden" name="payment_method_id" id="payment_method_id_input">
-                <input type="hidden" name="use_credit" id="manual-use-credit-hidden" value="0"> {{-- Hidden input untuk JS --}}
+                <input type="hidden" name="use_credit" id="manual-use-credit-hidden" value="0">
                 
                 <div class="modal-body">
                     <div class="alert alert-info">
@@ -424,7 +399,6 @@
                     </div>
                     @endif
 
-                    {{-- Bagian ini hanya untuk 'Cash via Sales' --}}
                     <div id="cash-fields" class="d-none">
                         <div class="mb-3">
                             <label for="user_id_sales" class="form-label">Diterima oleh Sales <span class="text-danger">*</span></label>
@@ -437,15 +411,31 @@
                         </div>
                     </div>
 
-                    {{-- Bagian ini hanya untuk 'Transfer Bank' --}}
                     <div id="transfer-fields" class="d-none">
                         <div class="mb-3">
-                            <label for="proof_of_payment" class="form-label">File Bukti Bayar (JPG, PNG) <span class="text-danger">*</span></label>
-                            <input type="file" class="form-control" name="proof_of_payment" id="proof_of_payment" accept="image/jpeg,image/png">
+                            <label for="payment_method_id" class="form-label">Metode Pembayaran <span class="text-danger">*</span></label>
+                            <select name="payment_method_id" id="payment_method_id" class="form-select">
+                                <option value="">-- Pilih Metode --</option>
+                                @foreach($paymentMethods as $method)
+                                    <option value="{{ $method->payment_method_id }}" 
+                                            data-config="{{ $method->required_fields_config }}">
+                                        {{ $method->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="mb-3" id="payment-reference-group" style="display: none;">
+                            <label for="reference_number" class="form-label">Nomor Referensi (Giro/Cek)</label>
+                            <input type="text" class="form-control" name="reference_number" id="reference_number">
+                        </div>
+
+                        <div class="mb-3" id="payment-proof-group" style="display: none;">
+                            <label for="proof_of_payment" class="form-label">File Bukti Bayar (JPG, PNG)</label>
+                            <input type="file" class="form-control" name="proof_of_payment" id="proof_of_payment" accept="image/jpeg,image/png,image/jpg">
                         </div>
                     </div>
 
-                    {{-- Bagian umum untuk keduanya --}}
                     <div class="mb-3">
                         <label for="payment_amount_display" class="form-label">Jumlah Dibayar (Manual/Cash) <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="payment_amount_display" placeholder="Rp 0">
@@ -466,10 +456,6 @@
     </div>
 </div>
 
-
-{{-- ========================================================== --}}
-{{-- MODAL MIDTRANS (Tidak Berubah) --}}
-{{-- ========================================================== --}}
 <div class="modal fade" id="midtransPaymentModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -528,11 +514,8 @@
     data-client-key="{{ config('midtrans.client_key') }}"></script>
 <script type"text/javascript">
     
-    // Ambil variabel dari @php di atas
     const remainingBalance = parseFloat("{{ $sisaTagihan }}");
     const currentCreditBalance = parseFloat("{{ $saldoKreditKlien }}");
-    
-    // ✅ PERBAIKAN: Ambil ID metode dari @php
     const transferMethodId = "{{ $transferMethodId }}";
     const cashMethodId = "{{ $cashMethodId }}";
 
@@ -547,20 +530,20 @@
         const midtransPaymentModal = new bootstrap.Modal(document.getElementById('midtransPaymentModal'));
 
         
-        // ======================================================
-        // ✅ LOGIKA MODAL 1: PEMBAYARAN MANUAL (DIPERBARUI)
-        // ======================================================
         const manualPaymentForm = document.querySelector('#manualPaymentModal form');
         if (manualPaymentForm) {
             const titleEl = document.getElementById('manualPaymentModalTitle');
             
-            // ✅ PERBAIKAN: Target ID input yang baru
-            const methodInput = document.getElementById('payment_method_id_input'); 
+            const methodDropdown = document.getElementById('payment_method_id');
             
             const cashFields = document.getElementById('cash-fields');
             const transferFields = document.getElementById('transfer-fields');
             const salesSelect = document.getElementById('user_id_sales');
             const proofInput = document.getElementById('proof_of_payment');
+            const proofGroup = document.getElementById('payment-proof-group');
+            const referenceInput = document.getElementById('reference_number');
+            const referenceGroup = document.getElementById('payment-reference-group');
+            
             const submitBtn = document.getElementById('submit-proof-btn');
             
             const amountDisplay = document.getElementById('payment_amount_display');
@@ -576,10 +559,36 @@
                 currencySymbol: 'Rp ',
                 currencySymbolPlacement: 'p',
                 minimumValue: 0,
-                // maximumValue: remainingBalance // Hapus max value agar bisa overpayment (jika ada)
             });
 
-            // --- Fungsi Baru untuk Modal Manual (Meniru Logika Midtrans) ---
+            function handleMethodConfigChange() {
+                if (!methodDropdown) return;
+                const selectedOption = methodDropdown.options[methodDropdown.selectedIndex];
+                const config = (selectedOption && !methodDropdown.disabled) ? selectedOption.dataset.config : 'none';
+
+                referenceGroup.style.display = 'none';
+                referenceInput.required = false;
+                proofGroup.style.display = 'none';
+                proofInput.required = false;
+
+                if (config === 'proof_only') {
+                    proofGroup.style.display = 'block';
+                    proofInput.required = true;
+                } else if (config === 'reference_only') {
+                    referenceGroup.style.display = 'block';
+                    referenceInput.required = true;
+                } else if (config === 'proof_and_reference') {
+                    proofGroup.style.display = 'block';
+                    proofInput.required = true;
+                    referenceGroup.style.display = 'block';
+                    referenceInput.required = true;
+                }
+            }
+
+            if (methodDropdown) {
+                methodDropdown.addEventListener('change', handleMethodConfigChange);
+            }
+
             function toggleManualFields() {
                 const useCredit = useCreditCheck ? useCreditCheck.checked : false;
                 const creditIsSufficient = currentCreditBalance >= remainingBalance && remainingBalance > 0;
@@ -599,7 +608,7 @@
                     autoNumericInstance.set(remainingBalance);
                     amountDisplay.disabled = false;
                 }
-                validateManualAmount(); // Validasi ulang
+                validateManualAmount();
             }
 
             function validateManualAmount() {
@@ -615,76 +624,66 @@
                      isValid = false;
                 }
                 
-                // Cek overpayment
                 if (totalPaymentValue > (remainingBalance + 0.01)) {
-                    // Ini diizinkan (overpayment akan jadi kredit), tapi kita beri info
-                    // isValid = false; // Tetap true, overpayment boleh
                     errorMessage = 'Info: Jumlah bayar melebihi sisa tagihan. Kelebihan akan jadi saldo kredit.';
+                    isError = false;
                 }
-                // Cek underpayment (jika tidak ada kredit dan tidak ada input)
                 if (totalPaymentValue <= 0.01 && remainingBalance > 0.01) {
                     isValid = false;
                     errorMessage = 'Jumlah pembayaran harus lebih dari 0.';
+                    isError = true;
                 }
 
                 submitBtn.disabled = !isValid;
-                
                 if (errorMessage) {
                     amountError.textContent = errorMessage;
                     amountError.classList.remove('d-none');
-                    amountError.classList.toggle('text-danger', !isValid); // Merah jika error
-                    amountError.classList.toggle('text-success', isValid); // Hijau jika info
+                    amountError.classList.toggle('text-danger', isError);
+                    amountError.classList.toggle('text-success', !isError);
                 } else {
                     amountError.classList.add('d-none');
                 }
             }
-            // --- Akhir Fungsi Baru ---
 
-            // Listener baru
             if (useCreditCheck) {
                 useCreditCheck.addEventListener('change', toggleManualFields);
             }
             amountDisplay.addEventListener('keyup', validateManualAmount);
             amountDisplay.addEventListener('change', validateManualAmount);
 
-            // Perbarui listener tombol
             document.getElementById('pay-manual-transfer-btn').addEventListener('click', function() {
                 paymentMethodModal.hide();
-                titleEl.textContent = 'Konfirmasi Pembayaran Transfer Bank';
-                
-                // ✅ PERBAIKAN: Set value ke ID
-                methodInput.value = transferMethodId; 
+                titleEl.textContent = 'Konfirmasi Pembayaran Manual';
                 
                 cashFields.classList.add('d-none');
                 transferFields.classList.remove('d-none');
-                proofInput.required = true;
                 salesSelect.required = false;
                 
-                if(useCreditCheck) useCreditCheck.checked = true; // Auto centang
-                toggleManualFields(); // Panggil fungsi baru
+                methodDropdown.value = transferMethodId; // Pre-select 'Transfer'
+                
+                if(useCreditCheck) useCreditCheck.checked = true;
+                toggleManualFields();
+                handleMethodConfigChange(); // Panggil untuk set form dinamis
                 manualPaymentModal.show();
             });
+            
             document.getElementById('pay-cash-btn').addEventListener('click', function() {
                 paymentMethodModal.hide();
                 titleEl.textContent = 'Konfirmasi Pembayaran Cash';
                 
-                // ✅ PERBAIKAN: Set value ke ID
-                methodInput.value = cashMethodId; 
-                
                 transferFields.classList.add('d-none');
                 cashFields.classList.remove('d-none');
                 salesSelect.required = true;
-                proofInput.required = false;
+
+                methodDropdown.value = cashMethodId; // Pre-select 'Cash'
                 
-                if(useCreditCheck) useCreditCheck.checked = true; // Auto centang
-                toggleManualFields(); // Panggil fungsi baru
+                if(useCreditCheck) useCreditCheck.checked = true;
+                toggleManualFields();
+                handleMethodConfigChange(); // Panggil untuk set form dinamis
                 manualPaymentModal.show();
             });
         }
-        // --- AKHIR LOGIKA MODAL 1 ---
 
-
-        // --- LOGIKA MODAL 2: PEMBAYARAN MIDTRANS ---
         document.getElementById('pay-online-btn').addEventListener('click', function() {
             paymentMethodModal.hide();
             midtransPaymentModal.show();
@@ -706,7 +705,6 @@
                 currencySymbol: 'Rp ',
                 currencySymbolPlacement: 'p',
                 minimumValue: 0,
-                // maximumValue: remainingBalance // Hapus max value
             });
 
             function toggleMidtransFields() {
@@ -735,33 +733,31 @@
                 const rawValue = midtransAutoNumeric.getNumericString();
                 midtransAmountHidden.value = rawValue;
                 const useCredit = midtransUseCreditCheck ? midtransUseCreditCheck.checked : false;
-
                 const totalPaymentValue = (useCredit ? currentCreditBalance : 0) + parseFloat(rawValue || 0);
-
                 let isValid = true;
                 let errorMessage = '';
+                let isError = true;
 
                 if (rawValue === null || rawValue === '' || parseFloat(rawValue) < 0) {
                      isValid = false;
                 }
                 
-                // Cek overpayment
                 if (totalPaymentValue > (remainingBalance + 0.01)) {
-                    // isValid = false; // Overpayment diizinkan di controller
                     errorMessage = 'Info: Jumlah bayar melebihi sisa tagihan.';
+                    isError = false;
                 }
-
                 if (totalPaymentValue <= 0.01 && remainingBalance > 0.01) {
                     isValid = false;
                     errorMessage = 'Jumlah pembayaran harus lebih dari 0.';
+                    isError = true;
                 }
 
                 midtransSubmitBtn.disabled = !isValid;
                 if (errorMessage) {
                     midtransAmountError.textContent = errorMessage;
                     midtransAmountError.classList.remove('d-none');
-                    midtransAmountError.classList.toggle('text-danger', !isValid);
-                    midtransAmountError.classList.toggle('text-success', isValid);
+                    midtransAmountError.classList.toggle('text-danger', isError);
+                    midtransAmountError.classList.toggle('text-success', !isError);
                 } else {
                     midtransAmountError.classList.add('d-none');
                 }
@@ -832,7 +828,6 @@
                 });
             });
         }
-        // --- AKHIR LOGIKA MODAL 2 ---
     });
 </script>
 @endpush

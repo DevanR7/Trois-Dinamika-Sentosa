@@ -13,7 +13,7 @@ use Illuminate\Http\RedirectResponse;
 class ProfileController extends Controller
 {
     /**
-     * Menampilkan form edit profil klien.
+     * Menampilkan form edit profil klien
      */
     public function edit(Request $request): View
     {
@@ -23,19 +23,28 @@ class ProfileController extends Controller
     }
 
     /**
-     * Mengupdate profil klien.
+     * Mengupdate data profil klien
      */
     public function update(Request $request): RedirectResponse
     {
         $client = $request->user('client');
 
+        // Validasi input data
         $validated = $request->validate([
             'client_name' => 'required|string|max:150',
             'person_in_charge' => 'nullable|string|max:100',
             'address' => 'nullable|string',
             'phone_number' => 'nullable|string|max:20',
-            'current_password' => ['nullable', 'required_with:password', 'current_password:client'],
-            'password' => ['nullable', 'confirmed', Password::defaults()],
+            'current_password' => [
+                'nullable', 
+                'required_with:password',
+                'current_password:client'
+            ],
+            'password' => [
+                'nullable', 
+                'confirmed',
+                Password::defaults()
+            ],
         ]);
 
         // Update informasi dasar

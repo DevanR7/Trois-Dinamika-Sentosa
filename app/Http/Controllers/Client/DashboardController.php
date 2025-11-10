@@ -12,74 +12,77 @@ use App\Models\OrderChangeRequest;
 
 class DashboardController extends Controller
 {
+    /**
+     * Menampilkan dashboard klien dengan metrik dan data penting
+     */
     public function index(): View
     {
+        // Data dasar klien
         $client = Auth::guard('client')->user();
         $clientId = $client->client_id;
 
-        // --- 1. DATA UNTUK KPI CARDS ---
+        // --- SECTION 1: DATA UNTUK KPI CARDS ---
 
-        // Ambil semua invoice yang belum lunas
+        // Perhitungan total piutang dari invoice belum lunas
         $unpaidInvoices = $client->salesInvoices()
             ->whereIn('status', ['unpaid', 'partially_paid'])
-            // ✅ Eager load relasi yang diperlukan untuk accessor
-            ->with(['deductingReturns', 'adjustments']) 
+            ->with(['deductingReturns', 'adjustments'])
             ->get();
         
-        // Hitung total piutang menggunakan accessor
         $totalPiutang = $unpaidInvoices->reduce(function ($carry, $invoice) {
-            // ✅ GUNAKAN ACCESSOR BARU
-            $remaining = $invoice->remaining_balance; 
-            return $carry + $remaining;
+            return $carry + $invoice->remaining_balance;
         }, 0);
 
-        // ✅ AMBIL SALDO KLIEN (AVAILABLE & PENDING)
+        // Data saldo klien
         $availableBalance = $client->balance;
         $pendingBalance = $client->pending_balance;
 
-        // ... (Hitungan pendingClientOrdersCount, activeSalesOrdersCount, dll. Anda sudah benar) ...
+        // Count data untuk KPI cards
         $pendingClientOrdersCount = $client->orders()
             ->where('order_source', 'client')
             ->where('status', 'pending_review')
             ->count();
+            
         $activeSalesOrdersCount = $client->orders()
             ->where('order_source', 'sales')
             ->whereIn('status', ['pending', 'approved'])
             ->count();
+            
         $pendingChangeRequestsCount = OrderChangeRequest::where('client_id', $clientId)
             ->where('status', 'pending')
             ->count();
 
+        // --- SECTION 2: DATA UNTUK DAFTAR "PERLU TINDAKAN" ---
 
-        // --- 2. DATA UNTUK DAFTAR "PERLU TINDAKAN" ---
-        // ... (Logika $latestPendingClientOrders, $latestPendingChangeRequests, $pendingActivities Anda sudah benar) ...
+        // Data order perlu tindakan
         $latestPendingClientOrders = $client->orders()
             ->where('order_source', 'client')
             ->where('status', 'pending_review')
             ->latest('created_at')
             ->take(3)
             ->get();
+
+        // Data permintaan perubahan pending
         $latestPendingChangeRequests = OrderChangeRequest::with('order')
             ->where('client_id', $clientId)
             ->where('status', 'pending')
             ->latest('created_at')
             ->take(3)
             ->get();
+
+        // Gabungan aktivitas pending
         $pendingActivities = $latestPendingClientOrders->concat($latestPendingChangeRequests)
                                         ->sortByDesc('created_at');
 
-
-        // --- 3. DATA UNTUK KARTU "TAGIHAN BELUM LUNAS" ---
-        // Kita sudah punya $unpaidInvoices, tinggal diurutkan
+        // --- SECTION 3: DATA UNTUK KARTU "TAGIHAN BELUM LUNAS" ---
         $invoicesForCard = $unpaidInvoices->sortByDesc('order_date');
-        
 
-        // Kirim semua data ke view
+        // Kirim data ke view
         return view('client.dashboard', compact(
             'client',
             'totalPiutang',
-            'availableBalance', // ✅ KIRIM SALDO INI
-            'pendingBalance',   // ✅ KIRIM SALDO INI
+            'availableBalance',
+            'pendingBalance',
             'pendingClientOrdersCount',
             'activeSalesOrdersCount',
             'pendingChangeRequestsCount',

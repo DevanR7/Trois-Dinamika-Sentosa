@@ -1,32 +1,16 @@
 @extends('layouts.app')
 
-{{-- ==================================================================== --}}
-{{-- ✅ BLOK PHP GLOBAL UNTUK SEMUA PERHITUANGAN (WAJIB DI ATAS) --}}
-{{-- ==================================================================== --}}
 @php
-    // Definisikan semua variabel di sini, di bagian atas
-    
-    // 1. Untuk Ringkasan Keuangan
     $sisaTagihan = $invoice->remaining_balance;
     $totalReturDipotong = $invoice->total_deducting_returns;
     $totalReturKredit = $invoice->returns
         ->where('return_handling_type', 'store_as_credit')
         ->sum('total_amount');
-    
-    // 2. Untuk Modal Pembayaran
     $saldoKreditKlien = $invoice->client->balance;
-
-    // 3. Asumsi $paymentMethods dikirim dari SalesInvoiceController@show
-    // Jika belum, tambahkan di controller Anda:
-    // $paymentMethods = \App\Models\PaymentMethod::where('is_active', true)
-    //     ->whereIn('type', ['direct', 'pending'])->orderBy('name')->get();
 @endphp
-{{-- ==================================================================== --}}
-
 
 @section('content')
 <div class="container py-4">
-    {{-- HEADER HALAMAN DENGAN TOMBOL AKSI --}}
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h2 class="fw-bold mb-0">Detail Invoice: {{ $invoice->invoice_number }}</h2>
         
@@ -42,7 +26,6 @@
                 </form>
             @endif
             
-            {{-- Gunakan variabel $sisaTagihan yang sudah didefinisikan di atas --}}
             @if(!in_array($invoice->status, ['cancelled', 'draft']) && $sisaTagihan > 0.01)
                 <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal" id="add-payment-btn">
                     <i class="bi bi-cash-coin me-1"></i> Catat Pembayaran
@@ -54,21 +37,17 @@
                     <i class="bi bi-gear"></i> Opsi
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
-                    {{-- ✅ PERBAIKAN: Tombol 'Edit' boleh untuk DRAFT --}}
                     @if(!in_array($invoice->status, ['paid', 'cancelled']))
                         <li><a class="dropdown-item" href="{{ route('invoices.edit', $invoice->invoice_id) }}"><i class="bi bi-pencil-square me-2"></i> Edit Invoice</a></li>
                     @endif
-                    
                     <li><hr class="dropdown-divider"></li>
                     <li>
-                        <a class="dropdown-item" href="{{ route('invoice-adjustments.create.manual', $invoice->invoice_id) }}"> 
+                        <a class="dropdown-item" href="{{ route('invoice-adjustments.create.manual', $invoice->invoice_id) }}">
                             <i class="bi bi-file-earmark-diff me-2"></i> Buat Penyesuaian
                         </a>
                     </li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" href="{{ route('invoices.pdf', $invoice->invoice_id) }}"><i class="bi bi-file-earmark-pdf me-2"></i> Download PDF</a></li>
-                    
-                    {{-- ✅ PERBAIKAN: Tombol 'Batal' hanya muncul jika BUKAN DRAFT, LUNAS, atau BATAL --}}
                     @if(!in_array($invoice->status, ['draft', 'paid', 'cancelled']))
                         <li><hr class="dropdown-divider"></li>
                         <li>
@@ -83,7 +62,6 @@
         </div>
     </div>
 
-    {{-- KARTU DETAIL UTAMA --}}
     <div class="card shadow-sm border-0">
         <div class="card-body p-4">
             <div class="row mb-4">
@@ -100,7 +78,9 @@
                         @if($invoice->status == 'paid') <span class="badge bg-success fs-6">Lunas</span>
                         @elseif($invoice->status == 'partially_paid') <span class="badge bg-info text-dark fs-6">Cicil</span>
                         @elseif($invoice->status == 'cancelled') <span class="badge bg-danger fs-6">Dibatalkan</span>
-                        @else <span class="badge bg-warning text-dark fs-6">Belum Lunas</span>
+                        @elseif($invoice->status == 'unpaid') <span class="badge bg-warning text-dark fs-6">Belum Lunas</span>
+                        @elseif($invoice->status == 'draft') <span class="badge bg-secondary fs-6">Draft</span>
+                        @else <span class="badge bg-secondary fs-6">{{ $invoice->status }}</span>
                         @endif
                     </p>
                 </div>
@@ -135,9 +115,6 @@
                 </table>
             </div>
 
-            {{-- =============================================== --}}
-            {{-- VERIFIKASI BUKTI PEMBAYARAN --}}
-            {{-- =============================================== --}}
             @php
                 $pendingPayments = $invoice->payments->where('status', 'pending_verification');
             @endphp
@@ -150,7 +127,6 @@
                 <div class="card-body">
                     @foreach($pendingPayments as $payment)
                     <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-3">
-                        {{-- Informasi Jumlah dan Tanggal --}}
                         <div>
                             <div><strong>Jumlah:</strong> Rp {{ number_format($payment->amount, 0, ',', '.') }}</div>
                             <div><strong>Tanggal Lapor:</strong> {{ $payment->created_at->format('d M Y H:i') }}</div>
@@ -159,9 +135,7 @@
                             @endif
                         </div>
 
-                        {{-- Aksi Verifikasi --}}
                         <div class="d-flex gap-3 align-items-center">
-                            {{-- ✅ PERBAIKAN: Kolom Bukti / Penerima --}}
                             <div class="text-center">
                                 @if($payment->paymentMethod && str_contains(strtolower($payment->paymentMethod->name), 'cash') && $payment->receivedBy)
                                     <button type="button" class="btn btn-sm btn-outline-secondary" 
@@ -177,7 +151,6 @@
                                 @endif
                             </div>
                             
-                            {{-- Kolom Tombol Aksi --}}
                             <div class="d-flex gap-2">
                                 <form action="{{ route('payments.reject', $payment->payment_id) }}" method="POST" class="d-inline mb-0">
                                     @csrf
@@ -195,9 +168,6 @@
             </div>
             @endif
 
-            {{-- ====================================================== --}}
-            {{-- ✅ POSISI BARU: RIWAYAT PENYESUAIAN --}}
-            {{-- ====================================================== --}}
             @if($invoice->adjustments->isNotEmpty())
             <h5 class="fw-semibold mt-4">Riwayat Penyesuaian (Koreksi)</h5>
             <div class="table-responsive">
@@ -243,14 +213,7 @@
                 </table>
             </div>
             @endif
-            {{-- ====================================================== --}}
-            {{-- 🛑 AKHIR BLOK PENYESUAIAN --}}
-            {{-- ====================================================== --}}
 
-
-            {{-- =============================================== --}}
-            {{-- RIWAYAT PEMBAYARAN --}}
-            {{-- =============================================== --}}
             <h5 class="fw-semibold mt-4">Riwayat Pembayaran</h5>
             <div class="table-responsive">
                 <table class="table table-sm table-bordered">
@@ -269,12 +232,10 @@
                             <td>{{ $payment->payment_date->format('d M Y') }}</td>
                             <td class="text-end">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
                             
-                            {{-- ✅ PERBAIKAN: Tampilkan nama metode dari relasi --}}
                             <td>
                                 {{ $payment->paymentMethod->name ?? ($payment->transaction_id ? 'Gateway / Kredit' : 'Kredit Klien / Internal') }}
                             </td>
                             
-                            {{-- ✅ PERBAIKAN: Tambahkan status 'pending_clearance' --}}
                             <td>
                                 @if($payment->status == 'completed')
                                     <span class="badge bg-success">Completed</span>
@@ -289,7 +250,6 @@
                                 @endif
                             </td>
 
-                            {{-- ✅ PERBAIKAN: Logika untuk penerima/bukti --}}
                              <td>
                                 @if($payment->paymentMethod && str_contains(strtolower($payment->paymentMethod->name), 'cash') && $payment->receivedBy)
                                     {{ $payment->receivedBy->full_name }} (Sales)
@@ -337,11 +297,9 @@
                         <hr class="my-1">
                         <div class="d-flex justify-content-between fw-bold"><span>Total Tagihan</span><span>Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span></div>
                         
-                        {{-- Tampilkan HANYA retur yang dipotong (Variabel dari @php di atas) --}}
                         @if($totalReturDipotong > 0)
                             <div class="d-flex justify-content-between text-warning"><span>Total Retur (Potong Tagihan)</span><span>(-) Rp {{ number_format($totalReturDipotong, 0, ',', '.') }}</span></div>
                         @endif
-                        {{-- Tampilkan Nota Penyesuaian --}}
                         @foreach ($invoice->adjustments as $adjustment)
                              <div class="d-flex justify-content-between {{ $adjustment->type == 'credit_note' ? 'text-success' : 'text-danger' }}">
                                 <span>{{ $adjustment->type == 'credit_note' ? 'Nota Kredit (Potongan)' : 'Nota Debit (Tambahan)' }}</span>
@@ -352,13 +310,11 @@
                         <hr class="my-1">
                         <div class="d-flex justify-content-between text-success"><span>Sudah Dibayar</span><span>Rp {{ number_format($invoice->amount_paid, 0, ',', '.') }}</span></div>
                         
-                        {{-- Tampilkan info jika ada retur yg jadi kredit (Variabel dari @php di atas) --}}
                         @if($totalReturKredit > 0)
                             <div class="d-flex justify-content-between text-info small"><span>(Nilai retur jadi kredit: Rp {{ number_format($totalReturKredit, 0, ',', '.') }})</span></div>
                         @endif
                         <hr class="my-1">
                         
-                        {{-- Tampilkan variabel $sisaTagihan (dari @php di atas) --}}
                         <div class="d-flex justify-content-between fw-bold fs-5 {{ $sisaTagihan > 0.01 ? 'text-danger' : 'text-success' }}">
                             <span>Sisa Tagihan</span>
                             <span>Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</span>
@@ -370,26 +326,18 @@
     </div>
 </div>
 
-{{-- =================================== --}}
-{{-- ✅ MODAL PEMBAYARAN DIPERBARUI --}}
-{{-- =================================== --}}
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header"><h5 class="modal-title">Catat Pembayaran untuk #{{ $invoice->invoice_number }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <form action="{{ route('payments.store', $invoice->invoice_id) }}" method="POST">
+            <form action="{{ route('payments.store', $invoice->invoice_id) }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 
                 <div class="modal-body">
                     
-                    {{-- Variabel $sisaTagihan, $saldoKreditKlien, dll. --}}
-                    {{-- sudah didefinisikan di blok @php di atas halaman --}}
-                    
-                    {{-- Info Sisa Tagihan --}}
                     <div class="alert alert-info">
                         <div class="d-flex justify-content-between"><span>Total Tagihan Awal:</span><span>Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span></div>
 
-                        {{-- Tampilkan Penyesuaian (jika ada) --}}
                         @foreach ($invoice->adjustments as $adjustment)
                             <div class="d-flex justify-content-between {{ $adjustment->type == 'credit_note' ? 'text-success' : 'text-danger' }} small">
                                 <span>{{ $adjustment->type == 'credit_note' ? 'Nota Kredit (Potongan):' : 'Nota Debit (Tambahan):' }}</span>
@@ -397,7 +345,6 @@
                             </div>
                         @endforeach
 
-                        {{-- Tampilkan Retur Potong Nota (jika ada) --}}
                         @if($totalReturDipotong > 0)
                             <div class="d-flex justify-content-between text-warning small"><span>Total Retur (Potong):</span><span>(-) Rp {{ number_format($totalReturDipotong, 0, ',', '.') }}</span></div>
                         @endif
@@ -412,7 +359,6 @@
                         </div>
                     </div>
 
-                    {{-- Info Saldo Kredit --}}
                     @if($saldoKreditKlien > 0)
                     <div id="credit-info-container" class="alert alert-success">
                         <div class="d-flex justify-content-between fw-bold">
@@ -426,7 +372,6 @@
                     </div>
                     @endif
 
-                    {{-- Form Input --}}
                     <div class="mb-3">
                         <label for="amount-formatted" class="form-label">Jumlah Dibayar (Non-Kredit)</label>
                         <input type="text" class="form-control" id="amount-formatted" required>
@@ -438,30 +383,40 @@
                         <input type="date" class="form-control" name="payment_date" id="payment_date" value="{{ now()->format('Y-m-d') }}" required>
                     </div>
                     
-                    {{-- ✅ PERBAIKAN: Dropdown Metode Pembayaran --}}
                     <div class="mb-3">
                         <label for="payment_method_id" class="form-label">Metode Pembayaran (Non-Kredit)</label>
                         <select name="payment_method_id" id="payment_method" class="form-select" required>
                             <option value="">-- Pilih Metode --</option>
-                            {{-- Loop dari variabel controller --}}
                             @foreach($paymentMethods as $method)
-                                <option value="{{ $method->payment_method_id }}">{{ $method->name }}</option>
+                                <option value="{{ $method->payment_method_id }}" 
+                                        data-config="{{ $method->required_fields_config }}">
+                                    {{ $method->name }}
+                                </option>
                             @endforeach
                         </select>
                     </div>
 
                     <div class="mb-3">
-        <label for="company_bank_account_id" class="form-label">Setor ke Akun <span class="text-danger">*</span></label>
-        <select name="company_bank_account_id" id="company_bank_account_id" class="form-select" required>
-            <option value="">-- Pilih Akun Bank/Kas --</option>
-            {{-- Loop dari variabel controller --}}
-            @foreach($companyBankAccounts as $account)
-                <option value="{{ $account->company_bank_account_id }}">
-                    {{ $account->bank_name }} - {{ $account->account_number ?? $account->account_name }}
-                </option>
-            @endforeach
-        </select>
-    </div>
+                        <label for="company_bank_account_id" class="form-label">Setor ke Akun <span class="text-danger">*</span></label>
+                        <select name="company_bank_account_id" id="company_bank_account_id" class="form-select" required>
+                            <option value="">-- Pilih Akun Bank/Kas --</option>
+                            @foreach($companyBankAccounts as $account)
+                                <option value="{{ $account->company_bank_account_id }}">
+                                    {{ $account->bank_name }} - {{ $account->account_number ?? $account->account_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3" id="payment-reference-group" style="display: none;">
+                        <label for="reference_number" class="form-label">Nomor Referensi (Giro/Cek)</label>
+                        <input type="text" class="form-control" name="reference_number" id="reference_number">
+                    </div>
+
+                    <div class="mb-3" id="payment-proof-group" style="display: none;">
+                        <label for="proof_of_payment" class="form-label">Bukti Pembayaran (Foto)</label>
+                        <input type="file" class="form-control" name="proof_of_payment" id="proof_of_payment" accept="image/jpeg,image/png,image/jpg">
+                    </div>
                     
                     <div class="mb-3">
                         <label for="notes" class="form-label">Catatan</label>
@@ -480,39 +435,34 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Inisialisasi Popover & Tooltip
     const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
     [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl));
     const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
     [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
 
-
-    // Elemen Modal
     const addPaymentBtn = document.getElementById('add-payment-btn');
     const amountFormattedInput = document.getElementById('amount-formatted');
     const amountHiddenInput = document.getElementById('amount');
     const amountError = document.getElementById('amount-error');
     const useCreditCheckbox = document.getElementById('modal-use-credit');
     const paymentMethodSelect = document.getElementById('payment_method');
+    const companyBankAccountSelect = document.getElementById('company_bank_account_id');
     
-    // Nilai-nilai (Gunakan variabel dari @php di atas)
     const remainingBalance = {{ $sisaTagihan ?? 0 }};
     const currentCreditBalance = {{ $saldoKreditKlien ?? 0 }};
-    
-    // ✅ PERBAIKAN: Ambil ID metode pertama sebagai default
     const defaultPaymentMethodId = "{{ $paymentMethods->first()->payment_method_id ?? '' }}";
+    const defaultBankAccountId = "{{ $companyBankAccounts->first()->company_bank_account_id ?? '' }}";
 
     if (amountFormattedInput) {
-        // Inisialisasi AutoNumeric
         const autoNumericInstance = new AutoNumeric(amountFormattedInput, { 
             decimalPlaces: 0, 
             digitGroupSeparator: '.', 
             decimalCharacter: ',' 
         });
 
-        // Fungsi untuk mengatur state input berdasarkan checkbox kredit
         function toggleRequiredFields() {
             const useCredit = useCreditCheckbox ? useCreditCheckbox.checked : false;
             const creditIsSufficient = currentCreditBalance >= remainingBalance && remainingBalance > 0;
@@ -520,62 +470,73 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (useCredit) {
                 if (creditIsSufficient) {
-                    // Kredit cukup: dana input 0, nonaktif, tidak wajib
                     autoNumericInstance.set(0);
                     amountFormattedInput.disabled = true;
                     amountFormattedInput.required = false;
                     paymentMethodSelect.disabled = true;
                     paymentMethodSelect.required = false;
                     paymentMethodSelect.value = "";
+                    companyBankAccountSelect.disabled = true;
+                    companyBankAccountSelect.required = false;
+                    companyBankAccountSelect.value = "";
                 } else {
-                    // Kredit kurang: isi kekurangan, aktif, wajib
                     const shortfall = remainingBalance - currentCreditBalance;
                     autoNumericInstance.set(shortfall);
                     amountFormattedInput.disabled = false;
                     amountFormattedInput.required = true;
                     paymentMethodSelect.disabled = false;
                     paymentMethodSelect.required = true;
-                    // ✅ PERBAIKAN: Gunakan ID
+                    companyBankAccountSelect.disabled = false;
+                    companyBankAccountSelect.required = true;
                     if (!paymentMethodSelect.value) paymentMethodSelect.value = defaultPaymentMethodId;
+                    if (!companyBankAccountSelect.value) companyBankAccountSelect.value = defaultBankAccountId;
                 }
             } else {
-                // Tidak pakai kredit: isi penuh, aktif, wajib
                 autoNumericInstance.set(remainingBalance);
                 amountFormattedInput.disabled = false;
                 amountFormattedInput.required = true;
+                
+                const isAmountPositive = inputAmountValue > 0 || remainingBalance > 0;
+                
                 paymentMethodSelect.disabled = false;
-                paymentMethodSelect.required = inputAmountValue > 0 || remainingBalance > 0; 
-                // ✅ PERBAIKAN: Gunakan ID
-                if (paymentMethodSelect.required && !paymentMethodSelect.value) paymentMethodSelect.value = defaultPaymentMethodId;
+                paymentMethodSelect.required = isAmountPositive;
+                companyBankAccountSelect.disabled = false;
+                companyBankAccountSelect.required = isAmountPositive;
+
+                if (isAmountPositive) {
+                    if (!paymentMethodSelect.value) paymentMethodSelect.value = defaultPaymentMethodId;
+                    if (!companyBankAccountSelect.value) companyBankAccountSelect.value = defaultBankAccountId;
+                }
             }
+            // Panggil juga fungsi untuk form dinamis
+            handlePaymentMethodChange();
         }
 
-        // Listener saat tombol "Catat Pembayaran" diklik
         if (addPaymentBtn) {
             addPaymentBtn.addEventListener('click', function() {
                 if (useCreditCheckbox) {
-                    useCreditCheckbox.checked = true; // Auto-centang
+                    useCreditCheckbox.checked = true; 
                 }
                 toggleRequiredFields();
                 amountError.textContent = '';
             });
         }
 
-        // Listener saat checkbox kredit diganti
         if (useCreditCheckbox) {
             useCreditCheckbox.addEventListener('change', toggleRequiredFields);
         }
 
-        // Listener saat input amount diubah
         amountFormattedInput.addEventListener('autoNumeric:rawValueModified', function(event) {
             const rawValue = event.detail.newRawValue;
             amountHiddenInput.value = rawValue;
             
+            const isAmountPositive = parseFloat(rawValue || 0) > 0;
+            
             if (useCreditCheckbox && !useCreditCheckbox.checked) {
-                 paymentMethodSelect.required = parseFloat(rawValue || 0) > 0;
+                paymentMethodSelect.required = isAmountPositive;
+                companyBankAccountSelect.required = isAmountPositive;
             }
 
-            // Info overpayment (akan jadi saldo kredit)
             const totalPayment = (useCreditCheckbox && useCreditCheckbox.checked ? currentCreditBalance : 0) + parseFloat(rawValue || 0);
             if (totalPayment > remainingBalance) {
                 amountError.textContent = 'Info: Kelebihan bayar akan jadi saldo kredit.';
@@ -587,33 +548,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    const confirmFormShow = document.getElementById('confirm-form-show');
-    if (confirmFormShow) {
-        confirmFormShow.addEventListener('submit', function(event) {
-            event.preventDefault(); // Hentikan form
-            Swal.fire({
-                title: 'Konfirmasi Invoice Ini?',
-                text: "Stok akan diperiksa dan dikurangi. Status akan berubah menjadi 'Belum Lunas'.",
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#198754', // Warna hijau
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Ya, Konfirmasi!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    event.target.submit(); // Lanjutkan submit form
-                }
-            });
-        });
-    }
-    // Script Swal untuk Batal Penyesuaian
     const cancelAdjustmentForms = document.querySelectorAll('.form-cancel-adjustment');
-    
     cancelAdjustmentForms.forEach(form => {
         form.addEventListener('submit', function (event) {
-            event.preventDefault(); // Hentikan submit form
-            
+            event.preventDefault(); 
             Swal.fire({
                 title: 'Anda Yakin?',
                 text: "Anda akan membatalkan penyesuaian ini. Sisa tagihan invoice akan dihitung ulang.",
@@ -631,6 +569,61 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    const confirmFormShow = document.getElementById('confirm-form-show');
+    if (confirmFormShow) {
+        confirmFormShow.addEventListener('submit', function(event) {
+            event.preventDefault(); 
+            Swal.fire({
+                title: 'Konfirmasi Invoice Ini?',
+                text: "Stok akan diperiksa dan dikurangi. Status akan berubah menjadi 'Belum Lunas'.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#198754', 
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Konfirmasi!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    event.target.submit(); 
+                }
+            });
+        });
+    }
+
+    // --- LOGIKA UNTUK FORM DINAMIS ---
+    const referenceGroup = document.getElementById('payment-reference-group');
+    const referenceInput = document.getElementById('reference_number');
+    const proofGroup = document.getElementById('payment-proof-group');
+    const proofInput = document.getElementById('proof_of_payment');
+    
+    function handlePaymentMethodChange() {
+        if (!paymentMethodSelect) return; 
+        
+        const selectedOption = paymentMethodSelect.options[paymentMethodSelect.selectedIndex];
+        const config = (selectedOption && !paymentMethodSelect.disabled) ? selectedOption.dataset.config : 'none';
+
+        referenceGroup.style.display = 'none';
+        referenceInput.required = false;
+        proofGroup.style.display = 'none';
+        proofInput.required = false;
+
+        if (config === 'proof_only') {
+            proofGroup.style.display = 'block';
+            proofInput.required = true;
+        } else if (config === 'reference_only') {
+            referenceGroup.style.display = 'block';
+            referenceInput.required = true;
+        } else if (config === 'proof_and_reference') {
+            proofGroup.style.display = 'block';
+            proofInput.required = true;
+            referenceGroup.style.display = 'block';
+            referenceInput.required = true;
+        }
+    }
+
+    if (paymentMethodSelect) {
+        paymentMethodSelect.addEventListener('change', handlePaymentMethodChange);
+    }
 });
 </script>
 @endpush

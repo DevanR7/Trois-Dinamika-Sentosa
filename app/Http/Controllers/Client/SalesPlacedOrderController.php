@@ -11,20 +11,25 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB; 
 use Carbon\Carbon;
 
-// Nama class diubah
 class SalesPlacedOrderController extends Controller
 {
     /**
-     * Menampilkan daftar pesanan yang dibuat oleh Sales untuk klien.
+     * ==============================================
+     * BAGIAN: Menampilkan daftar pesanan dari Sales
+     * ==============================================
      */
-    public function index(Request $request): View // <-- Tambahkan Request
+    public function index(Request $request): View
     {
+        // Ambil data klien yang sedang login
         $client = Auth::guard('client')->user();
         
+        // Query dasar: hanya pesanan yang dibuat oleh Sales
         $query = $client->orders()
-                       ->where('order_source', 'sales'); // Filter hanya order dari sales
+                        ->where('order_source', 'sales');
 
-        // --- Ambil Data untuk Dropdown Filter Tanggal ---
+        // ============================================
+        // Ambil daftar bulan unik untuk dropdown filter
+        // ============================================
         $uniqueDates = $client->orders()
             ->where('order_source', 'sales')
             ->select(DB::raw("DATE_FORMAT(order_date, '%Y-%m') as ym"))
@@ -35,57 +40,64 @@ class SalesPlacedOrderController extends Controller
                 return [$item->ym => Carbon::createFromFormat('Y-m', $item->ym)->isoFormat('MMMM YYYY')];
             });
 
-        // --- Terapkan Filter ---
-        // 1. Filter Search (Nomor Pesanan)
+        // =============================
+        // Terapkan berbagai jenis filter
+        // =============================
+
+        // 1. Filter berdasarkan nomor pesanan
         if ($request->filled('search')) {
             $query->where('order_number', 'like', "%{$request->search}%");
         }
 
-        // 2. Filter Tanggal (Bulan & Tahun)
+        // 2. Filter berdasarkan bulan dan tahun pesanan
         if ($request->filled('date_filter')) {
             $yearMonth = $request->date_filter; // Format YYYY-MM
             try {
                 $date = Carbon::createFromFormat('Y-m', $yearMonth);
                 $query->whereYear('order_date', $date->year)
                       ->whereMonth('order_date', $date->month);
-            } catch (\Exception $e) { /* Abaikan format tanggal salah */ }
+            } catch (\Exception $e) {
+                // Abaikan jika format tanggal tidak valid
+            }
         }
         
-        // 3. Filter Status (jika perlu)
+        // 3. Filter berdasarkan status pesanan
         if ($request->filled('status_filter')) {
              $query->where('status', $request->status_filter);
         }
 
-        // 4. Pengurutan
-        $sort = $request->get('sort', 'terbaru'); // Default terbaru
+        // 4. Pengurutan data (default: terbaru)
+        $sort = $request->get('sort', 'terbaru');
         if ($sort === 'terlama') {
             $query->orderBy('order_date', 'asc');
         } else {
             $query->orderBy('order_date', 'desc');
         }
 
+        // Ambil hasil akhir dengan paginasi
         $salesOrders = $query->paginate(15)->appends($request->query());
 
-        // View baru: client.sales_orders.index
+        // Tampilkan halaman daftar pesanan Sales
         return view('client.sales_orders.index', compact('salesOrders', 'uniqueDates'));
     }
 
-     /**
-     * Menampilkan detail pesanan yang dibuat oleh Sales untuk klien.
+    /**
+     * ====================================================
+     * BAGIAN: Menampilkan detail pesanan dari Sales
+     * ====================================================
      */
-    public function show(Order $order): View | RedirectResponse // Tambah RedirectResponse
+    public function show(Order $order): View|RedirectResponse
     {
-        // Keamanan: Pastikan order milik klien DAN dibuat oleh sales
+        // Keamanan: pastikan pesanan milik klien yang login dan dibuat oleh Sales
         if ($order->client_id !== Auth::guard('client')->id() || $order->order_source !== 'sales') {
-            // Redirect ke index jika mencoba akses order klien di sini
-            return redirect()->route('client.sales-orders.index')->with('error', 'Pesanan tidak ditemukan.');
-            // abort(403, 'Akses Ditolak');
+            return redirect()->route('client.sales-orders.index')
+                ->with('error', 'Pesanan tidak ditemukan.');
         }
 
-        // Load relasi termasuk change requests
+        // Muat relasi penting untuk tampilan detail
         $order->load(['items.product', 'sales', 'changeRequests']);
 
-        // View baru: client.sales_orders.show
+        // Tampilkan halaman detail pesanan Sales
         return view('client.sales_orders.show', compact('order'));
     }
 }

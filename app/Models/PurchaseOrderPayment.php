@@ -18,7 +18,8 @@ class PurchaseOrderPayment extends Model
         'payment_date', 
         'amount', 
         'payment_method_id',
-        'company_bank_account_id', 
+        'company_bank_account_id',
+        'reference_number', 
         'status',             
         'notes'
     ];

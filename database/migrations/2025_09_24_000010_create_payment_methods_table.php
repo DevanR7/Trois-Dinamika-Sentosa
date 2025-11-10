@@ -12,9 +12,18 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('payment_methods', function (Blueprint $table) {
-            $table->id('payment_method_id'); // Kita buat nama PK-nya agar konsisten
-            $table->string('name'); // Misal: "Cash", "BCA Transfer", "Giro Mundur"
+            $table->id('payment_method_id'); // Primary key
+            $table->string('name'); // Contoh: Cash, BCA Transfer, Giro
             $table->enum('type', ['direct', 'pending', 'gateway'])->default('direct');
+
+            // DITAMBAHKAN dari add_required_fields_to_payment_methods_table
+            $table->enum('required_fields_config', [
+                'none',              // Untuk Cash
+                'proof_only',        // Untuk Transfer Bank
+                'reference_only',    // Untuk No. Voucher Internal, dsb
+                'proof_and_reference'// Untuk Giro (Foto & Nomor)
+            ])->default('none');
+
             $table->boolean('is_active')->default(true);
             $table->softDeletes();
             $table->timestamps();

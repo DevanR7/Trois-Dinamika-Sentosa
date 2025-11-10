@@ -11,7 +11,9 @@ use Illuminate\Validation\Rule;
 class CompanyBankAccountController extends Controller
 {
     /**
-     * Terapkan permission middleware ke semua method.
+     * Konstruktor:
+     * Menerapkan middleware permission agar hanya user dengan izin tertentu
+     * yang bisa mengelola data akun bank perusahaan.
      */
     public function __construct()
     {
@@ -19,16 +21,19 @@ class CompanyBankAccountController extends Controller
     }
 
     /**
-     * Menampilkan daftar semua akun bank.
+     * Method index():
+     * Menampilkan daftar seluruh akun bank perusahaan.
      */
     public function index(): View
     {
         $accounts = CompanyBankAccount::orderBy('bank_name')->get();
+
         return view('company_bank_accounts.index', compact('accounts'));
     }
 
     /**
-     * Menampilkan form untuk membuat akun baru.
+     * Method create():
+     * Menampilkan form untuk menambahkan akun bank baru.
      */
     public function create(): View
     {
@@ -36,10 +41,12 @@ class CompanyBankAccountController extends Controller
     }
 
     /**
-     * Menyimpan akun baru ke database.
+     * Method store():
+     * Menyimpan data akun bank baru ke dalam database.
      */
     public function store(Request $request): RedirectResponse
     {
+        // Validasi input dari form
         $validated = $request->validate([
             'bank_name' => 'required|string|max:255',
             'account_name' => 'required|string|max:255',
@@ -47,29 +54,33 @@ class CompanyBankAccountController extends Controller
             'is_active' => 'required|boolean',
         ]);
 
+        // Simpan ke database
         CompanyBankAccount::create($validated);
 
-        return redirect()->route('company-bank-accounts.index')
-                         ->with('success', 'Akun bank baru berhasil ditambahkan.');
+        return redirect()
+            ->route('company-bank-accounts.index')
+            ->with('success', 'Akun bank baru berhasil ditambahkan.');
     }
 
     /**
-     * Menampilkan form untuk mengedit akun.
-     * Laravel secara otomatis akan menemukan 'company_bank_account'
-     * berdasarkan 'company_bank_account_id' karena kita set $primaryKey di Model.
+     * Method edit():
+     * Menampilkan form untuk mengedit data akun bank yang sudah ada.
      */
     public function edit(CompanyBankAccount $companyBankAccount): View
     {
-        // Parameter '$companyBankAccount' akan otomatis di-resolve oleh Laravel
-        // menjadi $account di view berdasarkan nama variabel.
-        return view('company_bank_accounts.edit', ['account' => $companyBankAccount]);
+        // Laravel otomatis melakukan model binding berdasarkan ID di route
+        return view('company_bank_accounts.edit', [
+            'account' => $companyBankAccount
+        ]);
     }
 
     /**
-     * Mengupdate akun di database.
+     * Method update():
+     * Memperbarui data akun bank yang dipilih.
      */
     public function update(Request $request, CompanyBankAccount $companyBankAccount): RedirectResponse
     {
+        // Validasi data baru dari form
         $validated = $request->validate([
             'bank_name' => 'required|string|max:255',
             'account_name' => 'required|string|max:255',
@@ -77,29 +88,32 @@ class CompanyBankAccountController extends Controller
             'is_active' => 'required|boolean',
         ]);
 
+        // Update data di database
         $companyBankAccount->update($validated);
 
-        return redirect()->route('company-bank-accounts.index')
-                         ->with('success', 'Akun bank berhasil diperbarui.');
+        return redirect()
+            ->route('company-bank-accounts.index')
+            ->with('success', 'Akun bank berhasil diperbarui.');
     }
 
     /**
-     * Menghapus akun dari database.
+     * Method destroy():
+     * Menghapus akun bank dari database.
+     * Data transaksi lama akan otomatis diatur NULL berkat relasi nullOnDelete().
      */
     public function destroy(CompanyBankAccount $companyBankAccount): RedirectResponse
     {
         try {
-            // Karena kita menggunakan ->nullOnDelete() pada migration tabel payments,
-            // menghapus ini aman dan tidak akan menyebabkan error.
-            // Transaksi lama akan memiliki company_bank_account_id = NULL.
             $companyBankAccount->delete();
-            
-            return redirect()->route('company-bank-accounts.index')
-                             ->with('success', 'Akun bank berhasil dihapus.');
+
+            return redirect()
+                ->route('company-bank-accounts.index')
+                ->with('success', 'Akun bank berhasil dihapus.');
         } catch (\Exception $e) {
-            // Menangkap error jika ada constraint lain
-            return redirect()->route('company-bank-accounts.index')
-                             ->with('error', 'Gagal menghapus akun. Pastikan tidak ada data terkait: ' . $e->getMessage());
+            // Tangkap kesalahan apabila ada constraint lain di database
+            return redirect()
+                ->route('company-bank-accounts.index')
+                ->with('error', 'Gagal menghapus akun. Pastikan tidak ada data terkait: ' . $e->getMessage());
         }
     }
 }

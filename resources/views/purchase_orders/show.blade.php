@@ -19,7 +19,7 @@
     $sisaTagihanPO = $sisaUtang; // Sama dengan sisa utang
     $saldoDepositSupplier = $purchaseOrder->supplier->balance ?? 0;
     
-    // 3. $paymentMethods sekarang dikirim dari PurchaseOrderController@show
+    // 3. $paymentMethods & $companyBankAccounts sekarang dikirim dari PurchaseOrderController@show
 @endphp
 {{-- ==================================================================== --}}
 
@@ -40,7 +40,6 @@
                 @endif
             @endcan
             @can('pay', $purchaseOrder)
-                {{-- Gunakan variabel $sisaUtang yang sudah kita definisikan --}}
                 @if($sisaUtang > 0.01 && $purchaseOrder->payment_status != 'paid')
                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#paymentModal" id="add-payment-btn">
                         <i class="bi bi-cash-coin me-1"></i> Catat Pembayaran
@@ -59,9 +58,8 @@
                     @endif
                     <li><hr class="dropdown-divider"></li>
 
-                    {{-- ✅ Link Penyesuaian PO Baru --}}
                     <li>
-                        <a class="dropdown-item" href="{{ route('purchase-order-adjustments.create.manual', $purchaseOrder->po_id) }}"> {{-- Asumsi ke manual --}}
+                        <a class="dropdown-item" href="{{ route('purchase-order-adjustments.create.manual', $purchaseOrder->po_id) }}">
                             <i class="bi bi-file-earmark-diff me-2"></i> Buat Penyesuaian PO
                         </a>
                     </li>
@@ -86,7 +84,6 @@
     {{-- KARTU DETAIL UTAMA --}}
     <div class="card shadow-sm border-0">
         <div class="card-body p-4">
-            {{-- Info Supplier & Status --}}
             <div class="row mb-4">
                 <div class="col-md-6">
                     <h5 class="fw-semibold">Supplier</h5>
@@ -121,7 +118,6 @@
             </div>
             <hr>
             
-            {{-- Tabel Rincian Item --}}
             <h5 class="fw-semibold mt-4">Rincian Item Dipesan</h5>
             <div class="table-responsive">
                 <table class="table table-bordered align-middle">
@@ -162,9 +158,6 @@
                 </table>
             </div>
 
-            {{-- ====================================================== --}}
-            {{-- ✅ POSISI BARU: RIWAYAT PENYESUAIAN --}}
-            {{-- ====================================================== --}}
             @if($purchaseOrder->adjustments->isNotEmpty())
             <h5 class="fw-semibold mt-4">Riwayat Penyesuaian PO (Koreksi)</h5>
             <div class="table-responsive">
@@ -210,9 +203,7 @@
                 </table>
             </div>
             @endif
-            {{-- ====================================================== --}}
 
-            {{-- Riwayat Pembayaran --}}
             @if($purchaseOrder->payments->isNotEmpty())
             <h5 class="fw-semibold mt-4">Riwayat Pembayaran</h5>
             <div class="table-responsive">
@@ -221,9 +212,9 @@
                         <tr>
                             <th>Tanggal Bayar</th>
                             <th>Metode</th>
-                            <th>Status</th> {{-- ✅ KOLOM BARU --}}
+                            <th>Status</th>
                             <th class="text-end">Jumlah</th>
-                            <th>Catatan</th>
+                            <th>Catatan / Ref.</th>
                             <th>Dicatat Oleh</th>
                         </tr>
                     </thead>
@@ -231,13 +222,9 @@
                         @foreach($purchaseOrder->payments as $payment)
                         <tr>
                             <td>{{ $payment->payment_date->format('d M Y') }}</td>
-                            
-                            {{-- ✅ PERBAIKAN: Tampilkan nama metode dari relasi --}}
                             <td>
                                 {{ $payment->paymentMethod->name ?? ($payment->notes && str_contains($payment->notes, 'Deposit') ? 'Deposit' : 'N/A') }}
                             </td>
-                            
-                            {{-- ✅ PERBAIKAN: Tampilkan status --}}
                             <td>
                                 @if($payment->status == 'completed')
                                     <span class="badge bg-success">Completed</span>
@@ -249,9 +236,13 @@
                                     <span class="badge bg-secondary">{{ $payment->status }}</span>
                                 @endif
                             </td>
-                            
                             <td class="text-end">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
-                            <td>{{ $payment->notes }}</td>
+                            <td>
+                                {{ $payment->notes }}
+                                @if($payment->reference_number)
+                                    <strong class="d-block">Ref: {{ $payment->reference_number }}</strong>
+                                @endif
+                            </td>
                             <td>{{ $payment->receivedBy->full_name ?? 'N/A' }}</td>
                         </tr>
                         @endforeach
@@ -260,9 +251,7 @@
             </div>
             @endif
 
-            {{-- Ringkasan Keuangan (Dipindah ke bawah agar rapi) --}}
             <div class="row mt-4">
-                {{-- KOLOM KIRI: RINGKASAN PEMBELIAN --}}
                 <div class="col-md-6">
                     <h5 class="fw-semibold mb-3">Rincian Perhitungan</h5>
                     <div class="border rounded p-3">
@@ -278,13 +267,10 @@
                     </div>
                 </div>
 
-                {{-- KOLOM KANAN: RINGKASAN KEUANGAN --}}
                 <div class="col-md-6">
                     <h5 class="fw-semibold mb-3">Ringkasan Keuangan</h5>
                     <div class="border rounded p-3">
                         
-                        {{-- Variabel $totalDebitNotesPO, dll. sudah ada dari @php di atas --}}
-
                         <div class="d-flex justify-content-between mb-2"><span>Total Tagihan Awal</span><span>Rp {{ number_format($purchaseOrder->total_amount, 0, ',', '.') }}</span></div>
                         
                         @if($totalDebitNotesPO > 0)
@@ -317,9 +303,6 @@
     </div>
 </div>
 
-{{-- ========================================================== --}}
-{{-- MODAL UNTUK TAMBAH PEMBAYARAN (DIPERBARUI) --}}
-{{-- ========================================================== --}}
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -327,15 +310,11 @@
                 <h5 class="modal-title" id="paymentModalLabel">Catat Pembayaran Baru</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="{{ route('purchase-orders.payments.store', $purchaseOrder->po_id) }}" method="POST">
+            <form action="{{ route('purchase-orders.payments.store', $purchaseOrder->po_id) }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 
                 <div class="modal-body">
                     
-                    {{-- Variabel $sisaTagihanPO, $saldoDepositSupplier, dll. --}}
-                    {{-- sudah didefinisikan di blok @php di atas halaman --}}
-                    
-                    {{-- Info Sisa Tagihan --}}
                     <div class="alert alert-info">
                         <div class="d-flex justify-content-between"><span>Total Tagihan Awal:</span><span>Rp {{ number_format($purchaseOrder->total_amount, 0, ',', '.') }}</span></div>
                         
@@ -359,7 +338,6 @@
                         </div>
                     </div>
 
-                    {{-- Info Saldo Deposit --}}
                     @if($saldoDepositSupplier > 0)
                     <div id="debit-info-container" class="alert alert-success">
                         <div class="d-flex justify-content-between fw-bold">
@@ -373,7 +351,6 @@
                     </div>
                     @endif
                     
-                    {{-- Form Input --}}
                     <div class="mb-3">
                         <label for="amount-formatted-po" class="form-label">Jumlah Dibayar (Non-Deposit)</label>
                         <input type="text" class="form-control" id="amount-formatted-po" required>
@@ -385,28 +362,39 @@
                         <input type="date" class="form-control" id="payment_date" name="payment_date" value="{{ now()->format('Y-m-d') }}" required>
                     </div>
                     
-                    {{-- ✅ PERBAIKAN: Dropdown Metode Pembayaran --}}
                     <div class="mb-3">
                         <label for="payment_method_id_po" class="form-label">Metode Pembayaran (Non-Deposit)</label>
                         <select class="form-select" id="payment_method_id_po" name="payment_method_id" required>
                             <option value="">-- Pilih Metode --</option>
                             @foreach($paymentMethods as $method)
-                                <option value="{{ $method->payment_method_id }}">{{ $method->name }}</option>
+                                <option value="{{ $method->payment_method_id }}" 
+                                        data-config="{{ $method->required_fields_config }}">
+                                    {{ $method->name }}
+                                </option>
                             @endforeach
                         </select>
                     </div>
 
                     <div class="mb-3">
-    <label for="company_bank_account_id_po" class="form-label">Setor ke Akun <span class="text-danger">*</span></label>
-    <select class="form-select" id="company_bank_account_id_po" name="company_bank_account_id" required>
-        <option value="">-- Pilih Akun Bank/Kas --</option>
-        @foreach($companyBankAccounts as $account)
-            <option value="{{ $account->company_bank_account_id }}">
-                {{ $account->bank_name }} - {{ $account->account_number ?? $account->account_name }}
-            </option>
-        @endforeach
-    </select>
-</div>
+                        <label for="company_bank_account_id_po" class="form-label">Keluar dari Akun <span class="text-danger">*</span></label>
+                        <select class="form-select" id="company_bank_account_id_po" name="company_bank_account_id" required>
+                            <option value="">-- Pilih Akun Bank/Kas --</option>
+                            @foreach($companyBankAccounts as $account)
+                                <option value="{{ $account->company_bank_account_id }}">
+                                    {{ $account->bank_name }} - {{ $account->account_number ?? $account->account_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="payment-reference-group-po" style="display: none;">
+                        <label for="reference_number_po" class="form-label">Nomor Referensi (Giro/Cek)</label>
+                        <input type="text" class="form-control" name="reference_number" id="reference_number_po">
+                    </div>
+                    <div class="mb-3" id="payment-proof-group-po" style="display: none;">
+                        <label for="proof_of_payment_po" class="form-label">Bukti Pembayaran (Foto)</label>
+                        <input type="file" class="form-control" name="proof_of_payment" id="proof_of_payment_po" accept="image/jpeg,image/png,image/jpg">
+                    </div>
                     
                     <div class="mb-3">
                         <label for="notes" class="form-label">Catatan (Opsional)</label>
@@ -423,7 +411,6 @@
     </div>
 </div>
 
-{{-- Modal untuk Input Nomor Faktur Supplier --}}
 <div class="modal fade" id="supplierInvoiceModal" tabindex="-1" aria-labelledby="supplierInvoiceModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -451,9 +438,9 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // SweetAlert untuk Receive Goods
         const receiveGoodsForm = document.getElementById('receive-goods-form');
         if (receiveGoodsForm) {
             receiveGoodsForm.addEventListener('submit', function(event) {
@@ -475,30 +462,59 @@
             });
         }
 
-        // Logika AutoNumeric
         const addPaymentBtnPO = document.getElementById('add-payment-btn');
         const amountFormattedInputPO = document.getElementById('amount-formatted-po');
         const amountHiddenInputPO = document.getElementById('amount-po');
         const amountErrorPO = document.getElementById('amount-error-po');
         const useDebitCheckboxPO = document.getElementById('modal-use-debit');
         
-        // ✅ PERBAIKAN: Target ID select yang baru
         const paymentMethodSelectPO = document.getElementById('payment_method_id_po');
         const bankAccountSelectPO = document.getElementById('company_bank_account_id_po');
+        const referenceGroupPO = document.getElementById('payment-reference-group-po');
+        const referenceInputPO = document.getElementById('reference_number_po');
+        const proofGroupPO = document.getElementById('payment-proof-group-po');
+        const proofInputPO = document.getElementById('proof_of_payment_po');
 
-        {{-- Gunakan variabel $sisaTagihanPO dan $saldoDepositSupplier dari @php di atas --}}
         const remainingBalancePO = {{ $sisaTagihanPO ?? 0 }};
         const currentDebitBalancePO = {{ $saldoDepositSupplier ?? 0 }};
         
-        // ✅ PERBAIKAN: Ambil ID metode pertama sebagai default
         const defaultPaymentMethodIdPO = "{{ $paymentMethods->first()->payment_method_id ?? '' }}";
+        const defaultBankAccountIdPO = "{{ $companyBankAccounts->first()->company_bank_account_id ?? '' }}";
 
+        function handlePaymentMethodChangePO() {
+            if (!paymentMethodSelectPO) return;
+            
+            const selectedOption = paymentMethodSelectPO.options[paymentMethodSelectPO.selectedIndex];
+            const config = (selectedOption && !paymentMethodSelectPO.disabled) ? selectedOption.dataset.config : 'none';
 
+            referenceGroupPO.style.display = 'none';
+            referenceInputPO.required = false;
+            proofGroupPO.style.display = 'none';
+            proofInputPO.required = false;
+
+            if (config === 'proof_only') {
+                proofGroupPO.style.display = 'block';
+                proofInputPO.required = true;
+            } else if (config === 'reference_only') {
+                referenceGroupPO.style.display = 'block';
+                referenceInputPO.required = true;
+            } else if (config === 'proof_and_reference') {
+                proofGroupPO.style.display = 'block';
+                proofInputPO.required = true;
+                referenceGroupPO.style.display = 'block';
+                referenceInputPO.required = true;
+            }
+        }
+
+        if (paymentMethodSelectPO) {
+            paymentMethodSelectPO.addEventListener('change', handlePaymentMethodChangePO);
+        }
+        
         if (amountFormattedInputPO) {
             const autoNumericInstancePO = new AutoNumeric(amountFormattedInputPO, {
                 decimalCharacter: ',',
                 digitGroupSeparator: '.',
-                decimalPlaces: 0, // Dibuat 0 agar konsisten dengan invoice
+                decimalPlaces: 0,
                 minimumValue: '0'
             });
 
@@ -512,37 +528,48 @@
                         autoNumericInstancePO.set(0);
                         amountFormattedInputPO.disabled = true;
                         amountFormattedInputPO.required = false;
+                        
                         paymentMethodSelectPO.disabled = true;
                         paymentMethodSelectPO.required = false;
                         paymentMethodSelectPO.value = "";
 
-                        bankAccountSelectPO.disabled = true; // ✅ 2. TAMBAHKAN INI
-                bankAccountSelectPO.required = false; // ✅ 3. TAMBAHKAN INI
-                bankAccountSelectPO.value = "";
+                        bankAccountSelectPO.disabled = true;
+                        bankAccountSelectPO.required = false;
+                        bankAccountSelectPO.value = "";
                     } else {
                         const shortfall = remainingBalancePO - currentDebitBalancePO;
                         autoNumericInstancePO.set(shortfall);
                         amountFormattedInputPO.disabled = false;
                         amountFormattedInputPO.required = true;
+                        
                         paymentMethodSelectPO.disabled = false;
                         paymentMethodSelectPO.required = true;
-                        // ✅ PERBAIKAN: Gunakan ID
                         if (!paymentMethodSelectPO.value) paymentMethodSelectPO.value = defaultPaymentMethodIdPO;
-                        bankAccountSelectPO.disabled = false; // ✅ 5. TAMBAHKAN INI
-                bankAccountSelectPO.required = true; // ✅ 6. TAMBAHKAN INI
-                    }   
+                        
+                        bankAccountSelectPO.disabled = false;
+                        bankAccountSelectPO.required = true;
+                        if (!bankAccountSelectPO.value) bankAccountSelectPO.value = defaultBankAccountIdPO;
+                    }  
                 } else {
                     autoNumericInstancePO.set(remainingBalancePO);
                     amountFormattedInputPO.disabled = false;
                     amountFormattedInputPO.required = true;
+
+                    const isAmountPositive = inputAmountValue > 0 || remainingBalancePO > 0;
+
                     paymentMethodSelectPO.disabled = false;
-                    paymentMethodSelectPO.required = inputAmountValue > 0 || remainingBalancePO > 0;
-                    // ✅ PERBAIKAN: Gunakan ID
-                    if (paymentMethodSelectPO.required && !paymentMethodSelectPO.value) paymentMethodSelectPO.value = defaultPaymentMethodIdPO;
-                    bankAccountSelectPO.disabled = false; // ✅ 7. TAMBAHKAN INI
-            // ✅ 8. Atur required berdasarkan kondisi yang sama
-            bankAccountSelectPO.required = inputAmountValue > 0 || remainingBalancePO > 0;
+                    paymentMethodSelectPO.required = isAmountPositive;
+                    bankAccountSelectPO.disabled = false;
+                    bankAccountSelectPO.required = isAmountPositive;
+                    
+                    if (isAmountPositive) {
+                        if (!paymentMethodSelectPO.value) paymentMethodSelectPO.value = defaultPaymentMethodIdPO;
+                        if (!bankAccountSelectPO.value) bankAccountSelectPO.value = defaultBankAccountIdPO;
+                    }
                 }
+                
+                // Panggil fungsi ini di akhir
+                handlePaymentMethodChangePO();
             }
 
             if (addPaymentBtnPO) {
@@ -563,11 +590,13 @@
                 const rawValue = event.detail.newRawValue;
                 amountHiddenInputPO.value = rawValue;
 
+                const isAmountPositive = parseFloat(rawValue || 0) > 0;
+
                 if (useDebitCheckboxPO && !useDebitCheckboxPO.checked) {
-                    paymentMethodSelectPO.required = parseFloat(rawValue || 0) > 0;
+                    paymentMethodSelectPO.required = isAmountPositive;
+                    bankAccountSelectPO.required = isAmountPositive;
                 }
 
-                // Info overpayment
                 const totalPayment = (useDebitCheckboxPO && useDebitCheckboxPO.checked ? currentDebitBalancePO : 0) + parseFloat(rawValue || 0);
                 if (totalPayment > remainingBalancePO) {
                     amountErrorPO.textContent = 'Info: Kelebihan bayar akan jadi saldo deposit.';
@@ -579,7 +608,6 @@
             });
         }
         
-        {{-- SCRIPT SWAL BARU UNTUK BATAL ADJUSTMENT --}}
         const cancelPOAdjustmentForms = document.querySelectorAll('.form-cancel-po-adjustment');
         
         cancelPOAdjustmentForms.forEach(form => {

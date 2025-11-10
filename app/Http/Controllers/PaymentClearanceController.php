@@ -13,22 +13,21 @@ use Illuminate\Support\Facades\Log;
 class PaymentClearanceController extends Controller
 {
     /**
-     * Tampilkan daftar semua pembayaran yang menunggu kliring.
+     * Menampilkan daftar semua pembayaran yang menunggu kliring
      */
     public function index(): View
     {
-        // 1. Ambil Piutang (Sales Payments) yang menunggu kliring
+        // Ambil piutang (sales payments) yang menunggu kliring
         $salesPayments = Payment::where('status', 'pending_clearance')
             ->with(['salesInvoice.client', 'paymentMethod', 'companyBankAccount'])
             ->get();
 
-        // ✅ 2. Tambahkan 'companyBankAccount' ke relasi 'with()'
+        // Ambil hutang (purchase payments) yang menunggu kliring
         $purchasePayments = PurchaseOrderPayment::where('status', 'pending_clearance')
             ->with(['purchaseOrder.supplier', 'paymentMethod', 'companyBankAccount'])
             ->get();
 
-        // 3. Gabungkan keduanya
-        // Kita tambahkan 'payment_type' manual untuk membedakan di view
+        // Gabungkan dan tambahkan identifier type
         $combined = $salesPayments->map(function ($item) {
             $item->payment_type = 'Piutang';
             return $item;
@@ -37,14 +36,14 @@ class PaymentClearanceController extends Controller
             return $item;
         }));
 
-        // 4. Urutkan berdasarkan tanggal
+        // Urutkan berdasarkan tanggal
         $pendingPayments = $combined->sortBy('payment_date');
 
         return view('payment_clearance.index', compact('pendingPayments'));
     }
 
     /**
-     * Menyetujui kliring Piutang (Sales Payment).
+     * Menyetujui kliring Piutang (Sales Payment)
      */
     public function approveSalesPayment(Payment $payment): RedirectResponse
     {
@@ -56,8 +55,6 @@ class PaymentClearanceController extends Controller
             DB::beginTransaction();
             
             $payment->update(['status' => 'completed']);
-            
-            // Panggil fungsi di model SalesInvoice untuk update status invoice
             $payment->salesInvoice->updatePaymentStatus();
 
             DB::commit();
@@ -71,7 +68,7 @@ class PaymentClearanceController extends Controller
     }
 
     /**
-     * Menolak kliring Piutang (Sales Payment).
+     * Menolak kliring Piutang (Sales Payment)
      */
     public function rejectSalesPayment(Payment $payment): RedirectResponse
     {
@@ -83,9 +80,6 @@ class PaymentClearanceController extends Controller
             DB::beginTransaction();
             
             $payment->update(['status' => 'failed']);
-            
-            // Panggil fungsi di model SalesInvoice untuk update status invoice
-            // (Penting jika invoice jadi 'partially_paid' atau 'unpaid' lagi)
             $payment->salesInvoice->updatePaymentStatus();
 
             DB::commit();
@@ -99,7 +93,7 @@ class PaymentClearanceController extends Controller
     }
 
     /**
-     * Menyetujui kliring Hutang (Purchase Order Payment).
+     * Menyetujui kliring Hutang (Purchase Order Payment)
      */
     public function approvePurchasePayment(PurchaseOrderPayment $purchaseOrderPayment): RedirectResponse
     {
@@ -111,8 +105,6 @@ class PaymentClearanceController extends Controller
             DB::beginTransaction();
             
             $purchaseOrderPayment->update(['status' => 'completed']);
-            
-            // Panggil fungsi di model PurchaseOrder untuk update status PO
             $purchaseOrderPayment->purchaseOrder->updatePaymentStatus();
 
             DB::commit();
@@ -126,7 +118,7 @@ class PaymentClearanceController extends Controller
     }
 
     /**
-     * Menolak kliring Hutang (Purchase Order Payment).
+     * Menolak kliring Hutang (Purchase Order Payment)
      */
     public function rejectPurchasePayment(PurchaseOrderPayment $purchaseOrderPayment): RedirectResponse
     {
@@ -138,8 +130,6 @@ class PaymentClearanceController extends Controller
             DB::beginTransaction();
             
             $purchaseOrderPayment->update(['status' => 'failed']);
-            
-            // Panggil fungsi di model PurchaseOrder untuk update status PO
             $purchaseOrderPayment->purchaseOrder->updatePaymentStatus();
 
             DB::commit();

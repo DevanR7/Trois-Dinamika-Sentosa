@@ -15,6 +15,7 @@ class PaymentMethod extends Model
     protected $fillable = [
         'name',
         'type',
+        'required_fields_config',
         'is_active',
     ];
 

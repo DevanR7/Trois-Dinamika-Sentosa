@@ -2,70 +2,76 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\PurchaseReturn;
-use App\Models\PurchaseOrder;
-use App\Models\PurchaseOrderItem;
-use App\Models\Product;
-use App\Models\Tax;
-use Illuminate\Http\Request;
-use Illuminate\Http\RedirectResponse;
+use App\Models\{
+    PurchaseReturn,
+    PurchaseOrder,
+    PurchaseOrderItem,
+    Product,
+    Tax,
+    SupplierLedger
+};
+use Illuminate\Http\{
+    Request,
+    RedirectResponse
+};
 use Illuminate\View\View;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
-use App\Models\SupplierLedger; // ✅ Tambahkan ini
+use Illuminate\Support\Facades\{
+    DB,
+    Auth
+};
 
 class PurchaseReturnController extends Controller
 {
+    /**
+     * Tampilkan daftar retur pembelian.
+     */
     public function index(Request $request): View
     {
-        // [AUTH] Panggil policy untuk memeriksa permission 'view-purchase-returns'
         $this->authorize('viewAny', PurchaseReturn::class);
 
         $query = PurchaseReturn::with(['supplier', 'purchaseOrder']);
 
-        // Logika untuk Pencarian Umum
+        // Pencarian umum berdasarkan nomor retur, nama supplier, atau nomor PO
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('return_number', 'like', "%{$search}%")
-                  ->orWhereHas('supplier', function($q_supplier) use ($search) {
-                      $q_supplier->where('supplier_name', 'like', "%{$search}%");
-                  })
-                  ->orWhereHas('purchaseOrder', function($q_po) use ($search) {
-                      $q_po->where('po_number', 'like', "%{$search}%");
-                  });
+                  ->orWhereHas('supplier', fn($q) => $q->where('supplier_name', 'like', "%{$search}%"))
+                  ->orWhereHas('purchaseOrder', fn($q) => $q->where('po_number', 'like', "%{$search}%"));
             });
         }
 
-        // Logika untuk Filter Tanggal
+        // Filter berdasarkan tanggal retur
         if ($request->filled('return_date')) {
             $query->whereDate('return_date', $request->return_date);
         }
 
-        $purchaseReturns = $query->latest('return_date')->paginate(15)->appends($request->query());
-            
+        $purchaseReturns = $query->latest('return_date')
+                                 ->paginate(15)
+                                 ->appends($request->query());
+
         return view('purchase_returns.index', compact('purchaseReturns'));
     }
 
+    /**
+     * Tampilkan form untuk membuat retur pembelian baru.
+     */
     public function create(): View
     {
-
-        // [AUTH] Panggil policy untuk memeriksa permission 'create-purchase-returns'
         $this->authorize('create', PurchaseReturn::class);
 
         $purchaseOrders = PurchaseOrder::where('status', 'completed')
             ->orderBy('order_date', 'desc')
             ->get();
-            
+
         return view('purchase_returns.create', compact('purchaseOrders'));
     }
 
     /**
-     * Menyimpan data retur pembelian baru dengan logika perhitungan yang akurat.
+     * Simpan data retur pembelian baru.
      */
     public function store(Request $request): RedirectResponse
     {
-        // [AUTH] Panggil policy
         $this->authorize('create', PurchaseReturn::class);
 
         $validated = $request->validate([
@@ -79,251 +85,238 @@ class PurchaseReturnController extends Controller
         ]);
 
         DB::beginTransaction();
+
         try {
             $purchaseOrder = PurchaseOrder::with(['tax', 'supplier'])->findOrFail($validated['purchase_order_id']);
             $totalReturnValue = 0;
             $hasReturnedItems = false;
-            $handlingType = $validated['return_handling_type']; // Ambil tipe pilihan user
+            $handlingType = $validated['return_handling_type'];
 
-            // ======================================================
-            // ✅ LANGKAH 1: Hitung nilai retur
-            // ======================================================
+            /**
+             * LANGKAH 1: Hitung nilai retur berdasarkan item yang dikembalikan.
+             */
             foreach ($validated['items'] as $itemData) {
-                if (!empty($itemData['quantity']) && $itemData['quantity'] > 0) {
-                    $hasReturnedItems = true;
-                    $originalItem = PurchaseOrderItem::with('discounts')->find($itemData['item_id']);
-                    
-                    $maxQty = $originalItem->quantity - $originalItem->quantity_returned;
-                    if ($itemData['quantity'] > $maxQty) {
-                        throw new \Exception("Jumlah retur melebihi batas untuk " . $originalItem->product->product_name);
-                    }
-
-                    // (Logika perhitungan harga retur pembelian Anda tetap sama)
-                    $netPricePerUnit = $originalItem->price_per_unit;
-                    foreach ($originalItem->discounts as $discount) {
-                        $netPricePerUnit *= (1 - ($discount->percentage / 100));
-                    }
-                    
-                    $totalValuePerUnit = 0;
-                    if ($purchaseOrder->tax) {
-                        $dppFactor = $purchaseOrder->custom_dpp_factor ?? (1 / 1.11); 
-                        $taxRate = $purchaseOrder->tax->rate ?? 11;
-                        
-                        $dpp_per_unit = round($netPricePerUnit * $dppFactor);
-                        $ppn_per_unit = round($dpp_per_unit * ($taxRate / 100));
-                        $totalValuePerUnit = $netPricePerUnit + $ppn_per_unit; 
-                    } else {
-                        $totalValuePerUnit = $netPricePerUnit;
-                    }
-
-                    $subtotal = $itemData['quantity'] * $totalValuePerUnit;
-                    $totalReturnValue += $subtotal;
+                if (empty($itemData['quantity']) || $itemData['quantity'] <= 0) {
+                    continue;
                 }
+
+                $hasReturnedItems = true;
+                $originalItem = PurchaseOrderItem::with('discounts')->find($itemData['item_id']);
+
+                $maxQty = $originalItem->quantity - $originalItem->quantity_returned;
+                if ($itemData['quantity'] > $maxQty) {
+                    throw new \Exception("Jumlah retur melebihi batas untuk {$originalItem->product->product_name}");
+                }
+
+                // Hitung harga per unit setelah diskon
+                $netPricePerUnit = $originalItem->price_per_unit;
+                foreach ($originalItem->discounts as $discount) {
+                    $netPricePerUnit *= (1 - ($discount->percentage / 100));
+                }
+
+                // Hitung nilai total per unit termasuk pajak
+                if ($purchaseOrder->tax) {
+                    $dppFactor = $purchaseOrder->custom_dpp_factor ?? (1 / 1.11);
+                    $taxRate = $purchaseOrder->tax->rate ?? 11;
+
+                    $dpp = round($netPricePerUnit * $dppFactor);
+                    $ppn = round($dpp * ($taxRate / 100));
+                    $totalValuePerUnit = $netPricePerUnit + $ppn;
+                } else {
+                    $totalValuePerUnit = $netPricePerUnit;
+                }
+
+                $totalReturnValue += $itemData['quantity'] * $totalValuePerUnit;
             }
 
-            if (!$hasReturnedItems) throw new \Exception("Tidak ada item yang dipilih untuk diretur.");
+            if (!$hasReturnedItems) {
+                throw new \Exception("Tidak ada item yang dipilih untuk diretur.");
+            }
 
-            // ======================================================
-            // ✅ LANGKAH 2: Terapkan Aturan Bisnis
-            // ======================================================
-            
-            // Hitung sisa tagihan PO saat ini
+            /**
+             * LANGKAH 2: Terapkan aturan bisnis retur.
+             */
             $sisaTagihanPO = $purchaseOrder->total_amount - $purchaseOrder->total_returned - $purchaseOrder->amount_paid;
-            
-            // Aturan: Jika user pilih 'Potong Tagihan' TAPI nilai retur > sisa tagihan,
-            // paksa ubah ke 'Simpan Deposit'.
-            if ($handlingType == 'deduct_invoice' && $totalReturnValue > $sisaTagihanPO) {
+
+            if ($handlingType === 'deduct_invoice' && $totalReturnValue > $sisaTagihanPO) {
                 $handlingType = 'store_as_deposit';
             }
-            // ======================================================
 
-            
+            /**
+             * LANGKAH 3: Simpan retur pembelian utama.
+             */
             $purchaseReturn = PurchaseReturn::create([
                 'return_number' => PurchaseReturn::generateReturnNumber(),
                 'supplier_id' => $purchaseOrder->supplier_id,
                 'purchase_order_id' => $purchaseOrder->po_id,
                 'user_id' => Auth::id(),
                 'return_date' => $validated['return_date'],
-                'return_handling_type' => $handlingType, // Simpan tipe yang sudah dikoreksi
+                'return_handling_type' => $handlingType,
                 'notes' => $validated['notes'],
-                'total_amount' => $totalReturnValue, // Simpan total
+                'total_amount' => $totalReturnValue,
             ]);
 
-            // Loop kedua untuk simpan item, update stok, dan qty_returned
+            /**
+             * LANGKAH 4: Simpan detail item retur, update stok dan jumlah dikembalikan.
+             */
             foreach ($validated['items'] as $itemData) {
-                if (!empty($itemData['quantity']) && $itemData['quantity'] > 0) {
-                    $originalItem = PurchaseOrderItem::with('discounts')->find($itemData['item_id']);
-
-                    // Hitung ulang harga per unit untuk disimpan
-                    $netPricePerUnit = $originalItem->price_per_unit;
-                    foreach ($originalItem->discounts as $discount) {
-                        $netPricePerUnit *= (1 - ($discount->percentage / 100));
-                    }
-                    $totalValuePerUnit = 0;
-                    if ($purchaseOrder->tax) {
-                        $dppFactor = $purchaseOrder->custom_dpp_factor ?? (1 / 1.11); 
-                        $taxRate = $purchaseOrder->tax->rate ?? 11;
-                        $dpp_per_unit = round($netPricePerUnit * $dppFactor);
-                        $ppn_per_unit = round($dpp_per_unit * ($taxRate / 100));
-                        $totalValuePerUnit = $netPricePerUnit + $ppn_per_unit; 
-                    } else {
-                        $totalValuePerUnit = $netPricePerUnit;
-                    }
-                    $subtotal = $itemData['quantity'] * $totalValuePerUnit;
-
-                    $purchaseReturn->items()->create([
-                        'product_id' => $originalItem->product_id,
-                        'quantity' => $itemData['quantity'],
-                        'price_per_unit' => $totalValuePerUnit,
-                        'subtotal' => $subtotal,
-                    ]);
-                    
-                    $originalItem->increment('quantity_returned', $itemData['quantity']);
-                    Product::find($originalItem->product_id)->decrement('stock_quantity', $itemData['quantity']);
+                if (empty($itemData['quantity']) || $itemData['quantity'] <= 0) {
+                    continue;
                 }
-            }
-            
-            // ======================================================
-            // ✅ LANGKAH 3: Eksekusi Aksi (DIPERBARUI)
-            // ======================================================
-            if ($handlingType == 'store_as_deposit') {
-                // Opsi 2: Tampung sebagai Deposit Supplier via LEDGER
 
-                // Tentukan status ledger berdasarkan status PO
-                $ledgerStatus = ($purchaseOrder->payment_status == 'paid') ? 'available' : 'pending';
-                $description = 'Deposit dari Retur Pembelian #' . $purchaseReturn->return_number;
-                if ($ledgerStatus == 'pending') {
+                $originalItem = PurchaseOrderItem::with('discounts')->find($itemData['item_id']);
+                $netPricePerUnit = $originalItem->price_per_unit;
+
+                foreach ($originalItem->discounts as $discount) {
+                    $netPricePerUnit *= (1 - ($discount->percentage / 100));
+                }
+
+                if ($purchaseOrder->tax) {
+                    $dppFactor = $purchaseOrder->custom_dpp_factor ?? (1 / 1.11);
+                    $taxRate = $purchaseOrder->tax->rate ?? 11;
+                    $dpp = round($netPricePerUnit * $dppFactor);
+                    $ppn = round($dpp * ($taxRate / 100));
+                    $totalValuePerUnit = $netPricePerUnit + $ppn;
+                } else {
+                    $totalValuePerUnit = $netPricePerUnit;
+                }
+
+                $subtotal = $itemData['quantity'] * $totalValuePerUnit;
+
+                $purchaseReturn->items()->create([
+                    'product_id' => $originalItem->product_id,
+                    'quantity' => $itemData['quantity'],
+                    'price_per_unit' => $totalValuePerUnit,
+                    'subtotal' => $subtotal,
+                ]);
+
+                $originalItem->increment('quantity_returned', $itemData['quantity']);
+                Product::find($originalItem->product_id)->decrement('stock_quantity', $itemData['quantity']);
+            }
+
+            /**
+             * LANGKAH 5: Proses hasil retur berdasarkan tipe penanganan.
+             */
+            if ($handlingType === 'store_as_deposit') {
+                $ledgerStatus = ($purchaseOrder->payment_status === 'paid') ? 'available' : 'pending';
+                $description = "Deposit dari Retur Pembelian #{$purchaseReturn->return_number}";
+                if ($ledgerStatus === 'pending') {
                     $description .= ' (Ditahan)';
                 }
 
                 SupplierLedger::create([
                     'supplier_id' => $purchaseOrder->supplier_id,
-                    'purchase_order_id' => $purchaseOrder->po_id, // Tautkan ke PO
+                    'purchase_order_id' => $purchaseOrder->po_id,
                     'reference_type' => PurchaseReturn::class,
                     'reference_id' => $purchaseReturn->return_id,
                     'transaction_date' => $validated['return_date'],
                     'type' => 'credit',
-                    'amount' => $totalReturnValue, // Jumlah positif (kredit)
-                    'status' => $ledgerStatus, // Set status (pending/available)
+                    'amount' => $totalReturnValue,
+                    'status' => $ledgerStatus,
                     'description' => $description,
                     'user_id' => Auth::id(),
                 ]);
-                
-                // Catatan: Kita TIDAK menyentuh PO. Sisa hutang PO tetap.
-
             } else {
-                // Opsi 1: Potong Tagihan (Logika lama Anda sudah benar)
-                // Update total retur di PO
                 $totalReturDipotong = $purchaseOrder->returns()
-                                          ->where('return_handling_type', 'deduct_invoice')
-                                          ->sum('total_amount');
-                                          
-                $purchaseOrder->update(['total_returned' => $totalReturDipotong]);
-                
-                // Refresh data PO setelah update
-                $purchaseOrder->refresh(); 
+                    ->where('return_handling_type', 'deduct_invoice')
+                    ->sum('total_amount');
 
-                // Update status pembayaran PO
+                $purchaseOrder->update(['total_returned' => $totalReturDipotong]);
+
+                $purchaseOrder->refresh();
+
                 $sisaUtang = $purchaseOrder->total_amount - $purchaseOrder->total_returned - $purchaseOrder->amount_paid;
-                if ($sisaUtang <= 0.01) {
-                    $purchaseOrder->payment_status = 'paid';
-                } elseif ($purchaseOrder->amount_paid > 0) {
-                    $purchaseOrder->payment_status = 'partially_paid';
-                } else {
-                    $purchaseOrder->payment_status = 'unpaid';
-                }
+
+                $purchaseOrder->payment_status =
+                    $sisaUtang <= 0.01 ? 'paid' :
+                    ($purchaseOrder->amount_paid > 0 ? 'partially_paid' : 'unpaid');
+
                 $purchaseOrder->save();
             }
-            // ======================================================
-            
+
             DB::commit();
             return redirect()->route('purchase-returns.index')->with('success', 'Retur pembelian berhasil disimpan.');
-
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Gagal menyimpan retur: ' . $e->getMessage())->withInput();
         }
     }
 
-    public function show(PurchaseReturn $purchaseReturn)
+    /**
+     * Tampilkan detail retur pembelian.
+     */
+    public function show(PurchaseReturn $purchaseReturn): View
     {
-        // [AUTH] Panggil policy untuk memeriksa permission 'view-purchase-returns'
         $this->authorize('view', $purchaseReturn);
 
         $purchaseReturn->load(['supplier', 'purchaseOrder', 'user', 'items.product.unit']);
+
         return view('purchase_returns.show', compact('purchaseReturn'));
     }
 
-    public function destroy(PurchaseReturn $purchaseReturn)
+    /**
+     * Hapus atau batalkan retur pembelian.
+     */
+    public function destroy(PurchaseReturn $purchaseReturn): RedirectResponse
     {
-        // [AUTH] Panggil policy
         $this->authorize('delete', $purchaseReturn);
-        
+
         DB::beginTransaction();
+
         try {
             $purchaseOrder = $purchaseReturn->purchaseOrder;
-            $isDeductInvoice = $purchaseReturn->return_handling_type == 'deduct_invoice';
-            
-            // ======================================================
-            // ✅ PERBAIKAN LOGIKA PENGHAPUSAN LEDGER
-            // ======================================================
-            if ($purchaseReturn->return_handling_type == 'store_as_deposit') {
-                // Tipe "Simpan Deposit" -> Boleh dibatalkan kapan saja.
-                // Hapus entri ledger yang terkait. Ini akan menghapus 'pending' atau 'available'.
-                SupplierLedger::where('reference_type', PurchaseReturn::class)
-                            ->where('reference_id', $purchaseReturn->return_id)
-                            ->delete();
+            $isDeductInvoice = $purchaseReturn->return_handling_type === 'deduct_invoice';
 
+            // Hapus entri ledger jika retur berupa deposit
+            if ($purchaseReturn->return_handling_type === 'store_as_deposit') {
+                SupplierLedger::where('reference_type', PurchaseReturn::class)
+                    ->where('reference_id', $purchaseReturn->return_id)
+                    ->delete();
             } else {
-                // Tipe "Potong Tagihan"
+                // Cegah pembatalan jika PO sudah lunas
                 if ($purchaseOrder && $purchaseOrder->payment_status === 'paid') {
-                     $sisaUtang = $purchaseOrder->total_amount - $purchaseOrder->total_returned - $purchaseOrder->amount_paid;
-                     if ($sisaUtang <= 0.01) { // Jika lunas pas
-                         throw new \Exception('Retur "Potong Tagihan" tidak bisa dibatalkan jika PO aslinya sudah lunas.');
-                     }
+                    $sisaUtang = $purchaseOrder->total_amount - $purchaseOrder->total_returned - $purchaseOrder->amount_paid;
+                    if ($sisaUtang <= 0.01) {
+                        throw new \Exception('Retur "Potong Tagihan" tidak bisa dibatalkan jika PO sudah lunas.');
+                    }
                 }
             }
 
-            // Kembalikan stok dan kuantitas
+            // Kembalikan stok produk dan jumlah dikembalikan
             foreach ($purchaseReturn->items as $item) {
-                $product = Product::find($item->product_id);
-                if ($product) {
+                if ($product = Product::find($item->product_id)) {
                     $product->increment('stock_quantity', $item->quantity);
                 }
+
                 $originalItem = PurchaseOrderItem::where('po_id', $purchaseReturn->purchase_order_id)
-                                                ->where('product_id', $item->product_id)
-                                                ->first();
+                    ->where('product_id', $item->product_id)
+                    ->first();
+
                 if ($originalItem) {
                     $originalItem->decrement('quantity_returned', $item->quantity);
                 }
             }
 
-            $purchaseReturn->delete(); // Hapus retur
+            $purchaseReturn->delete();
 
-            // Update PO HANYA JIKA tipenya 'deduct_invoice'
             if ($purchaseOrder && $isDeductInvoice) {
-                // Hitung ulang total retur yang HANYA bertipe 'deduct_invoice'
                 $totalReturDipotong = $purchaseOrder->returns()
-                                          ->where('return_handling_type', 'deduct_invoice')
-                                          ->sum('total_amount');
-                
+                    ->where('return_handling_type', 'deduct_invoice')
+                    ->sum('total_amount');
+
                 $purchaseOrder->update(['total_returned' => $totalReturDipotong]);
-                
-                // Hitung ulang status pembayaran
+
                 $sisaUtang = $purchaseOrder->total_amount - $totalReturDipotong - $purchaseOrder->amount_paid;
-                if ($sisaUtang <= 0.01) {
-                    $purchaseOrder->payment_status = 'paid';
-                } elseif ($purchaseOrder->amount_paid > 0) {
-                    $purchaseOrder->payment_status = 'partially_paid';
-                } else {
-                    $purchaseOrder->payment_status = 'unpaid';
-                }
+
+                $purchaseOrder->payment_status =
+                    $sisaUtang <= 0.01 ? 'paid' :
+                    ($purchaseOrder->amount_paid > 0 ? 'partially_paid' : 'unpaid');
+
                 $purchaseOrder->save();
             }
-            
+
             DB::commit();
             return redirect()->route('purchase-returns.index')->with('success', 'Retur pembelian berhasil dibatalkan.');
-        
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Gagal membatalkan retur: ' . $e->getMessage());

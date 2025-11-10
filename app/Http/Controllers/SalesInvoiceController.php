@@ -22,9 +22,12 @@ class SalesInvoiceController extends Controller
 {
     public function __construct()
     {
-       
+        // Constructor untuk middleware global jika diperlukan
     }
     
+    /**
+     * Menampilkan daftar invoice dengan filter dan sorting
+     */
     public function index(Request $request): View
     {
         $this->authorize('viewAny', SalesInvoice::class);
@@ -41,7 +44,7 @@ class SalesInvoiceController extends Controller
             });
         }
 
-        // Filter tanggal (menggunakan order_date)
+        // Filter tanggal
         if ($request->filled('start_date')) {
             $query->whereDate('order_date', '>=', $request->start_date);
         }
@@ -54,6 +57,7 @@ class SalesInvoiceController extends Controller
             $query->where('status', $request->status);
         }
 
+        // Sorting
         $sort = $request->get('sort', 'terbaru');
         switch ($sort) {
             case 'terlama':
@@ -79,24 +83,38 @@ class SalesInvoiceController extends Controller
         return view('invoices.index', ['invoices' => $invoices]);
     } 
 
+    /**
+     * Menampilkan detail invoice
+     */
     public function show(SalesInvoice $invoice): View
     {
         $this->authorize('view', $invoice);
-        $invoice->load(['client', 'sales', 'payments.receivedBy', 'payments.paymentMethod', 'items.product' => function ($query) { // ✅ 'payments.paymentMethod'
-            $query->withTrashed();
-        }, 'taxes', 'adjustments', 'returns']); // ✅ 'adjustments' & 'returns'
+        $invoice->load([
+            'client', 
+            'sales', 
+            'payments.receivedBy', 
+            'payments.paymentMethod', 
+            'items.product' => function ($query) {
+                $query->withTrashed();
+            }, 
+            'taxes', 
+            'adjustments', 
+            'returns'
+        ]);
 
-        // ✅ TAMBAHKAN INI
         $paymentMethods = PaymentMethod::where('is_active', true)
                             ->whereIn('type', ['direct', 'pending'])
                             ->orderBy('name')
                             ->get();
 
-       $companyBankAccounts = CompanyBankAccount::where('is_active', true)->orderBy('bank_name')->get();
+        $companyBankAccounts = CompanyBankAccount::where('is_active', true)->orderBy('bank_name')->get();
 
-       return view('invoices.show', compact('invoice', 'paymentMethods', 'companyBankAccounts'));
+        return view('invoices.show', compact('invoice', 'paymentMethods', 'companyBankAccounts'));
     }
 
+    /**
+     * Menampilkan form buat invoice baru
+     */
     public function create(): View
     {
         $this->authorize('create', SalesInvoice::class);
@@ -108,11 +126,12 @@ class SalesInvoiceController extends Controller
         return view('invoices.create', compact('clients', 'products', 'taxes', 'salesUsers'));
     }
     
+    /**
+     * Menampilkan form buat invoice dari order
+     */
     public function createFromOrder(Order $order): View
     {
         $this->authorize('create', SalesInvoice::class);
-        
-        // ✅ BERUBAH: Menggunakan variabel $order
         $order->load('items.product'); 
         
         $clients = Client::all();
@@ -120,12 +139,11 @@ class SalesInvoiceController extends Controller
         $taxes = Tax::where('is_active', true)->get();
         $salesUsers = User::role('sales')->get();
         
-        // ✅ BERUBAH: Mengirim $order (bukan $salesOrder) ke view
         return view('invoices.create', compact('clients', 'products', 'order', 'taxes', 'salesUsers'));
     }
 
     /**
-     * Menyimpan invoice baru dengan multi-pajak.
+     * Menyimpan invoice baru
      */
     public function store(Request $request): RedirectResponse
     {
@@ -152,58 +170,46 @@ class SalesInvoiceController extends Controller
 
             $originOrder = $request->filled('sales_order_id') ? Order::find($request->sales_order_id) : null;
 
-            // 1. Hitung Subtotal dan siapkan item
+            // Kalkulasi subtotal dan persiapan item
             $subtotal = 0;
             $productsToSave = [];
             foreach ($validated['products'] as $productData) {
-                // Kunci produk untuk memastikan data stok & HPP akurat
                 $product = Product::find($productData['product_id']); 
                 if (!$product) {
                     throw new \Exception("Produk dengan ID {$productData['product_id']} tidak ditemukan.");
                 }
 
                 $quantity = $productData['quantity'];
-                
-                // Cek Stok:
                 $isFromClientOrder = $originOrder && $originOrder->order_source === 'client';
 
                 if (!$isFromClientOrder) {
-                    /*
-                    if ($product->stock_quantity < $quantity) {
-                        throw new \Exception("Stok untuk produk '{$product->product_name}' tidak mencukupi. Sisa stok: {$product->stock_quantity}.");
-                    }
-                    */
                     $itemsToDecrementStock[] = [
                         'product_id' => $product->product_id,
                         'quantity' => $quantity
                     ];
                 }
 
-                // Ambil harga jual (berdasarkan purchase_price)
                 $price = $product->selling_price ?? 0;
                 $itemSubtotal = $quantity * $price;
                 $subtotal += $itemSubtotal;
 
-                // =============================================
-                // ✅ LOGIKA BARU: Simpan HPP saat penjualan
-                // =============================================
                 $hppSaatIni = $product->average_cost ?? 0;
 
                 $productsToSave[] = [
                     'product_id' => $product->product_id,
                     'quantity' => $quantity,
-                    'price_per_unit' => $price, // Ini harga jual per unit
-                    'hpp' => $hppSaatIni,       // Ini HPP (modal) per unit
+                    'price_per_unit' => $price,
+                    'hpp' => $hppSaatIni,
                     'subtotal' => $itemSubtotal,
                 ];
             }
 
-            // 2. Hitung Diskon Global
+            // Kalkulasi diskon
             $discountPercentage = $request->input('discount_percentage', 0);
             $discountAmount = $subtotal * ($discountPercentage / 100);
             $subtotalAfterDiscount = $subtotal - $discountAmount;
 
-            // 3. Hitung Total Pajak
+            // Kalkulasi pajak
             $totalTaxAmount = 0;
             $taxesToAttach = [];
             if (!empty($validated['taxes'])) {
@@ -219,10 +225,9 @@ class SalesInvoiceController extends Controller
                 }
             }
 
-            // 4. Hitung Total Akhir
             $totalAmount = $subtotalAfterDiscount + $totalTaxAmount;
 
-            // 5. Logika Penentuan Nomor Invoice
+            // Generate nomor invoice
             $salesUserId = $request->input('user_id_sales');
             $orderSource = 'sales'; 
             if ($originOrder) {
@@ -232,7 +237,7 @@ class SalesInvoiceController extends Controller
                 }
             }
 
-            // 6. Simpan data utama ke tabel sales_invoices
+            // Simpan invoice
             $invoice = SalesInvoice::create([
                 'client_id' => $validated['client_id'],
                 'invoice_number' => SalesInvoice::generateInvoiceNumber($salesUserId, $orderSource),
@@ -242,27 +247,20 @@ class SalesInvoiceController extends Controller
                 'discount_percentage' => $discountPercentage,
                 'discount_amount' => $discountAmount,
                 'total_amount' => $totalAmount,
-                'status' => 'draft', // ✅ PERUBAHAN UTAMA DI SINI
+                'status' => 'draft',
                 'user_id_sales' => $salesUserId,
                 'amount_paid' => 0,
                 'notes' => $request->input('notes'),
             ]);
-            // 7. Lampirkan Pajak dan Item (yang sekarang sudah berisi HPP)
+
             $invoice->taxes()->attach($taxesToAttach);
             $invoice->items()->createMany($productsToSave);
 
-            // 8. Update status Order jika dibuat dari order
             if ($originOrder) {
                 $originOrder->status = 'invoiced';
                 $originOrder->invoice_id = $invoice->invoice_id;
                 $originOrder->save();
             }
-
-            // 9. Kurangi Stok (HANYA jika perlu)
-            /*foreach ($itemsToDecrementStock as $item) {
-                // Kita tidak perlu lock lagi karena sudah di-lock di atas
-                Product::where('product_id', $item['product_id'])->decrement('stock_quantity', $item['quantity']);
-            }*/
 
             DB::commit();
 
@@ -274,9 +272,12 @@ class SalesInvoiceController extends Controller
         }
     }
 
+    /**
+     * Konfirmasi invoice draft
+     */
     public function confirm(SalesInvoice $invoice): RedirectResponse
     {
-        $this->authorize('update', $invoice); // Gunakan permission 'update' yang ada
+        $this->authorize('update', $invoice);
 
         if ($invoice->status !== 'draft') {
             return back()->with('error', 'Hanya invoice DRAFT yang bisa dikonfirmasi.');
@@ -285,7 +286,6 @@ class SalesInvoiceController extends Controller
         try {
             DB::beginTransaction();
             
-            // 1. Kunci dan Cek Stok (LOGIKA PINDAHAN DARI STORE)
             $itemsToDecrement = [];
             foreach ($invoice->items as $item) {
                 $product = Product::lockForUpdate()->find($item->product_id);
@@ -293,26 +293,16 @@ class SalesInvoiceController extends Controller
                     throw new \Exception("Produk '{$item->product_name}' tidak ditemukan lagi.");
                 }
 
-                // Ini adalah pengecekan stok yang sebenarnya, terjadi saat konfirmasi
-                /*
-                // Ini adalah pengecekan stok yang sebenarnya, terjadi saat konfirmasi
-                if ($product->stock_quantity < $item->quantity) {
-                    throw new \Exception("Stok untuk produk '{$product->product_name}' tidak mencukupi. Sisa stok: {$product->stock_quantity}.");
-                }
-                */
-                
                 $itemsToDecrement[] = [
                     'product_id' => $product->product_id,
                     'quantity' => $item->quantity
                 ];
             }
 
-            // 2. Jika semua stok aman, kurangi stok
             foreach ($itemsToDecrement as $item) {
                 Product::where('product_id', $item['product_id'])->decrement('stock_quantity', $item['quantity']);
             }
 
-            // 3. Ubah status invoice
             $invoice->update(['status' => 'unpaid']);
 
             DB::commit();
@@ -325,7 +315,7 @@ class SalesInvoiceController extends Controller
     }
 
     /**
-     * Menampilkan form untuk mengedit invoice.
+     * Menampilkan form edit invoice
      */
     public function edit(SalesInvoice $invoice): View
     {
@@ -340,7 +330,7 @@ class SalesInvoiceController extends Controller
     }
 
     /**
-     * Mengupdate invoice di database.
+     * Mengupdate invoice
      */
     public function update(Request $request, SalesInvoice $invoice): RedirectResponse
     {
@@ -365,7 +355,7 @@ class SalesInvoiceController extends Controller
         try {
             DB::beginTransaction();
 
-            // 2. Kembalikan stok barang
+            // Kembalikan stok lama
             foreach ($invoice->items as $oldItem) {
                 $product = Product::find($oldItem->product_id);
                 if ($product) {
@@ -373,13 +363,11 @@ class SalesInvoiceController extends Controller
                 }
             }
 
-            // 3. Hitung ulang semua
+            // Kalkulasi ulang
             $subtotal = 0;
             $productsToSave = [];
             foreach ($validated['products'] as $productData) {
                 $product = Product::find($productData['product_id']);
-                
-                // ✅ Sesuai permintaan Anda: Tetap menggunakan purchase_price
                 $price = $product->selling_price ?? 0;
                 $quantity = $productData['quantity'];
                 $itemSubtotal = $quantity * $price;
@@ -416,7 +404,7 @@ class SalesInvoiceController extends Controller
             
             $totalAmount = $subtotalAfterDiscount + $totalTaxAmount;
 
-            // 4. Update data utama Invoice
+            // Update invoice
             $invoice->update([
                 'client_id' => $validated['client_id'],
                 'order_date' => $validated['order_date'],
@@ -426,16 +414,13 @@ class SalesInvoiceController extends Controller
                 'discount_amount' => $discountAmount,
                 'total_amount' => $totalAmount,
                 'notes' => $request->input('notes'),
-                'amount_paid' => 0, 
+                'amount_paid' => 0,
                 'status' => 'unpaid',
             ]);
 
-            // 5. Hapus item dan pembayaran lama, lalu buat ulang item baru
             $invoice->items()->delete();
-            $invoice->payments()->delete(); 
+            $invoice->payments()->delete();
             $invoice->items()->createMany($productsToSave);
-
-            // 6. Sinkronkan data pajak
             $invoice->taxes()->sync($taxesToSync);
 
             DB::commit();
@@ -448,7 +433,7 @@ class SalesInvoiceController extends Controller
     }
 
     /**
-     * Menghapus invoice dari database (atau membatalkan).
+     * Menghapus invoice
      */
     public function destroy(SalesInvoice $invoice): RedirectResponse
     { 
@@ -458,19 +443,16 @@ class SalesInvoiceController extends Controller
         return redirect()->route('invoices.index')->with('success', 'Invoice berhasil dihapus.');
     }
 
+    /**
+     * Membatalkan invoice
+     */
     public function cancel(SalesInvoice $invoice): RedirectResponse
     {
         $this->authorize('cancel', $invoice);
 
-        // ✅ PERBAIKAN: Cek status 'paid' ATAU 'partially_paid'
         if (in_array($invoice->status, ['paid', 'partially_paid'])) {
              return back()->with('error', 'Invoice yang sudah lunas atau dicicil tidak bisa dibatalkan.');
         }
-        
-        // Alternatif (lebih aman): Cek langsung ke 'amount_paid'
-        // if ($invoice->amount_paid > 0) {
-        //     return back()->with('error', 'Invoice yang sudah memiliki pembayaran (meski cicil) tidak bisa dibatalkan.');
-        // }
 
         $invoice->status = 'cancelled';
         $invoice->save();
@@ -478,6 +460,9 @@ class SalesInvoiceController extends Controller
         return redirect()->route('invoices.index')->with('success', 'Invoice berhasil dibatalkan.');
     }
 
+    /**
+     * Download PDF invoice
+     */
     public function downloadPDF(SalesInvoice $invoice)
     {
         $this->authorize('view', $invoice);

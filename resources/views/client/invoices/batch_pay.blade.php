@@ -1,21 +1,14 @@
 @extends('layouts.client')
 
 @push('styles')
-{{-- Select2 CSS --}}
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
 @endpush
 
-{{-- ==================================================================== --}}
-{{-- ✅ BLOK PHP BARU UNTUK MENGAMBIL ID METODE --}}
-{{-- ==================================================================== --}}
 @php
-    // Asumsi $paymentMethods dikirim dari Client/InvoiceController@showBatchPay
     $transferMethodId = $paymentMethods->firstWhere(fn($m) => str_contains(strtolower($m->name), 'transfer'))->payment_method_id ?? null;
     $cashMethodId = $paymentMethods->firstWhere(fn($m) => str_contains(strtolower($m->name), 'cash'))->payment_method_id ?? null;
 @endphp
-{{-- ==================================================================== --}}
-
 
 @section('content')
 <div class="container-fluid py-4">
@@ -24,7 +17,6 @@
     <form id="batch-payment-form">
         @csrf
         <div class="row g-4">
-            {{-- Kolom Kiri: Daftar Invoice --}}
             <div class="col-lg-8">
                 <div class="card shadow-sm">
                     <div class="card-header bg-white">
@@ -75,7 +67,6 @@
                 </div>
             </div>
 
-            {{-- Kolom Kanan: Ringkasan Pembayaran --}}
             <div class="col-lg-4">
                 <div class="card shadow-sm sticky-top" style="top: 20px;">
                     <div class="card-header bg-white">
@@ -132,7 +123,7 @@
                             <button type="button" class="btn btn-outline-primary p-3" id="pay-manual-transfer-btn" disabled>
                                 <i class="bi bi-bank2 fs-4 me-2"></i>
                                 <div>
-                                    <span class="fw-bold">Upload Bukti Transfer</span><br>
+                                    <span class="fw-bold">Upload Bukti Transfer / Giro</span><br>
                                     <small>Laporkan pembayaran batch manual.</small>
                                 </div>
                             </button>
@@ -151,9 +142,6 @@
     </form>
 </div>
 
-{{-- ========================================================== --}}
-{{-- ✅ MODAL MANUAL (DIPERBARUI) --}}
-{{-- ========================================================== --}}
 <div class="modal fade" id="batchManualPaymentModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -163,9 +151,6 @@
             </div>
             <form id="batch-manual-form" action="{{ route('client.invoices.batchPay.storeManual') }}" method="POST" enctype="multipart/form-data">
                 @csrf
-                
-                {{-- ✅ PERBAIKAN: Ganti name="payment_method" menjadi "payment_method_id" --}}
-                <input type="hidden" name="payment_method_id" id="batch_payment_method_id_input">
                 <input type="hidden" name="use_credit" id="batch-manual-use-credit-hidden">
                 
                 <div class="modal-body">
@@ -185,8 +170,6 @@
                             <select name="user_id_sales" id="batch_user_id_sales" class="form-select select2-in-modal">
                                 <option value="" disabled selected>-- Pilih Sales --</option>
                                 @php
-                                    // Pindahkan query ke controller jika memungkinkan,
-                                    // tapi untuk sekarang ini tidak apa-apa
                                     $salesUsers = \App\Models\User::role('sales')->get();
                                 @endphp
                                 @foreach($salesUsers as $sales)
@@ -194,12 +177,31 @@
                                 @endforeach
                             </select>
                         </div>
+                        <input type="hidden" name="payment_method_id" id="batch_payment_method_id_cash">
                     </div>
 
                     <div id="batch-transfer-fields" class="d-none">
                         <div class="mb-3">
-                            <label for="batch_proof_of_payment" class="form-label">File Bukti Bayar (JPG, PNG) <span class="text-danger">*</span></label>
-                            <input type="file" class="form-control" name="proof_of_payment" id="batch_proof_of_payment" accept="image/jpeg,image/png">
+                            <label for="batch_payment_method_id" class="form-label">Metode Pembayaran <span class="text-danger">*</span></label>
+                            <select name="payment_method_id" id="batch_payment_method_id" class="form-select select2-in-modal">
+                                <option value="">-- Pilih Metode --</option>
+                                @foreach($paymentMethods as $method)
+                                    <option value="{{ $method->payment_method_id }}" 
+                                            data-config="{{ $method->required_fields_config }}">
+                                        {{ $method->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3" id="batch-payment-reference-group" style="display: none;">
+                            <label for="batch_reference_number" class="form-label">Nomor Referensi (Giro/Cek)</label>
+                            <input type="text" class="form-control" name="reference_number" id="batch_reference_number">
+                        </div>
+
+                        <div class="mb-3" id="batch-payment-proof-group" style="display: none;">
+                            <label for="batch_proof_of_payment" class="form-label">File Bukti Bayar (JPG, PNG)</label>
+                            <input type="file" class="form-control" name="proof_of_payment" id="batch_proof_of_payment" accept="image/jpeg,image/png,image/jpg">
                         </div>
                     </div>
 
@@ -223,8 +225,6 @@
     </div>
 </div>
 
-
-{{-- MODAL MIDTRANS (Tidak Berubah) --}}
 <div class="modal fade" id="batchMidtransPaymentModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -259,8 +259,6 @@
 @endsection
 
 @push('scripts')
-{{-- Select2 & AutoNumeric JS --}}
-{{-- <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> --}} {{-- Asumsi jQuery sudah di-load di layouts/client.blade.php --}}
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script type="text/javascript"
@@ -269,7 +267,6 @@
     
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // === Inisialisasi Global ===
     const checkboxes = document.querySelectorAll('.invoice-checkbox');
     const checkAll = document.getElementById('check-all-invoices');
     const useCreditCheck = document.getElementById('use-credit-batch');
@@ -285,7 +282,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const amountDisplay = document.getElementById('batch-amount-formatted');
     const amountError = document.getElementById('batch-amount-error');
     
-    // ✅ PERBAIKAN: Ambil ID dari PHP
     const transferMethodId = "{{ $transferMethodId }}";
     const cashMethodId = "{{ $cashMethodId }}";
     
@@ -303,14 +299,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const midtransForm = document.getElementById('batch-midtrans-form');
     const manualForm = document.getElementById('batch-manual-form');
 
-    // Variabel Global
     let currentTotalTagihan = 0;
     let currentTotalDitagih = 0;
     let currentKreditDigunakan = 0;
     let currentAmountFromInput = 0;
-    let currentTotalPaymentValue = 0; // Ini adalah total nilai yang ingin dibayar klien
+    let currentTotalPaymentValue = 0; 
 
-    // === Fungsi Helper ===
     const min = (a, b) => Math.min(a, b);
     const max = (a, b) => Math.max(a, b);
     const round = (num) => Math.round(num);
@@ -319,11 +313,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
     }
 
-    // ======================================================
-    // ✅ FUNGSI PERHITUNGAN BARU (LEBIH BENAR)
-    // ======================================================
     function calculateTotal() {
-        // 1. Hitung total tagihan yang dicentang
         currentTotalTagihan = 0;
         checkboxes.forEach(cb => {
             if (cb.checked) {
@@ -333,58 +323,46 @@ document.addEventListener('DOMContentLoaded', function () {
         summaryTagihan.textContent = formatRupiah(currentTotalTagihan);
         summaryTagihan.dataset.total = currentTotalTagihan;
         
-        // 2. Ambil jumlah yang diinput klien
         currentAmountFromInput = parseFloat(autoNumericInstance.getNumericString() || 0);
         const useCredit = useCreditCheck ? useCreditCheck.checked : false;
         
-        // 3. Tentukan Total Nilai Pembayaran (apa yang ingin dibayar klien)
-        currentTotalPaymentValue = currentAmountFromInput; // Nilai total yang ingin dibayar = input
-        currentKreditDigunakan = 0; // Default
+        currentTotalPaymentValue = currentAmountFromInput;
+        currentKreditDigunakan = 0; 
 
-        // 4. Terapkan kredit jika dicentang
         if (useCredit && availableBalance > 0) {
-            // Kredit yg dipakai = min(saldo, total yg mau dibayar)
             currentKreditDigunakan = min(availableBalance, currentTotalPaymentValue);
         }
 
-        // 5. Hitung total yang akan ditagih (ke Midtrans/Manual)
-        // Total yg ditagih = Total Pembayaran - Kredit yang dipakai
         currentTotalDitagih = currentTotalPaymentValue - currentKreditDigunakan;
-        currentTotalDitagih = round(max(0, currentTotalDitagih)); // Tidak boleh negatif
+        currentTotalDitagih = round(max(0, currentTotalDitagih));
 
         summaryDitagih.textContent = formatRupiah(currentTotalDitagih);
 
-        // 6. Validasi
         let isValid = true;
         let errorMessage = '';
-        let isError = true; // Tipe pesan (merah)
+        let isError = true;
         const hasSelection = currentTotalTagihan > 0;
 
-        // Validasi: Total bayar (input) tidak boleh 0
         if (currentTotalPaymentValue <= 0.01 && hasSelection) {
             isValid = false;
             errorMessage = 'Jumlah pembayaran harus lebih dari 0.';
         }
         
-        // Cek Overpayment (DI-IZINKAN, tapi beri info)
         if (hasSelection && currentTotalPaymentValue > (currentTotalTagihan + 0.01)) {
-            isError = false; // Ini info, bukan error
+            isError = false;
             errorMessage = 'Info: Anda akan kelebihan bayar. Sisa dana akan jadi saldo kredit.';
         }
 
-        // Aktifkan tombol
         btnMidtrans.disabled = !isValid || !hasSelection;
         btnManual.disabled = !isValid || !hasSelection;
         btnCash.disabled = !isValid || !hasSelection;
 
-        // Tampilkan error/info
         amountError.textContent = errorMessage;
         amountError.classList.toggle('d-none', !errorMessage);
         amountError.classList.toggle('text-danger', isError);
-        amountError.classList.toggle('text-info', !isError); // Ganti jadi info
+        amountError.classList.toggle('text-info', !isError);
     }
     
-    // === Event Listeners Utama ===
     checkAll.addEventListener('change', function () {
         checkboxes.forEach(cb => { cb.checked = this.checked; });
         let totalChecked = 0;
@@ -393,7 +371,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (c.checked) totalChecked += parseFloat(c.dataset.balance);
             });
         }
-        autoNumericInstance.set(totalChecked); // Auto-isi lunas/0
+        autoNumericInstance.set(totalChecked);
         calculateTotal();
     });
     
@@ -403,7 +381,7 @@ document.addEventListener('DOMContentLoaded', function () {
             checkboxes.forEach(c => {
                 if (c.checked) totalChecked += parseFloat(c.dataset.balance);
             });
-            autoNumericInstance.set(totalChecked); // Auto-isi lunas/0
+            autoNumericInstance.set(totalChecked);
             calculateTotal();
         });
     });
@@ -414,28 +392,27 @@ document.addEventListener('DOMContentLoaded', function () {
     amountDisplay.addEventListener('keyup', calculateTotal);
     amountDisplay.addEventListener('change', calculateTotal);
     
-    calculateTotal(); // Panggil saat memuat
+    calculateTotal();
 
-    // ======================================================
-    // ✅ LOGIKA MODAL MANUAL (DIPERBARUI)
-    // ======================================================
     const manualTitle = document.getElementById('batchManualPaymentModalTitle');
-    // ✅ PERBAIKAN: Target ID input yang baru
-    const manualMethodInput = document.getElementById('batch_payment_method_id_input');
+    const manualMethodDropdown = document.getElementById('batch_payment_method_id');
     const manualCashFields = document.getElementById('batch-cash-fields');
     const manualTransferFields = document.getElementById('batch-transfer-fields');
     const manualSalesSelect = document.getElementById('batch_user_id_sales');
     const manualProofInput = document.getElementById('batch_proof_of_payment');
+    const manualProofGroup = document.getElementById('batch-payment-proof-group');
+    const manualReferenceInput = document.getElementById('batch_reference_number');
+    const manualReferenceGroup = document.getElementById('batch-payment-reference-group');
     const manualAmountDisplay = document.getElementById('batch_payment_amount_display');
     const manualAmountHidden = document.getElementById('batch_payment_amount');
     const manualAmountError = document.getElementById('batch-amount-error');
     const manualSubmitBtn = document.getElementById('batch-submit-proof-btn');
-    const manualTotalBayar = document.getElementById('batch-modal-total-bayar'); // Diubah
+    const manualTotalBayar = document.getElementById('batch-modal-total-bayar');
     const manualKreditDipakai = document.getElementById('batch-modal-kredit-dipakai');
     const manualSisaBayar = document.getElementById('batch-modal-sisa-bayar');
     const manualUseCreditHidden = document.getElementById('batch-manual-use-credit-hidden');
+    const cashMethodIdInput = document.getElementById('batch_payment_method_id_cash');
     
-    // Inisialisasi Select2 di dalam modal
     $('.select2-in-modal').select2({
         theme: 'bootstrap-5',
         dropdownParent: $('#batchManualPaymentModal')
@@ -445,14 +422,42 @@ document.addEventListener('DOMContentLoaded', function () {
         decimalPlaces: 0, digitGroupSeparator: '.', decimalCharacter: ',', minimumValue: 0
     });
     
+    function handleBatchMethodConfigChange() {
+        if (!manualMethodDropdown) return;
+        const selectedOption = manualMethodDropdown.options[manualMethodDropdown.selectedIndex];
+        const config = (selectedOption && !manualMethodDropdown.disabled) ? selectedOption.dataset.config : 'none';
+
+        manualReferenceGroup.style.display = 'none';
+        manualReferenceInput.required = false;
+        manualProofGroup.style.display = 'none';
+        manualProofInput.required = false;
+
+        if (config === 'proof_only') {
+            manualProofGroup.style.display = 'block';
+            manualProofInput.required = true;
+        } else if (config === 'reference_only') {
+            manualReferenceGroup.style.display = 'block';
+            manualReferenceInput.required = true;
+        } else if (config === 'proof_and_reference') {
+            manualProofGroup.style.display = 'block';
+            manualProofInput.required = true;
+            manualReferenceGroup.style.display = 'block';
+            manualReferenceInput.required = true;
+        }
+    }
+    
+    if (manualMethodDropdown) {
+        manualMethodDropdown.addEventListener('change', handleBatchMethodConfigChange);
+    }
+    
     function validateManualForm() {
         const rawValue = manualAutoNumeric.getNumericString();
         manualAmountHidden.value = rawValue;
         
         let isValid = true;
         let errorMessage = '';
+        let isError = true;
         
-        // Cek jika jumlahnya cocok (toleransi 1 rupiah)
         if(Math.abs(parseFloat(rawValue) - currentTotalDitagih) > 0.01) {
             isValid = false;
             errorMessage = 'Jumlah bayar (Rp ' + formatRupiah(rawValue) + ') tidak cocok dengan total ditagih (Rp ' + formatRupiah(currentTotalDitagih) + ').';
@@ -469,7 +474,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         manualAmountError.textContent = errorMessage;
-        manualAmountError.classList.toggle('d-none', !isValid);
+        manualAmountError.classList.toggle('d-none', !errorMessage);
         manualSubmitBtn.disabled = !isValid;
     }
     manualAmountDisplay.addEventListener('keyup', validateManualForm);
@@ -477,14 +482,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     btnManual.addEventListener('click', function() {
         manualTitle.textContent = 'Upload Bukti Transfer Batch';
-        
-        // ✅ PERBAIKAN: Set value ke ID
-        manualMethodInput.value = transferMethodId; 
-        
         manualCashFields.classList.add('d-none');
         manualTransferFields.classList.remove('d-none');
-        manualProofInput.required = (currentTotalDitagih > 0);
         manualSalesSelect.required = false;
+        manualMethodDropdown.disabled = false;
+        
+        manualMethodDropdown.value = transferMethodId; 
         
         manualTotalBayar.textContent = formatRupiah(currentTotalPaymentValue);
         manualKreditDipakai.textContent = formatRupiah(currentKreditDigunakan);
@@ -492,32 +495,34 @@ document.addEventListener('DOMContentLoaded', function () {
         manualAutoNumeric.set(currentTotalDitagih);
         manualUseCreditHidden.value = (useCreditCheck && useCreditCheck.checked) ? '1' : '0';
         
+        handleBatchMethodConfigChange();
         validateManualForm();
         batchManualModal.show();
     });
 
     btnCash.addEventListener('click', function() {
         manualTitle.textContent = 'Lapor Bayar Tunai Batch';
-        
-        // ✅ PERBAIKAN: Set value ke ID
-        manualMethodInput.value = cashMethodId; 
-        
         manualTransferFields.classList.add('d-none');
         manualCashFields.classList.remove('d-none');
         manualSalesSelect.required = true;
-        manualProofInput.required = false;
-
+        
+        cashMethodIdInput.value = cashMethodId;
+        manualMethodDropdown.disabled = true;
+        
         manualTotalBayar.textContent = formatRupiah(currentTotalPaymentValue);
         manualKreditDipakai.textContent = formatRupiah(currentKreditDigunakan);
         manualSisaBayar.textContent = formatRupiah(currentTotalDitagih);
         manualAutoNumeric.set(currentTotalDitagih);
         manualUseCreditHidden.value = (useCreditCheck && useCreditCheck.checked) ? '1' : '0';
 
+        handleBatchMethodConfigChange();
         validateManualForm();
         batchManualModal.show();
     });
     
     manualForm.addEventListener('submit', function() {
+        manualMethodDropdown.disabled = false;
+        
         manualForm.querySelectorAll('input[name="invoice_ids[]"]').forEach(el => el.remove());
         checkboxes.forEach(cb => {
             if (cb.checked) {
@@ -530,8 +535,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-
-    // === Logika Modal Midtrans ===
     btnMidtrans.addEventListener('click', function() {
         document.getElementById('midtrans-summary-total-bayar').textContent = formatRupiah(currentTotalPaymentValue);
         document.getElementById('midtrans-summary-kredit').textContent = formatRupiah(currentKreditDigunakan);

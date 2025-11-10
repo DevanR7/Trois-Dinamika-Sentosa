@@ -3,20 +3,23 @@
 namespace App\Http\Controllers;
 
 use App\Models\Announcement;
-use App\Models\Client; // Import Client model
+use App\Models\Client;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
 class AnnouncementController extends Controller
 {
+    /**
+     * Middleware untuk otorisasi pengelolaan pengumuman
+     */
     public function __construct()
     {
         $this->middleware('can:manage-announcements');
     }
 
     /**
-     * Menampilkan daftar pengumuman (termasuk arsip).
+     * Menampilkan daftar pengumuman (termasuk arsip)
      */
     public function index(Request $request): View
     {
@@ -31,16 +34,16 @@ class AnnouncementController extends Controller
     }
 
     /**
-     * Menampilkan form untuk membuat pengumuman baru.
+     * Menampilkan form untuk membuat pengumuman baru
      */
     public function create(): View
     {
-        $clients = Client::orderBy('client_name')->get(['client_id', 'client_name']); // Ambil klien untuk pilihan
+        $clients = Client::orderBy('client_name')->get(['client_id', 'client_name']);
         return view('announcements.create', compact('clients'));
     }
 
     /**
-     * Menyimpan pengumuman baru.
+     * Menyimpan pengumuman baru
      */
     public function store(Request $request): RedirectResponse
     {
@@ -48,17 +51,16 @@ class AnnouncementController extends Controller
             'title' => 'nullable|string|max:255',
             'content' => 'required|string',
             'type' => 'required|in:broadcast,targeted',
-            'is_active' => 'sometimes|boolean', // 'sometimes' agar tidak error jika checkbox tidak dicentang
-            'client_ids' => 'required_if:type,targeted|array', // Wajib jika 'targeted'
-            'client_ids.*' => 'exists:clients,client_id', // Pastikan ID klien valid
+            'is_active' => 'sometimes|boolean',
+            'client_ids' => 'required_if:type,targeted|array',
+            'client_ids.*' => 'exists:clients,client_id',
         ]);
 
-        // Set is_active ke false jika tidak ada di request
         $validated['is_active'] = $request->has('is_active');
 
         $announcement = Announcement::create($validated);
 
-        // Jika tipe 'targeted', simpan relasi klien
+        // Simpan relasi klien untuk tipe targeted
         if ($validated['type'] === 'targeted' && isset($validated['client_ids'])) {
             $announcement->clients()->sync($validated['client_ids']);
         }
@@ -67,24 +69,22 @@ class AnnouncementController extends Controller
     }
 
     /**
-     * Menampilkan form untuk mengedit pengumuman.
+     * Menampilkan form untuk mengedit pengumuman
      */
     public function edit(Announcement $announcement): View
     {
         $clients = Client::orderBy('client_name')->get(['client_id', 'client_name']);
-        
-        // ✅ PERBAIKI BARIS INI
-        $selectedClientIds = $announcement->clients()->pluck('clients.client_id')->toArray(); 
+        $selectedClientIds = $announcement->clients()->pluck('clients.client_id')->toArray();
 
         return view('announcements.edit', compact('announcement', 'clients', 'selectedClientIds'));
     }
 
     /**
-     * Memperbarui pengumuman yang ada.
+     * Memperbarui pengumuman yang ada
      */
     public function update(Request $request, Announcement $announcement): RedirectResponse
     {
-         $validated = $request->validate([
+        $validated = $request->validate([
             'title' => 'nullable|string|max:255',
             'content' => 'required|string',
             'type' => 'required|in:broadcast,targeted',
@@ -97,11 +97,10 @@ class AnnouncementController extends Controller
 
         $announcement->update($validated);
 
-        // Update relasi klien
+        // Update relasi klien berdasarkan tipe
         if ($validated['type'] === 'targeted' && isset($validated['client_ids'])) {
             $announcement->clients()->sync($validated['client_ids']);
         } else {
-            // Jika tipe diubah ke broadcast, hapus relasi lama
             $announcement->clients()->detach();
         }
 
@@ -109,20 +108,19 @@ class AnnouncementController extends Controller
     }
 
     /**
-     * Mengarsipkan pengumuman (soft delete).
+     * Mengarsipkan pengumuman (soft delete)
      */
     public function destroy(Announcement $announcement): RedirectResponse
     {
-        $announcement->delete(); // Soft delete
+        $announcement->delete();
         return redirect()->route('announcements.index')->with('success', 'Pengumuman berhasil diarsipkan.');
     }
 
     /**
-     * Memulihkan pengumuman yang diarsipkan.
+     * Memulihkan pengumuman yang diarsipkan
      */
     public function restore(Announcement $announcement): RedirectResponse
     {
-        // TODO: Tambahkan otorisasi jika perlu
         if ($announcement->trashed()) {
             $announcement->restore();
             return back()->with('success', 'Pengumuman berhasil dipulihkan.');
@@ -130,16 +128,12 @@ class AnnouncementController extends Controller
         return back()->with('error', 'Pengumuman tidak terhapus.');
     }
 
-     /**
-     * Menghapus pengumuman secara permanen.
+    /**
+     * Menghapus pengumuman secara permanen
      */
     public function forceDelete(Announcement $announcement): RedirectResponse
     {
-        // TODO: Tambahkan otorisasi jika perlu (misal hanya superadmin)
         if ($announcement->trashed()) {
-            // Hapus relasi pivot terlebih dahulu (opsional, cascade delete sudah menangani)
-            // $announcement->clients()->detach(); 
-            
             $announcement->forceDelete();
             return redirect()->route('announcements.index', ['status' => 'deleted'])
                              ->with('success', 'Pengumuman telah dihapus permanen.');

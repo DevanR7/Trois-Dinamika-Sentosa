@@ -7,7 +7,7 @@ use App\Models\SalesInvoice;
 use App\Models\BatchPayment;
 use App\Models\Payment;
 use App\Models\ClientLedger;
-use App\Models\PaymentMethod; // ✅ Pastikan ini ada
+use App\Models\PaymentMethod;
 use App\Models\User;
 use App\Models\CompanyBankAccount;
 use Illuminate\Http\Request;
@@ -22,7 +22,9 @@ use Illuminate\Validation\Rule;
 class BatchPaymentController extends Controller
 {
     /**
-     * Terapkan permission middleware
+     * ===========================================
+     * BAGIAN: Middleware otorisasi (permission)
+     * ===========================================
      */
     public function __construct()
     {
@@ -31,41 +33,49 @@ class BatchPaymentController extends Controller
     }
 
     /**
-     * Tampilkan form untuk admin membuat batch payment.
+     * ==============================================
+     * BAGIAN: Form untuk membuat Batch Payment baru
+     * ==============================================
      */
     public function create(): View
     {
+        // Ambil daftar klien
         $clients = Client::orderBy('client_name')->get();
         
+        // Ambil metode pembayaran aktif bertipe direct atau pending
         $paymentMethods = PaymentMethod::where('is_active', true)
                             ->whereIn('type', ['direct', 'pending'])
                             ->orderBy('name')
                             ->get();
         
-        // ✅ 2. Tambahkan query ini
-        $companyBankAccounts = CompanyBankAccount::where('is_active', true)->orderBy('bank_name')->get();
+        // Ambil daftar akun bank perusahaan
+        $companyBankAccounts = CompanyBankAccount::where('is_active', true)
+                                ->orderBy('bank_name')
+                                ->get();
                             
-        // ✅ 3. Tambahkan 'companyBankAccounts' ke compact()
         return view('batch_payments.create', compact('clients', 'paymentMethods', 'companyBankAccounts'));
     }
 
     /**
-     * [API] Ambil data invoice yang belum lunas milik klien.
+     * ======================================================
+     * BAGIAN: API untuk mengambil invoice klien yang belum lunas
+     * ======================================================
      */
     public function getUnpaidInvoicesApi(Client $client): JsonResponse
     {
         $invoices = $client->salesInvoices()
             ->whereIn('status', ['unpaid', 'partially_paid'])
-            ->with(['deductingReturns', 'adjustments']) // Eager load untuk accessor
+            ->with(['deductingReturns', 'adjustments'])
             ->orderBy('due_date', 'asc')
             ->get();
 
+        // Hitung sisa tagihan dan tampilkan hanya yang belum lunas
         $invoicesWithBalance = $invoices->map(function ($invoice) {
             return [
                 'invoice_id' => $invoice->invoice_id,
                 'invoice_number' => $invoice->invoice_number,
                 'due_date_formatted' => $invoice->due_date->format('d M Y'),
-                'sisa_tagihan' => $invoice->remaining_balance, // Gunakan accessor
+                'sisa_tagihan' => $invoice->remaining_balance,
             ];
         })->filter(fn($inv) => $inv['sisa_tagihan'] > 0.01);
 
@@ -73,11 +83,14 @@ class BatchPaymentController extends Controller
     }
 
     /**
-     * Simpan batch payment (dibuat oleh Admin).
+     * =========================================================
+     * BAGIAN: Menyimpan batch payment yang dibuat oleh Admin
+     * =========================================================
      */
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
+        // Validasi awal input pengguna
+        $rules = [
             'client_id' => 'required|exists:clients,client_id',
             'payment_date' => 'required|date',
             'total_amount' => 'required|numeric|min:0',
@@ -86,7 +99,6 @@ class BatchPaymentController extends Controller
                 'nullable',
                 'exists:payment_methods,payment_method_id',
             ],
-
             'company_bank_account_id' => [
                 'required_unless:total_amount,0',
                 'nullable',
@@ -96,27 +108,59 @@ class BatchPaymentController extends Controller
             'invoice_ids' => 'required|array|min:1',
             'invoice_ids.*' => 'required|exists:sales_invoices,invoice_id',
             'use_credit' => 'nullable|boolean',
-        ]);
+        ];
+
+        // Atur validasi tambahan berdasarkan konfigurasi Payment Method
+        $paymentMethod = $request->filled('payment_method_id')
+            ? PaymentMethod::find($request->input('payment_method_id'))
+            : null;
+
+        if ($paymentMethod) {
+            $config = $paymentMethod->required_fields_config;
+
+            if ($config === 'proof_only' || $config === 'proof_and_reference') {
+                $rules['proof_of_payment'] = 'required|image|mimes:jpeg,png,jpg|max:2048';
+            } else {
+                $rules['proof_of_payment'] = 'nullable|image|mimes:jpeg,png,jpg|max:2048';
+            }
+
+            if ($config === 'reference_only' || $config === 'proof_and_reference') {
+                $rules['reference_number'] = 'required|string|max:255';
+            } else {
+                $rules['reference_number'] = 'nullable|string|max:255';
+            }
+        } else {
+            $rules['proof_of_payment'] = 'nullable|image|mimes:jpeg,png,jpg|max:2048';
+            $rules['reference_number'] = 'nullable|string|max:255';
+        }
+
+        $validated = $request->validate($rules);
 
         DB::beginTransaction();
         try {
+            // Inisialisasi data klien dan input
             $client = Client::findOrFail($validated['client_id']);
             $pakaiKredit = $validated['use_credit'] ?? false;
             $danaDariInput = (float) ($validated['total_amount'] ?? 0);
             $kreditAwalKlien = $client->balance;
 
+            // Ambil daftar invoice yang akan dibayar
             $invoicesDipilih = SalesInvoice::whereIn('invoice_id', $validated['invoice_ids'])
                 ->with(['deductingReturns', 'adjustments'])
                 ->orderBy('due_date', 'asc')
                 ->get();
 
+            // Hitung total tagihan yang dipilih
             $totalTagihanTerpilih = $invoicesDipilih->reduce(fn($carry, $inv) => $carry + $inv->remaining_balance, 0.0);
-            if ($totalTagihanTerpilih <= 0.01) throw new \Exception("Semua invoice yang dipilih sudah lunas.");
+            if ($totalTagihanTerpilih <= 0.01) {
+                throw new \Exception("Semua invoice yang dipilih sudah lunas.");
+            }
 
-            // Hitung alokasi dana
+            // Hitung alokasi kredit dan dana input
             $kreditAkanDigunakan = ($pakaiKredit && $kreditAwalKlien > 0)
                 ? min($kreditAwalKlien, $totalTagihanTerpilih)
                 : 0;
+
             $sisaTagihanSetelahKredit = max(0, $totalTagihanTerpilih - $kreditAkanDigunakan);
             $danaInputAkanDigunakan = min($danaDariInput, $sisaTagihanSetelahKredit);
             $totalDanaAlokasi = $kreditAkanDigunakan + $danaInputAkanDigunakan;
@@ -126,32 +170,31 @@ class BatchPaymentController extends Controller
                 throw new \Exception("Tidak ada dana (input/kredit) yang bisa dialokasikan.");
             }
 
-            // Ambil nama & tipe metode
-            $paymentMethodType = 'direct';
-            if ($validated['payment_method_id']) {
-                $method = PaymentMethod::find($validated['payment_method_id']);
-                if ($method) {
-                    $paymentMethodType = $method->type;
-                }
-            }
-            
-            // Tentukan status baru (untuk Giro/Cek)
+            // Tentukan status pembayaran berdasarkan tipe metode
+            $paymentMethodType = $paymentMethod->type ?? 'direct';
             $newPaymentStatus = ($paymentMethodType == 'pending') ? 'pending_clearance' : 'completed';
 
-            // ✅ PERBAIKAN: Simpan ID dan Status Dinamis
+            // Simpan bukti pembayaran jika ada
+            $proofPath = $request->hasFile('proof_of_payment')
+                ? $request->file('proof_of_payment')->store('payment_proofs', 'public')
+                : null;
+
+            // Buat record batch payment baru
             $batchPayment = BatchPayment::create([
                 'client_id' => $validated['client_id'],
                 'processed_by_user_id' => Auth::id(),
                 'payment_date' => $validated['payment_date'],
                 'total_amount' => $totalDanaAlokasi,
                 'notes' => $validated['notes'],
-                'payment_method_id' => $validated['payment_method_id'],
-                'company_bank_account_id' => $validated['company_bank_account_id'] ?? null, // <-- TAMBAHKAN
+                'payment_method_id' => $validated['payment_method_id'] ?? null,
+                'company_bank_account_id' => $validated['company_bank_account_id'] ?? null,
                 'status' => $newPaymentStatus,
                 'details' => ['invoice_ids' => $validated['invoice_ids']],
+                'reference_number' => $validated['reference_number'] ?? null,
+                'proof_of_payment_path' => $proofPath,
             ]);
 
-            // Ledger: kredit digunakan
+            // Catat penggunaan kredit (jika ada)
             if ($kreditAkanDigunakan > 0) {
                 ClientLedger::create([
                     'client_id' => $client->client_id,
@@ -166,13 +209,14 @@ class BatchPaymentController extends Controller
                 ]);
             }
 
-            // Alokasikan ke invoice
+            // Distribusikan pembayaran ke tiap invoice
             $sisaKredit = $kreditAkanDigunakan;
             $sisaInput = $danaInputAkanDigunakan;
             $alokasiLog = [];
 
             foreach ($invoicesDipilih as $invoice) {
                 if ($sisaKredit <= 0.01 && $sisaInput <= 0.01) break;
+
                 $sisaTagihan = $invoice->remaining_balance;
                 if ($sisaTagihan <= 0.01) continue;
 
@@ -184,14 +228,15 @@ class BatchPaymentController extends Controller
                     'batch_payment_id' => $batchPayment->batch_payment_id,
                     'payment_date' => $validated['payment_date'],
                     'amount' => $jumlahBayar,
-                    'payment_method_id' => $validated['payment_method_id'],
-                    'company_bank_account_id' => $validated['company_bank_account_id'] ?? null, // <-- TAMBAHKAN
+                    'payment_method_id' => $validated['payment_method_id'] ?? null,
+                    'company_bank_account_id' => $validated['company_bank_account_id'] ?? null,
                     'status' => $newPaymentStatus,
                     'received_by_user_id' => Auth::id(),
                     'notes' => 'Auto-allocated dari Batch Payment #' . $batchPayment->batch_payment_id,
+                    'reference_number' => $validated['reference_number'] ?? null,
+                    'proof_of_payment_path' => $proofPath,
                 ]);
 
-                // Panggil fungsi update status dari model
                 $invoice->updatePaymentStatus();
 
                 $sisaKredit -= $bayarDariKredit;
@@ -199,7 +244,7 @@ class BatchPaymentController extends Controller
                 $alokasiLog[] = "Rp " . number_format($jumlahBayar) . " dialokasikan ke " . $invoice->invoice_number;
             }
 
-            // Overpayment → simpan ke kredit klien
+            // Jika ada sisa dana input, dikembalikan ke saldo klien
             if ($sisaDanaInput > 0.01) {
                 ClientLedger::create([
                     'client_id' => $client->client_id,
@@ -216,7 +261,7 @@ class BatchPaymentController extends Controller
 
             DB::commit();
             return redirect()->route('clients.show', $client->client_id)
-                         ->with('success', 'Pembayaran batch berhasil. ' . implode('. ', $alokasiLog));
+                             ->with('success', 'Pembayaran batch berhasil. ' . implode('. ', $alokasiLog));
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Gagal menyimpan batch: ' . $e->getMessage());
@@ -224,23 +269,31 @@ class BatchPaymentController extends Controller
         }
     }
 
-    // ======================================================
-    // BAGIAN VERIFIKASI ADMIN
-    // ======================================================
+    /**
+     * ========================================
+     * BAGIAN: Menampilkan batch yang pending
+     * ========================================
+     */
     public function pending(): View
     {
         $pendingBatches = BatchPayment::where('status', 'pending_verification')
-            ->with(['client', 'paymentMethod']) // ✅ PERBAIKAN: Tambahkan 'paymentMethod'
+            ->with(['client', 'paymentMethod'])
             ->orderBy('created_at', 'asc')
             ->paginate(15);
 
         return view('batch_payments.pending', compact('pendingBatches'));
     }
 
+    /**
+     * ====================================================
+     * BAGIAN: Menampilkan detail batch payment yang pending
+     * ====================================================
+     */
     public function showPending(BatchPayment $batchPayment): View|RedirectResponse
     {
         if ($batchPayment->status !== 'pending_verification') {
-            return redirect()->route('batch-payments.pending')->with('error', 'Pembayaran ini sudah diproses.');
+            return redirect()->route('batch-payments.pending')
+                ->with('error', 'Pembayaran ini sudah diproses.');
         }
 
         $batchPayment->load(['client', 'paymentMethod']); 
@@ -255,26 +308,31 @@ class BatchPaymentController extends Controller
             ? User::find($details['sales_receiver_id'])
             : null;
 
-        // ✅ 3. Ambil data akun bank
-        $companyBankAccounts = CompanyBankAccount::where('is_active', true)->orderBy('bank_name')->get();
+        $companyBankAccounts = CompanyBankAccount::where('is_active', true)
+                                ->orderBy('bank_name')
+                                ->get();
 
-        // ✅ 4. Kirim 'companyBankAccounts' ke view
         return view('batch_payments.show_pending', compact(
             'batchPayment', 
             'invoices', 
             'details', 
             'salesUser', 
-            'companyBankAccounts' // <-- Tambahkan ini
+            'companyBankAccounts'
         ));
     }
 
+    /**
+     * ===================================================
+     * BAGIAN: Menyetujui batch payment yang pending
+     * ===================================================
+     */
     public function approve(Request $request, BatchPayment $batchPayment): RedirectResponse
     {
         if ($batchPayment->status !== 'pending_verification') {
-            return redirect()->route('batch-payments.pending')->with('error', 'Pembayaran ini sudah diproses.');
+            return redirect()->route('batch-payments.pending')
+                ->with('error', 'Pembayaran ini sudah diproses.');
         }
 
-        // ✅ 6. Validasi input akun bank dari form
         $validated = $request->validate([
             'company_bank_account_id' => 'required|exists:company_bank_accounts,company_bank_account_id'
         ]);
@@ -287,26 +345,30 @@ class BatchPaymentController extends Controller
             $invoiceIds = $details['invoice_ids'] ?? [];
             $danaDariInput = (float) $batchPayment->total_amount;
             $kreditAkanDigunakan = (float) ($details['credit_amount_to_use'] ?? 0);
-            $invoices = SalesInvoice::whereIn('invoice_id', $invoiceIds)
-                                      ->with(['deductingReturns', 'adjustments'])
-                                      ->orderBy('due_date', 'asc')
-                                      ->get();
+            $proofPathFromDetails = $details['proof_path'] ?? null;
+            $referenceNumberFromDetails = $details['reference_number'] ?? null;
             
+            $invoices = SalesInvoice::whereIn('invoice_id', $invoiceIds)
+                ->with(['deductingReturns', 'adjustments'])
+                ->orderBy('due_date', 'asc')
+                ->get();
+
             $sisaKredit = $kreditAkanDigunakan;
             $sisaInput = $danaDariInput;
             $alokasiLog = [];
-            
-            // Ambil metode pembayaran yang dilaporkan klien
+
             $paymentMethodId = $details['payment_method_id'] ?? null;
             $method = $paymentMethodId ? PaymentMethod::find($paymentMethodId) : null;
+
             if (!$method && !empty($batchPayment->payment_method)) {
-                 $method = PaymentMethod::where('name', $batchPayment->payment_method)->first();
-                 if ($method) $paymentMethodId = $method->payment_method_id;
+                $method = PaymentMethod::where('name', $batchPayment->payment_method)->first();
+                if ($method) $paymentMethodId = $method->payment_method_id;
             }
+
             $paymentMethodType = $method->type ?? 'direct';
             $newPaymentStatus = ($paymentMethodType == 'pending') ? 'pending_clearance' : 'completed';
 
-            // 1. Buat entri Ledger untuk KREDIT YANG DIPAKAI
+            // Catat penggunaan kredit
             if ($kreditAkanDigunakan > 0) {
                 ClientLedger::create([
                     'client_id' => $client->client_id,
@@ -321,12 +383,15 @@ class BatchPaymentController extends Controller
                 ]);
                 $alokasiLog[] = "Menggunakan kredit Rp " . number_format($kreditAkanDigunakan);
             }
-            if ($danaDariInput > 0) $alokasiLog[] = "Menggunakan dana input Rp " . number_format($danaDariInput);
 
-            // 2. Alokasikan dana ke invoice
+            if ($danaDariInput > 0) {
+                $alokasiLog[] = "Menggunakan dana input Rp " . number_format($danaDariInput);
+            }
+
+            // Distribusi ke invoice
             foreach ($invoices as $invoice) {
                 if ($sisaKredit <= 0.01 && $sisaInput <= 0.01) break;
-                
+
                 $sisaTagihanInvoice = $invoice->remaining_balance;
                 if ($sisaTagihanInvoice <= 0.01) continue;
 
@@ -335,27 +400,27 @@ class BatchPaymentController extends Controller
                 $jumlahBayar = $bayarDariKredit + $bayarDariInput;
 
                 if ($jumlahBayar <= 0.01) continue;
-                
+
                 $invoice->payments()->create([
                     'batch_payment_id' => $batchPayment->batch_payment_id,
                     'payment_date' => $batchPayment->payment_date,
                     'amount' => $jumlahBayar,
                     'payment_method_id' => $paymentMethodId,
-                    'company_bank_account_id' => $bankAccountId, // ✅ 7. Simpan bank_id
+                    'company_bank_account_id' => $bankAccountId,
                     'status' => $newPaymentStatus,
                     'received_by_user_id' => $details['sales_receiver_id'] ?? Auth::id(),
                     'notes' => 'Disetujui dari Batch Payment #' . $batchPayment->batch_payment_id,
-                    'proof_of_payment_path' => $details['proof_path'] ?? null
+                    'proof_of_payment_path' => $proofPathFromDetails,
+                    'reference_number' => $referenceNumberFromDetails
                 ]);
-                
-                // Panggil fungsi update status dari model
-                $invoice->updatePaymentStatus();
 
+                $invoice->updatePaymentStatus();
                 $sisaKredit -= $bayarDariKredit;
                 $sisaInput -= $bayarDariInput;
             }
 
-            // Overpayment kembali ke kredit
+            // Kembalikan kelebihan dana ke saldo klien
+                        // Kembalikan kelebihan dana ke saldo klien jika ada
             $sisaDana = $sisaKredit + $sisaInput;
             if ($sisaDana > 0.01) {
                 ClientLedger::create([
@@ -366,39 +431,109 @@ class BatchPaymentController extends Controller
                     'type' => 'credit',
                     'amount' => $sisaDana,
                     'status' => 'available',
-                    'description' => 'Kelebihan dana dari Batch Payment #' . $batchPayment->batch_payment_id,
+                    'description' => 'Kelebihan dana setelah persetujuan Batch Payment #' . $batchPayment->batch_payment_id,
                     'user_id' => Auth::id(),
                 ]);
-                 $alokasiLog[] = "Kelebihan dana Rp " . number_format($sisaDana) . " dikembalikan ke kredit klien.";
+                $alokasiLog[] = "Rp " . number_format($sisaDana) . " dikembalikan ke saldo klien.";
             }
 
+            // Update status batch menjadi approved
             $batchPayment->update([
-                'status' => 'completed',
-                'processed_by_user_id' => Auth::id(),
-                'payment_method_id' => $paymentMethodId,
-                'company_bank_account_id' => $bankAccountId // <-- Tambahkan ini
+                'status' => 'approved',
+                'approved_by_user_id' => Auth::id(),
+                'approved_at' => now(),
             ]);
 
             DB::commit();
-            return redirect()->route('batch-payments.pending')->with('success', 'Batch payment berhasil disetujui.');
+
+            return redirect()->route('batch-payments.pending')
+                ->with('success', 'Batch payment #' . $batchPayment->batch_payment_id . ' berhasil disetujui. ' . implode(' ', $alokasiLog));
+
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Gagal approve batch: ' . $e->getMessage() . ' on line ' . $e->getLine());
-            return back()->with('error', 'Gagal menyetujui batch: ' . $e->getMessage());
+            Log::error('Gagal menyetujui batch payment: ' . $e->getMessage());
+            return back()->with('error', 'Gagal menyetujui batch payment: ' . $e->getMessage());
         }
     }
 
-    public function reject(BatchPayment $batchPayment): RedirectResponse
+    /**
+     * ===================================================
+     * BAGIAN: Menolak batch payment yang pending
+     * ===================================================
+     */
+    public function reject(BatchPayment $batchPayment, Request $request): RedirectResponse
     {
         if ($batchPayment->status !== 'pending_verification') {
-            return redirect()->route('batch-payments.pending')->with('error', 'Pembayaran ini sudah diproses.');
+            return redirect()->route('batch-payments.pending')
+                ->with('error', 'Pembayaran ini sudah diproses.');
         }
 
-        $batchPayment->update([
-            'status' => 'rejected',
-            'processed_by_user_id' => Auth::id(),
+        $request->validate([
+            'reason' => 'required|string|max:255',
         ]);
 
-        return redirect()->route('batch-payments.pending')->with('success', 'Pembayaran batch ditolak.');
+        DB::beginTransaction();
+        try {
+            // Update status menjadi rejected
+            $batchPayment->update([
+                'status' => 'rejected',
+                'rejected_by_user_id' => Auth::id(),
+                'rejected_at' => now(),
+                'rejection_reason' => $request->reason,
+            ]);
+
+            // Kembalikan dana batch ke saldo klien
+            ClientLedger::create([
+                'client_id' => $batchPayment->client_id,
+                'reference_type' => BatchPayment::class,
+                'reference_id' => $batchPayment->batch_payment_id,
+                'transaction_date' => now(),
+                'type' => 'credit',
+                'amount' => $batchPayment->total_amount,
+                'status' => 'available',
+                'description' => 'Dana dikembalikan karena Batch Payment #' . $batchPayment->batch_payment_id . ' ditolak',
+                'user_id' => Auth::id(),
+            ]);
+
+            DB::commit();
+            return redirect()->route('batch-payments.pending')
+                ->with('success', 'Batch payment #' . $batchPayment->batch_payment_id . ' berhasil ditolak.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Gagal menolak batch payment: ' . $e->getMessage());
+            return back()->with('error', 'Gagal menolak batch payment: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * ===========================================================
+     * BAGIAN: Daftar Batch Payment (untuk semua status)
+     * ===========================================================
+     */
+    public function index(): View
+    {
+        $batchPayments = BatchPayment::with(['client', 'paymentMethod', 'processedByUser'])
+            ->orderByDesc('created_at')
+            ->paginate(15);
+
+        return view('batch_payments.index', compact('batchPayments'));
+    }
+
+    /**
+     * ===================================================
+     * BAGIAN: Menampilkan detail Batch Payment tertentu
+     * ===================================================
+     */
+    public function show(BatchPayment $batchPayment): View
+    {
+        $batchPayment->load(['client', 'paymentMethod', 'processedByUser', 'approvedByUser', 'rejectedByUser']);
+        $details = $batchPayment->details ?? [];
+        $invoiceIds = $details['invoice_ids'] ?? [];
+
+        $invoices = SalesInvoice::whereIn('invoice_id', $invoiceIds)
+            ->with(['payments', 'deductingReturns', 'adjustments'])
+            ->get();
+
+        return view('batch_payments.show', compact('batchPayment', 'invoices', 'details'));
     }
 }

@@ -22,6 +22,7 @@ class Payment extends Model
         'batch_payment_id',
         'payment_method_id', // ✅ Ini adalah ID, bukan teks
         'company_bank_account_id',
+        'reference_number',
         'payment_date',
         'amount',
         'proof_of_payment_path',

@@ -8,25 +8,27 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
-use Illuminate\Http\RedirectResponse; // ✅ PASTIKAN INI ADA
+use Illuminate\Http\RedirectResponse;
 use App\Services\PurchaseOrderCalculator;
 use App\Models\Product;
 use App\Models\Tax;
 use App\Models\User;
 use App\Models\Supplier;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Log; // ✅ Tambahkan ini untuk Log::error
+use Illuminate\Support\Facades\Log;
 
 class PurchaseOrderAdjustmentController extends Controller
 {
+    /**
+     * Middleware untuk kontrol akses
+     */
     public function __construct()
     {
-         // Pastikan Anda telah membuat permission 'create-purchase-adjustments'
-         $this->middleware('permission:create-purchase-adjustments');
+        $this->middleware('permission:create-purchase-adjustments');
     }
 
     /**
-     * Tampilkan halaman PILIHAN (Manual vs Otomatis)
+     * Menampilkan halaman pilihan jenis penyesuaian
      */
     public function create(Request $request): View
     {
@@ -41,14 +43,13 @@ class PurchaseOrderAdjustmentController extends Controller
     }
 
     // ======================================================
-    // ALUR 1: MANUAL
+    // ALUR PENYESUAIAN MANUAL
     // ======================================================
 
     /**
-     * Tampilkan form input nominal MANUAL
-     * Return type bisa View atau RedirectResponse
+     * Menampilkan form penyesuaian manual
      */
-    public function createManual(PurchaseOrder $purchaseOrder): View|RedirectResponse // ✅ Return type diubah
+    public function createManual(PurchaseOrder $purchaseOrder): View|RedirectResponse
     {
         if ($purchaseOrder->status == 'cancelled') {
              return redirect()->route('purchase-orders.show', $purchaseOrder->po_id)->with('error', 'PO yang sudah dibatalkan tidak dapat disesuaikan.');
@@ -57,7 +58,7 @@ class PurchaseOrderAdjustmentController extends Controller
     }
 
     /**
-     * Simpan penyesuaian MANUAL
+     * Menyimpan penyesuaian manual
      */
     public function storeManual(Request $request): RedirectResponse
     {
@@ -85,7 +86,6 @@ class PurchaseOrderAdjustmentController extends Controller
                 'reason' => $validated['reason'],
             ]);
             
-            // Panggil fungsi update status
             $purchaseOrder->updatePaymentStatus();
 
             DB::commit();
@@ -95,20 +95,19 @@ class PurchaseOrderAdjustmentController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Gagal menyimpan penyesuaian PO manual: ' . $e->getMessage() . ' on line ' . $e->getLine()); // ✅ Menambahkan log
+            Log::error('Gagal menyimpan penyesuaian PO manual: ' . $e->getMessage() . ' on line ' . $e->getLine());
             return back()->with('error', 'Gagal menyimpan penyesuaian: ' . $e->getMessage())->withInput();
         }
     }
 
     // ======================================================
-    // ALUR 2: OTOMATIS (REVISI)
+    // ALUR PENYESUAIAN OTOMATIS (REVISI)
     // ======================================================
 
     /**
-     * Tampilkan form revisi OTOMATIS
-     * Return type bisa View atau RedirectResponse
+     * Menampilkan form revisi otomatis
      */
-    public function createAuto(PurchaseOrder $purchaseOrder): View|RedirectResponse // ✅ Return type diubah
+    public function createAuto(PurchaseOrder $purchaseOrder): View|RedirectResponse
     {
         if ($purchaseOrder->status == 'cancelled') {
              return redirect()->route('purchase-orders.show', $purchaseOrder->po_id)->with('error', 'PO yang sudah dibatalkan tidak dapat disesuaikan.');
@@ -119,13 +118,13 @@ class PurchaseOrderAdjustmentController extends Controller
         $suppliers = Supplier::all(); 
         $products = Product::with('unit')->orderBy('product_name')->get();
         $users = User::all();
-        $taxes = Tax::all(); // ✅ Tambahkan ini agar tax bisa dipilih
+        $taxes = Tax::all();
         
         return view('purchase_order_adjustments.create_auto', compact('purchaseOrder', 'suppliers', 'products', 'users', 'taxes'));
     }
 
     /**
-     * Simpan penyesuaian OTOMATIS
+     * Menyimpan penyesuaian otomatis
      */
     public function storeAuto(Request $request, PurchaseOrder $purchaseOrder): RedirectResponse
     {
@@ -133,7 +132,6 @@ class PurchaseOrderAdjustmentController extends Controller
             return back()->with('error', 'PO yang sudah dibatalkan tidak dapat disesuaikan.');
         }
         
-        // 1. Validasi input
         $validated = $request->validate([
             'products' => 'required|array|min:1',
             'products.*.product_id' => 'required|exists:products,product_id',
@@ -155,10 +153,8 @@ class PurchaseOrderAdjustmentController extends Controller
         
         DB::beginTransaction();
         try {
-            // Load relasi lama untuk perbandingan
             $purchaseOrder->load('items.product', 'items.discounts', 'tax');
 
-            // 2. Hitung TOTAL BARU
             $itemSubtotal = 0;
             foreach ($validated['products'] as $p) {
                 $finalPrice = floatval($p['price_per_unit']);
@@ -186,15 +182,14 @@ class PurchaseOrderAdjustmentController extends Controller
             $calc = PurchaseOrderCalculator::calculate($calculatorOptions);
             $newTotalAmount = $calc['grand_total'];
 
-            // 3. Hitung Selisih
             $oldTotalAmount = $purchaseOrder->total_amount;
-            $diff = $oldTotalAmount - $newTotalAmount; // (Lama - Baru)
+            $diff = $oldTotalAmount - $newTotalAmount;
 
             $adjustmentType = null;
             $adjustmentAmount = 0;
 
             if ($diff > 0.01) {
-                $adjustmentType = 'credit_note'; 
+                $adjustmentType = 'credit_note';
                 $adjustmentAmount = $diff;
             } elseif ($diff < -0.01) {
                 $adjustmentType = 'debit_note';
@@ -204,11 +199,6 @@ class PurchaseOrderAdjustmentController extends Controller
                 return redirect()->route('purchase-orders.show', $purchaseOrder->po_id)->with('info', 'Tidak ada perubahan nominal yang signifikan. Penyesuaian tidak dibuat.');
             }
 
-            // ==================================================
-            // 4. Buat Alasan Otomatis (Versi Rapi)
-            // ==================================================
-            
-            // Helper untuk format angka
             $nf = fn($val) => number_format($val, 0, ',', '.');
 
             $headerChanges = [];
@@ -216,7 +206,6 @@ class PurchaseOrderAdjustmentController extends Controller
             $itemAddedLogs = [];
             $itemRemovedLogs = [];
             
-            // A. Perbandingan Header
             $oldTaxName = $purchaseOrder->tax->name ?? 'Tidak Ada';
             $newTax = $request->input('tax_id') ? Tax::find($request->input('tax_id')) : null;
             $newTaxName = $newTax->name ?? 'Tidak Ada';
@@ -236,13 +225,11 @@ class PurchaseOrderAdjustmentController extends Controller
                 $headerChanges[] = "Diskon/Fee (Header): {$nf($oldDiscAmount)} -> {$nf($newDiscAmount)}";
             }
             
-            // B. Perbandingan Item
             $oldItemsMap = $purchaseOrder->items->keyBy('product_id');
             $newItemsMap = collect($validated['products'])->keyBy('product_id');
             $allProductIds = $oldItemsMap->keys()->merge($newItemsMap->keys())->unique();
             $productNames = Product::whereIn('product_id', $allProductIds)->pluck('product_name', 'product_id');
 
-            // Cek perubahan dan item baru
             foreach ($newItemsMap as $newProductId => $newItemData) {
                 $productName = Str::limit($productNames->get($newProductId) ?? "Produk ID $newProductId", 30);
                 $newQty = (float) $newItemData['quantity'];
@@ -251,14 +238,13 @@ class PurchaseOrderAdjustmentController extends Controller
                 $newDiscountsStr = empty($newDiscountsRaw) ? '0%' : implode('%, ', $newDiscountsRaw) . '%';
 
                 if ($oldItemsMap->has($newProductId)) {
-                    // Item ada di lama dan baru -> Cek Modifikasi
                     $oldItem = $oldItemsMap->get($newProductId);
                     $oldQty = (float) $oldItem->quantity;
                     $oldPrice = (float) $oldItem->price_per_unit;
                     $oldDiscountsRaw = $oldItem->discounts->pluck('percentage')->toArray();
                     $oldDiscountsStr = empty($oldDiscountsRaw) ? '0%' : implode('%, ', $oldDiscountsRaw) . '%';
                     
-                    $itemLogParts = []; // Log spesifik untuk item ini
+                    $itemLogParts = [];
                     if (abs($oldQty - $newQty) > 0.001) {
                         $itemLogParts[] = "Qty: $oldQty -> $newQty";
                     }
@@ -274,21 +260,17 @@ class PurchaseOrderAdjustmentController extends Controller
                     }
 
                 } else {
-                    // Item hanya ada di baru -> Item Ditambahkan
                     $itemAddedLogs[] = "[$productName] (Qty: $newQty, Harga: {$nf($newPrice)}, Diskon: '$newDiscountsStr')";
                 }
             }
             
-            // Cek item yang dihapus
             foreach ($oldItemsMap as $oldProductId => $oldItem) {
                 if (!$newItemsMap->has($oldProductId)) {
-                    // Item hanya ada di lama -> Item Dihapus
                     $productName = Str::limit($productNames->get($oldProductId) ?? "Produk ID $oldProductId", 30);
                     $itemRemovedLogs[] = "[$productName] (Qty Asli: {$oldItem->quantity}, Harga: {$nf($oldItem->price_per_unit)})";
                 }
             }
 
-            // C. Gabungkan Alasan
             $reasonParts = [];
             $reasonParts[] = "Alasan Pengguna:";
             $reasonParts[] = $validated['notes'];
@@ -323,17 +305,15 @@ class PurchaseOrderAdjustmentController extends Controller
             $reasonParts[] = "=======================================";
             $finalReason = implode("\n", $reasonParts);
 
-            // 5. Buat PurchaseOrderAdjustment
             PurchaseOrderAdjustment::create([
                 'purchase_order_id' => $purchaseOrder->po_id,
                 'user_id' => Auth::id(),
                 'adjustment_date' => now(),
                 'type' => $adjustmentType,
                 'amount' => $adjustmentAmount,
-                'reason' => $finalReason, // Gunakan $finalReason yang sudah rapi
+                'reason' => $finalReason,
             ]);
             
-            // 6. Panggil fungsi update status
             $purchaseOrder->updatePaymentStatus();
             
             DB::commit();
@@ -348,13 +328,11 @@ class PurchaseOrderAdjustmentController extends Controller
         }
     }
 
-
     /**
-     * Membatalkan penyesuaian.
+     * Membatalkan penyesuaian
      */
     public function destroy(PurchaseOrderAdjustment $purchaseOrderAdjustment): RedirectResponse
     {
-        // $this->authorize('delete', $purchaseOrderAdjustment); // Pastikan permission ini ada
         DB::beginTransaction();
         try {
             $po_id = $purchaseOrderAdjustment->purchase_order_id;
@@ -373,7 +351,7 @@ class PurchaseOrderAdjustmentController extends Controller
                          
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Gagal membatalkan penyesuaian PO: ' . $e->getMessage() . ' on line ' . $e->getLine()); // ✅ Menambahkan log
+            Log::error('Gagal membatalkan penyesuaian PO: ' . $e->getMessage() . ' on line ' . $e->getLine());
             return back()->with('error', 'Gagal membatalkan penyesuaian: ' . $e->getMessage());
         }
     }
