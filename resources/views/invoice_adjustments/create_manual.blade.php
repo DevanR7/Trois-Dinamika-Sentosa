@@ -56,6 +56,45 @@
                             </div>
                         </div>
 
+                        <!-- Opsi Penanganan Kelebihan Bayar -->
+                        <div class="row mt-4" id="overpayment-section" style="display: none;">
+                            <div class="col-12">
+                                <div class="card border-info shadow-sm">
+                                    <div class="card-header bg-info text-white fw-semibold">
+                                        Opsi Penanganan Kelebihan Bayar
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="card-text small text-muted">
+                                            Jika penyesuaian ini (terutama Nota Kredit) menyebabkan kelebihan bayar pada invoice/PO yang sudah lunas, tentukan apa yang harus sistem lakukan:
+                                        </p>
+                                        <div class="form-check">
+                                            <input class="form-check-input" 
+                                                   type="radio" 
+                                                   name="overpayment_action" 
+                                                   id="overpayment_deposit" 
+                                                   value="deposit" 
+                                                   checked>
+                                            <label class="form-check-label" for="overpayment_deposit">
+                                                <strong>Simpan sebagai Deposit (Default)</strong><br>
+                                                <small>Kelebihan bayar akan otomatis masuk ke saldo Deposit Klien/Supplier.</small>
+                                            </label>
+                                        </div>
+                                        <div class="form-check mt-2">
+                                            <input class="form-check-input" 
+                                                   type="radio" 
+                                                   name="overpayment_action" 
+                                                   id="overpayment_refund" 
+                                                   value="refund">
+                                            <label class="form-check-label" for="overpayment_refund">
+                                                <strong>Proses Pengembalian Dana (Manual Refund)</strong><br>
+                                                <small>Saldo akan dibiarkan negatif (minus). Anda harus memproses pengembalian dana ini secara manual (misal: transfer balik).</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="d-flex justify-content-end mt-4">
                             <a href="{{ route('invoice-adjustments.create', $invoice->invoice_id) }}" class="btn btn-light me-2">Kembali ke Pilihan</a>
                             <button type="submit" class="btn btn-primary">Simpan Penyesuaian Manual</button>
@@ -76,6 +115,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // 1. Inisialisasi AutoNumeric
     const amountFormatted = document.getElementById('amount-formatted');
     const amountHidden = document.getElementById('amount-hidden');
+    const typeSelect = document.getElementById('type');
+    const overpaymentSection = document.getElementById('overpayment-section');
 
     const autoNumericInstance = new AutoNumeric(amountFormatted, {
         decimalPlaces: 0,
@@ -93,6 +134,49 @@ document.addEventListener('DOMContentLoaded', function () {
     if (amountHidden.value) {
         autoNumericInstance.set(amountHidden.value);
     }
+
+    // 4. Fungsi untuk menampilkan/menyembunyikan section overpayment
+    function toggleOverpaymentSection() {
+        if (typeSelect.value === 'credit_note') {
+            overpaymentSection.style.display = 'block';
+        } else {
+            overpaymentSection.style.display = 'none';
+        }
+    }
+
+    // 5. Event listener untuk perubahan tipe penyesuaian
+    typeSelect.addEventListener('change', toggleOverpaymentSection);
+
+    // 6. Jalankan sekali saat halaman dimuat untuk set status awal
+    toggleOverpaymentSection();
+
+    // 7. Validasi form sebelum submit
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(event) {
+        const amountValue = parseFloat(amountHidden.value) || 0;
+        const adjustmentType = typeSelect.value;
+        const reason = document.getElementById('reason').value.trim();
+        
+        if (amountValue <= 0) {
+            event.preventDefault();
+            alert('Nilai penyesuaian harus lebih dari 0.');
+            amountFormatted.focus();
+            return;
+        }
+        
+        if (!adjustmentType) {
+            event.preventDefault();
+            alert('Silakan pilih tipe penyesuaian.');
+            return;
+        }
+        
+        if (!reason) {
+            event.preventDefault();
+            alert('Silakan isi alasan penyesuaian.');
+            document.getElementById('reason').focus();
+            return;
+        }
+    });
 });
 </script>
 @endpush

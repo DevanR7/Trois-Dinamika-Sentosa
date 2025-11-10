@@ -23,12 +23,9 @@ class InvoiceAdjustmentController extends Controller
     public function create(Request $request): View
     {
         $preselectedInvoiceId = $request->query('invoice_id');
-
-        // Ambil invoice yang belum dibatalkan untuk ditampilkan sebagai opsi
         $invoices = SalesInvoice::where('status', '!=', 'cancelled')
             ->orderBy('order_date', 'desc')
             ->get();
-
         return view('invoice_adjustments.create', compact('invoices', 'preselectedInvoiceId'));
     }
 
@@ -55,6 +52,7 @@ class InvoiceAdjustmentController extends Controller
             'type' => 'required|in:credit_note,debit_note',
             'amount' => 'required|numeric|min:0.01',
             'reason' => 'required|string|max:1000',
+            'overpayment_action' => 'required|string|in:deposit,refund', // VALIDASI BARU
         ]);
 
         $invoice = SalesInvoice::findOrFail($validated['sales_invoice_id']);
@@ -64,7 +62,8 @@ class InvoiceAdjustmentController extends Controller
 
         DB::beginTransaction();
         try {
-            InvoiceAdjustment::create([
+            // 1. Buat penyesuaian
+            $adjustment = InvoiceAdjustment::create([
                 'sales_invoice_id' => $invoice->invoice_id,
                 'user_id' => Auth::id(),
                 'adjustment_date' => $validated['adjustment_date'],
@@ -73,8 +72,12 @@ class InvoiceAdjustmentController extends Controller
                 'reason' => $validated['reason'],
             ]);
 
-            // Perbarui status pembayaran invoice setelah penyesuaian
+            // 2. Perbarui status pembayaran invoice
             $invoice->updatePaymentStatus();
+
+            // 3. PERUBAHAN: Ambil pilihan user dan tangani kelebihan bayar
+            $overpaymentAction = $validated['overpayment_action'];
+            $this->handleOverpayment($invoice, $adjustment, 'dibuat', $overpaymentAction);
 
             DB::commit();
 
@@ -97,11 +100,8 @@ class InvoiceAdjustmentController extends Controller
     public function createAuto(SalesInvoice $invoice): View
     {
         $invoice->load('items.product', 'taxes');
-
         $products = Product::orderBy('product_name')->get();
         $taxes = Tax::where('is_active', true)->get();
-
-        // Variabel ini disertakan untuk kompatibilitas dengan view, meski tidak digunakan
         $clients = null;
         $salesUsers = null;
 
@@ -121,13 +121,14 @@ class InvoiceAdjustmentController extends Controller
             'taxes' => 'nullable|array',
             'taxes.*' => 'exists:taxes,id',
             'notes' => 'required|string|min:5|max:1000',
+            'overpayment_action' => 'required|string|in:deposit,refund', // VALIDASI BARU
         ]);
 
         DB::beginTransaction();
         try {
             $invoice->load('items.product', 'taxes');
 
-            // Hitung total baru berdasarkan input revisi
+            // Kalkulasi subtotal produk
             $subtotalProducts = 0;
             foreach ($validated['products'] as $item) {
                 $product = Product::find($item['product_id']);
@@ -135,10 +136,12 @@ class InvoiceAdjustmentController extends Controller
                 $subtotalProducts += $price * $item['quantity'];
             }
 
+            // Kalkulasi diskon
             $discountRate = (float) ($validated['discount_percentage'] ?? 0);
             $discountAmount = $subtotalProducts * ($discountRate / 100);
             $subtotalAfterDiscount = $subtotalProducts - $discountAmount;
 
+            // Kalkulasi pajak
             $totalTaxAmount = 0;
             if (!empty($validated['taxes'])) {
                 $taxes = Tax::whereIn('id', $validated['taxes'])->get();
@@ -151,7 +154,6 @@ class InvoiceAdjustmentController extends Controller
             $oldTotalAmount = $invoice->total_amount;
             $diff = $oldTotalAmount - $newTotalAmount;
 
-            // Tentukan jenis penyesuaian berdasarkan selisih
             if (abs($diff) <= 0.01) {
                 return redirect()->route('invoices.show', $invoice->invoice_id)
                     ->with('info', 'Tidak ada perubahan nominal. Penyesuaian tidak dibuat.');
@@ -160,16 +162,13 @@ class InvoiceAdjustmentController extends Controller
             $adjustmentType = $diff > 0 ? 'credit_note' : 'debit_note';
             $adjustmentAmount = abs($diff);
 
-            // Bangun alasan sistematis berdasarkan perubahan data
+            // Buat log perubahan detail
             $reasonDetails = [];
-
-            // Perubahan diskon global
             $oldDiscount = (float) $invoice->discount_percentage;
             if (abs($oldDiscount - $discountRate) > 0.001) {
                 $reasonDetails[] = "Diskon global diubah dari {$oldDiscount}% menjadi {$discountRate}%.";
             }
 
-            // Perubahan item
             $oldItems = $invoice->items->keyBy('product_id');
             $newItems = collect($validated['products'])->mapWithKeys(fn ($item) => [
                 $item['product_id'] => ['quantity' => (int) $item['quantity']],
@@ -190,21 +189,19 @@ class InvoiceAdjustmentController extends Controller
                 }
             }
 
-            // Perubahan pajak
             $oldTaxes = $invoice->taxes->pluck('id')->sort()->values()->all();
             $newTaxes = collect($validated['taxes'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();
             if ($oldTaxes !== $newTaxes) {
                 $reasonDetails[] = "Komponen pajak diubah.";
             }
 
-            // Gabungkan alasan manual dan sistem
             $finalReason = $validated['notes'];
             if (!empty($reasonDetails)) {
                 $finalReason .= "\n\n[LOG SISTEM OTOMATIS]:\n- " . implode("\n- ", $reasonDetails);
             }
 
-            // Simpan penyesuaian
-            InvoiceAdjustment::create([
+            // 1. Simpan penyesuaian
+            $adjustment = InvoiceAdjustment::create([
                 'sales_invoice_id' => $invoice->invoice_id,
                 'user_id' => Auth::id(),
                 'adjustment_date' => now(),
@@ -213,8 +210,12 @@ class InvoiceAdjustmentController extends Controller
                 'reason' => $finalReason,
             ]);
 
-            // Perbarui status pembayaran
+            // 2. Perbarui status pembayaran
             $invoice->updatePaymentStatus();
+
+            // 3. PERUBAHAN: Ambil pilihan user dan tangani kelebihan bayar
+            $overpaymentAction = $validated['overpayment_action'];
+            $this->handleOverpayment($invoice, $adjustment, 'dibuat', $overpaymentAction);
 
             DB::commit();
 
@@ -231,28 +232,144 @@ class InvoiceAdjustmentController extends Controller
     }
 
     /**
-     * Membatalkan (menghapus) penyesuaian yang telah dibuat.
+     * ======================================================
+     * FUNGSI 'DESTROY' YANG DIPERBARUI
+     * ======================================================
      */
     public function destroy(InvoiceAdjustment $invoiceAdjustment): RedirectResponse
     {
+        // --- PENCEGAHAN ---
+        if ($invoiceAdjustment->type === 'debit_note' && str_contains($invoiceAdjustment->reason, 'Otomatis: Memindahkan kelebihan bayar')) {
+            return back()->with('error', 'Gagal: Ini adalah Nota Debit otomatis. Untuk membatalkan, hapus Nota Kredit asli yang memicu pemindahan deposit ini.');
+        }
+
         DB::beginTransaction();
         try {
             $invoiceId = $invoiceAdjustment->sales_invoice_id;
             $invoice = SalesInvoice::find($invoiceId);
 
-            $invoiceAdjustment->delete();
+            // --- LOGIKA REVERSAL (Membatalkan overpayment yg TERTULIS) ---
+            if ($invoiceAdjustment->type === 'credit_note') {
+                $ledgerEntry = ClientLedger::where('reference_type', InvoiceAdjustment::class)
+                                            ->where('reference_id', $invoiceAdjustment->adjustment_id)
+                                            ->first();
+                if ($ledgerEntry) {
+                    $autoDebitNote = InvoiceAdjustment::where('sales_invoice_id', $invoiceId)
+                        ->where('type', 'debit_note')
+                        ->where('reason', 'like', '%Ledger ID: ' . $ledgerEntry->ledger_id . '%')
+                        ->first();
 
-            if ($invoice) {
-                $invoice->updatePaymentStatus();
+                    if ($autoDebitNote) {
+                        $autoDebitNote->delete();
+                    }
+                    $ledgerEntry->delete();
+                }
             }
 
+            // 5. Hapus penyesuaian yang diminta user
+            $invoiceAdjustment->delete();
+            
+            // 6. Update status invoice (wajib untuk kalkulasi ulang)
+            if ($invoice) {
+                $invoice->updatePaymentStatus();
+                
+                // 7. PERUBAHAN: Tangani overpayment dengan default ke 'deposit' saat penghapusan
+                $this->handleOverpayment($invoice, null, 'dihapus', 'deposit');
+            }
+            
             DB::commit();
 
             return redirect()->route('invoices.show', $invoiceId)
-                ->with('success', 'Penyesuaian invoice berhasil dibatalkan.');
+                             ->with('success', 'Penyesuaian invoice berhasil dibatalkan. Status utang dan deposit diperbarui.');
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Gagal membatalkan penyesuaian: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * ======================================================
+     * FUNGSI 'handleOverpayment' YANG DIPERBARUI UNTUK SALES INVOICES
+     * ======================================================
+     * @param SalesInvoice $invoice Invoice yang dicek
+     * @param InvoiceAdjustment|null $originalAdjustment Penyesuaian asli (jika ada)
+     * @param string $context Konteks ('dibuat' atau 'dihapus') untuk log
+     * @param string $overpaymentAction Pilihan user ('deposit' atau 'refund')
+     */
+    private function handleOverpayment(SalesInvoice $invoice, ?InvoiceAdjustment $originalAdjustment, string $context = 'dibuat', string $overpaymentAction = 'deposit')
+    {
+        $invoice->refresh();
+        $remainingBalance = $invoice->remaining_balance ?? 0;
+
+        if ($remainingBalance < -0.01) { // Jika ada kelebihan bayar
+            
+            // ==========================================================
+            // LOGIKA KONDISIONAL BARU - HANDLE REFUND
+            // ==========================================================
+            if ($overpaymentAction === 'refund') {
+                // Pilihan B: Proses Refund Manual
+                // Kita tidak melakukan apa-apa. Biarkan saldo invoice negatif.
+                $adjustmentId = $originalAdjustment ? $originalAdjustment->adjustment_id : 'N/A';
+                Log::info("Kelebihan bayar terdeteksi di Inv #{$invoice->invoice_id} (dari Adj. ID: {$adjustmentId}). Dibiarkan untuk proses refund manual.");
+                return; // Hentikan fungsi
+            }
+            // ==========================================================
+
+            // Pilihan A: Simpan sebagai Deposit (Lanjutkan logika lama)
+            $overpaymentAmount = abs($remainingBalance);
+            $client = $invoice->client; 
+
+            if (!$client) {
+                Log::warning("Gagal memindahkan kelebihan bayar Invoice #{$invoice->invoice_id}: Klien tidak ditemukan.");
+                return;
+            }
+
+            // Tentukan data referensi
+            $transDate = now()->format('Y-m-d');
+            $descContext = "(saat penyesuaian $context)";
+            $refType = SalesInvoice::class; // Default referensi ke Invoice...
+            $refId = $invoice->invoice_id;
+
+            if ($originalAdjustment) {
+                // ...kecuali jika kita punya adjustment-nya
+                $refType = InvoiceAdjustment::class; 
+                $refId = $originalAdjustment->adjustment_id;
+                $transDate = $originalAdjustment->adjustment_date;
+                $descContext = "(dari Adj. ID: {$originalAdjustment->adjustment_id})";
+            }
+
+            try {
+                // 1. Buat entri deposit (kredit) di Client Ledger
+                $ledgerEntry = ClientLedger::create([
+                    'client_id' => $client->client_id,
+                    'sales_invoice_id' => $invoice->invoice_id,
+                    'reference_type' => $refType,
+                    'reference_id' => $refId,
+                    'transaction_date' => $transDate,
+                    'type' => 'credit', // Menambah deposit klien
+                    'amount' => $overpaymentAmount,
+                    'status' => 'available',
+                    'description' => 'Otomatis: Kelebihan bayar dari Inv #' . $invoice->invoice_number . ' ' . $descContext,
+                    'user_id' => Auth::id(),
+                ]);
+
+                // 2. Buat penyesuaian "lawan" (debit note) untuk menolkan saldo Invoice
+                InvoiceAdjustment::create([
+                    'sales_invoice_id' => $invoice->invoice_id,
+                    'user_id' => Auth::id(),
+                    'adjustment_date' => now(),
+                    'type' => 'debit_note', // Menambah tagihan (untuk menetralkan minus)
+                    'amount' => $overpaymentAmount,
+                    'reason' => 'Otomatis: Memindahkan kelebihan bayar (Rp ' . number_format($overpaymentAmount) . ') ke deposit klien (Ledger ID: ' . $ledgerEntry->ledger_id . ')',
+                ]);
+
+                // 3. Update status invoice terakhir kali untuk menolkan saldo
+                $invoice->updatePaymentStatus();
+
+            } catch (\Exception $e) {
+                Log::error('Gagal memproses overpayment adjustment invoice: ' . $e->getMessage());
+                throw $e; 
+            }
         }
     }
 }

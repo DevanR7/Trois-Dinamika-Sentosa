@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -23,12 +22,12 @@ class DatabaseSeeder extends Seeder
         DB::table('payments')->truncate();
         DB::table('purchase_order_payments')->truncate();
         DB::table('invoice_tax')->truncate();
-        
+
         // Kosongkan tabel baru dari Spatie
         DB::table('model_has_roles')->truncate();
         DB::table('model_has_permissions')->truncate();
         DB::table('role_has_permissions')->truncate();
-        
+
         DB::table('purchase_orders')->truncate();
         DB::table('sales_invoices')->truncate();
         DB::table('products')->truncate();
@@ -37,23 +36,27 @@ class DatabaseSeeder extends Seeder
         DB::table('users')->truncate();
         DB::table('roles')->truncate();
         DB::table('permissions')->truncate();
-        
+        DB::table('units')->truncate(); 
+
         $this->call([
-            // Panggil RoleAndPermissionSeeder SEBELUM UserSeeder
-            RoleAndPermissionSeeder::class, 
+            // Panggil seeder sesuai urutan dependensi
+            RoleAndPermissionSeeder::class,
             SettingSeeder::class,
             UserSeeder::class,
-            SupplierSeeder::class, 
-            ClientSeeder::class,   
+            SupplierSeeder::class,
+            ClientSeeder::class,
             UnitSeeder::class,
-            ProductSeeder::class, 
-            TaxSeeder::class, 
+            ProductSeeder::class,
+            TaxSeeder::class,
             PaymentMethodSeeder::class,
-            // SalesInvoiceSeeder dan InvoiceItemSeeder bisa Anda nonaktifkan jika ingin data invoice kosong
+            PurchaseOrderSeeder::class,
+            SalesInvoiceSeeder::class,
+            CompanyBankAccountSeeder::class,
+            // Opsional: aktifkan jika ingin generate data invoice juga
             // SalesInvoiceSeeder::class,
             // InvoiceItemSeeder::class,
         ]);
-        
+
         Schema::enableForeignKeyConstraints();
     }
 }

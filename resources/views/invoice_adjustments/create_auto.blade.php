@@ -118,8 +118,36 @@
                             </div>
                         </div>
 
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="card border-info shadow-sm">
+                                    <div class="card-header bg-info text-white fw-semibold">
+                                        Opsi Penanganan Kelebihan Bayar
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="card-text small text-muted">
+                                            Jika penyesuaian ini (terutama Nota Kredit) menyebabkan kelebihan bayar pada invoice/PO yang sudah lunas, tentukan apa yang harus sistem lakukan:
+                                        </p>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="overpayment_action" id="overpayment_deposit" value="deposit" checked>
+                                            <label class="form-check-label" for="overpayment_deposit">
+                                                <strong>Simpan sebagai Deposit (Default)</strong><br>
+                                                <small>Kelebihan bayar akan otomatis masuk ke saldo Deposit Klien/Supplier.</small>
+                                            </label>
+                                        </div>
+                                        <div class="form-check mt-2">
+                                            <input class="form-check-input" type="radio" name="overpayment_action" id="overpayment_refund" value="refund">
+                                            <label class="form-check-label" for="overpayment_refund">
+                                                <strong>Proses Pengembalian Dana (Manual Refund)</strong><br>
+                                                <small>Saldo akan dibiarkan negatif (minus). Anda harus memproses pengembalian dana ini secara manual (misal: transfer balik).</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="d-flex justify-content-end mt-4">
-                            {{-- ✅ 3. TOMBOL DIUBAH --}}
                             <a href="{{ route("invoice-adjustments.create", $invoice->invoice_id) }}" class="btn btn-light me-2">Batal</a>
                             <button type="submit" class="btn btn-primary">Hitung & Simpan Koreksi</button>
                         </div>

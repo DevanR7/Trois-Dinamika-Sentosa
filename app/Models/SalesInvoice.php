@@ -196,20 +196,27 @@ class SalesInvoice extends Model
         $balance = $this->total_amount;
 
         // 2. Tambahkan semua Nota Debit (Kekurangan tagih)
+        // Kita gunakan query langsung untuk data terbaru
         $totalDebitNotes = $this->adjustments()->where('type', 'debit_note')->sum('amount');
         $balance += $totalDebitNotes;
 
-        // 3. Kurangi semua pembayaran
+        // 3. Kurangi semua pembayaran (dari kolom yg disinkronisasi)
         $balance -= $this->amount_paid;
         
         // 4. Kurangi semua retur yang "Potong Nota"
-        $balance -= $this->total_deducting_returns; // Ini memanggil accessor di atas
+        // Kita gunakan accessor yg sudah ada
+        $balance -= $this->total_deducting_returns; 
 
         // 5. Kurangi semua Nota Kredit (Kelebihan tagih)
         $totalCreditNotes = $this->adjustments()->where('type', 'credit_note')->sum('amount');
         $balance -= $totalCreditNotes;
         
-        return max(0, $balance); // Pastikan tidak pernah negatif
+        // ==========================================================
+        // PERBAIKAN: Hapus 'max(0, $balance)'
+        // Kita HARUS mengizinkan nilai negatif agar controller bisa
+        // mendeteksi kelebihan bayar.
+        // ==========================================================
+        return $balance; 
     }
 
     public function adjustments(): HasMany

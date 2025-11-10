@@ -14,6 +14,7 @@ use App\Models\Product;
 use App\Models\Tax;
 use App\Models\User;
 use App\Models\Supplier;
+use App\Models\SupplierLedger; 
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
@@ -68,6 +69,7 @@ class PurchaseOrderAdjustmentController extends Controller
             'type' => 'required|in:credit_note,debit_note',
             'amount' => 'required|numeric|min:0.01',
             'reason' => 'required|string|max:1000',
+            'overpayment_action' => 'required|string|in:deposit,refund', // VALIDASI BARU
         ]);
 
         $purchaseOrder = PurchaseOrder::findOrFail($validated['purchase_order_id']);
@@ -77,7 +79,8 @@ class PurchaseOrderAdjustmentController extends Controller
 
         DB::beginTransaction();
         try {
-            PurchaseOrderAdjustment::create([
+            // 1. Buat penyesuaian dan tangkap hasilnya
+            $adjustment = PurchaseOrderAdjustment::create([
                 'purchase_order_id' => $purchaseOrder->po_id,
                 'user_id' => Auth::id(),
                 'adjustment_date' => $validated['adjustment_date'],
@@ -86,7 +89,12 @@ class PurchaseOrderAdjustmentController extends Controller
                 'reason' => $validated['reason'],
             ]);
             
+            // 2. Update status PO untuk menghitung ulang saldo
             $purchaseOrder->updatePaymentStatus();
+            
+            // 3. Ambil pilihan user dan tangani overpayment
+            $overpaymentAction = $validated['overpayment_action'];
+            $this->handleOverpayment($purchaseOrder, $adjustment, 'dibuat', $overpaymentAction); 
 
             DB::commit();
 
@@ -148,13 +156,15 @@ class PurchaseOrderAdjustmentController extends Controller
             'custom_dpp_factor' => 'nullable|numeric|min:0',
             'tax_id' => 'nullable|exists:taxes,id',
             'shipping_amount' => 'nullable|numeric|min:0',
-            'notes' => 'required|string|min:5|max:1000', 
+            'notes' => 'required|string|min:5|max:1000',
+            'overpayment_action' => 'required|string|in:deposit,refund', // VALIDASI BARU
         ]);
         
         DB::beginTransaction();
         try {
             $purchaseOrder->load('items.product', 'items.discounts', 'tax');
 
+            // Kalkulasi item subtotal
             $itemSubtotal = 0;
             foreach ($validated['products'] as $p) {
                 $finalPrice = floatval($p['price_per_unit']);
@@ -166,9 +176,10 @@ class PurchaseOrderAdjustmentController extends Controller
                 $itemSubtotal += (floatval($p['quantity']) * $finalPrice);
             }
             
+            // Kalkulasi dengan PurchaseOrderCalculator
             $calculatorOptions = [
-                'subtotal'                 => $itemSubtotal,
-                'tax_id'                   => $request->input('tax_id'),
+                'subtotal'                  => $itemSubtotal,
+                'tax_id'                    => $request->input('tax_id'),
                 'apply_disc_fee'           => $request->boolean('apply_disc_fee'),
                 'disc_fee_percent'         => $request->input('disc_fee_percent'),
                 'disc_fee_amount'          => $request->input('disc_fee_amount'),
@@ -178,10 +189,10 @@ class PurchaseOrderAdjustmentController extends Controller
                 'custom_dpp_factor'        => $request->input('custom_dpp_factor'),
                 'shipping_amount'          => $request->input('shipping_amount'),
             ];
-
             $calc = PurchaseOrderCalculator::calculate($calculatorOptions);
             $newTotalAmount = $calc['grand_total'];
 
+            // Kalkulasi selisih dan tentukan jenis penyesuaian
             $oldTotalAmount = $purchaseOrder->total_amount;
             $diff = $oldTotalAmount - $newTotalAmount;
 
@@ -199,8 +210,8 @@ class PurchaseOrderAdjustmentController extends Controller
                 return redirect()->route('purchase-orders.show', $purchaseOrder->po_id)->with('info', 'Tidak ada perubahan nominal yang signifikan. Penyesuaian tidak dibuat.');
             }
 
+            // Buat log perubahan
             $nf = fn($val) => number_format($val, 0, ',', '.');
-
             $headerChanges = [];
             $itemModifiedChanges = [];
             $itemAddedLogs = [];
@@ -305,7 +316,8 @@ class PurchaseOrderAdjustmentController extends Controller
             $reasonParts[] = "=======================================";
             $finalReason = implode("\n", $reasonParts);
 
-            PurchaseOrderAdjustment::create([
+            // 1. Buat penyesuaian dan tangkap hasilnya
+            $adjustment = PurchaseOrderAdjustment::create([
                 'purchase_order_id' => $purchaseOrder->po_id,
                 'user_id' => Auth::id(),
                 'adjustment_date' => now(),
@@ -314,12 +326,17 @@ class PurchaseOrderAdjustmentController extends Controller
                 'reason' => $finalReason,
             ]);
             
+            // 2. Update status PO untuk menghitung ulang saldo
             $purchaseOrder->updatePaymentStatus();
+            
+            // 3. Ambil pilihan user dan tangani overpayment
+            $overpaymentAction = $validated['overpayment_action'];
+            $this->handleOverpayment($purchaseOrder, $adjustment, 'dibuat', $overpaymentAction);
             
             DB::commit();
             
             return redirect()->route('purchase-orders.show', $purchaseOrder->po_id)
-                             ->with('success', 'Koreksi otomatis berhasil. Nota ' . ($adjustmentType == 'credit_note' ? 'Kredit' : 'Debit') . ' senilai Rp ' . $nf($adjustmentAmount) . ' telah dibuat.');
+                         ->with('success', 'Koreksi otomatis berhasil. Nota ' . ($adjustmentType == 'credit_note' ? 'Kredit' : 'Debit') . ' senilai Rp ' . $nf($adjustmentAmount) . ' telah dibuat.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -329,30 +346,168 @@ class PurchaseOrderAdjustmentController extends Controller
     }
 
     /**
-     * Membatalkan penyesuaian
+     * ======================================================
+     * FUNGSI 'DESTROY' YANG DIPERBARUI
+     * ======================================================
      */
     public function destroy(PurchaseOrderAdjustment $purchaseOrderAdjustment): RedirectResponse
     {
+        // --- PENCEGAHAN ---
+        // Cek apakah ini 'debit_note' otomatis yang dibuat oleh sistem overpayment.
+        // Jika ya, jangan biarkan dihapus langsung.
+        if ($purchaseOrderAdjustment->type === 'debit_note' && str_contains($purchaseOrderAdjustment->reason, 'Otomatis: Memindahkan kelebihan bayar')) {
+            return back()->with('error', 'Gagal: Ini adalah Nota Debit otomatis. Untuk membatalkan, hapus Nota Kredit asli yang memicu pemindahan deposit ini.');
+        }
+
         DB::beginTransaction();
         try {
             $po_id = $purchaseOrderAdjustment->purchase_order_id;
             $po = PurchaseOrder::find($po_id);
 
+            // --- LOGIKA REVERSAL ---
+            
+            // Cek apakah penyesuaian ini adalah 'credit_note' yang memicu overpayment
+            if ($purchaseOrderAdjustment->type === 'credit_note') {
+                
+                // 1. Cari ledger entry (deposit) yang TEPAT merujuk ke ID adjustment ini
+                $ledgerEntry = SupplierLedger::where('reference_type', PurchaseOrderAdjustment::class)
+                                            ->where('reference_id', $purchaseOrderAdjustment->adjustment_id)
+                                            ->first();
+
+                if ($ledgerEntry) {
+                    // Penyesuaian ini memicu overpayment. Kita harus membatalkan semua.
+                    
+                    // 2. Cari 'debit_note' otomatis yang dibuat BERSAMAAN DENGAN ledger ini
+                    // Kita pakai 'like' untuk mencari berdasarkan ID Ledger yang unik
+                    $autoDebitNote = PurchaseOrderAdjustment::where('purchase_order_id', $po_id)
+                        ->where('type', 'debit_note')
+                        ->where('reason', 'like', '%Ledger ID: ' . $ledgerEntry->ledger_id . '%')
+                        ->first();
+
+                    // 3. Hapus 'debit_note' otomatis (jika ada)
+                    if ($autoDebitNote) {
+                        $autoDebitNote->delete();
+                    }
+
+                    // 4. Hapus ledger entry (deposit)
+                    $ledgerEntry->delete();
+                }
+            }
+            // --- LOGIKA REVERSAL SELESAI ---
+
+            // 5. Hapus penyesuaian yang diminta user (ini adalah $purchaseOrderAdjustment)
             $purchaseOrderAdjustment->delete();
             
+            // 6. Update status PO (wajib untuk kalkulasi ulang)
             if ($po) {
                 $po->updatePaymentStatus();
+                
+                // 7. Tangani overpayment dengan default ke 'deposit' saat penghapusan
+                $this->handleOverpayment($po, null, 'dihapus', 'deposit');
             }
             
             DB::commit();
 
             return redirect()->route('purchase-orders.show', $po_id)
-                         ->with('success', 'Penyesuaian PO berhasil dibatalkan.');
-                         
+                             ->with('success', 'Penyesuaian PO berhasil dibatalkan. Status utang dan deposit diperbarui.');
+                          
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Gagal membatalkan penyesuaian PO: ' . $e->getMessage() . ' on line ' . $e->getLine());
             return back()->with('error', 'Gagal membatalkan penyesuaian: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * ======================================================
+     * FUNGSI 'handleOverpayment' YANG DIPERBARUI
+     * ======================================================
+     * @param PurchaseOrder $purchaseOrder PO yang dicek
+     * @param PurchaseOrderAdjustment|null $originalAdjustment Penyesuaian asli (jika ada)
+     * @param string $context Konteks ('dibuat' atau 'dihapus') untuk log
+     * @param string $overpaymentAction Pilihan user ('deposit' atau 'refund')
+     */
+    private function handleOverpayment(PurchaseOrder $purchaseOrder, ?PurchaseOrderAdjustment $originalAdjustment, string $context = 'dibuat', string $overpaymentAction = 'deposit')
+    {
+        // Panggil refresh() untuk mendapatkan data saldo terbaru
+        $purchaseOrder->refresh();
+        $remainingBalance = $purchaseOrder->remaining_balance ?? 0;
+
+        // Jika sisa saldo negatif (artinya ada kelebihan bayar)
+        if ($remainingBalance < -0.01) {
+            
+            // ==========================================================
+            // LOGIKA KONDISIONAL BARU - HANDLE REFUND
+            // ==========================================================
+            if ($overpaymentAction === 'refund') {
+                // Pilihan B: Proses Refund Manual
+                // Kita tidak melakukan apa-apa. Biarkan saldo PO negatif.
+                $adjustmentId = $originalAdjustment ? $originalAdjustment->adjustment_id : 'N/A';
+                Log::info("Kelebihan bayar terdeteksi di PO #{$purchaseOrder->po_id} (dari Adj. ID: {$adjustmentId}). Dibiarkan untuk proses refund manual.");
+                return; // Hentikan fungsi
+            }
+            // ==========================================================
+
+            // Pilihan A: Simpan sebagai Deposit (Lanjutkan logika lama)
+            $overpaymentAmount = abs($remainingBalance);
+            $supplier = $purchaseOrder->supplier; 
+
+            if (!$supplier) {
+                Log::warning("Gagal memindahkan kelebihan bayar PO #{$purchaseOrder->po_id}: Supplier tidak ditemukan.");
+                return;
+            }
+
+            // --- Tentukan data referensi & log berdasarkan konteks ---
+            $transDate = now()->format('Y-m-d');
+            $descContext = "(saat penyesuaian $context)";
+
+            // Tentukan referensi berdasarkan apakah ada originalAdjustment
+            if ($originalAdjustment) {
+                // Jika dipicu oleh 'create', referensinya adalah adjustment itu sendiri
+                $refType = PurchaseOrderAdjustment::class;
+                $refId = $originalAdjustment->adjustment_id;
+                $transDate = $originalAdjustment->adjustment_date;
+                $descContext = "(dari Adj. ID: {$originalAdjustment->adjustment_id})";
+            } else {
+                // Jika dipicu oleh 'delete', referensinya adalah PO itu sendiri
+                $refType = PurchaseOrder::class;
+                $refId = $purchaseOrder->po_id;
+                $descContext = "(saat penyesuaian $context)";
+            }
+
+            try {
+                // 1. Buat entri deposit (kredit) di Supplier Ledger
+                $ledgerEntry = SupplierLedger::create([
+                    'supplier_id' => $supplier->supplier_id,
+                    'purchase_order_id' => $purchaseOrder->po_id,
+                    'reference_type' => $refType,
+                    'reference_id' => $refId,
+                    'transaction_date' => $transDate,
+                    'type' => 'credit',
+                    'amount' => $overpaymentAmount,
+                    'status' => 'available',
+                    'description' => 'Otomatis: Kelebihan bayar dari PO #' . $purchaseOrder->po_number . ' ' . $descContext,
+                    'user_id' => Auth::id(),
+                ]);
+
+                // 2. Buat penyesuaian "lawan" (debit note) untuk menolkan saldo PO
+                PurchaseOrderAdjustment::create([
+                    'purchase_order_id' => $purchaseOrder->po_id,
+                    'user_id' => Auth::id(),
+                    'adjustment_date' => now(),
+                    'type' => 'debit_note',
+                    'amount' => $overpaymentAmount,
+                    'reason' => 'Otomatis: Memindahkan kelebihan bayar (Rp ' . number_format($overpaymentAmount) . ') ke deposit supplier (Ledger ID: ' . $ledgerEntry->ledger_id . ')',
+                ]);
+
+                // 3. Update status PO terakhir kali untuk menolkan saldo
+                $purchaseOrder->updatePaymentStatus();
+
+            } catch (\Exception $e) {
+                Log::error('Gagal memproses overpayment adjustment: ' . $e->getMessage());
+                // Biarkan transaksi utama di-rollback oleh pemanggil
+                throw $e; 
+            }
         }
     }
 }

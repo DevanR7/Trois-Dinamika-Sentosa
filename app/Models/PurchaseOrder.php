@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\DB; // <-- Pastikan baris ini ada
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PurchaseOrder extends Model
@@ -153,23 +153,34 @@ class PurchaseOrder extends Model
         $balance = $this->total_amount;
 
         // 2. Tambahkan semua Nota Debit (Kita ditagih lebih)
+        // Kita gunakan query langsung agar mendapatkan data terbaru
         $totalDebitNotes = $this->adjustments()->where('type', 'debit_note')->sum('amount');
         $balance += $totalDebitNotes;
 
-        // 3. Kurangi semua pembayaran
+        // 3. Kurangi semua pembayaran (gunakan kolom 'amount_paid' yg sudah disinkronisasi)
         $balance -= $this->amount_paid;
         
         // 4. Kurangi semua retur yang "Potong Nota"
-        // Kita gunakan $this->total_returned karena controller Anda sudah mengisinya dengan benar
+        // Kita gunakan $this->total_returned (kolom yg sudah disinkronisasi)
         $balance -= $this->total_returned; 
 
         // 5. Kurangi semua Nota Kredit (Kita dapat diskon/potongan)
         $totalCreditNotes = $this->adjustments()->where('type', 'credit_note')->sum('amount');
         $balance -= $totalCreditNotes;
         
-        return max(0, $balance); // Pastikan tidak pernah negatif
+        // ==========================================================
+        // PERBAIKAN: Hapus 'max(0, $balance)'
+        // Kita HARUS mengizinkan nilai negatif agar controller bisa
+        // mendeteksi kelebihan bayar.
+        // ==========================================================
+        return $balance;
     }
 
+    /**
+     * Fungsi ini sudah BENAR.
+     * Fungsi ini menghitung tagihan akhir dan total pembayaran
+     * lalu menyimpannya ke database.
+     */
     public function updatePaymentStatus()
     {
         // Jangan update jika sudah dibatalkan
@@ -189,6 +200,7 @@ class PurchaseOrder extends Model
         
         $totalDeductingReturns = $this->deductingReturns->sum('total_amount');
         
+        // Ini adalah total tagihan akhir
         $totalDue = $this->total_amount + $totalAdjustments - $totalDeductingReturns;
         
         $totalDue = round($totalDue, 2);
