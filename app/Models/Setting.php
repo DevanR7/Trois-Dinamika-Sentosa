@@ -1,7 +1,10 @@
 <?php
+
 namespace App\Models;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class Setting extends Model
 {
@@ -12,4 +15,42 @@ class Setting extends Model
     protected $keyType = 'string'; // Tipe data primary key adalah string
 
     protected $fillable = ['key', 'value'];
+
+    /**
+     * Helper untuk mengambil semua setting dan menyimpannya di cache.
+     * @return array
+     */
+    public static function getAllSettings(): array
+    {
+        // Cache selama 60 menit (Anda bisa sesuaikan)
+        return Cache::remember('app_settings', 60 * 60, function () {
+            return self::all()->pluck('value', 'key')->toArray();
+        });
+    }
+
+    /**
+     * Helper untuk mengambil satu nilai setting dari cache.
+     * @param string $key
+     * @param mixed $default
+     * @return mixed
+     */
+    public static function getValue(string $key, $default = null)
+    {
+        $settings = self::getAllSettings();
+        return $settings[$key] ?? $default;
+    }
+
+    /**
+     * Hapus cache secara otomatis saat setting di-update.
+     */
+    protected static function booted()
+    {
+        static::saved(function () {
+            Cache::forget('app_settings');
+        });
+
+        static::deleted(function () {
+            Cache::forget('app_settings');
+        });
+    }
 }

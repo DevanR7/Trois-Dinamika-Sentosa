@@ -17,19 +17,28 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\AccountingService;
+use App\Services\AccountingSettingService;
+use Illuminate\Support\Facades\Log;
 
 class PurchaseOrderController extends Controller
 {
-    public function __construct()
-    {
-        // Jika Anda ingin menambahkan middleware atau policy global, letakkan di sini.
-        // Contoh: $this->middleware('permission:manage-purchase-orders');
+    /**
+     * Service untuk penanganan jurnal akuntansi
+     */
+    protected $accountingService;
+    protected $accountingSettings;
+
+    public function __construct(
+        AccountingService $accountingService, 
+        AccountingSettingService $accountingSettingService
+    ) {
+        $this->accountingService = $accountingService;
+        $this->accountingSettings = $accountingSettingService;
     }
 
     /**
-     * Display a listing of purchase orders.
-     *
-     * Supports search, date filters (order_date, due_date), payment status filter and sorting.
+     * Menampilkan daftar purchase order dengan filter dan sorting
      */
     public function index(Request $request): View
     {
@@ -38,7 +47,7 @@ class PurchaseOrderController extends Controller
         $query = PurchaseOrder::with(['supplier', 'requester'])
             ->latest('order_date');
 
-        // General search across po_number, supplier_invoice_number, supplier name
+        // Filter pencarian umum
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -50,22 +59,21 @@ class PurchaseOrderController extends Controller
             });
         }
 
-        // Filter by exact order_date
+        // Filter berdasarkan tanggal
         if ($request->filled('order_date')) {
             $query->whereDate('order_date', $request->order_date);
         }
 
-        // Filter by exact due_date
         if ($request->filled('due_date')) {
             $query->whereDate('due_date', $request->due_date);
         }
 
-        // Filter by payment_status
+        // Filter status pembayaran
         if ($request->filled('payment_status')) {
             $query->where('payment_status', $request->payment_status);
         }
 
-        // Sorting options
+        // Opsi sorting
         $sort = $request->get('sort', 'terbaru');
         switch ($sort) {
             case 'terlama':
@@ -95,7 +103,7 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Show the form for creating a new purchase order.
+     * Menampilkan form untuk membuat purchase order baru
      */
     public function create(): View
     {
@@ -109,13 +117,8 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Store a newly created purchase order in storage.
-     *
-     * Steps:
-     *  - Validate request
-     *  - Recalculate item subtotals server-side
-     *  - Call PurchaseOrderCalculator service for full totals
-     *  - Create PO and items (and item discounts)
+     * Menyimpan purchase order baru ke database
+     * Jurnal akuntansi akan dibuat saat proses receive
      */
     public function store(Request $request): RedirectResponse
     {
@@ -147,7 +150,7 @@ class PurchaseOrderController extends Controller
 
         DB::beginTransaction();
         try {
-            // Recalculate item subtotal server-side (apply discounts multiplicatively)
+            // Menghitung subtotal item dengan diskon bertingkat
             $itemSubtotal = 0.0;
             foreach ($validated['products'] as $p) {
                 $finalPrice = (float) $p['price_per_unit'];
@@ -161,12 +164,12 @@ class PurchaseOrderController extends Controller
                 $itemSubtotal += ((float) $p['quantity']) * $finalPrice;
             }
 
-            // Prepare options for calculator service
+            // Menghitung total menggunakan service calculator
             $options = $request->all();
             $options['subtotal'] = $itemSubtotal;
             $calc = PurchaseOrderCalculator::calculate($options);
 
-            // Create Purchase Order master record
+            // Membuat record purchase order utama
             $po = PurchaseOrder::create([
                 'po_number' => PurchaseOrder::generatePoNumber(),
                 'supplier_id' => $validated['supplier_id'],
@@ -177,8 +180,6 @@ class PurchaseOrderController extends Controller
                 'notes' => $request->input('notes'),
                 'status' => 'draft',
                 'payment_status' => 'unpaid',
-
-                // Calculation fields from service
                 'subtotal' => $calc['subtotal'],
                 'tax_id' => $request->input('tax_id'),
                 'apply_disc_fee' => $request->boolean('apply_disc_fee'),
@@ -196,7 +197,7 @@ class PurchaseOrderController extends Controller
                 'grand_total' => $calc['grand_total'],
             ]);
 
-            // Create PO items and discounts; optionally update master purchase price
+            // Membuat item PO dan diskon
             foreach ($validated['products'] as $p) {
                 $finalPrice = (float) $p['price_per_unit'];
                 if (!empty($p['discounts']) && is_array($p['discounts'])) {
@@ -216,6 +217,7 @@ class PurchaseOrderController extends Controller
                     'subtotal' => $subtotalItem,
                 ]);
 
+                // Menyimpan diskon item jika ada
                 if (!empty($p['discounts']) && is_array($p['discounts'])) {
                     foreach ($p['discounts'] as $d) {
                         if (is_numeric($d)) {
@@ -224,6 +226,7 @@ class PurchaseOrderController extends Controller
                     }
                 }
 
+                // Update harga master produk jika diminta
                 if (!empty($p['update_master_price'])) {
                     $product = Product::find($p['product_id']);
                     if ($product) {
@@ -244,9 +247,7 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Display the specified purchase order.
-     *
-     * Eager-load relations required by the view (supplier, items, payments, etc.)
+     * Menampilkan detail purchase order
      */
     public function show(PurchaseOrder $purchaseOrder): View
     {
@@ -277,7 +278,7 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Show the form for editing the specified purchase order.
+     * Menampilkan form untuk mengedit purchase order
      */
     public function edit(PurchaseOrder $purchaseOrder): View
     {
@@ -293,9 +294,7 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Update the specified purchase order in storage.
-     *
-     * This mirrors store() but updates existing PO and replaces its items.
+     * Mengupdate purchase order yang sudah ada
      */
     public function update(Request $request, PurchaseOrder $purchaseOrder): RedirectResponse
     {
@@ -327,7 +326,7 @@ class PurchaseOrderController extends Controller
 
         DB::beginTransaction();
         try {
-            // Recalculate subtotal
+            // Menghitung ulang subtotal
             $itemSubtotal = 0.0;
             foreach ($validated['products'] as $p) {
                 $finalPrice = (float) $p['price_per_unit'];
@@ -345,6 +344,7 @@ class PurchaseOrderController extends Controller
             $options['subtotal'] = $itemSubtotal;
             $calc = PurchaseOrderCalculator::calculate($options);
 
+            // Update data purchase order
             $purchaseOrder->update([
                 'supplier_id' => $validated['supplier_id'],
                 'order_date' => $validated['order_date'],
@@ -368,13 +368,13 @@ class PurchaseOrderController extends Controller
                 'grand_total' => $calc['grand_total'],
             ]);
 
-            // Remove old items and their discounts
+            // Hapus item lama dan diskonnya
             foreach ($purchaseOrder->items as $oldItem) {
                 $oldItem->discounts()->delete();
                 $oldItem->delete();
             }
 
-            // Recreate items from validated data
+            // Buat ulang item dari data yang divalidasi
             foreach ($validated['products'] as $p) {
                 $finalPrice = (float) $p['price_per_unit'];
                 if (!empty($p['discounts']) && is_array($p['discounts'])) {
@@ -421,9 +421,8 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Receive goods for the given purchase order.
-     *
-     * Updates product stock and weighted average cost (average inventory cost).
+     * Menerima barang untuk purchase order
+     * Blok kode ini menangani penerimaan barang dan pembuatan jurnal akuntansi
      */
     public function receive(PurchaseOrder $purchaseOrder): RedirectResponse
     {
@@ -433,15 +432,23 @@ class PurchaseOrderController extends Controller
             return back()->with('error', 'Pesanan ini sudah diproses sebelumnya.');
         }
 
+        // Validasi akun default untuk akuntansi
+        $inventoryAccountId = $this->accountingSettings->getInventoryId();
+        $apAccountId = $this->accountingSettings->getAccountsPayableId();
+
+        if (!$inventoryAccountId || !$apAccountId) {
+            return back()->with('error', 'Gagal: Akun default Persediaan (Inventory) atau Hutang Dagang (AP) belum diatur di Pengaturan Akuntansi.');
+        }
+
         DB::beginTransaction();
         try {
+            // 1. Update stok dan harga pokok produk
             foreach ($purchaseOrder->items as $item) {
                 $product = Product::lockForUpdate()->find($item->product_id);
                 if (! $product) {
                     continue;
                 }
 
-                // Net price per unit derived from item subtotal
                 $netPricePerUnit = $item->quantity > 0 ? ($item->subtotal / $item->quantity) : 0.0;
 
                 $oldStock = (float) $product->stock_quantity;
@@ -461,34 +468,106 @@ class PurchaseOrderController extends Controller
                 $product->save();
             }
 
+            // 2. Update status PO menjadi completed
             $purchaseOrder->status = 'completed';
             $purchaseOrder->save();
+
+            // 3. Membuat jurnal akuntansi untuk penerimaan barang
+            $journalGroupId = "PO-" . $purchaseOrder->po_number;
+            $description = "Penerimaan barang PO #" . $purchaseOrder->po_number . " (Supplier: " . $purchaseOrder->supplier->supplier_name . ")";
+            
+            $amount = $purchaseOrder->grand_total;
+
+            // Entri debit untuk persediaan, kredit untuk hutang dagang
+            $debitEntries = [
+                [$inventoryAccountId, $amount]
+            ];
+            $creditEntries = [
+                [$apAccountId, $amount]
+            ];
+
+            $this->accountingService->postJournal(
+                $journalGroupId,
+                $purchaseOrder->order_date,
+                $description,
+                $debitEntries,
+                $creditEntries,
+                $purchaseOrder
+            );
 
             DB::commit();
 
             return redirect()
                 ->route('purchase-orders.index')
-                ->with('success', 'Barang untuk pesanan #' . ($purchaseOrder->po_number ?? $purchaseOrder->po_id) . ' telah diterima. Stok dan HPP rata-rata diperbarui.');
+                ->with('success', 'Barang untuk PO #' . ($purchaseOrder->po_number ?? $purchaseOrder->po_id) . ' telah diterima. Stok, HPP, dan Jurnal Akuntansi telah diperbarui.');
+        
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error("Gagal receive PO: " . $e->getMessage());
             return back()->with('error', 'Gagal memproses penerimaan barang: ' . $e->getMessage());
         }
     }
 
     /**
-     * Mark a purchase order as cancelled.
+     * Membatalkan purchase order
+     * Blok kode ini menangani pembatalan PO dan reversal jurnal jika PO sudah completed
      */
     public function cancel(PurchaseOrder $purchaseOrder): RedirectResponse
     {
         $this->authorize('cancel', $purchaseOrder);
+        
+        $wasCompleted = ($purchaseOrder->status === 'completed');
 
-        $purchaseOrder->update(['status' => 'cancelled']);
+        DB::beginTransaction();
+        try {
+            // Update status PO menjadi cancelled
+            $purchaseOrder->update(['status' => 'cancelled']);
 
-        return redirect()->route('purchase-orders.index')->with('success', 'Pesanan Pembelian berhasil dibatalkan.');
+            // Jika PO sudah pernah completed, buat jurnal reversal
+            if ($wasCompleted) {
+                
+                $inventoryAccountId = $this->accountingSettings->getInventoryId();
+                $apAccountId = $this->accountingSettings->getAccountsPayableId();
+                if (!$inventoryAccountId || !$apAccountId) {
+                    throw new \Exception("Akun default Persediaan/Hutang Dagang belum diatur.");
+                }
+
+                // Post jurnal reversal
+                $journalGroupId = "PO-REVERSAL-" . $purchaseOrder->po_number;
+                $description = "Reversal/Pembatalan PO #" . $purchaseOrder->po_number;
+                $amount = $purchaseOrder->grand_total;
+
+                $debitEntries = [
+                    [$apAccountId, $amount]
+                ];
+                $creditEntries = [
+                    [$inventoryAccountId, $amount]
+                ];
+
+                $this->accountingService->postJournal(
+                    $journalGroupId,
+                    now(),
+                    $description,
+                    $debitEntries,
+                    $creditEntries,
+                    $purchaseOrder
+                );
+
+                // Hapus jurnal asli
+                DB::table('general_ledgers')->where('journal_group_id', "PO-" . $purchaseOrder->po_number)->delete();
+            }
+            
+            DB::commit();
+            return redirect()->route('purchase-orders.index')->with('success', 'Pesanan Pembelian berhasil dibatalkan.');
+        
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Gagal membatalkan PO: ' . $e->getMessage());
+        }
     }
 
     /**
-     * Mark a purchase order as paid.
+     * Menandai purchase order sebagai sudah dibayar
      */
     public function markAsPaid(PurchaseOrder $purchaseOrder): RedirectResponse
     {
@@ -506,7 +585,7 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Download PDF for the purchase order.
+     * Mengunduh PDF untuk purchase order
      */
     public function downloadPDF(PurchaseOrder $purchaseOrder)
     {
@@ -514,7 +593,6 @@ class PurchaseOrderController extends Controller
 
         $purchaseOrder->load(['supplier', 'items.product.unit', 'items.discounts', 'tax']);
 
-        // Custom paper size (points): 9.5" x 5.5" ≈ 684 x 396 points
         $paperSize = [0, 0, 684, 396];
 
         $pdf = Pdf::loadView('purchase_orders.pdf_template', compact('purchaseOrder'));
@@ -525,7 +603,7 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Add supplier invoice number to the PO.
+     * Menambahkan nomor faktur supplier ke PO
      */
     public function addSupplierInvoice(Request $request, PurchaseOrder $purchaseOrder): RedirectResponse
     {

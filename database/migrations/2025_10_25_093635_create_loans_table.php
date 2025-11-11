@@ -14,12 +14,29 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->date('loan_date'); // Tanggal pinjaman diterima
             $table->decimal('principal_amount', 15, 2); // Jumlah pokok pinjaman
-            
-            // Sisa pokok pinjaman (akan diupdate saat ada pembayaran cicilan)
-            $table->decimal('remaining_balance', 15, 2); 
-            
+            $table->decimal('remaining_balance', 15, 2); // Sisa pokok pinjaman
             $table->enum('status', ['active', 'paid_off'])->default('active');
-            $table->foreignId('user_id')->nullable()->constrained('users', 'user_id')->nullOnDelete();
+
+            // Siapa yang mencatat
+            $table->foreignId('user_id')
+                  ->nullable()
+                  ->constrained('users', 'user_id')
+                  ->nullOnDelete();
+
+            // === Gabungan dari modify_loans_table_for_accounting ===
+
+            // 1. Akun Utang Pinjaman (Liabilitas, dikredit)
+            $table->foreignId('loan_account_id')
+                  ->nullable()
+                  ->constrained('chart_of_accounts', 'account_id')
+                  ->nullOnDelete();
+
+            // 2. Akun Kas/Bank (Aset, didebit saat uang diterima)
+            $table->foreignId('cash_bank_account_id')
+                  ->nullable()
+                  ->constrained('chart_of_accounts', 'account_id')
+                  ->nullOnDelete();
+
             $table->timestamps();
         });
     }

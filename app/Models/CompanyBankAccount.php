@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\ChartOfAccount;
 
 class CompanyBankAccount extends Model
 {
@@ -16,6 +18,7 @@ class CompanyBankAccount extends Model
         'bank_name',
         'account_name',
         'account_number',
+        'chart_of_account_id',
         'is_active',
     ];
 
@@ -28,5 +31,13 @@ class CompanyBankAccount extends Model
     public function purchasePayments(): HasMany
     {
         return $this->hasMany(PurchaseOrderPayment::class, 'company_bank_account_id', 'company_bank_account_id');
+    }
+
+    /**
+     * Relasi ke Akun Aset (COA) yang mewakili akun bank ini.
+     */
+    public function account(): BelongsTo
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'chart_of_account_id', 'account_id');
     }
 }

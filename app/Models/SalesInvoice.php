@@ -184,39 +184,27 @@ class SalesInvoice extends Model
     }
     
     /**
-     * BARU: Accessor untuk mendapatkan sisa tagihan yang belum dibayar.
-     * Ini adalah cara terbaik untuk menampilkan sisa tagihan di view.
-     * Anda bisa memanggil ini di view/controller dengan: $invoice->remaining_balance
+     * ========================================================================
+     * ✅ FUNGSI DIPERBARUI: getRemainingBalanceAttribute
+     * ========================================================================
+     *
+     * Accessor untuk mendapatkan sisa tagihan.
+     * Logikanya sekarang sederhana: Total Tagihan - Total Terbayar.
      *
      * @return float
      */
     public function getRemainingBalanceAttribute(): float
     {
-        // 1. Mulai dengan total tagihan asli
-        $balance = $this->total_amount;
-
-        // 2. Tambahkan semua Nota Debit (Kekurangan tagih)
-        // Kita gunakan query langsung untuk data terbaru
-        $totalDebitNotes = $this->adjustments()->where('type', 'debit_note')->sum('amount');
-        $balance += $totalDebitNotes;
-
-        // 3. Kurangi semua pembayaran (dari kolom yg disinkronisasi)
-        $balance -= $this->amount_paid;
+        // $this->total_due adalah accessor baru yang kita buat di atas.
+        // $this->amount_paid adalah kolom DB yang disinkronkan oleh updatePaymentStatus.
+        $balance = $this->total_due - $this->amount_paid;
         
-        // 4. Kurangi semua retur yang "Potong Nota"
-        // Kita gunakan accessor yg sudah ada
-        $balance -= $this->total_deducting_returns; 
-
-        // 5. Kurangi semua Nota Kredit (Kelebihan tagih)
-        $totalCreditNotes = $this->adjustments()->where('type', 'credit_note')->sum('amount');
-        $balance -= $totalCreditNotes;
+        // Kita tidak lagi mengizinkan sisa saldo negatif di sini,
+        // karena kelebihan bayar ditangani oleh ClientLedger.
+        // return $balance; // <-- Versi lama Anda mengizinkan negatif
         
-        // ==========================================================
-        // PERBAIKAN: Hapus 'max(0, $balance)'
-        // Kita HARUS mengizinkan nilai negatif agar controller bisa
-        // mendeteksi kelebihan bayar.
-        // ==========================================================
-        return $balance; 
+        // Versi yang lebih aman:
+        return max(0, $balance);
     }
 
     public function adjustments(): HasMany
@@ -226,29 +214,19 @@ class SalesInvoice extends Model
 
     public function updatePaymentStatus()
     {
-        // Jangan update jika sudah dibatalkan
         if ($this->status == 'cancelled') {
             return;
         }
 
-        // 1. Ambil total pembayaran yang sudah selesai
+        // 1. Ambil total pembayaran yang sudah selesai (sumber data: pembayaran)
         $totalPaid = $this->payments()->where('status', 'completed')->sum('amount');
+        
+        // 2. Ambil total tagihan sebenarnya (sumber data: accessor baru kita)
+        // Kita panggil relasi agar accessor 'total_due' bisa bekerja efisien
+        $this->loadMissing(['adjustments', 'deductingReturns']);
+        $totalDue = $this->total_due; // <-- Menggunakan accessor 'getTotalDueAttribute'
 
-        // 2. Hitung total tagihan yang sebenarnya (setelah koreksi/retur)
-        // Kita tidak bisa pakai remaining_balance karena itu sudah dikurangi amount_paid
-        
-        // Eager load relasi jika belum
-        $this->loadMissing(['adjustments', 'deductingReturns']); 
-        
-        $totalAdjustments = $this->adjustments->sum(function($adj) {
-            return $adj->type == 'debit_note' ? $adj->amount : -$adj->amount;
-        });
-        
-        $totalDeductingReturns = $this->deductingReturns->sum('total_amount');
-        
-        $totalDue = $this->total_amount + $totalAdjustments - $totalDeductingReturns;
-        
-        // Bulatkan untuk menghindari masalah floating point (misal 0.000001)
+        // Bulatkan untuk menghindari masalah floating point
         $totalDue = round($totalDue, 2);
         $totalPaid = round($totalPaid, 2);
         
@@ -261,15 +239,12 @@ class SalesInvoice extends Model
             $newStatus = 'partially_paid';
         }
         
-        // 4. Update HANYA jika status berubah
-        if ($this->status != $newStatus) {
+        // 4. Update HANYA jika status berubah atau amount_paid tidak sinkron
+        if ($this->status != $newStatus || $this->amount_paid != $totalPaid) {
             $this->update([
                 'status' => $newStatus,
-                'amount_paid' => $totalPaid // ✅ Sinkronkan juga amount_paid
+                'amount_paid' => $totalPaid // Sinkronkan kolom amount_paid
             ]);
-        } elseif ($this->amount_paid != $totalPaid) {
-             // Jika status sama tapi amount_paid beda (misal: pembayaran dihapus)
-             $this->update(['amount_paid' => $totalPaid]);
         }
         
         // 5. Jika Lunas, hapus token pending (jika ada)
@@ -288,5 +263,49 @@ class SalesInvoice extends Model
                             'description' => DB::raw("REPLACE(description, ' (Ditahan)', '')")
                         ]);
         }
+    }
+
+    /**
+     * ========================================================================
+     * ✅ FUNGSI BARU: PUSAT LOGIKA TOTAL TAGIHAN
+     * ========================================================================
+     *
+     * Accessor untuk mendapatkan total tagihan SEBENARNYA (setelah
+     * penyesuaian dan retur). Ini adalah satu-satunya sumber kebenaran.
+     *
+     * @return float
+     */
+    public function getTotalDueAttribute(): float
+    {
+        // 1. Mulai dengan total asli
+        $total = $this->total_amount;
+
+        // 2. Tambah/kurangi penyesuaian (Nota Debit/Kredit)
+        // Kita gunakan relasi yang sudah di-load jika ada, atau query baru jika tidak.
+        
+        // ✅ PERBAIKAN: $this.relationLoaded() diubah menjadi $this->relationLoaded()
+        if ($this->relationLoaded('adjustments')) {
+            $totalAdjustments = $this->adjustments->sum(function($adj) {
+                return $adj->type == 'debit_note' ? $adj->amount : -$adj->amount;
+            });
+        } else {
+            $totalDebitNotes = $this->adjustments()->where('type', 'debit_note')->sum('amount');
+            $totalCreditNotes = $this->adjustments()->where('type', 'credit_note')->sum('amount');
+            $totalAdjustments = $totalDebitNotes - $totalCreditNotes;
+        }
+        $total += $totalAdjustments;
+
+        // 3. Kurangi retur yang memotong tagihan
+        // Kita gunakan relasi yang sudah di-load jika ada, atau accessor jika tidak.
+
+        // ✅ PERBAIKAN: $this.relationLoaded() diubah menjadi $this->relationLoaded()
+        if ($this->relationLoaded('deductingReturns')) {
+            $total -= $this->deductingReturns->sum('total_amount');
+        } else {
+            // Gunakan accessor 'total_deducting_returns' yang memanggil query baru
+            $total -= $this->total_deducting_returns;
+        }
+
+        return (float) $total;
     }
 }

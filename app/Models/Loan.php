@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\ChartOfAccount;
 
 class Loan extends Model
 {
@@ -21,6 +22,8 @@ class Loan extends Model
         'remaining_balance',
         'status',
         'user_id',
+        'loan_account_id',
+        'cash_bank_account_id', 
     ];
 
     protected $casts = [
@@ -37,5 +40,21 @@ class Loan extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(LoanPayment::class, 'loan_id', 'loan_id')->latest('payment_date');
+    }
+
+    /**
+     * Relasi ke Akun Utang Pinjaman (COA).
+     */
+    public function loanAccount(): BelongsTo
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'loan_account_id', 'account_id');
+    }
+
+    /**
+     * Relasi ke Akun Kas/Bank (COA) tempat menerima dana.
+     */
+    public function cashBankAccount(): BelongsTo
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'cash_bank_account_id', 'account_id');
     }
 }

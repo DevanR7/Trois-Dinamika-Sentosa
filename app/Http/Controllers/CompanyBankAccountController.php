@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\Rule;
+use App\Models\ChartOfAccount;
 
 class CompanyBankAccountController extends Controller
 {
@@ -26,8 +27,8 @@ class CompanyBankAccountController extends Controller
      */
     public function index(): View
     {
-        $accounts = CompanyBankAccount::orderBy('bank_name')->get();
-
+        // ✅ Eager load relasi 'account'
+        $accounts = CompanyBankAccount::with('account')->orderBy('bank_name')->get();
         return view('company_bank_accounts.index', compact('accounts'));
     }
 
@@ -37,7 +38,13 @@ class CompanyBankAccountController extends Controller
      */
     public function create(): View
     {
-        return view('company_bank_accounts.create');
+        // ✅ Ambil semua akun COA tipe 'Aset'
+        $assetAccounts = ChartOfAccount::where('account_type', 'Aset')
+                            ->where('is_active', true)
+                            ->orderBy('account_number')
+                            ->get();
+                            
+        return view('company_bank_accounts.create', compact('assetAccounts'));
     }
 
     /**
@@ -52,11 +59,13 @@ class CompanyBankAccountController extends Controller
             'account_name' => 'required|string|max:255',
             'account_number' => 'nullable|string|max:50',
             'is_active' => 'required|boolean',
+            // ✅ Validasi baru
+            'chart_of_account_id' => 'required|exists:chart_of_accounts,account_id',
         ]);
 
         // Simpan ke database
         CompanyBankAccount::create($validated);
-
+        
         return redirect()
             ->route('company-bank-accounts.index')
             ->with('success', 'Akun bank baru berhasil ditambahkan.');
@@ -68,9 +77,15 @@ class CompanyBankAccountController extends Controller
      */
     public function edit(CompanyBankAccount $companyBankAccount): View
     {
-        // Laravel otomatis melakukan model binding berdasarkan ID di route
+        // ✅ Ambil semua akun COA tipe 'Aset'
+        $assetAccounts = ChartOfAccount::where('account_type', 'Aset')
+                            ->where('is_active', true)
+                            ->orderBy('account_number')
+                            ->get();
+                            
         return view('company_bank_accounts.edit', [
-            'account' => $companyBankAccount
+            'account' => $companyBankAccount,
+            'assetAccounts' => $assetAccounts // ✅ Kirim ke view
         ]);
     }
 
@@ -86,11 +101,13 @@ class CompanyBankAccountController extends Controller
             'account_name' => 'required|string|max:255',
             'account_number' => 'nullable|string|max:50',
             'is_active' => 'required|boolean',
+            // ✅ Validasi baru
+            'chart_of_account_id' => 'required|exists:chart_of_accounts,account_id',
         ]);
 
         // Update data di database
         $companyBankAccount->update($validated);
-
+        
         return redirect()
             ->route('company-bank-accounts.index')
             ->with('success', 'Akun bank berhasil diperbarui.');

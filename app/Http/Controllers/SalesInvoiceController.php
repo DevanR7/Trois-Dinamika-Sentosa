@@ -17,12 +17,24 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf; 
 use App\Models\User;
+use App\Services\AccountingService;
+use App\Services\AccountingSettingService;
+use Illuminate\Support\Facades\Log;
 
 class SalesInvoiceController extends Controller
 {
-    public function __construct()
-    {
-        // Constructor untuk middleware global jika diperlukan
+    /**
+     * ✅ Inject Service Akuntansi
+     */
+    protected $accountingService;
+    protected $accountingSettings;
+
+    public function __construct(
+        AccountingService $accountingService, 
+        AccountingSettingService $accountingSettingService
+    ) {
+        $this->accountingService = $accountingService;
+        $this->accountingSettings = $accountingSettingService;
     }
     
     /**
@@ -274,6 +286,7 @@ class SalesInvoiceController extends Controller
 
     /**
      * Konfirmasi invoice draft
+     * ✅ DIPERBARUI: Menambahkan Jurnal Akuntansi
      */
     public function confirm(SalesInvoice $invoice): RedirectResponse
     {
@@ -283,9 +296,20 @@ class SalesInvoiceController extends Controller
             return back()->with('error', 'Hanya invoice DRAFT yang bisa dikonfirmasi.');
         }
 
+        // ✅ Validasi Akun Default
+        $arAccountId = $this->accountingSettings->getAccountsReceivableId();
+        $salesRevenueAccountId = $this->accountingSettings->getSalesRevenueId();
+        $cogsAccountId = $this->accountingSettings->getCogsId();
+        $inventoryAccountId = $this->accountingSettings->getInventoryId();
+
+        if (!$arAccountId || !$salesRevenueAccountId || !$cogsAccountId || !$inventoryAccountId) {
+            return back()->with('error', 'Gagal: Akun default (Piutang, Pendapatan, HPP, Persediaan) belum diatur di Pengaturan Akuntansi.');
+        }
+
         try {
             DB::beginTransaction();
             
+            // Logika Stok
             $itemsToDecrement = [];
             foreach ($invoice->items as $item) {
                 $product = Product::lockForUpdate()->find($item->product_id);
@@ -303,13 +327,44 @@ class SalesInvoiceController extends Controller
                 Product::where('product_id', $item['product_id'])->decrement('stock_quantity', $item['quantity']);
             }
 
+            // Update Status Invoice
             $invoice->update(['status' => 'unpaid']);
 
+            // ✅ Post Jurnal Akuntansi (Jurnal Penjualan & HPP)
+            $journalGroupId = "INV-" . $invoice->invoice_number;
+            $description = "Penjualan Invoice #" . $invoice->invoice_number . " ke " . $invoice->client->client_name;
+            
+            // Ambil total HPP dari item invoice
+            $totalHpp = $invoice->items()->sum(DB::raw('quantity * hpp'));
+            
+            $debitEntries = [
+                // [Akun Piutang, Total Invoice]
+                [$arAccountId, $invoice->total_amount, "Piutang atas " . $invoice->client->client_name],
+                // [Akun HPP, Total HPP]
+                [$cogsAccountId, $totalHpp, "HPP atas Invoice #" . $invoice->invoice_number]
+            ];
+            $creditEntries = [
+                // [Akun Pendapatan, Total Invoice]
+                [$salesRevenueAccountId, $invoice->total_amount, "Pendapatan atas Invoice #" . $invoice->invoice_number],
+                // [Akun Persediaan, Total HPP]
+                [$inventoryAccountId, $totalHpp, "Pengurangan Persediaan"]
+            ];
+
+            $this->accountingService->postJournal(
+                $journalGroupId,
+                $invoice->order_date,
+                $description,
+                $debitEntries,
+                $creditEntries,
+                $invoice
+            );
+
             DB::commit();
-            return redirect()->route('invoices.show', $invoice->invoice_id)->with('success', 'Invoice berhasil dikonfirmasi. Stok telah dikurangi.');
+            return redirect()->route('invoices.show', $invoice->invoice_id)->with('success', 'Invoice berhasil dikonfirmasi. Stok telah dikurangi dan jurnal telah diposting.');
 
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error("Gagal konfirmasi invoice: " . $e->getMessage());
             return back()->with('error', 'Gagal konfirmasi invoice: ' . $e->getMessage());
         }
     }
@@ -355,11 +410,13 @@ class SalesInvoiceController extends Controller
         try {
             DB::beginTransaction();
 
-            // Kembalikan stok lama
-            foreach ($invoice->items as $oldItem) {
-                $product = Product::find($oldItem->product_id);
-                if ($product) {
-                    $product->increment('stock_quantity', $oldItem->quantity);
+            // Kembalikan stok lama (hanya jika status bukan draft)
+            if ($invoice->status !== 'draft') {
+                foreach ($invoice->items as $oldItem) {
+                    $product = Product::find($oldItem->product_id);
+                    if ($product) {
+                        $product->increment('stock_quantity', $oldItem->quantity);
+                    }
                 }
             }
 
@@ -378,9 +435,13 @@ class SalesInvoiceController extends Controller
                     'quantity' => $quantity,
                     'price_per_unit' => $price,
                     'subtotal' => $itemSubtotal,
+                    'hpp' => $product->average_cost ?? 0 // ✅ Pastikan HPP di-update juga
                 ];
                 
-                $product->decrement('stock_quantity', $quantity);
+                // Kurangi stok baru (hanya jika status bukan draft)
+                if ($invoice->status !== 'draft') {
+                    $product->decrement('stock_quantity', $quantity);
+                }
             }
 
             $discountPercentage = $request->input('discount_percentage', 0);
@@ -434,30 +495,122 @@ class SalesInvoiceController extends Controller
 
     /**
      * Menghapus invoice
+     * ✅ DIPERBARUI: Lebih aman, hanya izinkan hapus 'draft' atau 'cancelled'
      */
     public function destroy(SalesInvoice $invoice): RedirectResponse
     { 
         $this->authorize('delete', $invoice); 
-        $invoice->delete();
-        
-        return redirect()->route('invoices.index')->with('success', 'Invoice berhasil dihapus.');
+
+        // ✅ Cek status. Jangan hapus invoice yg sudah terkonfirmasi.
+        if (!in_array($invoice->status, ['draft', 'cancelled'])) {
+             return back()->with('error', 'Invoice yang sudah aktif (unpaid/paid) tidak bisa dihapus permanen. Gunakan fitur "Batalkan".');
+        }
+
+        // Cek relasi lain jika perlu
+        if ($invoice->payments()->exists() || $invoice->returns()->exists() || $invoice->adjustments()->exists()) {
+             return back()->with('error', 'Invoice ini tidak bisa dihapus karena memiliki data terkait (pembayaran/retur/penyesuaian).');
+        }
+
+        try {
+            DB::beginTransaction();
+            // Hapus item dan pajak terkait
+            $invoice->items()->delete();
+            $invoice->taxes()->detach();
+            // Hapus invoice
+            $invoice->delete();
+            DB::commit();
+            return redirect()->route('invoices.index')->with('success', 'Invoice draft berhasil dihapus.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Gagal menghapus invoice: ' . $e->getMessage());
+        }
     }
 
     /**
      * Membatalkan invoice
+     * ✅ DIPERBARUI: Menambahkan Jurnal Reversal dan Kembalikan Stok
      */
     public function cancel(SalesInvoice $invoice): RedirectResponse
     {
         $this->authorize('cancel', $invoice);
-
+        
+        // Cek status
         if (in_array($invoice->status, ['paid', 'partially_paid'])) {
              return back()->with('error', 'Invoice yang sudah lunas atau dicicil tidak bisa dibatalkan.');
         }
+        
+        // Jika statusnya 'draft', batalkan saja tanpa jurnal
+        if ($invoice->status === 'draft') {
+            $invoice->status = 'cancelled';
+            $invoice->save();
+            return redirect()->route('invoices.index')->with('success', 'Invoice draft berhasil dibatalkan.');
+        }
 
-        $invoice->status = 'cancelled';
-        $invoice->save();
+        // --- Jika status 'unpaid' atau 'overdue', lakukan Jurnal Reversal ---
 
-        return redirect()->route('invoices.index')->with('success', 'Invoice berhasil dibatalkan.');
+        // ✅ Validasi Akun Default
+        $arAccountId = $this->accountingSettings->getAccountsReceivableId();
+        $salesRevenueAccountId = $this->accountingSettings->getSalesRevenueId();
+        $cogsAccountId = $this->accountingSettings->getCogsId();
+        $inventoryAccountId = $this->accountingSettings->getInventoryId();
+
+        if (!$arAccountId || !$salesRevenueAccountId || !$cogsAccountId || !$inventoryAccountId) {
+            return back()->with('error', 'Gagal: Akun default (Piutang, Pendapatan, HPP, Persediaan) belum diatur.');
+        }
+
+        try {
+            DB::beginTransaction();
+            
+            // ✅ Kembalikan Stok
+            foreach ($invoice->items as $item) {
+                $product = Product::find($item->product_id);
+                if ($product) {
+                    $product->increment('stock_quantity', $item->quantity);
+                }
+            }
+
+            // Update Status Invoice
+            $invoice->status = 'cancelled';
+            $invoice->save();
+
+            // ✅ Post Jurnal Reversal (Jurnal dibalik)
+            $journalGroupId = "INV-REV-" . $invoice->invoice_number;
+            $description = "Reversal/Pembatalan Invoice #" . $invoice->invoice_number;
+            $totalHpp = $invoice->items()->sum(DB::raw('quantity * hpp'));
+
+            $debitEntries = [
+                // [Akun Pendapatan, Total Invoice]
+                [$salesRevenueAccountId, $invoice->total_amount, "Reversal pendapatan"],
+                // [Akun Persediaan, Total HPP]
+                [$inventoryAccountId, $totalHpp, "Reversal persediaan"]
+            ];
+            $creditEntries = [
+                // [Akun Piutang, Total Invoice]
+                [$arAccountId, $invoice->total_amount, "Reversal piutang"],
+                // [Akun HPP, Total HPP]
+                [$cogsAccountId, $totalHpp, "Reversal HPP"]
+            ];
+
+            $this->accountingService->postJournal(
+                $journalGroupId,
+                now(),
+                $description,
+                $debitEntries,
+                $creditEntries,
+                $invoice
+            );
+            
+            // ✅ Hapus Jurnal Asli (INV-...)
+            DB::table('general_ledgers')->where('journal_group_id', "INV-" . $invoice->invoice_number)->delete();
+
+            DB::commit();
+            return redirect()->route('invoices.index')->with('success', 'Invoice berhasil dibatalkan. Stok telah dikembalikan dan jurnal telah dibalik.');
+        
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Gagal batalkan invoice: " . $e->getMessage());
+            return back()->with('error', 'Gagal membatalkan invoice: ' . $e->getMessage());
+        }
     }
 
     /**

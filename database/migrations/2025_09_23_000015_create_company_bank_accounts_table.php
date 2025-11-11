@@ -13,6 +13,13 @@ return new class extends Migration
             $table->string('bank_name'); // Misal: "BCA", "Mandiri", "Kas Tunai"
             $table->string('account_name'); // Misal: "PT. USAHA JAYA"
             $table->string('account_number')->nullable(); // Misal: "1234567890" (nullable untuk kas)
+
+            // Hapus ->after(), karena tidak valid di Schema::create()
+            $table->foreignId('chart_of_account_id')
+                  ->nullable()
+                  ->constrained('chart_of_accounts', 'account_id')
+                  ->nullOnDelete();
+
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });

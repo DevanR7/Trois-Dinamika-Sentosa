@@ -8,7 +8,7 @@
             <i class="bi bi-plus-lg"></i> Catat Transaksi
         </a>
     </div>
-
+    
     {{-- FORM FILTER --}}
     <div class="card shadow-sm mb-4">
         <div class="card-body">
@@ -46,7 +46,7 @@
                     <thead class="table-dark">
                         <tr>
                             <th>Tanggal</th>
-                            <th>Tipe</th>
+                            <th>Akun Transaksi</th> 
                             <th>Deskripsi</th>
                             <th class="text-end">Jumlah</th>
                             <th>Dicatat Oleh</th>
@@ -57,13 +57,23 @@
                         @forelse ($transactions as $transaction)
                         <tr>
                             <td>{{ $transaction->transaction_date->format('d/m/Y') }}</td>
+                            
                             <td>
                                 @if ($transaction->type == 'investment')
-                                    <span class="badge bg-success">Setoran Modal</span>
+                                    {{-- Setoran: Kas (Debit), Modal (Kredit) --}}
+                                    <span class="fw-semibold">{{ $transaction->cashBankAccount->account_name ?? 'N/A' }}</span>
+                                    <i class="bi bi-arrow-right-short text-muted"></i>
+                                    <span class="text-muted">{{ $transaction->equityAccount->account_name ?? 'N/A' }}</span>
+                                    <span class="badge bg-success ms-1">Setoran</span>
                                 @else
-                                    <span class="badge bg-danger">Penarikan Modal</span>
+                                    {{-- Penarikan: Prive (Debit), Kas (Kredit) --}}
+                                    <span class="fw-semibold">{{ $transaction->equityAccount->account_name ?? 'N/A' }}</span>
+                                    <i class="bi bi-arrow-right-short text-muted"></i>
+                                    <span class="text-muted">{{ $transaction->cashBankAccount->account_name ?? 'N/A' }}</span>
+                                    <span class="badge bg-danger ms-1">Penarikan</span>
                                 @endif
                             </td>
+
                             <td>{{ $transaction->description }}</td>
                             <td class="text-end fw-semibold">
                                 Rp {{ number_format($transaction->amount, 0, ',', '.') }}
@@ -73,7 +83,17 @@
                                 <a href="{{ route('equity-transactions.edit', $transaction) }}" class="btn btn-sm btn-outline-dark" title="Edit">
                                     <i class="bi bi-pencil-fill"></i>
                                 </a>
-                                <form action="{{ route('equity-transactions.destroy', $transaction) }}" method="POST" class="d-inline" onsubmit="return confirm('Anda yakin ingin menghapus data ini?')">
+                                
+                                {{-- ✅ MODIFIKASI: Hapus onsubmit, tambah class & data attribute --}}
+                                @php
+                                    $txTypeLabel = $transaction->type == 'investment' ? 'Setoran' : 'Penarikan';
+                                    $txAmountLabel = 'Rp ' . number_format($transaction->amount, 0, ',', '.');
+                                    $txDateLabel = $transaction->transaction_date->format('d/m/Y');
+                                    $txLabel = "$txTypeLabel $txAmountLabel tgl $txDateLabel";
+                                @endphp
+                                <form action="{{ route('equity-transactions.destroy', $transaction) }}" method="POST" 
+                                      class="d-inline form-delete-transaction" 
+                                      data-transaction-label="{{ $txLabel }}">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
@@ -88,6 +108,7 @@
                         </tr>
                         @endforelse
                     </tbody>
+                    
                     {{-- RINGKASAN TOTAL --}}
                     <tfoot class="table-group-divider">
                         <tr class="table-light">
@@ -114,7 +135,6 @@
                     </tfoot>
                 </table>
             </div>
-
             <div class="mt-3">
                 {{ $transactions->links() }}
             </div>
@@ -122,3 +142,38 @@
     </div>
 </div>
 @endsection
+
+{{-- ✅ MODIFIKASI: Tambah script SweetAlert --}}
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const deleteForms = document.querySelectorAll('.form-delete-transaction');
+    
+    deleteForms.forEach(form => {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault(); 
+            
+            // Ambil label transaksi dari data attribute
+            const txLabel = event.target.dataset.transactionLabel;
+            const warningText = `Anda yakin ingin menghapus transaksi ini: "${txLabel}"? Jurnal yang terkait akan dibalik.`;
+
+            Swal.fire({
+                title: 'Anda Yakin?',
+                text: warningText,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Hapus!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Jika dikonfirmasi, submit form-nya
+                    event.target.submit();
+                }
+            });
+        });
+    });
+});
+</script>
+@endpush

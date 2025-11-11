@@ -37,6 +37,7 @@ use App\Http\Controllers\BatchPurchasePaymentController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\PaymentClearanceController;
 use App\Http\Controllers\CompanyBankAccountController;
+use App\Http\Controllers\ChartOfAccountController;
 
 /*
 |--------------------------------------------------------------------------
@@ -72,6 +73,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
           ->name('suppliers.restore')
           ->withTrashed();
     Route::resource('purchase-orders', PurchaseOrderController::class);
+    Route::resource('chart-of-accounts', \App\Http\Controllers\ChartOfAccountController::class)->except(['show']);
     // 
     // --- Rute Klien (SUDAH DIPERBAIKI) ---
     // 1. Daftarkan resource, KECUALI 'show'
@@ -113,6 +115,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/invoices/{invoice}/cancel', [SalesInvoiceController::class, 'cancel'])->name('invoices.cancel');
     Route::get('/invoices/{invoice}/download', [SalesInvoiceController::class, 'downloadPDF'])->name('invoices.pdf');
     Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('payments.store');
+    Route::delete('/payments/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
     Route::post('/payments/{payment}/approve', [PaymentController::class, 'approve'])->name('payments.approve');
     Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
     Route::post('/invoices/{invoice}/confirm', [SalesInvoiceController::class, 'confirm'])->name('invoices.confirm');
@@ -121,7 +124,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase-orders.cancel');
     Route::post('/purchase-orders/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->name('purchase-orders.receive');
     Route::post('/purchase-orders/{purchaseOrder}/mark-as-paid', [PurchaseOrderController::class, 'markAsPaid'])->name('purchase-orders.markAsPaid');
-    Route::post('/purchase-orders/{purchaseOrder}/payments', [PurchaseOrderPaymentController::class, 'store'])->name('purchase-orders.payments.store');
+    Route::post('/purchase-orders/{purchaseOrder}/payments', [PurchaseOrderPaymentController::class, 'store'])
+         ->name('purchase-orders.payments.store');
+    Route::delete('/purchase-order-payments/{payment}', [PurchaseOrderPaymentController::class, 'destroy'])
+         ->name('purchase-orders.payments.destroy');
     Route::post('/purchase-orders/{purchaseOrder}/add-supplier-invoice', [PurchaseOrderController::class, 'addSupplierInvoice'])->name('purchase-orders.addSupplierInvoice');
     Route::get('/purchase-orders/{purchaseOrder}/download-pdf', [PurchaseOrderController::class, 'downloadPDF'])->name('purchase-orders.pdf');
 
@@ -143,6 +149,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
     Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/general-ledger', [\App\Http\Controllers\GeneralLedgerController::class, 'index'])
+         ->name('reports.general-ledger');
 
     // Review Order Klien
     Route::prefix('client-order-reviews')->name('client-order-reviews.')->group(function() {
@@ -303,5 +311,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('company-bank-accounts', CompanyBankAccountController::class)
         ->except(['show'])
         ->middleware('permission:manage-bank-accounts');
+    
+    
 });
 require __DIR__.'/auth.php';

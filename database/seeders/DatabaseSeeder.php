@@ -49,8 +49,9 @@ class DatabaseSeeder extends Seeder
             ProductSeeder::class,
             TaxSeeder::class,
             PaymentMethodSeeder::class,
-            PurchaseOrderSeeder::class,
-            SalesInvoiceSeeder::class,
+            ChartOfAccountsSeeder::class,
+            //PurchaseOrderSeeder::class,
+            //SalesInvoiceSeeder::class,
             CompanyBankAccountSeeder::class,
             // Opsional: aktifkan jika ingin generate data invoice juga
             // SalesInvoiceSeeder::class,

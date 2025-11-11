@@ -17,11 +17,30 @@ use Illuminate\Http\{
 use Illuminate\View\View;
 use Illuminate\Support\Facades\{
     DB,
-    Auth
+    Auth,
+    Log
 };
+
+// ✅ IMPORT BARU
+use App\Services\AccountingService;
+use App\Services\AccountingSettingService;
 
 class PurchaseReturnController extends Controller
 {
+    /**
+     * ✅ (BARU) Inject Service Akuntansi
+     */
+    protected $accountingService;
+    protected $accountingSettings;
+
+    public function __construct(
+        AccountingService $accountingService, 
+        AccountingSettingService $accountingSettingService
+    ) {
+        $this->accountingService = $accountingService;
+        $this->accountingSettings = $accountingSettingService;
+    }
+
     /**
      * Tampilkan daftar retur pembelian.
      */
@@ -69,6 +88,7 @@ class PurchaseReturnController extends Controller
 
     /**
      * Simpan data retur pembelian baru.
+     * ✅ DIPERBARUI: Menambahkan Jurnal Akuntansi.
      */
     public function store(Request $request): RedirectResponse
     {
@@ -83,6 +103,16 @@ class PurchaseReturnController extends Controller
             'items.*.item_id' => 'required|exists:purchase_order_items,item_id',
             'items.*.quantity' => 'nullable|integer|min:1',
         ]);
+
+        // ✅ Validasi Akun Akuntansi
+        $apAccountId = $this->accountingSettings->getAccountsPayableId();
+        $purchaseReturnAccountId = $this->accountingSettings->getPurchaseReturnId();
+        $inventoryAccountId = $this->accountingSettings->getInventoryId();
+        $supplierDepositAccountId = $this->accountingSettings->getSupplierDepositId();
+
+        if (!$apAccountId || !$purchaseReturnAccountId || !$inventoryAccountId || !$supplierDepositAccountId) {
+            return back()->with('error', 'Gagal: Akun default (Hutang, Retur Pembelian, Persediaan, Deposit Supplier) belum diatur.')->withInput();
+        }
 
         DB::beginTransaction();
 
@@ -134,16 +164,7 @@ class PurchaseReturnController extends Controller
             }
 
             /**
-             * LANGKAH 2: Terapkan aturan bisnis retur.
-             */
-            $sisaTagihanPO = $purchaseOrder->total_amount - $purchaseOrder->total_returned - $purchaseOrder->amount_paid;
-
-            if ($handlingType === 'deduct_invoice' && $totalReturnValue > $sisaTagihanPO) {
-                $handlingType = 'store_as_deposit';
-            }
-
-            /**
-             * LANGKAH 3: Simpan retur pembelian utama.
+             * LANGKAH 2: Simpan retur pembelian utama.
              */
             $purchaseReturn = PurchaseReturn::create([
                 'return_number' => PurchaseReturn::generateReturnNumber(),
@@ -157,7 +178,7 @@ class PurchaseReturnController extends Controller
             ]);
 
             /**
-             * LANGKAH 4: Simpan detail item retur, update stok dan jumlah dikembalikan.
+             * LANGKAH 3: Simpan detail item retur, update stok dan jumlah dikembalikan.
              */
             foreach ($validated['items'] as $itemData) {
                 if (empty($itemData['quantity']) || $itemData['quantity'] <= 0) {
@@ -195,6 +216,28 @@ class PurchaseReturnController extends Controller
             }
 
             /**
+             * LANGKAH 4: ✅ Post Jurnal Akuntansi untuk Retur Pembelian
+             */
+            $journalGroupId = "PUR-RET-" . $purchaseReturn->return_id;
+            $description = "Retur Pembelian #" . $purchaseReturn->return_number . " untuk PO #" . $purchaseOrder->po_number;
+
+            $debitEntries = [];
+            $creditEntries = [];
+
+            // Jurnal untuk retur pembelian (mengurangi hutang dan persediaan)
+            $debitEntries[] = [$apAccountId, $totalReturnValue, "Potongan hutang dari retur PO #" . $purchaseOrder->po_number];
+            $creditEntries[] = [$inventoryAccountId, $totalReturnValue, "Pengembalian persediaan dari retur #" . $purchaseReturn->return_number];
+
+            $this->accountingService->postJournal(
+                $journalGroupId,
+                $validated['return_date'],
+                $description,
+                $debitEntries,
+                $creditEntries,
+                $purchaseReturn
+            );
+
+            /**
              * LANGKAH 5: Proses hasil retur berdasarkan tipe penanganan.
              */
             if ($handlingType === 'store_as_deposit') {
@@ -204,7 +247,7 @@ class PurchaseReturnController extends Controller
                     $description .= ' (Ditahan)';
                 }
 
-                SupplierLedger::create([
+                $supplierLedger = SupplierLedger::create([
                     'supplier_id' => $purchaseOrder->supplier_id,
                     'purchase_order_id' => $purchaseOrder->po_id,
                     'reference_type' => PurchaseReturn::class,
@@ -216,6 +259,31 @@ class PurchaseReturnController extends Controller
                     'description' => $description,
                     'user_id' => Auth::id(),
                 ]);
+
+                /**
+                 * LANGKAH 6: ✅ Post Jurnal Akuntansi untuk Deposit Supplier
+                 */
+                if ($ledgerStatus === 'available') {
+                    $depositJournalGroupId = "SUP-DEP-" . $supplierLedger->ledger_id;
+                    $depositDescription = "Deposit dari retur pembelian #" . $purchaseReturn->return_number;
+
+                    $depositDebitEntries = [
+                        [$supplierDepositAccountId, $totalReturnValue, "Deposit dari retur PO #" . $purchaseOrder->po_number]
+                    ];
+                    $depositCreditEntries = [
+                        [$purchaseReturnAccountId, $totalReturnValue, "Pindah ke deposit supplier"]
+                    ];
+
+                    $this->accountingService->postJournal(
+                        $depositJournalGroupId,
+                        $validated['return_date'],
+                        $depositDescription,
+                        $depositDebitEntries,
+                        $depositCreditEntries,
+                        $supplierLedger
+                    );
+                }
+
             } else {
                 $totalReturDipotong = $purchaseOrder->returns()
                     ->where('return_handling_type', 'deduct_invoice')
@@ -235,9 +303,10 @@ class PurchaseReturnController extends Controller
             }
 
             DB::commit();
-            return redirect()->route('purchase-returns.index')->with('success', 'Retur pembelian berhasil disimpan.');
+            return redirect()->route('purchase-returns.index')->with('success', 'Retur pembelian berhasil disimpan dan dijurnal.');
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Gagal menyimpan retur pembelian: ' . $e->getMessage());
             return back()->with('error', 'Gagal menyimpan retur: ' . $e->getMessage())->withInput();
         }
     }
@@ -256,6 +325,7 @@ class PurchaseReturnController extends Controller
 
     /**
      * Hapus atau batalkan retur pembelian.
+     * ✅ DIPERBARUI: Menambahkan Jurnal Reversal.
      */
     public function destroy(PurchaseReturn $purchaseReturn): RedirectResponse
     {
@@ -267,11 +337,20 @@ class PurchaseReturnController extends Controller
             $purchaseOrder = $purchaseReturn->purchaseOrder;
             $isDeductInvoice = $purchaseReturn->return_handling_type === 'deduct_invoice';
 
-            // Hapus entri ledger jika retur berupa deposit
+            // ✅ Reversal Jurnal untuk retur utama
+            $this->reverseAndClearJournal("PUR-RET-" . $purchaseReturn->return_id, "Reversal Retur #" . $purchaseReturn->return_number, $purchaseReturn);
+
+            // Hapus entri ledger jika retur berupa deposit dan reversal jurnal deposit
             if ($purchaseReturn->return_handling_type === 'store_as_deposit') {
-                SupplierLedger::where('reference_type', PurchaseReturn::class)
+                $supplierLedger = SupplierLedger::where('reference_type', PurchaseReturn::class)
                     ->where('reference_id', $purchaseReturn->return_id)
-                    ->delete();
+                    ->first();
+
+                if ($supplierLedger) {
+                    // ✅ Reversal Jurnal untuk deposit supplier
+                    $this->reverseAndClearJournal("SUP-DEP-" . $supplierLedger->ledger_id, "Reversal Deposit dari Retur #" . $purchaseReturn->return_number, $supplierLedger);
+                    $supplierLedger->delete();
+                }
             } else {
                 // Cegah pembatalan jika PO sudah lunas
                 if ($purchaseOrder && $purchaseOrder->payment_status === 'paid') {
@@ -316,10 +395,55 @@ class PurchaseReturnController extends Controller
             }
 
             DB::commit();
-            return redirect()->route('purchase-returns.index')->with('success', 'Retur pembelian berhasil dibatalkan.');
+            return redirect()->route('purchase-returns.index')->with('success', 'Retur pembelian berhasil dibatalkan dan jurnal direversal.');
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Gagal membatalkan retur pembelian: ' . $e->getMessage());
             return back()->with('error', 'Gagal membatalkan retur: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * ✅ (BARU) Helper untuk membalik dan menghapus jurnal
+     */
+    private function reverseAndClearJournal(string $journalGroupId, string $reversalDescription, $referenceModel)
+    {
+        // 1. Ambil jurnal asli
+        $originalJournalEntries = DB::table('general_ledgers')
+                                    ->where('journal_group_id', $journalGroupId)
+                                    ->get();
+        
+        if ($originalJournalEntries->isEmpty()) {
+            return; // Tidak ada jurnal untuk dibalik
+        }
+
+        $debitEntries = [];
+        $creditEntries = [];
+
+        foreach ($originalJournalEntries as $entry) {
+            // Balikkan Debit jadi Kredit
+            if ($entry->debit > 0) {
+                $creditEntries[] = [$entry->chart_of_account_id, $entry->debit, "Reversal: " . $entry->description];
+            }
+            // Balikkan Kredit jadi Debit
+            if ($entry->credit > 0) {
+                $debitEntries[] = [$entry->chart_of_account_id, $entry->credit, "Reversal: " . $entry->description];
+            }
+        }
+
+        // 2. Post Jurnal Reversal
+        if (!empty($debitEntries) || !empty($creditEntries)) {
+            $this->accountingService->postJournal(
+                str_replace(['PUR-RET-', 'SUP-DEP-'], ['PUR-RET-REV-', 'SUP-DEP-REV-'], $journalGroupId),
+                now(),
+                $reversalDescription,
+                $debitEntries,
+                $creditEntries,
+                $referenceModel
+            );
+        }
+
+        // 3. Hapus Jurnal Asli
+        DB::table('general_ledgers')->where('journal_group_id', $journalGroupId)->delete();
     }
 }

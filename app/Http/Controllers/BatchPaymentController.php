@@ -18,16 +18,29 @@ use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
+use App\Services\AccountingService;
+use App\Services\AccountingSettingService;
 
 class BatchPaymentController extends Controller
 {
+    /**
+     * ✅ Inject Service Akuntansi
+     */
+    protected $accountingService;
+    protected $accountingSettings;
+
     /**
      * ===========================================
      * BAGIAN: Middleware otorisasi (permission)
      * ===========================================
      */
-    public function __construct()
-    {
+    public function __construct(
+        AccountingService $accountingService, 
+        AccountingSettingService $accountingSettingService
+    ) {
+        $this->accountingService = $accountingService;
+        $this->accountingSettings = $accountingSettingService;
+        
         $this->middleware('permission:create-batch-payments')->only(['create', 'store', 'getUnpaidInvoicesApi']);
         $this->middleware('permission:review-batch-payments')->only(['pending', 'showPending', 'approve', 'reject']);
     }
@@ -39,16 +52,13 @@ class BatchPaymentController extends Controller
      */
     public function create(): View
     {
-        // Ambil daftar klien
         $clients = Client::orderBy('client_name')->get();
         
-        // Ambil metode pembayaran aktif bertipe direct atau pending
         $paymentMethods = PaymentMethod::where('is_active', true)
                             ->whereIn('type', ['direct', 'pending'])
                             ->orderBy('name')
                             ->get();
         
-        // Ambil daftar akun bank perusahaan
         $companyBankAccounts = CompanyBankAccount::where('is_active', true)
                                 ->orderBy('bank_name')
                                 ->get();
@@ -69,7 +79,6 @@ class BatchPaymentController extends Controller
             ->orderBy('due_date', 'asc')
             ->get();
 
-        // Hitung sisa tagihan dan tampilkan hanya yang belum lunas
         $invoicesWithBalance = $invoices->map(function ($invoice) {
             return [
                 'invoice_id' => $invoice->invoice_id,
@@ -85,6 +94,7 @@ class BatchPaymentController extends Controller
     /**
      * =========================================================
      * BAGIAN: Menyimpan batch payment yang dibuat oleh Admin
+     * ✅ DIPERBARUI: Menambahkan Jurnal Akuntansi
      * =========================================================
      */
     public function store(Request $request): RedirectResponse
@@ -170,6 +180,23 @@ class BatchPaymentController extends Controller
                 throw new \Exception("Tidak ada dana (input/kredit) yang bisa dialokasikan.");
             }
 
+            // ✅ Validasi Akun Akuntansi
+            $arAccountId = $this->accountingSettings->getAccountsReceivableId();
+            $clientDepositAccountId = $this->accountingSettings->getClientDepositId();
+            if (!$arAccountId || !$clientDepositAccountId) {
+                throw new \Exception("Akun Piutang Usaha (AR) atau Akun Deposit Klien belum diatur.");
+            }
+            
+            $cashBankAccount = null;
+            $cashBankAccountId = null;
+            if ($danaDariInput > 0) {
+                $cashBankAccount = CompanyBankAccount::find($validated['company_bank_account_id']);
+                if (!$cashBankAccount || !$cashBankAccount->chart_of_account_id) {
+                    throw new \Exception("Akun Bank Perusahaan yang dipilih belum terhubung ke Chart of Account.");
+                }
+                $cashBankAccountId = $cashBankAccount->chart_of_account_id;
+            }
+
             // Tentukan status pembayaran berdasarkan tipe metode
             $paymentMethodType = $paymentMethod->type ?? 'direct';
             $newPaymentStatus = ($paymentMethodType == 'pending') ? 'pending_clearance' : 'completed';
@@ -224,7 +251,7 @@ class BatchPaymentController extends Controller
                 $bayarDariInput = min($sisaTagihan - $bayarDariKredit, $sisaInput);
                 $jumlahBayar = $bayarDariKredit + $bayarDariInput;
 
-                $invoice->payments()->create([
+                $payment = $invoice->payments()->create([
                     'batch_payment_id' => $batchPayment->batch_payment_id,
                     'payment_date' => $validated['payment_date'],
                     'amount' => $jumlahBayar,
@@ -237,7 +264,9 @@ class BatchPaymentController extends Controller
                     'proof_of_payment_path' => $proofPath,
                 ]);
 
-                $invoice->updatePaymentStatus();
+                if ($newPaymentStatus == 'completed') {
+                    $invoice->updatePaymentStatus();
+                }
 
                 $sisaKredit -= $bayarDariKredit;
                 $sisaInput -= $bayarDariInput;
@@ -259,12 +288,50 @@ class BatchPaymentController extends Controller
                 ]);
             }
 
+            // ✅ Post Jurnal Akuntansi (Agregat)
+            if ($newPaymentStatus == 'completed') {
+                $journalGroupId = "BPAY-" . $batchPayment->batch_payment_id;
+                $description = "Penerimaan Batch Payment #" . $batchPayment->batch_payment_id . " dari " . $client->client_name;
+                
+                // Jurnal seimbang:
+                // (D) Kas/Bank         (Total Kas Masuk)   : $danaDariInput
+                // (D) Deposit Klien    (Deposit Terpakai)  : $kreditAkanDigunakan
+                // (K) Piutang Usaha    (Piutang Lunas)     : $totalDanaAlokasi
+                // (K) Deposit Klien    (Kelebihan Bayar)   : $sisaDanaInput
+                
+                $debitEntries = [];
+                $creditEntries = [];
+
+                if ($danaDariInput > 0 && $cashBankAccountId) {
+                    $debitEntries[] = [$cashBankAccountId, $danaDariInput, "Penerimaan batch ke " . $cashBankAccount->account_name];
+                }
+                if ($kreditAkanDigunakan > 0) {
+                    $debitEntries[] = [$clientDepositAccountId, $kreditAkanDigunakan, "Penggunaan deposit klien batch"];
+                }
+                
+                if ($totalDanaAlokasi > 0) {
+                    $creditEntries[] = [$arAccountId, $totalDanaAlokasi, "Pelunasan Piutang batch"];
+                }
+                if ($sisaDanaInput > 0) {
+                    $creditEntries[] = [$clientDepositAccountId, $sisaDanaInput, "Kelebihan bayar batch"];
+                }
+                
+                $this->accountingService->postJournal(
+                    $journalGroupId,
+                    $validated['payment_date'],
+                    $description,
+                    $debitEntries,
+                    $creditEntries,
+                    $batchPayment
+                );
+            }
+
             DB::commit();
             return redirect()->route('clients.show', $client->client_id)
                              ->with('success', 'Pembayaran batch berhasil. ' . implode('. ', $alokasiLog));
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Gagal menyimpan batch: ' . $e->getMessage());
+            Log::error('Gagal menyimpan batch: ' . $e->getMessage() . " on line " . $e->getLine());
             return back()->with('error', 'Gagal menyimpan pembayaran batch: ' . $e->getMessage())->withInput();
         }
     }
@@ -324,6 +391,7 @@ class BatchPaymentController extends Controller
     /**
      * ===================================================
      * BAGIAN: Menyetujui batch payment yang pending
+     * ✅ DIPERBARUI: Menambahkan Jurnal Akuntansi
      * ===================================================
      */
     public function approve(Request $request, BatchPayment $batchPayment): RedirectResponse
@@ -336,6 +404,7 @@ class BatchPaymentController extends Controller
         $validated = $request->validate([
             'company_bank_account_id' => 'required|exists:company_bank_accounts,company_bank_account_id'
         ]);
+
         $bankAccountId = $validated['company_bank_account_id'];
 
         DB::beginTransaction();
@@ -343,6 +412,7 @@ class BatchPaymentController extends Controller
             $client = $batchPayment->client;
             $details = $batchPayment->details ?? [];
             $invoiceIds = $details['invoice_ids'] ?? [];
+            
             $danaDariInput = (float) $batchPayment->total_amount;
             $kreditAkanDigunakan = (float) ($details['credit_amount_to_use'] ?? 0);
             $proofPathFromDetails = $details['proof_path'] ?? null;
@@ -367,6 +437,19 @@ class BatchPaymentController extends Controller
 
             $paymentMethodType = $method->type ?? 'direct';
             $newPaymentStatus = ($paymentMethodType == 'pending') ? 'pending_clearance' : 'completed';
+
+            // ✅ Validasi Akun Akuntansi
+            $arAccountId = $this->accountingSettings->getAccountsReceivableId();
+            $clientDepositAccountId = $this->accountingSettings->getClientDepositId();
+            if (!$arAccountId || !$clientDepositAccountId) {
+                throw new \Exception("Akun Piutang Usaha (AR) atau Akun Deposit Klien belum diatur.");
+            }
+            
+            $cashBankAccount = CompanyBankAccount::find($bankAccountId);
+            if (!$cashBankAccount || !$cashBankAccount->chart_of_account_id) {
+                throw new \Exception("Akun Bank Perusahaan yang dipilih belum terhubung ke Chart of Account.");
+            }
+            $cashBankAccountId = $cashBankAccount->chart_of_account_id;
 
             // Catat penggunaan kredit
             if ($kreditAkanDigunakan > 0) {
@@ -419,8 +502,7 @@ class BatchPaymentController extends Controller
                 $sisaInput -= $bayarDariInput;
             }
 
-            // Kembalikan kelebihan dana ke saldo klien
-                        // Kembalikan kelebihan dana ke saldo klien jika ada
+            // Kembalikan kelebihan dana ke saldo klien jika ada
             $sisaDana = $sisaKredit + $sisaInput;
             if ($sisaDana > 0.01) {
                 ClientLedger::create([
@@ -442,7 +524,42 @@ class BatchPaymentController extends Controller
                 'status' => 'approved',
                 'approved_by_user_id' => Auth::id(),
                 'approved_at' => now(),
+                'company_bank_account_id' => $bankAccountId,
             ]);
+
+            // ✅ Post Jurnal Akuntansi (Agregat)
+            if ($newPaymentStatus == 'completed') {
+                $journalGroupId = "BPAY-" . $batchPayment->batch_payment_id;
+                $description = "Persetujuan Batch Payment #" . $batchPayment->batch_payment_id . " dari " . $client->client_name;
+                
+                $totalDanaAlokasi = $danaDariInput + $kreditAkanDigunakan;
+                
+                $debitEntries = [];
+                $creditEntries = [];
+
+                if ($danaDariInput > 0 && $cashBankAccountId) {
+                    $debitEntries[] = [$cashBankAccountId, $danaDariInput, "Penerimaan batch (Verified) ke " . $cashBankAccount->account_name];
+                }
+                if ($kreditAkanDigunakan > 0) {
+                    $debitEntries[] = [$clientDepositAccountId, $kreditAkanDigunakan, "Penggunaan deposit klien batch"];
+                }
+                
+                if (($totalDanaAlokasi - $sisaDana) > 0) {
+                    $creditEntries[] = [$arAccountId, ($totalDanaAlokasi - $sisaDana), "Pelunasan Piutang batch (Verified)"];
+                }
+                if ($sisaDana > 0) {
+                    $creditEntries[] = [$clientDepositAccountId, $sisaDana, "Kelebihan bayar batch (Verified)"];
+                }
+                
+                $this->accountingService->postJournal(
+                    $journalGroupId,
+                    $batchPayment->payment_date,
+                    $description,
+                    $debitEntries,
+                    $creditEntries,
+                    $batchPayment
+                );
+            }
 
             DB::commit();
 
@@ -451,7 +568,7 @@ class BatchPaymentController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Gagal menyetujui batch payment: ' . $e->getMessage());
+            Log::error('Gagal menyetujui batch payment: ' . $e->getMessage() . " on line " . $e->getLine());
             return back()->with('error', 'Gagal menyetujui batch payment: ' . $e->getMessage());
         }
     }
@@ -459,6 +576,7 @@ class BatchPaymentController extends Controller
     /**
      * ===================================================
      * BAGIAN: Menolak batch payment yang pending
+     * ✅ DIPERBARUI: Menambahkan Jurnal Reversal
      * ===================================================
      */
     public function reject(BatchPayment $batchPayment, Request $request): RedirectResponse
@@ -494,6 +612,30 @@ class BatchPaymentController extends Controller
                 'description' => 'Dana dikembalikan karena Batch Payment #' . $batchPayment->batch_payment_id . ' ditolak',
                 'user_id' => Auth::id(),
             ]);
+
+            // ✅ Jurnal Akuntansi untuk Penolakan
+            $clientDepositAccountId = $this->accountingSettings->getClientDepositId();
+            if (!$clientDepositAccountId) {
+                throw new \Exception("Akun Deposit Klien belum diatur.");
+            }
+
+            // Untuk penolakan, kita asumsikan uang dikembalikan ke deposit klien
+            $journalGroupId = "BPAY-REJ-" . $batchPayment->batch_payment_id;
+            $description = "Penolakan Batch Payment #" . $batchPayment->batch_payment_id;
+            
+            $debitEntries = [];
+            $creditEntries = [
+                [$clientDepositAccountId, $batchPayment->total_amount, "Pengembalian dana ditolak"]
+            ];
+
+            $this->accountingService->postJournal(
+                $journalGroupId,
+                now(),
+                $description,
+                $debitEntries,
+                $creditEntries,
+                $batchPayment
+            );
 
             DB::commit();
             return redirect()->route('batch-payments.pending')

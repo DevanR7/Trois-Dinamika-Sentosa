@@ -18,9 +18,10 @@
                         <tr>
                             <th>Tanggal Pinjam</th>
                             <th>Pemberi Pinjaman</th>
-                            <th>Deskripsi</th>
+                            <th>Akun Utang</th>
                             <th class="text-end">Jumlah Pokok</th>
                             <th class="text-end">Sisa Pokok</th>
+                            <th>Kas Diterima</th>
                             <th>Status</th>
                             <th>Aksi</th>
                         </tr>
@@ -30,9 +31,14 @@
                         <tr>
                             <td>{{ $loan->loan_date->format('d/m/Y') }}</td>
                             <td class="fw-semibold">{{ $loan->lender_name }}</td>
-                            <td>{{ $loan->description ?? '-' }}</td>
+                            
+                            <td>{{ $loan->loanAccount->account_name ?? 'N/A' }}</td>
+                            
                             <td class="text-end">Rp {{ number_format($loan->principal_amount, 0, ',', '.') }}</td>
                             <td class="text-end fw-bold">Rp {{ number_format($loan->remaining_balance, 0, ',', '.') }}</td>
+                            
+                            <td>{{ $loan->cashBankAccount->account_name ?? 'N/A' }}</td>
+                            
                             <td>
                                 @if ($loan->status == 'active')
                                     <span class="badge bg-warning">Aktif</span>
@@ -50,7 +56,14 @@
                                     <a href="{{ route('loans.edit', $loan) }}" class="btn btn-sm btn-outline-dark" title="Edit">
                                         <i class="bi bi-pencil-fill"></i>
                                     </a>
-                                    <form action="{{ route('loans.destroy', $loan) }}" method="POST" class="d-inline" onsubmit="return confirm('Anda yakin ingin menghapus data ini?')">
+                                    
+                                    {{-- ✅ MODIFIKASI: Hapus onsubmit, tambah class & data attribute --}}
+                                    @php
+                                        $loanLabel = $loan->lender_name . ' (Rp ' . number_format($loan->principal_amount, 0, ',', '.') . ')';
+                                    @endphp
+                                    <form action="{{ route('loans.destroy', $loan) }}" method="POST" 
+                                          class="d-inline form-delete-loan" 
+                                          data-loan-label="{{ $loanLabel }}">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
@@ -62,7 +75,8 @@
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="7" class="text-center text-muted">Belum ada data pinjaman.</td>
+                            {{-- ✅ Colspan disesuaikan --}}
+                            <td colspan="8" class="text-center text-muted">Belum ada data pinjaman.</td>
                         </tr>
                         @endforelse
                     </tbody>
@@ -75,3 +89,36 @@
     </div>
 </div>
 @endsection
+
+{{-- ✅ MODIFIKASI: Tambah script SweetAlert --}}
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const deleteForms = document.querySelectorAll('.form-delete-loan');
+    
+    deleteForms.forEach(form => {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault(); 
+            
+            const loanLabel = event.target.dataset.loanLabel;
+            const warningText = `Anda yakin ingin menghapus pinjaman dari "${loanLabel}"? Jurnal pencatatan pinjaman akan dibalik.`;
+
+            Swal.fire({
+                title: 'Anda Yakin?',
+                text: warningText,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Hapus!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    event.target.submit();
+                }
+            });
+        });
+    });
+});
+</script>
+@endpush

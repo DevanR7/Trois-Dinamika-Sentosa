@@ -35,9 +35,9 @@
                         <tr>
                             <th>Nama Aset</th>
                             <th>Tanggal Beli</th>
-                            <th>Deskripsi</th>
+                            <th>Akun Aset</th>
                             <th class="text-end">Harga Beli</th>
-                            <th>Dicatat Oleh</th>
+                            <th>Sumber Dana</th>
                             <th>Aksi</th>
                         </tr>
                     </thead>
@@ -46,14 +46,18 @@
                         <tr>
                             <td class="fw-semibold">{{ $asset->asset_name }}</td>
                             <td>{{ $asset->purchase_date->format('d/m/Y') }}</td>
-                            <td>{{ $asset->description ?? '-' }}</td>
+                            <td>{{ $asset->assetAccount->account_name ?? 'N/A' }}</td>
                             <td class="text-end">Rp {{ number_format($asset->purchase_cost, 0, ',', '.') }}</td>
-                            <td>{{ $asset->user->name ?? 'N/A' }}</td>
+                            <td>{{ $asset->cashBankAccount->account_name ?? 'N/A' }}</td>
                             <td>
                                 <a href="{{ route('fixed-assets.edit', $asset) }}" class="btn btn-sm btn-outline-dark" title="Edit">
                                     <i class="bi bi-pencil-fill"></i>
                                 </a>
-                                <form action="{{ route('fixed-assets.destroy', $asset) }}" method="POST" class="d-inline" onsubmit="return confirm('Anda yakin ingin menghapus data ini?')">
+                                
+                                {{-- ✅ MODIFIKASI: Hapus onsubmit, tambah class & data attribute --}}
+                                <form action="{{ route('fixed-assets.destroy', $asset) }}" method="POST" 
+                                      class="d-inline form-delete-asset" 
+                                      data-asset-name="{{ $asset->asset_name }}">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
@@ -78,3 +82,38 @@
     </div>
 </div>
 @endsection
+
+{{-- ✅ MODIFIKASI: Tambah script SweetAlert --}}
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const deleteForms = document.querySelectorAll('.form-delete-asset');
+    
+    deleteForms.forEach(form => {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault(); 
+            
+            // Ambil nama aset dari data attribute
+            const assetName = event.target.dataset.assetName;
+            const warningText = `Anda yakin ingin menghapus aset: "${assetName}"? Jurnal pembelian yang terkait akan dibalik.`;
+
+            Swal.fire({
+                title: 'Anda Yakin?',
+                text: warningText,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Hapus!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Jika dikonfirmasi, submit form-nya
+                    event.target.submit();
+                }
+            });
+        });
+    });
+});
+</script>
+@endpush

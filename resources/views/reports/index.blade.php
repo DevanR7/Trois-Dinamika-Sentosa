@@ -2,8 +2,8 @@
 
 @section('content')
 <div class="container-fluid py-4">
-    <h2 class="fw-bold mb-4">Laporan Keuangan</h2>
-
+    <h2 class="fw-bold mb-4">Laporan Keuangan (Berbasis Jurnal Umum)</h2>
+    
     {{-- FORM FILTER --}}
     <div class="card shadow-sm mb-4">
         <div class="card-body">
@@ -23,8 +23,8 @@
         </div>
         <div class="card-footer bg-light">
             <small class="text-muted">
-                <strong>Laba Rugi & Arus Kas:</strong> Berdasarkan rentang tanggal yang dipilih.<br>
-                <strong>Neraca:</strong> Merupakan "foto" kondisi keuangan pada <strong>Tanggal Akhir</strong> yang dipilih.
+                <strong>Laba Rugi:</strong> Berdasarkan Jurnal Umum pada rentang tanggal yang dipilih.<br>
+                <strong>Neraca:</strong> Merupakan "foto" Jurnal Umum pada <strong>Tanggal Akhir</strong> yang dipilih.
             </small>
         </div>
     </div>
@@ -39,6 +39,7 @@
         </div>
         <div class="card-body p-0">
             <div class="row g-0">
+                
                 {{-- SISI ASET --}}
                 <div class="col-lg-6 border-end">
                     <div class="table-responsive">
@@ -49,37 +50,17 @@
                                 </tr>
                             </thead>
                             <tbody>
+                                {{-- Loop Dinamis Akun Aset --}}
+                                @forelse ($neraca_aset as $account)
                                 <tr>
-                                    <td class="fw-semibold ps-3" colspan="2">Aset Lancar</td>
+                                    <td class="ps-4">{{ $account->account_name }}</td>
+                                    <td class="text-end pe-3">Rp {{ number_format($account->balance, 0, ',', '.') }}</td>
                                 </tr>
+                                @empty
                                 <tr>
-                                    <td class="ps-4">Kas & Bank (Estimasi)</td>
-                                    <td class="text-end pe-3">Rp {{ number_format($aset_kasDanBank, 0, ',', '.') }}</td>
+                                    <td class="ps-4 text-muted" colspan="2">Tidak ada data Aset.</td>
                                 </tr>
-                                <tr>
-                                    <td class="ps-4">Piutang Usaha</td>
-                                    <td class="text-end pe-3">Rp {{ number_format($aset_piutangUsaha, 0, ',', '.') }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-4">Persediaan Barang</td>
-                                    <td class="text-end pe-3">Rp {{ number_format($aset_persediaan, 0, ',', '.') }}</td>
-                                </tr>
-                                <tr class="table-light">
-                                    <td class="fw-bold ps-4">Total Aset Lancar</td>
-                                    <td class="text-end fw-bold pe-3">Rp {{ number_format($totalAsetLancar, 0, ',', '.') }}</td>
-                                </tr>
-                                
-                                <tr>
-                                    <td class="fw-semibold ps-3" colspan="2">Aset Tetap</td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-4">Nilai Perolehan Aset</td>
-                                    <td class="text-end pe-3">Rp {{ number_format($aset_tetap, 0, ',', '.') }}</td>
-                                </tr>
-                                <tr class="table-light">
-                                    <td class="fw-bold ps-4">Total Aset Tetap</td>
-                                    <td class="text-end fw-bold pe-3">Rp {{ number_format($totalAsetTetap, 0, ',', '.') }}</td>
-                                </tr>
+                                @endforelse
                             </tbody>
                             <tfoot class="table-primary">
                                 <tr>
@@ -102,45 +83,40 @@
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td class="fw-semibold ps-3" colspan="2">Liabilitas Lancar</td>
+                                    <td class="fw-semibold ps-3" colspan="2">Liabilitas</td>
                                 </tr>
+                                {{-- Loop Dinamis Akun Liabilitas --}}
+                                @forelse ($neraca_liabilitas as $account)
                                 <tr>
-                                    <td class="ps-4">Utang Usaha (Supplier)</td>
-                                    <td class="text-end pe-3">Rp {{ number_format($liabilitas_utangUsaha, 0, ',', '.') }}</td>
+                                    <td class="ps-4">{{ $account->account_name }}</td>
+                                    <td class="text-end pe-3">Rp {{ number_format($account->balance, 0, ',', '.') }}</td>
                                 </tr>
-                                <tr class="table-light">
-                                    <td class="fw-bold ps-4">Total Liabilitas Lancar</td>
-                                    <td class="text-end fw-bold pe-3">Rp {{ number_format($totalLiabilitasLancar, 0, ',', '.') }}</td>
-                                </tr>
-
+                                @empty
                                 <tr>
-                                    <td class="fw-semibold ps-3" colspan="2">Liabilitas Jangka Panjang</td>
+                                    <td class="ps-4 text-muted" colspan="2">Tidak ada data Liabilitas.</td>
                                 </tr>
-                                <tr>
-                                    <td class="ps-4">Utang Pinjaman</td>
-                                    <td class="text-end pe-3">Rp {{ number_format($liabilitas_utangJangkaPanjang, 0, ',', '.') }}</td>
-                                </tr>
-                                <tr class="table-light">
-                                    <td class="fw-bold ps-4">Total Liabilitas Jangka Panjang</td>
-                                    <td class="text-end fw-bold pe-3">Rp {{ number_format($totalLiabilitasJangkaPanjang, 0, ',', '.') }}</td>
-                                </tr>
-                                
+                                @endforelse
                                 <tr class="table-secondary">
                                     <td class="fw-bold ps-3">TOTAL LIABILITAS</td>
                                     <td class="text-end fw-bold pe-3">Rp {{ number_format($totalLiabilitas, 0, ',', '.') }}</td>
                                 </tr>
                                 
                                 <tr>
-                                    <td class="fw-semibold ps-3" colspan="2">Ekuitas (Modal)</td>
+                                    <td class="fw-semibold ps-3 mt-2" colspan="2">Ekuitas (Modal)</td>
                                 </tr>
+                                {{-- Loop Dinamis Akun Ekuitas (Modal Setor, Prive, dll) --}}
+                                @forelse ($neraca_ekuitas_non_pl as $account)
                                 <tr>
-                                    <td class="ps-4">Modal Disetor</td>
-                                    <td class="text-end pe-3">Rp {{ number_format($ekuitas_modalDisetor, 0, ',', '.') }}</td>
+                                    <td class="ps-4">{{ $account->account_name }}</td>
+                                    <td class="text-end pe-3">Rp {{ number_format($account->balance, 0, ',', '.') }}</td>
                                 </tr>
+                                @empty
                                 <tr>
-                                    <td class="ps-4">Penarikan Modal (Prive)</td>
-                                    <td class="text-end pe-3 text-danger">(Rp {{ number_format($ekuitas_penarikanModal, 0, ',', '.') }})</td>
+                                    <td class="ps-4 text-muted" colspan="2">Tidak ada data Ekuitas.</td>
                                 </tr>
+                                @endforelse
+                                
+                                {{-- Laba Rugi Akumulasi (Dihitung terpisah) --}}
                                 <tr>
                                     <td class="ps-4">Laba/Rugi Akumulasi</td>
                                     <td class="text-end pe-3 {{ $ekuitas_labaRugiAkumulasi < 0 ? 'text-danger' : '' }}">
@@ -166,14 +142,14 @@
                     </div>
                 </div>
             </div>
-
+            
             {{-- Pengecekan Keseimbangan --}}
             @php
                 $selisih = $totalAset - $totalLiabilitasDanEkuitas;
             @endphp
-            @if(round($selisih) != 0)
+            @if(round($selisih, 2) != 0)
                 <div class="card-footer bg-danger text-white text-center fw-bold">
-                    TIDAK SEIMBANG! (Selisih: Rp {{ number_format($selisih, 0, ',', '.') }}) - Cek kembali semua transaksi.
+                    TIDAK SEIMBANG! (Selisih: Rp {{ number_format($selisih, 2, ',', '.') }}) - Cek kembali Jurnal Umum.
                 </div>
             @else
                 <div class="card-footer bg-success text-white text-center fw-bold">
@@ -182,7 +158,6 @@
             @endif
         </div>
     </div>
-
 
     {{-- =================================== --}}
     {{-- LAPORAN LABA RUGI --}}
@@ -197,49 +172,67 @@
                 <table class="table table-sm table-striped mb-0">
                     <tbody>
                         <tr>
-                            <td class="fw-semibold" style="width: 60%;">A. Pendapatan Kotor Penjualan</td>
-                            <td class="text-end" style="width: 40%;">Rp {{ number_format($pendapatanKotor, 0, ',', '.') }}</td>
+                            <td class="fw-semibold" style="width: 60%;" colspan="2">A. Pendapatan</td>
                         </tr>
+                        {{-- Loop Dinamis Akun Pendapatan --}}
+                        @forelse ($labaRugi_pendapatan as $account)
                         <tr>
-                            <td class="ps-4">Potongan Diskon Penjualan</td>
-                            <td class="text-end text-danger">(Rp {{ number_format($totalDiskonPenjualan, 0, ',', '.') }})</td>
+                            <td class="ps-4" style="width: 60%;">{{ $account->account_name }}</td>
+                            <td class="text-end" style="width: 40%;">Rp {{ number_format($account->total_credit - $account->total_debit, 0, ',', '.') }}</td>
                         </tr>
+                        @empty
                         <tr>
-                            <td class="ps-4">Retur Penjualan</td>
-                            <td class="text-end text-danger">(Rp {{ number_format($totalReturPenjualan, 0, ',', '.') }})</td>
+                            <td class="ps-4 text-muted" colspan="2">Tidak ada data Pendapatan.</td>
                         </tr>
+                        @endforelse
                         <tr class="table-light">
-                            <td class="fw-bold ps-4">Pendapatan Bersih (Netto)</td>
-                            <td class="text-end fw-bold">Rp {{ number_format($pendapatanNetto, 0, ',', '.') }}</td>
+                            <td class="fw-bold ps-4">Total Pendapatan</td>
+                            <td class="text-end fw-bold">Rp {{ number_format($totalPendapatan, 0, ',', '.') }}</td>
                         </tr>
+
                         <tr>
-                            <td class="fw-semibold">B. Harga Pokok Penjualan (HPP)</td>
-                            <td class="text-end text-danger">(Rp {{ number_format($totalHPP, 0, ',', '.') }})</td>
+                            <td class="fw-semibold" colspan="2">B. Harga Pokok Penjualan (HPP)</td>
                         </tr>
+                        {{-- Loop Dinamis Akun HPP --}}
+                        @forelse ($labaRugi_hpp as $account)
+                        <tr>
+                            <td class="ps-4">{{ $account->account_name }}</td>
+                            <td class="text-end text-danger">(Rp {{ number_format($account->total_debit - $account->total_credit, 0, ',', '.') }})</td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td class="ps-4 text-muted" colspan="2">Tidak ada data HPP.</td>
+                        </tr>
+                        @endforelse
                         <tr class="table-light">
+                            <td class="fw-bold ps-4">Total HPP</td>
+                            <td class="text-end fw-bold text-danger">(Rp {{ number_format($totalHPP, 0, ',', '.') }})</td>
+                        </tr>
+
+                        <tr class="table-info">
                             <td class="fw-bold">LABA KOTOR (Gross Profit)</td>
                             <td class="text-end fw-bold fs-5">Rp {{ number_format($labaKotor, 0, ',', '.') }}</td>
                         </tr>
-                         <tr>
-                            {{-- BEBAN OPERASIONAL --}}
-                         <tr>
+                         
+                        <tr>
                             <td class="fw-semibold ps-3" colspan="2">C. Beban Operasional</td>
                         </tr>
-                        {{-- Detail Beban --}}
+                        {{-- Loop Dinamis Akun Beban --}}
+                        @forelse ($labaRugi_beban as $account)
                         <tr>
-                            <td class="ps-4">Beban Usaha Lainnya (Listrik, Gaji, dll)</td>
-                            <td class="text-end text-danger">(Rp {{ number_format($bebanDariExpenses, 0, ',', '.') }})</td>
+                            <td class="ps-4">{{ $account->account_name }}</td>
+                            <td class="text-end text-danger">(Rp {{ number_format($account->total_debit - $account->total_credit, 0, ',', '.') }})</td>
                         </tr>
+                        @empty
                         <tr>
-                            <td class="ps-4">Beban Bunga Pinjaman</td>
-                            <td class="text-end text-danger">(Rp {{ number_format($bebanBungaPinjaman, 0, ',', '.') }})</td>
+                            <td class="ps-4 text-muted" colspan="2">Tidak ada data Beban.</td>
                         </tr>
+                        @endforelse
                         <tr class="table-light">
                             <td class="fw-bold ps-4">Total Beban Operasional</td>
-                            <td class="text-end fw-bold text-danger">(Rp {{ number_format($totalBebanOperasional, 0, ',', '.') }})</td>
+                            <td class="text-end fw-bold text-danger">(Rp {{ number_format($totalBeban, 0, ',', '.') }})</td>
                         </tr>
-
-                        {{-- LABA BERSIH (Tetap Sama) --}}
+                        
                         <tr class="table-dark">
                             <td class="fw-bold fs-5">LABA BERSIH (Net Profit)</td>
                             <td class="text-end fw-bold fs-5">
@@ -255,16 +248,17 @@
             </div>
         </div>
     </div>
-
+    
     {{-- =================================== --}}
-    {{-- LAPORAN ARUS KAS & UTANG/PIUTANG (Ringkasan) --}}
+    {{-- LAPORAN PENDUKUNG (Sub-Ledger & Arus Kas) --}}
     {{-- =================================== --}}
+    <h3 class="fw-bold mb-3 mt-5">Laporan Pendukung</h3>
     <div class="row g-4">
-        {{-- ARUS KAS --}}
+        {{-- ARUS KAS SEDERHANA (Basis Kas) --}}
         <div class="col-lg-12">
             <div class="card shadow-sm h-100">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-semibold">Laporan Arus Kas (Sederhana)</h5>
+                    <h5 class="mb-0 fw-semibold">Laporan Arus Kas (Sederhana - Basis Kas)</h5>
                     @php
                         $arusKasBersih = $totalPemasukan - $totalPengeluaran;
                     @endphp
@@ -286,21 +280,32 @@
                                 <tr><th>Tanggal</th><th>Keterangan</th><th class="text-end">Jumlah</th></tr>
                             </thead>
                             <tbody>
-                                @forelse ($pemasukan as $item)
+                                @forelse ($pemasukan_invoice as $item)
                                 <tr>
                                     <td>{{ optional($item->payment_date)->format('d/m/Y') }}</td>
                                     <td>Pembayaran Invoice <a href="{{ route('invoices.show', $item->invoice_id) }}">{{ $item->salesInvoice->invoice_number ?? 'N/A' }}</a></td>
                                     <td class="text-end">Rp {{ number_format($item->amount, 0, ',', '.') }}</td>
                                 </tr>
                                 @empty
-                                <tr><td colspan="3" class="text-center text-muted">Tidak ada kas masuk.</td></tr>
+                                {{-- Kosong --}}
                                 @endforelse
+                                @forelse ($pemasukan_modal as $item)
+                                <tr>
+                                    <td>{{ optional($item->transaction_date)->format('d/m/Y') }}</td>
+                                    <td>Setoran Modal: {{ $item->description }}</td>
+                                    <td class="text-end">Rp {{ number_format($item->amount, 0, ',', '.') }}</td>
+                                </tr>
+                                @empty
+                                {{-- Kosong --}}
+                                @endforelse
+                                @if($pemasukan_invoice->isEmpty() && $pemasukan_modal->isEmpty())
+                                <tr><td colspan="3" class="text-center text-muted">Tidak ada kas masuk.</td></tr>
+                                @endif
                                 <tr class="table-light">
                                     <td colspan="2" class="text-end fw-bold">Total Pemasukan</td>
                                     <td class="text-end fw-bold text-success">Rp {{ number_format($totalPemasukan, 0, ',', '.') }}</td>
                                 </tr>
                             </tbody>
-
                             <thead class="table-light">
                                 <tr>
                                     <th colspan="3" class="fw-semibold mt-3">Kas Keluar (Pengeluaran)</th>
@@ -308,39 +313,58 @@
                                  <tr><th>Tanggal</th><th>Keterangan</th><th class="text-end">Jumlah</th></tr>
                             </thead>
                              <tbody>
-                                @forelse ($pengeluaranPO as $item)
+                                @forelse ($pengeluaran_po as $item)
                                 <tr>
                                     <td>{{ optional($item->payment_date)->format('d/m/Y') }}</td>
                                     <td>Pembayaran PO <a href="{{ route('purchase-orders.show', $item->po_id) }}">{{ $item->purchaseOrder->po_number ?? 'N/A' }}</a></td>
                                     <td class="text-end">Rp {{ number_format($item->amount, 0, ',', '.') }}</td>
                                 </tr>
                                 @empty
-                                {{-- Jangan tampilkan apa-apa jika kosong --}}
+                                {{-- Kosong --}}
                                 @endforelse
                                 
-                                {{-- Pengeluaran Beban (Sudah Ada) --}}
-                                @foreach ($pengeluaranBeban as $item)
+                                @foreach ($pengeluaran_beban as $item)
                                  <tr>
                                     <td>{{ optional($item->expense_date)->format('d/m/Y') }}</td>
-                                    <td>Beban: {{ $item->category }} ({{ $item->description }})</td>
+                                    <td>Beban: {{ $item->expenseAccount->account_name ?? $item->category }} ({{ $item->description }})</td>
                                     <td class="text-end">Rp {{ number_format($item->amount, 0, ',', '.') }}</td>
                                 </tr>
                                 @endforeach
                                 
-                                {{-- ✅ [TAMBAHKAN LOOP INI] Pengeluaran Pinjaman --}}
-                                @forelse ($pengeluaranPinjaman as $item)
+                                @forelse ($pengeluaran_pinjaman as $item)
                                  <tr>
                                     <td>{{ optional($item->payment_date)->format('d/m/Y') }}</td>
-                                    {{-- Link ke detail pinjaman induk --}}
                                     <td>Pembayaran Cicilan <a href="{{ route('loans.show', $item->loan_id) }}">{{ $item->loan->lender_name ?? 'N/A' }}</a></td>
                                     <td class="text-end">Rp {{ number_format($item->total_paid, 0, ',', '.') }}</td>
                                 </tr>
                                 @empty
-                                {{-- Jangan tampilkan apa-apa jika kosong --}}
+                                {{-- Kosong --}}
                                 @endforelse
-                                {{-- Akhir Loop Baru --}}
 
-                                {{-- Total Pengeluaran (Sudah Ada) --}}
+                                @forelse ($pengeluaran_aset as $item)
+                                 <tr>
+                                    <td>{{ optional($item->purchase_date)->format('d/m/Y') }}</td>
+                                    <td>Pembelian Aset: {{ $item->asset_name }}</td>
+                                    <td class="text-end">Rp {{ number_format($item->purchase_cost, 0, ',', '.') }}</td>
+                                </tr>
+                                @empty
+                                {{-- Kosong --}}
+                                @endforelse
+
+                                @forelse ($pengeluaran_modal as $item)
+                                 <tr>
+                                    <td>{{ optional($item->transaction_date)->format('d/m/Y') }}</td>
+                                    <td>Penarikan Modal: {{ $item->description }}</td>
+                                    <td class="text-end">Rp {{ number_format($item->amount, 0, ',', '.') }}</td>
+                                </tr>
+                                @empty
+                                {{-- Kosong --}}
+                                @endforelse
+
+                                @if($totalPengeluaran == 0)
+                                <tr><td colspan="3" class="text-center text-muted">Tidak ada kas keluar.</td></tr>
+                                @endif
+                                
                                 <tr class="table-light">
                                     <td colspan="2" class="text-end fw-bold">Total Pengeluaran</td>
                                     <td class="text-end fw-bold text-danger">(Rp {{ number_format($totalPengeluaran, 0, ',', '.') }})</td>
@@ -348,6 +372,100 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- RINCIAN PIUTANG (Sub-Ledger) --}}
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="mb-0 fw-semibold">Rincian Piutang Usaha (Sub-Ledger)</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Klien</th>
+                                    <th>Invoice</th>
+                                    <th>Jatuh Tempo</th>
+                                    <th class="text-end">Sisa Tagihan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($laporanPiutang as $invoice)
+                                    <tr>
+                                        <td>{{ $invoice->client->client_name ?? 'N/A' }}</td>
+                                        <td>
+                                            <a href="{{ route('invoices.show', $invoice->invoice_id) }}">
+                                                {{ $invoice->invoice_number }}
+                                            </a>
+                                        </td>
+                                        <td>{{ $invoice->due_date->format('d/m/Y') }}</td>
+                                        <td class="text-end fw-semibold">
+                                            Rp {{ number_format($invoice->remaining_balance, 0, ',', '.') }}
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">Tidak ada piutang jatuh tempo.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer fw-bold d-flex justify-content-between">
+                    <span>Total Piutang (Sub-Ledger)</span>
+                    <span>Rp {{ number_format($totalPiutang_SL, 0, ',', '.') }}</span>
+                </div>
+            </div>
+        </div>
+
+        {{-- RINCIAN UTANG (Sub-Ledger) --}}
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="mb-0 fw-semibold">Rincian Utang Usaha (Sub-Ledger)</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Supplier</th>
+                                    <th>No. PO</th>
+                                    <th>Jatuh Tempo</th>
+                                    <th class="text-end">Sisa Hutang</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($laporanUtang as $po)
+                                    <tr>
+                                        <td>{{ $po->supplier->supplier_name ?? 'N/A' }}</td>
+                                        <td>
+                                            <a href="{{ route('purchase-orders.show', $po->po_id) }}">
+                                                {{ $po->po_number }}
+                                            </a>
+                                        </td>
+                                        <td>{{ $po->due_date ? $po->due_date->format('d/m/Y') : '-' }}</td>
+                                        <td class="text-end fw-semibold">
+                                            Rp {{ number_format($po->remaining_balance, 0, ',', '.') }}
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">Tidak ada utang jatuh tempo.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer fw-bold d-flex justify-content-between">
+                    <span>Total Utang (Sub-Ledger)</span>
+                    <span>Rp {{ number_format($totalUtang_SL, 0, ',', '.') }}</span>
                 </div>
             </div>
         </div>

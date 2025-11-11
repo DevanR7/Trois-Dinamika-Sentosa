@@ -53,7 +53,7 @@
                         @forelse ($expenses as $expense)
                         <tr>
                             <td>{{ $expense->expense_date->format('d/m/Y') }}</td>
-                            <td>{{ $expense->category }}</td>
+                            <td>{{ $expense->expenseAccount->account_name ?? $expense->category }}</td>
                             <td>{{ $expense->description }}</td>
                             <td class="text-end fw-semibold">Rp {{ number_format($expense->amount, 0, ',', '.') }}</td>
                             <td>{{ $expense->user->name ?? 'N/A' }}</td>
@@ -61,7 +61,15 @@
                                 <a href="{{ route('expenses.edit', $expense) }}" class="btn btn-sm btn-outline-dark" title="Edit">
                                     <i class="bi bi-pencil-fill"></i>
                                 </a>
-                                <form action="{{ route('expenses.destroy', $expense) }}" method="POST" class="d-inline" onsubmit="return confirm('Anda yakin ingin menghapus data ini?')">
+                                
+                                {{-- ✅ MODIFIKASI: Hapus onsubmit, tambah class & data attribute --}}
+                                @php
+                                    // Buat label yang deskriptif untuk alert
+                                    $expenseLabel = $expense->description . ' (Rp ' . number_format($expense->amount, 0, ',', '.') . ' tgl ' . $expense->expense_date->format('d/m/Y') . ')';
+                                @endphp
+                                <form action="{{ route('expenses.destroy', $expense) }}" method="POST" 
+                                      class="d-inline form-delete-expense" 
+                                      data-expense-label="{{ $expenseLabel }}">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
@@ -93,3 +101,38 @@
     </div>
 </div>
 @endsection
+
+{{-- ✅ MODIFIKASI: Tambah script SweetAlert --}}
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const deleteForms = document.querySelectorAll('.form-delete-expense');
+    
+    deleteForms.forEach(form => {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault(); 
+            
+            // Ambil label pengeluaran dari data attribute
+            const expenseLabel = event.target.dataset.expenseLabel;
+            const warningText = `Anda yakin ingin menghapus pengeluaran ini: "${expenseLabel}"? Jurnal yang terkait akan dibalik.`;
+
+            Swal.fire({
+                title: 'Anda Yakin?',
+                text: warningText,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Hapus!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Jika dikonfirmasi, submit form-nya
+                    event.target.submit();
+                }
+            });
+        });
+    });
+});
+</script>
+@endpush

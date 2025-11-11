@@ -289,6 +289,13 @@
     </li>
 
     <li class="item">
+        <a class="link flex {{ request()->routeIs("reports.general-ledger") ? "active" : "" }}" href="{{ route("reports.general-ledger") }}">
+            <i class="material-icons">book</i>
+            <span>Jurnal Umum</span>
+        </a>
+    </li>
+
+    <li class="item">
         <a class="link flex {{ request()->routeIs('expenses.*') ? 'active' : '' }}" href="{{ route('expenses.index') }}">
             <i class="material-icons">account_balance_wallet</i>
             <span>Beban Operasional</span>
@@ -344,6 +351,13 @@
         </a>
     </li>
     @endcan
+
+    <li class="item">
+        <a class="link flex {{ request()->routeIs("chart-of-accounts.*") ? "active" : "" }}" href="{{ route("chart-of-accounts.index") }}">
+            <i class="material-icons">account_tree</i>
+            <span>Daftar Akun (COA)</span>
+        </a>
+    </li>
 
     @can("manage-payment-methods")
     <li class="item">

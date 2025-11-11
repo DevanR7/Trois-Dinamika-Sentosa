@@ -7,44 +7,53 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
+use App\Models\ChartOfAccount;
+use App\Services\AccountingService;
+use Illuminate\Support\Facades\DB;
 
 class EquityTransactionController extends Controller
-{
-    // Definisikan tipe transaksi agar konsisten
-    const TRANSACTION_TYPES = [
-        'investment' => 'Setoran Modal',
-        'drawing' => 'Penarikan Modal (Prive)',
-    ];
+{   
+    protected $accountingService;
+
+    public function __construct(AccountingService $accountingService)
+    {
+        $this->accountingService = $accountingService;
+        
+        // ✅ TAMBAHKAN BLOK INI
+        // Hanya yang bisa 'view-reports' boleh lihat daftar (index)
+        $this->middleware('can:view-reports')->only(['index']);
+        
+        // (Opsional) Jika Anda ingin permission terpisah
+        // $this->middleware('can:manage-equity')->except(['index']);
+    }
 
     /**
      * Menampilkan daftar semua transaksi modal.
      */
     public function index(Request $request): View
     {
-        // $this->authorize('viewAny', EquityTransaction::class);
-        $query = EquityTransaction::with('user');
-
-        // Filter Tanggal
+        // ✅ Perbarui query untuk load relasi baru
+        $query = EquityTransaction::with(['user', 'equityAccount', 'cashBankAccount']);
+        
+        // Filter (Sama)
         if ($request->filled('start_date')) {
             $query->whereDate('transaction_date', '>=', $request->start_date);
         }
         if ($request->filled('end_date')) {
             $query->whereDate('transaction_date', '<=', $request->end_date);
         }
-        // Filter Tipe
         if ($request->filled('type')) {
             $query->where('type', $request->type);
         }
 
         $transactions = $query->latest('transaction_date')->paginate(15)->appends($request->query());
-
-        // Hitung total untuk summary
-        $queryTotals = clone $query; // Clone query sebelum di-paginate
+        
+        // Kalkulasi (Sama)
+        $queryTotals = clone $query; 
         $totalInvestment = $queryTotals->where('type', 'investment')->sum('amount');
         
-        $queryTotals = clone $query; // Reset clone
+        $queryTotals = clone $query; 
         $totalDrawing = $queryTotals->where('type', 'drawing')->sum('amount');
-
         $netModal = $totalInvestment - $totalDrawing;
 
         return view('equity_transactions.index', compact(
@@ -61,8 +70,20 @@ class EquityTransactionController extends Controller
     public function create(): View
     {
         // $this->authorize('create', EquityTransaction::class);
-        $types = self::TRANSACTION_TYPES;
-        return view('equity_transactions.create', compact('types'));
+        
+        // ✅ Ambil akun Ekuitas dari COA
+        $equityAccounts = ChartOfAccount::where('account_type', 'Ekuitas')
+                                ->where('is_active', true)
+                                ->orderBy('account_number')
+                                ->get();
+        
+        // ✅ Ambil akun Sumber Dana (Kas/Bank) dari COA
+        $cashAccounts = ChartOfAccount::where('account_type', 'Aset')
+                                ->where('is_active', true)
+                                ->orderBy('account_number')
+                                ->get();
+
+        return view('equity_transactions.create', compact('equityAccounts', 'cashAccounts'));
     }
 
     /**
@@ -71,23 +92,68 @@ class EquityTransactionController extends Controller
     public function store(Request $request): RedirectResponse
     {
         // $this->authorize('create', EquityTransaction::class);
-
+        
         $validated = $request->validate([
             'transaction_date' => 'required|date',
-            'type' => 'required|in:investment,drawing', // Pastikan tipenya valid
             'amount' => 'required|numeric|min:1',
             'description' => 'required|string|max:1000',
+            // ✅ Validasi kolom baru
+            'equity_account_id' => 'required|exists:chart_of_accounts,account_id',
+            'cash_bank_account_id' => 'required|exists:chart_of_accounts,account_id',
         ]);
 
-        EquityTransaction::create([
-            'transaction_date' => $validated['transaction_date'],
-            'type' => $validated['type'],
-            'amount' => $validated['amount'],
-            'description' => $validated['description'],
-            'user_id' => Auth::id(),
-        ]);
+        // Tentukan 'type' (investment/drawing) berdasarkan Saldo Normal Akun Ekuitas
+        $equityAccount = ChartOfAccount::find($validated['equity_account_id']);
+        // Akun Modal (Saldo Normal Kredit) = 'investment'
+        // Akun Prive (Saldo Normal Debit) = 'drawing'
+        $type = ($equityAccount->normal_balance == 'Kredit') ? 'investment' : 'drawing';
 
-        return redirect()->route('equity-transactions.index')->with('success', 'Transaksi modal berhasil dicatat.');
+        DB::beginTransaction();
+        try {
+            // 1. Simpan data transaksi
+            $transaction = EquityTransaction::create([
+                'transaction_date' => $validated['transaction_date'],
+                'amount' => $validated['amount'],
+                'description' => $validated['description'],
+                'user_id' => Auth::id(),
+                'equity_account_id' => $validated['equity_account_id'],
+                'cash_bank_account_id' => $validated['cash_bank_account_id'],
+                'type' => $type, // Simpan tipe yg ditentukan otomatis
+            ]);
+
+            // 2. Post Jurnal Akuntansi
+            $journalGroupId = "EQ-" . $transaction->transaction_id;
+            $description = "Modal: " . $transaction->description;
+            
+            $debitEntries = [];
+            $creditEntries = [];
+
+            if ($type == 'investment') {
+                // Setoran Modal: Kas (Debit), Modal (Kredit)
+                $debitEntries[] = [$validated['cash_bank_account_id'], $validated['amount']];
+                $creditEntries[] = [$validated['equity_account_id'], $validated['amount']];
+            } else {
+                // Penarikan Modal: Prive (Debit), Kas (Kredit)
+                $debitEntries[] = [$validated['equity_account_id'], $validated['amount']];
+                $creditEntries[] = [$validated['cash_bank_account_id'], $validated['amount']];
+            }
+
+            $this->accountingService->postJournal(
+                $journalGroupId,
+                $validated['transaction_date'],
+                $description,
+                $debitEntries,
+                $creditEntries,
+                $transaction // Model referensi
+            );
+
+            DB::commit();
+            return redirect()->route('equity-transactions.index')->with('success', 'Transaksi modal berhasil dicatat dan dijurnal.');
+        
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Gagal menyimpan data: ' . $e->getMessage())->withInput();
+        }
     }
 
     /**
@@ -96,12 +162,19 @@ class EquityTransactionController extends Controller
     public function edit(EquityTransaction $equityTransaction): View
     {
         // $this->authorize('update', $equityTransaction);
-        $types = self::TRANSACTION_TYPES;
         
-        // Ganti nama variabel agar tidak bentrok dengan nama 'route resource'
+        $equityAccounts = ChartOfAccount::where('account_type', 'Ekuitas')
+                                ->where('is_active', true)
+                                ->orderBy('account_number')
+                                ->get();
+        $cashAccounts = ChartOfAccount::where('account_type', 'Aset')
+                                ->where('is_active', true)
+                                ->orderBy('account_number')
+                                ->get();
+        
         $transaction = $equityTransaction; 
         
-        return view('equity_transactions.edit', compact('transaction', 'types'));
+        return view('equity_transactions.edit', compact('transaction', 'equityAccounts', 'cashAccounts'));
     }
 
     /**
@@ -110,17 +183,62 @@ class EquityTransactionController extends Controller
     public function update(Request $request, EquityTransaction $equityTransaction): RedirectResponse
     {
         // $this->authorize('update', $equityTransaction);
-
+        
         $validated = $request->validate([
             'transaction_date' => 'required|date',
-            'type' => 'required|in:investment,drawing',
             'amount' => 'required|numeric|min:1',
             'description' => 'required|string|max:1000',
+            // ✅ Validasi kolom baru
+            'equity_account_id' => 'required|exists:chart_of_accounts,account_id',
+            'cash_bank_account_id' => 'required|exists:chart_of_accounts,account_id',
         ]);
 
-        $equityTransaction->update($validated);
+        $equityAccount = ChartOfAccount::find($validated['equity_account_id']);
+        $type = ($equityAccount->normal_balance == 'Kredit') ? 'investment' : 'drawing';
 
-        return redirect()->route('equity-transactions.index')->with('success', 'Transaksi modal berhasil diupdate.');
+        DB::beginTransaction();
+        try {
+            // 1. Update data transaksi
+            $equityTransaction->update([
+                'transaction_date' => $validated['transaction_date'],
+                'amount' => $validated['amount'],
+                'description' => $validated['description'],
+                'equity_account_id' => $validated['equity_account_id'],
+                'cash_bank_account_id' => $validated['cash_bank_account_id'],
+                'type' => $type,
+            ]);
+
+            // 2. Post ulang Jurnal Akuntansi
+            $journalGroupId = "EQ-" . $equityTransaction->transaction_id;
+            $description = "Modal (Update): " . $equityTransaction->description;
+            
+            $debitEntries = [];
+            $creditEntries = [];
+
+            if ($type == 'investment') {
+                $debitEntries[] = [$validated['cash_bank_account_id'], $validated['amount']];
+                $creditEntries[] = [$validated['equity_account_id'], $validated['amount']];
+            } else {
+                $debitEntries[] = [$validated['equity_account_id'], $validated['amount']];
+                $creditEntries[] = [$validated['cash_bank_account_id'], $validated['amount']];
+            }
+
+            $this->accountingService->postJournal(
+                $journalGroupId,
+                $validated['transaction_date'],
+                $description,
+                $debitEntries,
+                $creditEntries,
+                $equityTransaction // Model referensi
+            );
+
+            DB::commit();
+            return redirect()->route('equity-transactions.index')->with('success', 'Transaksi modal berhasil diupdate.');
+        
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Gagal mengupdate data: ' . $e->getMessage())->withInput();
+        }
     }
 
     /**
@@ -130,10 +248,48 @@ class EquityTransactionController extends Controller
     {
         // $this->authorize('delete', $equityTransaction);
         
+        DB::beginTransaction();
         try {
+            // 1. Hapus Jurnal terkait (Reversal)
+            $journalGroupId = "EQ-REVERSAL-" . $equityTransaction->transaction_id;
+            $description = "Reversal Modal: " . $equityTransaction->description;
+            
+            $debitEntries = [];
+            $creditEntries = [];
+
+            // Jurnalnya dibalik
+            if ($equityTransaction->type == 'investment') {
+                // Asli: (D) Kas, (K) Modal
+                // Balik: (D) Modal, (K) Kas
+                $debitEntries[] = [$equityTransaction->equity_account_id, $equityTransaction->amount];
+                $creditEntries[] = [$equityTransaction->cash_bank_account_id, $equityTransaction->amount];
+            } else {
+                // Asli: (D) Prive, (K) Kas
+                // Balik: (D) Kas, (K) Prive
+                $debitEntries[] = [$equityTransaction->cash_bank_account_id, $equityTransaction->amount];
+                $creditEntries[] = [$equityTransaction->equity_account_id, $equityTransaction->amount];
+            }
+            
+            $this->accountingService->postJournal(
+                $journalGroupId,
+                now(), // Tanggal reversal
+                $description,
+                $debitEntries,
+                $creditEntries,
+                $equityTransaction
+            );
+            
+            // 2. Hapus Jurnal Asli (EQ-...)
+            DB::table('general_ledgers')->where('journal_group_id', "EQ-" . $equityTransaction->transaction_id)->delete();
+            
+            // 3. Hapus data transaksi
             $equityTransaction->delete();
+            
+            DB::commit();
             return redirect()->route('equity-transactions.index')->with('success', 'Transaksi modal berhasil dihapus.');
+        
         } catch (\Exception $e) {
+            DB::rollBack();
             return back()->with('error', 'Gagal menghapus data: ' . $e->getMessage());
         }
     }

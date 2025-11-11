@@ -86,11 +86,12 @@ class InvoiceController extends Controller
 
         // Ambil semua invoice yang belum lunas
         $invoices = $client->salesInvoices()
-            ->whereIn('status', ['unpaid', 'partially_paid'])
+            ->whereIn('status', ['unpaid', 'partially_paid', 'paid']) // PERUBAHAN: Tambahkan 'paid'
             ->with(['deductingReturns', 'adjustments'])
             ->orderBy('due_date', 'asc')
-            ->get()
-            ->filter(fn($invoice) => $invoice->remaining_balance > 0.01);
+            ->get();
+            // PERUBAHAN: Hapus filter untuk menampilkan invoice dengan saldo negatif
+            // ->filter(fn($invoice) => $invoice->remaining_balance > 0.01);
 
         $availableBalance = $client->balance;
         $pendingBalance = $client->pending_balance;
@@ -152,9 +153,12 @@ class InvoiceController extends Controller
             return back()->with('error', 'Jumlah pembayaran harus lebih dari 0.');
         }
 
-        if ($totalPaymentValue > ($sisaTagihan + 0.01)) {
-            return back()->with('error', 'Jumlah pembayaran melebihi sisa tagihan.');
-        }
+        // PERUBAHAN: Hapus validasi kelebihan bayar
+        // if ($totalPaymentValue > ($sisaTagihan + 0.01)) {
+        //     return back()->with('error', 'Jumlah pembayaran melebihi sisa tagihan.');
+        // }
+        // Biarkan overpayment terjadi. Admin akan menanganinya
+        // (Controller admin akan mengubahnya jadi deposit).
 
         DB::beginTransaction();
         try {
@@ -277,7 +281,8 @@ class InvoiceController extends Controller
 
             if ($useCredit && $client->balance > 0) {
                 $totalPaymentValue = $amountFromInput + $client->balance;
-                $kreditAkanDigunakan = min($client->balance, $totalSisaTagihan, $totalPaymentValue);
+                // PERUBAHAN: Kredit yang dipakai adalah minimal dari saldo, ATAU total tagihan (jika tagihan negatif)
+                $kreditAkanDigunakan = min($client->balance, max(0, $totalSisaTagihan), $totalPaymentValue);
             }
 
             $totalPaymentValue = $amountFromInput + $kreditAkanDigunakan;
@@ -286,12 +291,14 @@ class InvoiceController extends Controller
                 throw new \Exception("Jumlah pembayaran harus lebih dari 0.");
             }
 
-            if ($totalPaymentValue > ($totalSisaTagihan + 0.01)) {
-                throw new \Exception(
-                    "Jumlah pembayaran (Rp " . number_format($totalPaymentValue) .
-                    ") melebihi total tagihan (Rp " . number_format($totalSisaTagihan) . ")."
-                );
-            }
+            // PERUBAHAN: Hapus validasi kelebihan bayar
+            // if ($totalPaymentValue > ($totalSisaTagihan + 0.01)) {
+            //     throw new \Exception(
+            //         "Jumlah pembayaran (Rp " . number_format($totalPaymentValue) .
+            //         ") melebihi total tagihan (Rp " . number_format($totalSisaTagihan) . ")."
+            //     );
+            // }
+            // Biarkan overpayment terjadi. JS di view sudah memberi info.
 
             BatchPayment::create([
                 'client_id'             => $client->client_id,

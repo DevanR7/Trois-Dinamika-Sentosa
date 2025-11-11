@@ -2,33 +2,34 @@
 
 namespace App\Http\Controllers;
 
-// Model-model yang sudah ada
+// Model-model untuk Arus Kas (Lama) & Laporan Utang/Piutang (Lama)
 use App\Models\SalesInvoice;
 use App\Models\PurchaseOrder;
-use App\Models\SalesReturn;
-use App\Models\PurchaseReturn;
 use App\Models\Payment;
 use App\Models\PurchaseOrderPayment;
 use App\Models\Expense;
-use App\Models\InvoiceItem;
 use App\Models\LoanPayment;
+use App\Models\FixedAsset; // <-- Ditambahkan untuk Arus Kas
+use App\Models\EquityTransaction; // <-- Ditambahkan untuk Arus Kas
 
-// <-- TAMBAHKAN MODEL-MODEL BARU UNTUK NERACA -->
-use App\Models\Product;
-use App\Models\FixedAsset;
-use App\Models\Loan;
-use App\Models\EquityTransaction;
+// ✅ Model BARU untuk Laporan Inti
+use App\Models\GeneralLedger;
+use App\Models\ChartOfAccount;
 
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use App\Services\AccountingSettingService;
 
 class ReportController extends Controller
 {
-    public function __construct()
+    protected $accountingSettings;
+
+    public function __construct(AccountingSettingService $accountingSettingService)
     {
         $this->middleware('can:view-reports');
+        $this->accountingSettings = $accountingSettingService;
     }
     
     public function index(Request $request): View
@@ -36,139 +37,143 @@ class ReportController extends Controller
         // --- 1. PENGATURAN TANGGAL ---
         $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->toDateString());
         $endDate = $request->input('end_date', Carbon::now()->endOfMonth()->toDateString());
-        $endDateCarbon = Carbon::parse($endDate)->endOfDay(); // Untuk filter neraca
+        $endDateCarbon = Carbon::parse($endDate)->endOfDay();
 
         // =================================================================
         // LAPORAN LABA RUGI (PROFIT & LOSS) - PERIODE ($startDate s/d $endDate)
+        // Dihitung murni dari Jurnal Umum (General Ledger)
         // =================================================================
         
-        $invoicesInPeriod = SalesInvoice::whereBetween('order_date', [$startDate, $endDate])
-                            ->where('status', '!=', 'cancelled');
+        $plAccounts = GeneralLedger::join('chart_of_accounts as coa', 'general_ledgers.chart_of_account_id', '=', 'coa.account_id')
+            ->whereIn('coa.account_type', ['Pendapatan', 'HPP', 'Beban'])
+            ->whereBetween('general_ledgers.entry_date', [$startDate, $endDate])
+            ->select(
+                'coa.account_id', 
+                'coa.account_name', 
+                'coa.account_type', 
+                'coa.normal_balance',
+                DB::raw('SUM(general_ledgers.debit) as total_debit'), 
+                DB::raw('SUM(general_ledgers.credit) as total_credit')
+            )
+            ->groupBy('coa.account_id', 'coa.account_name', 'coa.account_type', 'coa.normal_balance')
+            ->orderBy('coa.account_number')
+            ->get();
+
+        // Pisahkan berdasarkan Tipe Akun
+        $labaRugi_pendapatan = $plAccounts->where('account_type', 'Pendapatan');
+        $labaRugi_hpp = $plAccounts->where('account_type', 'HPP');
+        $labaRugi_beban = $plAccounts->where('account_type', 'Beban');
+
+        // Hitung Total (Saldo Normal Kredit - Saldo Normal Debit)
+        $totalPendapatan = $labaRugi_pendapatan->sum(fn($acc) => $acc->total_credit - $acc->total_debit);
+        $totalHPP = $labaRugi_hpp->sum(fn($acc) => $acc->total_debit - $acc->total_credit);
+        $totalBeban = $labaRugi_beban->sum(fn($acc) => $acc->total_debit - $acc->total_credit);
         
-        $pendapatanKotor = $invoicesInPeriod->sum('subtotal');
-        $totalDiskonPenjualan = $invoicesInPeriod->sum('discount_amount');
-        $totalReturPenjualan = SalesReturn::whereBetween('return_date', [$startDate, $endDate])->sum('total_amount');
-        $pendapatanNetto = ($pendapatanKotor - $totalDiskonPenjualan) - $totalReturPenjualan;
-
-        $totalHPP = InvoiceItem::whereHas('salesInvoice', function ($query) use ($startDate, $endDate) {
-            $query->whereBetween('order_date', [$startDate, $endDate])
-                  ->where('status', '!=', 'cancelled');
-        })->sum(DB::raw('quantity * hpp'));
-
-        $labaKotor = $pendapatanNetto - $totalHPP;
-        $bebanDariExpenses = Expense::whereBetween('expense_date', [$startDate, $endDate])->sum('amount');
-        $bebanBungaPinjaman = LoanPayment::whereBetween('payment_date', [$startDate, $endDate])->sum('interest_paid'); // <-- Ambil bunga dari cicilan
-        $totalBebanOperasional = $bebanDariExpenses + $bebanBungaPinjaman;
-        $labaBersih = $labaKotor - $totalBebanOperasional;
-
-
-        // =================================================================
-        // LAPORAN ARUS KAS (CASH FLOW) - PERIODE ($startDate s/d $endDate)
-        // =================================================================
-
-        // 1. Pemasukan (dari pembayaran invoice) - Tetap sama
-        $pemasukan = Payment::whereBetween('payment_date', [$startDate, $endDate])->get();
-        $totalPemasukan = $pemasukan->sum('amount');
-
-        // 2. Pengeluaran (dari pembayaran PO) - Tetap sama
-        $pengeluaranPO = PurchaseOrderPayment::whereBetween('payment_date', [$startDate, $endDate])->get();
-        $totalPengeluaranPO = $pengeluaranPO->sum('amount');
-
-        // 3. Pengeluaran (dari Beban Operasional) - Tetap sama
-        $pengeluaranBeban = Expense::whereBetween('expense_date', [$startDate, $endDate])->get();
-        $totalPengeluaranBeban = $pengeluaranBeban->sum('amount');
-
-        // 4. Pengeluaran (dari Pembayaran Pinjaman) - [NEW] <-- TAMBAHKAN INI
-        $pengeluaranPinjaman = LoanPayment::whereBetween('payment_date', [$startDate, $endDate])->get();
-        $totalPengeluaranPinjaman = $pengeluaranPinjaman->sum('total_paid'); // <-- Ambil TOTAL bayar (pokok+bunga)
-
-        // 5. Total Pengeluaran Kas - [UPDATED]
-        $totalPengeluaran = $totalPengeluaranPO + $totalPengeluaranBeban + $totalPengeluaranPinjaman; // <-- Tambahkan pengeluaran pinjaman
-        
+        $labaKotor = $totalPendapatan - $totalHPP;
+        $labaBersih = $labaKotor - $totalBeban;
 
         // =================================================================
         // LAPORAN NERACA (BALANCE SHEET) - SNAPSHOT PADA $endDate
+        // Dihitung murni dari Jurnal Umum (General Ledger) s/d $endDate
         // =================================================================
-
-        // --- A. ASET (ASSETS) ---
         
-        // 1. Aset Lancar
-        // Estimasi Kas (Total kas masuk - total kas keluar s/d $endDate)
-        $kasMasukTotal = Payment::where('payment_date', '<=', $endDateCarbon)->sum('amount');
-        $kasKeluarPoTotal = PurchaseOrderPayment::where('payment_date', '<=', $endDateCarbon)->sum('amount');
-        $kasKeluarBebanTotal = Expense::where('expense_date', '<=', $endDateCarbon)->sum('amount');
-        // TODO: Nanti tambahkan pengeluaran beli aset, bayar pinjaman, dan terima pinjaman
-        $aset_kasDanBank = $kasMasukTotal - $kasKeluarPoTotal - $kasKeluarBebanTotal;
+        // 1. Ambil Saldo Akun Aset, Liabilitas, Ekuitas
+        $bsAccounts = GeneralLedger::join('chart_of_accounts as coa', 'general_ledgers.chart_of_account_id', '=', 'coa.account_id')
+            ->whereIn('coa.account_type', ['Aset', 'Liabilitas', 'Ekuitas'])
+            ->where('general_ledgers.entry_date', '<=', $endDateCarbon)
+            ->select(
+                'coa.account_id', 
+                'coa.account_name', 
+                'coa.account_type', 
+                'coa.normal_balance',
+                DB::raw('SUM(general_ledgers.debit) as total_debit'), 
+                DB::raw('SUM(general_ledgers.credit) as total_credit')
+            )
+            ->groupBy('coa.account_id', 'coa.account_name', 'coa.account_type', 'coa.normal_balance')
+            ->orderBy('coa.account_number')
+            ->get()
+            ->map(function ($acc) {
+                // Hitung saldo akhir berdasarkan saldo normal
+                if ($acc->normal_balance == 'Debit') {
+                    $acc->balance = $acc->total_debit - $acc->total_credit;
+                } else {
+                    $acc->balance = $acc->total_credit - $acc->total_debit;
+                }
+                return $acc;
+            })
+            ->filter(function ($acc) {
+                // Sembunyikan akun dengan saldo 0
+                return round($acc->balance, 2) != 0;
+            });
 
-        // Piutang Usaha (Tagihan belum lunas saat ini)
+        // Pisahkan Aset, Liabilitas, Ekuitas
+        $neraca_aset = $bsAccounts->where('account_type', 'Aset');
+        $neraca_liabilitas = $bsAccounts->where('account_type', 'Liabilitas');
+        $neraca_ekuitas_non_pl = $bsAccounts->where('account_type', 'Ekuitas'); // Hanya Modal Disetor, Prive, dll.
+        
+        // 2. Hitung Laba/Rugi Akumulasi (dari Awal s/d $endDate)
+        $plAccumulated = GeneralLedger::join('chart_of_accounts as coa', 'general_ledgers.chart_of_account_id', '=', 'coa.account_id')
+            ->whereIn('coa.account_type', ['Pendapatan', 'HPP', 'Beban'])
+            ->where('general_ledgers.entry_date', '<=', $endDateCarbon)
+            ->select(
+                'coa.account_type',
+                DB::raw('SUM(general_ledgers.debit) as total_debit'), 
+                DB::raw('SUM(general_ledgers.credit) as total_credit')
+            )
+            ->groupBy('coa.account_type')
+            ->get()
+            ->keyBy('account_type');
+
+        $totalPendapatanAkumulasi = ($plAccumulated['Pendapatan']->total_credit ?? 0) - ($plAccumulated['Pendapatan']->total_debit ?? 0);
+        $totalHppAkumulasi = ($plAccumulated['HPP']->total_debit ?? 0) - ($plAccumulated['HPP']->total_credit ?? 0);
+        $totalBebanAkumulasi = ($plAccumulated['Beban']->total_debit ?? 0) - ($plAccumulated['Beban']->total_credit ?? 0);
+        
+        $ekuitas_labaRugiAkumulasi = $totalPendapatanAkumulasi - $totalHppAkumulasi - $totalBebanAkumulasi;
+
+        // 3. Hitung Total Neraca
+        $totalAset = $neraca_aset->sum('balance');
+        $totalLiabilitas = $neraca_liabilitas->sum('balance');
+        $totalEkuitasNonPl = $neraca_ekuitas_non_pl->sum('balance');
+        $totalEkuitas = $totalEkuitasNonPl + $ekuitas_labaRugiAkumulasi;
+        $totalLiabilitasDanEkuitas = $totalLiabilitas + $totalEkuitas;
+
+        // =================================================================
+        // LAPORAN PENDUKUNG (SUB-LEDGER & ARUS KAS LAMA)
+        // =================================================================
+        
+        // 1. Arus Kas (Sama seperti Controller Lama, namun lebih lengkap)
+        $pemasukan_invoice = Payment::whereBetween('payment_date', [$startDate, $endDate])->where('status', 'completed')->get();
+        $pemasukan_modal = EquityTransaction::where('type', 'investment')->whereBetween('transaction_date', [$startDate, $endDate])->get();
+        // (Anda bisa tambahkan pemasukan Pinjaman jika mau)
+        $totalPemasukan = $pemasukan_invoice->sum('amount') + $pemasukan_modal->sum('amount');
+
+        $pengeluaran_po = PurchaseOrderPayment::whereBetween('payment_date', [$startDate, $endDate])->where('status', 'completed')->get();
+        $pengeluaran_beban = Expense::whereBetween('expense_date', [$startDate, $endDate])->get();
+        $pengeluaran_pinjaman = LoanPayment::whereBetween('payment_date', [$startDate, $endDate])->get();
+        $pengeluaran_aset = FixedAsset::whereBetween('purchase_date', [$startDate, $endDate])->get();
+        $pengeluaran_modal = EquityTransaction::where('type', 'drawing')->whereBetween('transaction_date', [$startDate, $endDate])->get();
+
+        $totalPengeluaranPO = $pengeluaran_po->sum('amount');
+        $totalPengeluaranBeban = $pengeluaran_beban->sum('amount');
+        $totalPengeluaranPinjaman = $pengeluaran_pinjaman->sum('total_paid');
+        $totalPengeluaranAset = $pengeluaran_aset->sum('purchase_cost');
+        $totalPengeluaranModal = $pengeluaran_modal->sum('amount');
+        
+        $totalPengeluaran = $totalPengeluaranPO + $totalPengeluaranBeban + $totalPengeluaranPinjaman + $totalPengeluaranAset + $totalPengeluaranModal;
+
+        // 2. Laporan Rincian Utang & Piutang (Subsidiary Ledger)
         $laporanPiutang = SalesInvoice::with('client')
             ->whereIn('status', ['unpaid', 'partially_paid'])
             ->orderBy('due_date', 'asc')
             ->get();
-        $aset_piutangUsaha = $laporanPiutang->sum(function($invoice) {
-            return $invoice->total_amount - $invoice->amount_paid;
-        });
+        $totalPiutang_SL = $laporanPiutang->sum(fn($inv) => $inv->remaining_balance); // Gunakan accessor yg sudah diperbaiki
 
-        // Persediaan (Stok saat ini * HPP rata-rata)
-        $aset_persediaan = Product::sum(DB::raw('stock_quantity * average_cost'));
-        
-        $totalAsetLancar = $aset_kasDanBank + $aset_piutangUsaha + $aset_persediaan;
-
-        // 2. Aset Tetap (Nilai perolehan s/d $endDate, belum termasuk depresiasi)
-        $aset_tetap = FixedAsset::where('purchase_date', '<=', $endDateCarbon)->sum('purchase_cost');
-        $totalAsetTetap = $aset_tetap;
-
-        // 3. TOTAL ASET
-        $totalAset = $totalAsetLancar + $totalAsetTetap;
-
-        // --- B. LIABILITAS (LIABILITIES) & EKUITAS (EQUITY) ---
-        
-        // 1. Liabilitas Lancar (Utang Usaha)
         $laporanUtang = PurchaseOrder::with('supplier')
             ->whereIn('payment_status', ['unpaid', 'partially_paid'])
             ->orderBy('due_date', 'asc')
             ->get();
-        $liabilitas_utangUsaha = $laporanUtang->sum(function($po) {
-            return $po->total_amount - $po->total_returned - $po->amount_paid;
-        });
-        $totalLiabilitasLancar = $liabilitas_utangUsaha;
+        $totalUtang_SL = $laporanUtang->sum(fn($po) => $po->remaining_balance); // Gunakan accessor yg sudah ada
 
-        // 2. Liabilitas Jangka Panjang (Sisa pokok pinjaman)
-        $liabilitas_utangJangkaPanjang = Loan::where('status', 'active')->sum('remaining_balance');
-        $totalLiabilitasJangkaPanjang = $liabilitas_utangJangkaPanjang;
-
-        // 3. Total Liabilitas
-        $totalLiabilitas = $totalLiabilitasLancar + $totalLiabilitasJangkaPanjang;
-        
-        // 4. Ekuitas (Modal)
-        // Modal Disetor (total investasi s/d $endDate)
-        $ekuitas_modalDisetor = EquityTransaction::where('type', 'investment')
-                                ->where('transaction_date', '<=', $endDateCarbon)
-                                ->sum('amount');
-        // Penarikan Modal (total prive/drawing s/d $endDate)
-        $ekuitas_penarikanModal = EquityTransaction::where('type', 'drawing')
-                                ->where('transaction_date', '<=', $endDateCarbon)
-                                ->sum('amount');
-
-        // Laba/Rugi Akumulasi (Total Laba/Rugi dari awal s/d $endDate)
-        $totalPendapatanAkumulasi = SalesInvoice::where('order_date', '<=', $endDateCarbon)
-                                    ->where('status', '!=', 'cancelled')
-                                    ->sum(DB::raw('subtotal - discount_amount'));
-        $totalReturAkumulasi = SalesReturn::where('return_date', '<=', $endDateCarbon)->sum('total_amount');
-        $totalHppAkumulasi = InvoiceItem::whereHas('salesInvoice', function ($query) use ($endDateCarbon) {
-                                    $query->where('order_date', '<=', $endDateCarbon)
-                                          ->where('status', '!=', 'cancelled');
-                                })->sum(DB::raw('quantity * hpp'));
-        $totalBebanAkumulasi = Expense::where('expense_date', '<=', $endDateCarbon)->sum('amount');
-        
-        $ekuitas_labaRugiAkumulasi = ($totalPendapatanAkumulasi - $totalReturAkumulasi) - $totalHppAkumulasi - $totalBebanAkumulasi;
-
-        // 5. Total Ekuitas
-        $totalEkuitas = ($ekuitas_modalDisetor - $ekuitas_penarikanModal) + $ekuitas_labaRugiAkumulasi;
-
-        // 6. TOTAL LIABILITAS & EKUITAS
-        $totalLiabilitasDanEkuitas = $totalLiabilitas + $totalEkuitas;
-        
         // =================================================================
         // MENGIRIM DATA KE VIEW
         // =================================================================
@@ -176,31 +181,28 @@ class ReportController extends Controller
         return view('reports.index', compact(
             'startDate', 'endDate', 'endDateCarbon',
             
-            // Laba Rugi - [UPDATED] Tambahkan detail beban bunga
-            'pendapatanKotor', 'totalDiskonPenjualan', 'totalReturPenjualan', 'pendapatanNetto',
-            'totalHPP', 'labaKotor', 
-            'bebanDariExpenses', 'bebanBungaPinjaman', // Detail beban
-            'totalBebanOperasional', 'labaBersih',
+            // Laba Rugi (BARU - berbasis GL)
+            'labaRugi_pendapatan', 'totalPendapatan',
+            'labaRugi_hpp', 'totalHPP', 'labaKotor',
+            'labaRugi_beban', 'totalBeban',
+            'labaBersih',
+            
+            // Neraca (BARU - berbasis GL)
+            'neraca_aset', 'totalAset',
+            'neraca_liabilitas', 'totalLiabilitas',
+            'neraca_ekuitas_non_pl',
+            'ekuitas_labaRugiAkumulasi', 'totalEkuitas',
+            'totalLiabilitasDanEkuitas',
 
-            // Arus Kas - [UPDATED] Tambahkan detail pengeluaran pinjaman
-            'pemasukan', 'totalPemasukan',
-            'pengeluaranPO', 'totalPengeluaranPO',
-            'pengeluaranBeban', 'totalPengeluaranBeban',
-            'pengeluaranPinjaman', 'totalPengeluaranPinjaman', // Detail pinjaman
-            'totalPengeluaran',
-
-            // Laporan Utang & Piutang (untuk Neraca/ringkasan)
-            'laporanPiutang', 'laporanUtang',
-
-            // Neraca: Aset
-            'aset_kasDanBank', 'aset_piutangUsaha', 'aset_persediaan', 'totalAsetLancar',
-            'aset_tetap', 'totalAsetTetap', 'totalAset',
-
-            // Neraca: Liabilitas & Ekuitas
-            'liabilitas_utangUsaha', 'totalLiabilitasLancar',
-            'liabilitas_utangJangkaPanjang', 'totalLiabilitasJangkaPanjang', 'totalLiabilitas',
-            'ekuitas_modalDisetor', 'ekuitas_penarikanModal', 'ekuitas_labaRugiAkumulasi', 'totalEkuitas',
-            'totalLiabilitasDanEkuitas'
+            // Laporan Rincian (LAMA - untuk pendukung)
+            'laporanPiutang', 'totalPiutang_SL',
+            'laporanUtang', 'totalUtang_SL',
+            
+            // Arus Kas (LAMA - untuk pendukung)
+            'pemasukan_invoice', 'pemasukan_modal', 'totalPemasukan',
+            'pengeluaran_po', 'pengeluaran_beban', 'pengeluaran_pinjaman', 'pengeluaran_aset', 'pengeluaran_modal',
+            'totalPengeluaranPO', 'totalPengeluaranBeban', 'totalPengeluaranPinjaman', 'totalPengeluaranAset', 'totalPengeluaranModal',
+            'totalPengeluaran'
         ));
     }
 }

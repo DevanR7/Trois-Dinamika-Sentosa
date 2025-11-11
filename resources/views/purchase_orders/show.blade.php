@@ -58,21 +58,30 @@
                     @endif
                     <li><hr class="dropdown-divider"></li>
 
+                    {{-- =================================== --}}
+                    {{-- ✅ MODIFIKASI 1: Link Penyesuaian --}}
+                    {{-- =================================== --}}
                     <li>
-                        <a class="dropdown-item" href="{{ route('purchase-order-adjustments.create.manual', $purchaseOrder->po_id) }}">
+                        {{-- Mengarah ke halaman 'create' (pemilihan) dengan query string --}}
+                        <a class="dropdown-item" href="{{ route('purchase-order-adjustments.create') }}?purchase_order_id={{ $purchaseOrder->po_id }}">
                             <i class="bi bi-file-earmark-diff me-2"></i> Buat Penyesuaian PO
                         </a>
                     </li>
+                    {{-- =================================== --}}
 
                     <li><a class="dropdown-item" href="{{ route('purchase-orders.pdf', $purchaseOrder->po_id) }}"><i class="bi bi-file-earmark-pdf me-2"></i> Download PDF</a></li> 
                     @can('cancel', $purchaseOrder)
                         @if(in_array($purchaseOrder->status, ['draft', 'ordered']))
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                                <form action="{{ route('purchase-orders.cancel', $purchaseOrder->po_id) }}" method="POST" onsubmit="return confirm('Anda yakin ingin MEMBATALKAN pesanan ini?');">
+                                {{-- =================================== --}}
+                                {{-- ✅ MODIFIKASI 2: Form Batalkan Pesanan --}}
+                                {{-- =================================== --}}
+                                <form action="{{ route('purchase-orders.cancel', $purchaseOrder->po_id) }}" method="POST" class="form-cancel-po">
                                     @csrf
                                     <button type="submit" class="dropdown-item text-danger"><i class="bi bi-x-circle me-2"></i> Batalkan Pesanan</button>
                                 </form>
+                                {{-- =================================== --}}
                             </li>
                         @endif
                     @endcan
@@ -212,38 +221,48 @@
                         <tr>
                             <th>Tanggal Bayar</th>
                             <th>Metode</th>
-                            <th>Status</th>
                             <th class="text-end">Jumlah</th>
-                            <th>Catatan / Ref.</th>
+                            <th>Referensi</th>
                             <th>Dicatat Oleh</th>
+                            <th>Status</th>
+                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($purchaseOrder->payments as $payment)
                         <tr>
-                            <td>{{ $payment->payment_date->format('d M Y') }}</td>
-                            <td>
-                                {{ $payment->paymentMethod->name ?? ($payment->notes && str_contains($payment->notes, 'Deposit') ? 'Deposit' : 'N/A') }}
-                            </td>
+                            <td>{{ $payment->payment_date->format('d/m/Y') }}</td>
+                            <td>{{ $payment->paymentMethod->name ?? 'N/A' }}</td>
+                            <td class="text-end">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
+                            <td>{{ $payment->reference_number ?? '-' }}</td>
+                            <td>{{ $payment->receivedBy->full_name ?? 'N/A' }}</td>
                             <td>
                                 @if($payment->status == 'completed')
                                     <span class="badge bg-success">Completed</span>
                                 @elseif($payment->status == 'pending_clearance')
-                                    <span class="badge bg-info text-dark">Pending Kliring</span>
-                                @elseif($payment->status == 'failed')
-                                    <span class="badge bg-danger">Failed</span>
+                                    <span class="badge bg-warning text-dark">Pending</span>
                                 @else
-                                    <span class="badge bg-secondary">{{ $payment->status }}</span>
+                                    <span class="badge bg-danger">{{ $payment->status }}</span>
                                 @endif
                             </td>
-                            <td class="text-end">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
                             <td>
-                                {{ $payment->notes }}
-                                @if($payment->reference_number)
-                                    <strong class="d-block">Ref: {{ $payment->reference_number }}</strong>
-                                @endif
+                                {{-- =================================== --}}
+                                {{-- ✅ MODIFIKASI 3: Form Hapus Pembayaran --}}
+                                {{-- =================================== --}}
+                                @php
+                                    $paymentLabel = 'Pembayaran ' . $payment->paymentMethod->name . ' Rp ' . number_format($payment->amount, 0, ',', '.');
+                                @endphp
+                                <form action="{{ route('purchase-orders.payments.destroy', $payment) }}" method="POST" 
+                                      class="d-inline form-delete-po-payment" 
+                                      data-payment-label="{{ $paymentLabel }}">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus (Rollback)">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </form>
+                                {{-- =================================== --}}
                             </td>
-                            <td>{{ $payment->receivedBy->full_name ?? 'N/A' }}</td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -303,6 +322,7 @@
     </div>
 </div>
 
+{{-- Modal Pembayaran --}}
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -411,6 +431,7 @@
     </div>
 </div>
 
+{{-- Modal No Faktur Supplier --}}
 <div class="modal fade" id="supplierInvoiceModal" tabindex="-1" aria-labelledby="supplierInvoiceModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -630,6 +651,59 @@
                 });
             });
         });
+
+        {{-- =================================== --}}
+        {{-- ✅ MODIFIKASI 4: SCRIPT BARU --}}
+        {{-- =================================== --}}
+        
+        // Konfirmasi Batalkan Pesanan (PO)
+        const cancelPOForm = document.querySelector('.form-cancel-po');
+        if (cancelPOForm) {
+            cancelPOForm.addEventListener('submit', function (event) {
+                event.preventDefault(); 
+                Swal.fire({
+                    title: 'Anda Yakin?',
+                    text: "Anda akan membatalkan Pesanan Pembelian (PO) ini.",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Ya, Batalkan!',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        event.target.submit();
+                    }
+                });
+            });
+        }
+
+        // Konfirmasi Hapus (Rollback) Pembayaran PO
+        const deletePOPaymentForms = document.querySelectorAll('.form-delete-po-payment');
+        deletePOPaymentForms.forEach(form => {
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                
+                const paymentLabel = event.target.dataset.paymentLabel;
+                
+                Swal.fire({
+                    title: 'Anda Yakin?',
+                    text: `Anda akan membatalkan pembayaran ini: "${paymentLabel}". Jurnal akan dibalik dan sisa utang dihitung ulang.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Ya, Batalkan Pembayaran!',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        event.target.submit();
+                    }
+                });
+            });
+        });
+        {{-- =================================== --}}
+
     });
 </script>
 @endpush

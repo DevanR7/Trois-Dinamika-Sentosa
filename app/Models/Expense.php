@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\ChartOfAccount;
 
 class Expense extends Model
 {
@@ -21,6 +22,8 @@ class Expense extends Model
         'description',
         'amount',
         'user_id',
+        'chart_of_account_id',
+        'cash_bank_account_id',
     ];
 
     /**
@@ -37,5 +40,21 @@ class Expense extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
+    }
+
+    /**
+     * Relasi ke Akun Beban (COA).
+     */
+    public function expenseAccount(): BelongsTo
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'chart_of_account_id', 'account_id');
+    }
+
+    /**
+     * Relasi ke Akun Kas/Bank (COA) sebagai sumber dana.
+     */
+    public function cashBankAccount(): BelongsTo
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'cash_bank_account_id', 'account_id');
     }
 }

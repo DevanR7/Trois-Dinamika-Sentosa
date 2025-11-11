@@ -319,10 +319,32 @@
                         @endif
                         <hr class="my-1">
                         
-                        <div class="d-flex justify-content-between fw-bold fs-5 {{ ($sisaTagihan - $pendingPaymentAmount) > 0.01 ? 'text-danger' : 'text-success' }}">
-                            <span>Sisa Tagihan</span>
-                            <span>Rp {{ number_format($sisaTagihan - $pendingPaymentAmount, 0, ',', '.') }}</span>
-                        </div>
+                        {{-- ====================================================== --}}
+                        {{-- BLOK KODE YANG HARUS DIGANTI - MULAI --}}
+                        {{-- ====================================================== --}}
+                        @php
+                            $finalBalance = $sisaTagihan - $pendingPaymentAmount;
+                        @endphp
+
+                        @if($finalBalance < -0.01)
+                            <div class="d-flex justify-content-between fw-bold fs-5 text-success">
+                                <span>Kelebihan Bayar</span>
+                                <span>Rp {{ number_format(abs($finalBalance), 0, ',', '.') }}</span>
+                            </div>
+                        @elseif($finalBalance > 0.01)
+                            <div class="d-flex justify-content-between fw-bold fs-5 text-danger">
+                                <span>Sisa Tagihan</span>
+                                <span>Rp {{ number_format($finalBalance, 0, ',', '.') }}</span>
+                            </div>
+                        @else
+                            <div class="d-flex justify-content-between fw-bold fs-5 text-success">
+                                <span>Sisa Tagihan</span>
+                                <span>Lunas</span>
+                            </div>
+                        @endif
+                        {{-- ====================================================== --}}
+                        {{-- BLOK KODE YANG HARUS DIGANTI - SELESAI --}}
+                        {{-- ====================================================== --}}
                     </div>
                 </div>
             </div>
@@ -822,7 +844,7 @@
                     }
                 })
                 .catch(error => {
-                    alert('Error: ' + error.message);
+                    alert('Error: ' . error.message);
                     payButton.disabled = false;
                     payButton.innerHTML = 'Lanjutkan ke Pembayaran';
                 });

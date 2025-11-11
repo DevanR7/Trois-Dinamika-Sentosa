@@ -23,10 +23,13 @@ class SalesReturn extends Model
         'return_handling_type',
         'notes',
         'total_amount',
+        'total_hpp_amount',
     ];
 
     protected $casts = [
         'return_date' => 'date',
+        'total_amount' => 'float',
+        'total_hpp_amount' => 'float',
     ];
 
      public static function generateReturnNumber(): string

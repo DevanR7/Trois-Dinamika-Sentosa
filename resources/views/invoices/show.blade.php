@@ -42,7 +42,7 @@
                     @endif
                     <li><hr class="dropdown-divider"></li>
                     <li>
-                        <a class="dropdown-item" href="{{ route('invoice-adjustments.create.manual', $invoice->invoice_id) }}">
+                        <a class="dropdown-item" href="{{ route('invoice-adjustments.create') }}?sales_invoice_id={{ $invoice->invoice_id }}">
                             <i class="bi bi-file-earmark-diff me-2"></i> Buat Penyesuaian
                         </a>
                     </li>
@@ -51,7 +51,8 @@
                     @if(!in_array($invoice->status, ['draft', 'paid', 'cancelled']))
                         <li><hr class="dropdown-divider"></li>
                         <li>
-                            <form action="{{ route('invoices.cancel', $invoice->invoice_id) }}" method="POST" onsubmit="return confirm('Anda yakin ingin membatalkan invoice ini?');">
+                            {{-- ✅ MODIFIKASI: Menghapus onsubmit dan menambah class --}}
+                            <form action="{{ route('invoices.cancel', $invoice->invoice_id) }}" method="POST" class="form-cancel-invoice">
                                 @csrf
                                 <button type="submit" class="dropdown-item text-danger"><i class="bi bi-x-circle me-2"></i> Batalkan Invoice</button>
                             </form>
@@ -92,7 +93,7 @@
                 <table class="table table-bordered align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th>N</th>
+                            <th>No</th>
                             <th>Produk</th>
                             <th class="text-center">Kuantitas</th>
                             <th class="text-end">Harga Satuan</th>
@@ -152,11 +153,13 @@
                             </div>
                             
                             <div class="d-flex gap-2">
-                                <form action="{{ route('payments.reject', $payment->payment_id) }}" method="POST" class="d-inline mb-0">
+                                {{-- ✅ MODIFIKASI: Menambah class --}}
+                                <form action="{{ route('payments.reject', $payment->payment_id) }}" method="POST" class="d-inline mb-0 form-reject-payment">
                                     @csrf
                                     <button type="submit" class="btn btn-sm btn-danger">Tolak</button>
                                 </form>
-                                <form action="{{ route('payments.approve', $payment->payment_id) }}" method="POST" class="d-inline mb-0">
+                                {{-- ✅ MODIFIKASI: Menambah class --}}
+                                <form action="{{ route('payments.approve', $payment->payment_id) }}" method="POST" class="d-inline mb-0 form-approve-payment">
                                     @csrf
                                     <button type="submit" class="btn btn-sm btn-success">Setujui</button>
                                 </form>
@@ -199,6 +202,7 @@
                             <td>{{ $adjustment->reason }}</td>
                             <td>{{ $adjustment->user->full_name ?? 'N/A' }}</td>
                             <td>
+                                {{-- Form ini sudah ada SweetAlert-nya dari script Anda sebelumnya --}}
                                 <form action="{{ route('invoice-adjustments.destroy', $adjustment->adjustment_id) }}" method="POST" class="form-cancel-adjustment">
                                     @csrf
                                     @method('DELETE')
@@ -220,22 +224,22 @@
                     <thead class="table-light">
                         <tr>
                             <th>Tanggal Bayar</th>
-                            <th class="text-end">Jumlah</th>
                             <th>Metode</th>
+                            <th class="text-end">Jumlah</th>
+                            <th>Referensi</th>
+                            <th>Dicatat Oleh</th>
                             <th>Status</th>
-                            <th>Penerima / Bukti</th>
+                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($invoice->payments as $payment)
                         <tr>
-                            <td>{{ $payment->payment_date->format('d M Y') }}</td>
+                            <td>{{ $payment->payment_date->format('d/m/Y') }}</td>
+                            <td>{{ $payment->paymentMethod->name ?? 'N/A' }}</td>
                             <td class="text-end">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
-                            
-                            <td>
-                                {{ $payment->paymentMethod->name ?? ($payment->transaction_id ? 'Gateway / Kredit' : 'Kredit Klien / Internal') }}
-                            </td>
-                            
+                            <td>{{ $payment->reference_number ?? '-' }}</td>
+                            <td>{{ $payment->receivedBy->full_name ?? 'N/A' }}</td>
                             <td>
                                 @if($payment->status == 'completed')
                                     <span class="badge bg-success">Completed</span>
@@ -249,26 +253,20 @@
                                     <span class="badge bg-secondary">{{ $payment->status }}</span>
                                 @endif
                             </td>
-
-                             <td>
-                                @if($payment->paymentMethod && str_contains(strtolower($payment->paymentMethod->name), 'cash') && $payment->receivedBy)
-                                    {{ $payment->receivedBy->full_name }} (Sales)
-                                @elseif($payment->proof_of_payment_path)
-                                    <a href="{{ asset('storage/' . $payment->proof_of_payment_path) }}" target="_blank" class="btn btn-sm btn-outline-info">
-                                        Lihat Bukti
-                                    </a>
-                                @elseif($payment->transaction_id)
-                                    <span class="text-muted" data-bs-toggle="tooltip" title="TX ID: {{ $payment->transaction_id }}">
-                                        Gateway / Kredit
-                                    </span>
-                                @else
-                                    -
-                                @endif
+                            <td>
+                                {{-- ✅ MODIFIKASI: Menghapus onsubmit dan menambah class --}}
+                                <form action="{{ route('payments.destroy', $payment) }}" method="POST" class="d-inline form-delete-payment">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus (Rollback)">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </form>
                             </td>
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="5" class="text-center text-muted">Belum ada riwayat pembayaran.</td>
+                            <td colspan="7" class="text-center text-muted">Belum ada riwayat pembayaran.</td>
                         </tr>
                         @endforelse
                     </tbody>
@@ -302,9 +300,9 @@
                         @endif
                         @foreach ($invoice->adjustments as $adjustment)
                              <div class="d-flex justify-content-between {{ $adjustment->type == 'credit_note' ? 'text-success' : 'text-danger' }}">
-                                <span>{{ $adjustment->type == 'credit_note' ? 'Nota Kredit (Potongan)' : 'Nota Debit (Tambahan)' }}</span>
-                                <span>{{ $adjustment->type == 'credit_note' ? '(-)' : '(+)' }} Rp {{ number_format($adjustment->amount, 0, ',', '.') }}</span>
-                             </div>
+                                 <span>{{ $adjustment->type == 'credit_note' ? 'Nota Kredit (Potongan)' : 'Nota Debit (Tambahan)' }}</span>
+                                 <span>{{ $adjustment->type == 'credit_note' ? '(-)' : '(+)' }} Rp {{ number_format($adjustment->amount, 0, ',', '.') }}</span>
+                               </div>
                         @endforeach
 
                         <hr class="my-1">
@@ -326,6 +324,7 @@
     </div>
 </div>
 
+{{-- MODAL PEMBAYARAN (Tidak ada perubahan di sini) --}}
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -435,6 +434,7 @@
 @endsection
 
 @push('scripts')
+{{-- AutoNumeric tidak perlu di-load lagi karena sudah ada di app.blade.php, tapi tidak masalah jika ada --}}
 <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -548,6 +548,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // --- (SCRIPT ANDA YANG SUDAH ADA) ---
     const cancelAdjustmentForms = document.querySelectorAll('.form-cancel-adjustment');
     cancelAdjustmentForms.forEach(form => {
         form.addEventListener('submit', function (event) {
@@ -590,7 +591,97 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- LOGIKA UNTUK FORM DINAMIS ---
+    // --- (SCRIPT BARU DITAMBAHKAN) ---
+
+    // Konfirmasi Batalkan Invoice
+    const cancelInvoiceForm = document.querySelector('.form-cancel-invoice');
+    if (cancelInvoiceForm) {
+        cancelInvoiceForm.addEventListener('submit', function (event) {
+            event.preventDefault(); 
+            Swal.fire({
+                title: 'Anda Yakin?',
+                text: "Anda akan membatalkan invoice ini. Tindakan ini tidak dapat diurungkan.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Batalkan!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    event.target.submit();
+                }
+            });
+        });
+    }
+
+    // Konfirmasi Tolak Pembayaran
+    const rejectPaymentForms = document.querySelectorAll('.form-reject-payment');
+    rejectPaymentForms.forEach(form => {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault(); 
+            Swal.fire({
+                title: 'Tolak Pembayaran?',
+                text: "Anda yakin ingin menolak pembayaran ini? Status akan dikembalikan.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Tolak!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    event.target.submit();
+                }
+            });
+        });
+    });
+
+    // Konfirmasi Setujui Pembayaran
+    const approvePaymentForms = document.querySelectorAll('.form-approve-payment');
+    approvePaymentForms.forEach(form => {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault(); 
+            Swal.fire({
+                title: 'Setujui Pembayaran?',
+                text: "Anda akan menyetujui pembayaran ini. Sisa tagihan akan di-update.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#198754',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Setujui!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    event.target.submit();
+                }
+            });
+        });
+    });
+
+    // Konfirmasi Hapus (Rollback) Pembayaran
+    const deletePaymentForms = document.querySelectorAll('.form-delete-payment');
+    deletePaymentForms.forEach(form => {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault(); 
+            Swal.fire({
+                title: 'Anda Yakin?',
+                text: "Anda akan membatalkan pembayaran ini. Jurnal akan dibalik dan sisa tagihan dihitung ulang. Ini adalah tindakan 'rollback'.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Batalkan Pembayaran!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    event.target.submit();
+                }
+            });
+        });
+    });
+
+    // --- (SCRIPT ANDA YANG SUDAH ADA) ---
     const referenceGroup = document.getElementById('payment-reference-group');
     const referenceInput = document.getElementById('reference_number');
     const proofGroup = document.getElementById('payment-proof-group');

@@ -10,15 +10,27 @@ return new class extends Migration
     {
         Schema::create('fixed_assets', function (Blueprint $table) {
             $table->id('asset_id');
-            $table->string('asset_name'); // misal: "Laptop Dell XPS 15"
+            $table->string('asset_name'); 
             $table->text('description')->nullable();
-            $table->date('purchase_date'); // Tanggal beli
-            $table->decimal('purchase_cost', 15, 2); // Harga beli
+            $table->date('purchase_date'); 
+            $table->decimal('purchase_cost', 15, 2); 
             
-            // Opsional: Nilai buku saat ini (jika Anda menerapkan depresiasi nanti)
-            // $table->decimal('book_value', 15, 2); 
-            
-            $table->foreignId('user_id')->nullable()->constrained('users', 'user_id')->nullOnDelete(); // Siapa yang mencatat
+            $table->foreignId('user_id')
+                  ->nullable()
+                  ->constrained('users', 'user_id')
+                  ->nullOnDelete();
+
+            // === Gabungan kolom dari modify migration ===
+            $table->foreignId('fixed_asset_account_id')
+                  ->nullable()
+                  ->constrained('chart_of_accounts', 'account_id')
+                  ->nullOnDelete();
+
+            $table->foreignId('cash_bank_account_id')
+                  ->nullable()
+                  ->constrained('chart_of_accounts', 'account_id')
+                  ->nullOnDelete();
+
             $table->timestamps();
         });
     }

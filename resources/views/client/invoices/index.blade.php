@@ -85,14 +85,10 @@
                     </thead>
                     <tbody>
                         @forelse($invoices as $invoice)
-                            {{-- ====================================================== --}}
-                            {{-- ✅ INI ADALAH BLOK YANG HILANG DI FILE ANDA --}}
-                            {{-- ====================================================== --}}
                             @php
                                 // Gunakan accessor yang sudah benar (sudah di-load oleh controller)
                                 $sisaTagihan = $invoice->remaining_balance;
                             @endphp
-                            {{-- ====================================================== --}}
                             <tr>
                                 <td>{{ $invoice->invoice_number }}</td>
                                 <td>{{ optional($invoice->order_date)->format('d M Y') }}</td>
@@ -100,9 +96,27 @@
                                     {{ optional($invoice->due_date)->format('d M Y') }}
                                 </td>
                                 <td class="text-end">Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</td>
-                                <td class="text-end fw-bold {{ $sisaTagihan > 0.01 ? 'text-danger' : '' }}">
-                                    Rp {{ number_format($sisaTagihan, 0, ',', '.') }}
-                                </td>
+                                                               
+                                {{-- KODE BARU (GUNAKAN INI): --}}
+                                @if($sisaTagihan < -0.01)
+                                    <td class="text-end fw-bold text-success">
+                                        Kelebihan Bayar
+                                        <span class="d-block">Rp {{ number_format(abs($sisaTagihan), 0, ',', '.') }}</span>
+                                    </td>
+                                @elseif($sisaTagihan > 0.01)
+                                    <td class="text-end fw-bold text-danger">
+                                        Rp {{ number_format($sisaTagihan, 0, ',', '.') }}
+                                    </td>
+                                @else
+                                    <td class="text-end fw-bold text-success">
+                                        Lunas
+                                    </td>
+                                @endif
+                                
+                                {{-- ====================================================== --}}
+                                {{-- BLOK KODE YANG HARUS DIGANTI - SELESAI --}}
+                                {{-- ====================================================== --}}
+                                
                                 <td class="text-center">
                                     @if($invoice->status == 'paid')
                                         <span class="badge bg-success">Lunas</span>
