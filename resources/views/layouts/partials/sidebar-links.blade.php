@@ -280,6 +280,7 @@
     <span class="title">Laporan</span>
     <span class="line"></span>
 </div>
+
 <ul class="menu_item">
     <li class="item">
         <a class="link flex {{ request()->routeIs("reports.index") ? "active" : "" }}" href="{{ route("reports.index") }}">
@@ -294,6 +295,15 @@
             <span>Jurnal Umum</span>
         </a>
     </li>
+
+    @can('manage-settings')
+    <li class="item">
+        <a class="link flex {{ request()->routeIs("manual-journals.*") ? "active" : "" }}" href="{{ route("manual-journals.index") }}">
+            <i class="material-icons">post_add</i>
+            <span>Jurnal Umum Manual</span>
+        </a>
+    </li>
+    @endcan
 
     <li class="item">
         <a class="link flex {{ request()->routeIs('expenses.*') ? 'active' : '' }}" href="{{ route('expenses.index') }}">

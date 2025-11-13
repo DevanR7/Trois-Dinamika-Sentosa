@@ -109,6 +109,7 @@ class RoleAndPermissionSeeder extends Seeder
 
         // Announcements
         Permission::updateOrCreate(['name' => 'manage-announcements']);
+        Permission::updateOrCreate(['name' => 'manage-manual-journals']);
 
         // === BUAT ROLES ===
         $superadminRole = Role::updateOrCreate(['name' => 'superadmin']);

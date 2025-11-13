@@ -152,6 +152,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/reports/general-ledger', [\App\Http\Controllers\GeneralLedgerController::class, 'index'])
          ->name('reports.general-ledger');
 
+    Route::resource('manual-journals', \App\Http\Controllers\ManualJournalController::class)
+         ->except(['show']); // 'show' bisa diakses dari 'index'
+    Route::get('manual-journals/{manualJournal}', [\App\Http\Controllers\ManualJournalController::class, 'show'])
+         ->name('manual-journals.show');
+
     // Review Order Klien
     Route::prefix('client-order-reviews')->name('client-order-reviews.')->group(function() {
         Route::get('/', [ClientOrderReviewController::class, 'index'])->name('index'); 
