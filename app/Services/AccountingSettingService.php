@@ -94,4 +94,9 @@ class AccountingSettingService
         // 'acct_default_gateway'
         return (int) Setting::getValue('acct_default_gateway');
     }
+
+    public function getRetainedEarningsId(): ?int
+{
+    return (int) Setting::getValue('acct_default_retained_earnings');
+}
 }

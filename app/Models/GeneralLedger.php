@@ -23,6 +23,7 @@ class GeneralLedger extends Model
         'reference_type',
         'reference_id',
         'user_id',
+        'bank_reconciliation_id',
     ];
 
     protected $casts = [
@@ -53,5 +54,10 @@ class GeneralLedger extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
+    }
+
+    public function bankReconciliation(): BelongsTo
+    {
+        return $this->belongsTo(BankReconciliation::class, 'bank_reconciliation_id', 'reconciliation_id');
     }
 }

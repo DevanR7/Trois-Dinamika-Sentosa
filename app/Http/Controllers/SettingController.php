@@ -39,6 +39,7 @@ class SettingController extends Controller
                                         ->where('is_active', true)
                                         ->orderBy('account_number')
                                         ->get();
+        $equityAccounts = ChartOfAccount::where('account_type', 'Ekuitas')->where('is_active', true)->orderBy('account_number')->get();
 
 
         return view('settings.index', compact(
@@ -49,7 +50,8 @@ class SettingController extends Controller
             'cogsAccounts',
             'expenseOrRevenueAccounts',
             'assetOrLiabilityAccounts',
-            'assetOrLiabilityAccounts' 
+            'assetOrLiabilityAccounts',
+            'equityAccounts' 
         ));
     }
 

@@ -37,6 +37,14 @@ class CompanyBankAccountSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
+            [
+                'bank_name' => 'Midtrans Payment Gateway',
+                'account_name' => 'TDS',
+                'account_number' => null,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
         ]);
     }
 }

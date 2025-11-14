@@ -394,6 +394,21 @@
                                             <div class="form-text">Untuk mencatat Uang Muka Pembelian atau kelebihan bayar ke supplier.</div>
                                             @error('acct_default_supplier_deposit') <div class="invalid-feedback">{{ $message }}</div> @enderror
                                         </div>
+
+                                        {{-- ✅ AKUN LABA DITAHAN DITAMBAHKAN DI SINI --}}
+                                        <div class="col-md-6">
+                                            <label for="acct_default_retained_earnings" class="form-label">Akun Laba Ditahan</label>
+                                            <select class="form-select @error('acct_default_retained_earnings') is-invalid @enderror" id="acct_default_retained_earnings" name="acct_default_retained_earnings">
+                                                <option value="">-- Pilih Akun Ekuitas --</option>
+                                                @foreach ($equityAccounts as $account)
+                                                    <option value="{{ $account->account_id }}" {{ (isset($settings['acct_default_retained_earnings']) && $settings['acct_default_retained_earnings'] == $account->account_id) ? 'selected' : '' }}>
+                                                        {{ $account->account_number }} - {{ $account->account_name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            <div class="form-text">Wajib diisi. Akun untuk menyimpan Laba Bersih di akhir tahun.</div>
+                                            @error('acct_default_retained_earnings') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                        </div>
                                         
                                     </div>
                                 </div>

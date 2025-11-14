@@ -25,6 +25,7 @@ class Product extends Model
         'supplier_id', // <-- TAMBAHKAN BARIS INI
         'description',
         'image_path',
+        'average_cost',
     ];
 
     public function supplier(): BelongsTo

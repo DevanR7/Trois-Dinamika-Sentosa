@@ -151,11 +151,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/reports/general-ledger', [\App\Http\Controllers\GeneralLedgerController::class, 'index'])
          ->name('reports.general-ledger');
+     Route::resource('bank-reconciliations', \App\Http\Controllers\BankReconciliationController::class)
+         ->except(['edit']); // Kita akan gunakan 'show' untuk mengedit
 
     Route::resource('manual-journals', \App\Http\Controllers\ManualJournalController::class)
          ->except(['show']); // 'show' bisa diakses dari 'index'
     Route::get('manual-journals/{manualJournal}', [\App\Http\Controllers\ManualJournalController::class, 'show'])
          ->name('manual-journals.show');
+
+     Route::get('/closing-book', [\App\Http\Controllers\ClosingBookController::class, 'index'])
+         ->name('closing-book.index');
+    Route::post('/closing-book', [\App\Http\Controllers\ClosingBookController::class, 'store'])
+         ->name('closing-book.store');
 
     // Review Order Klien
     Route::prefix('client-order-reviews')->name('client-order-reviews.')->group(function() {

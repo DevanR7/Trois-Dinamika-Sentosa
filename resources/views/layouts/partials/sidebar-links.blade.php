@@ -303,6 +303,13 @@
             <span>Jurnal Umum Manual</span>
         </a>
     </li>
+
+    <li class="item">
+        <a class="link flex {{ request()->routeIs("bank-reconciliations.*") ? "active" : "" }}" href="{{ route("bank-reconciliations.index") }}">
+            <i class="material-icons">account_balance</i>
+            <span>Rekonsiliasi Bank</span>
+        </a>
+    </li>
     @endcan
 
     <li class="item">
@@ -360,6 +367,14 @@
             <span>Pengaturan Pajak</span>
         </a>
     </li>
+
+    <li class="item">
+    <a class="link flex {{ request()->routeIs("closing-book.*") ? "active" : "" }}" href="{{ route("closing-book.index") }}">
+        <i class="material-icons">gpp_good</i>
+        <span>Tutup Buku Tahunan</span>
+    </a>
+    </li>
+
     @endcan
 
     <li class="item">

@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\FixedAsset; // Pastikan Model di-import
+use App\Models\FixedAsset;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth; // Untuk melacak siapa yang input
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use App\Models\ChartOfAccount;
@@ -12,63 +12,83 @@ use App\Services\AccountingService;
 use Illuminate\Support\Facades\DB;
 
 class FixedAssetController extends Controller
-{   
+{
     protected $accountingService;
 
     public function __construct(AccountingService $accountingService)
     {
         $this->accountingService = $accountingService;
         
-        // ✅ TAMBAHKAN BLOK INI
-        // Hanya yang bisa 'view-reports' boleh lihat daftar (index)
         $this->middleware('can:view-reports')->only(['index']);
-        
-        // (Opsional) Jika Anda ingin permission terpisah
+        // (Anda bisa tambahkan permission baru 'manage-fixed-assets' jika mau)
         // $this->middleware('can:manage-fixed-assets')->except(['index']);
     }
 
     /**
      * Menampilkan daftar semua aset tetap.
+     * (Versi ini sudah di-update di langkah sebelumnya, tidak perlu diubah)
      */
     public function index(Request $request): View
     {
-        // $this->authorize('viewAny', FixedAsset::class);
+        $query = FixedAsset::with([
+            'user', 
+            'assetAccount', 
+            'cashBankAccount',
+            'accumulatedDepreciationAccount', // ✅ Tambahkan relasi baru
+            'depreciationExpenseAccount' // ✅ Tambahkan relasi baru
+        ]);
         
-        // ✅ Perbarui query untuk load relasi baru
-        $query = FixedAsset::with(['user', 'assetAccount', 'cashBankAccount']);
-        
-        // Filter pencarian (Sama)
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where('asset_name', 'like', "%{$search}%");
         }
         $fixedAssets = $query->latest('purchase_date')->paginate(15)->appends($request->query());
+        
         return view('fixed_assets.index', compact('fixedAssets'));
     }
+
     /**
      * Menampilkan form untuk membuat aset tetap baru.
+     * ✅ DIPERBARUI: Ambil akun Aset, Kas, dan Beban
      */
     public function create(): View
     {
         // $this->authorize('create', FixedAsset::class);
         
-        // ✅ Ambil akun Aset dari COA
+        // Akun Aset (untuk Aset itu sendiri)
         $assetAccounts = ChartOfAccount::where('account_type', 'Aset')
                                 ->where('is_active', true)
                                 ->orderBy('account_number')
                                 ->get();
         
-        // ✅ Ambil akun Sumber Dana (Kas/Bank) dari COA
-        $cashAccounts = ChartOfAccount::where('account_type', 'Aset')
+        // Akun Kas/Bank (untuk Sumber Dana)
+        $cashAccounts = $assetAccounts->filter(function($account) {
+            // Asumsi akun kas/bank punya 'Kas' atau 'Bank' di namanya
+            return str_contains($account->account_name, 'Kas') || str_contains($account->account_name, 'Bank');
+        });
+
+        // ✅ BARU: Akun Kontra-Aset (untuk Akumulasi Penyusutan)
+        $contraAssetAccounts = $assetAccounts->filter(function($account) {
+            return str_contains($account->account_name, 'Akumulasi');
+        });
+
+        // ✅ BARU: Akun Beban (untuk Beban Penyusutan)
+        $expenseAccounts = ChartOfAccount::where('account_type', 'Beban')
                                 ->where('is_active', true)
                                 ->orderBy('account_number')
                                 ->get();
                                 
-        return view('fixed_assets.create', compact('assetAccounts', 'cashAccounts'));
+        return view('fixed_assets.create', compact(
+            'assetAccounts', 
+            'cashAccounts', 
+            'contraAssetAccounts', 
+            'expenseAccounts'
+        ));
     }
 
     /**
      * Menyimpan aset tetap baru ke database.
+     * ✅ DIPERBARUI: Validasi & Simpan kolom penyusutan
      */
     public function store(Request $request): RedirectResponse
     {
@@ -78,10 +98,21 @@ class FixedAssetController extends Controller
             'purchase_date' => 'required|date',
             'purchase_cost' => 'required|numeric|min:1',
             'description' => 'nullable|string',
-            // ✅ Validasi kolom baru
             'fixed_asset_account_id' => 'required|exists:chart_of_accounts,account_id',
             'cash_bank_account_id' => 'required|exists:chart_of_accounts,account_id',
+            
+            // ✅ Validasi kolom baru
+            'accumulated_depreciation_account_id' => 'required|exists:chart_of_accounts,account_id',
+            'depreciation_expense_account_id' => 'required|exists:chart_of_accounts,account_id',
+            'depreciation_method' => 'required|in:straight_line',
+            'useful_life_months' => 'required|integer|min:1',
+            'salvage_value' => 'required|numeric|min:0',
         ]);
+        
+        // Validasi nilai sisa
+        if ($validated['salvage_value'] >= $validated['purchase_cost']) {
+            return back()->with('error', 'Nilai Sisa tidak boleh lebih besar atau sama dengan Harga Beli.')->withInput();
+        }
         
         DB::beginTransaction();
         try {
@@ -94,18 +125,23 @@ class FixedAssetController extends Controller
                 'user_id' => Auth::id(),
                 'fixed_asset_account_id' => $validated['fixed_asset_account_id'],
                 'cash_bank_account_id' => $validated['cash_bank_account_id'],
+                // ✅ Simpan data baru
+                'accumulated_depreciation_account_id' => $validated['accumulated_depreciation_account_id'],
+                'depreciation_expense_account_id' => $validated['depreciation_expense_account_id'],
+                'depreciation_method' => $validated['depreciation_method'],
+                'useful_life_months' => $validated['useful_life_months'],
+                'salvage_value' => $validated['salvage_value'],
+                // 'current_book_value' diatur otomatis oleh Model
             ]);
 
-            // 2. Post Jurnal Akuntansi
+            // 2. Post Jurnal Akuntansi (Pembelian Aset)
             $journalGroupId = "FASSET-" . $asset->asset_id;
             $description = "Pembelian Aset Tetap: " . $asset->asset_name;
 
             $debitEntries = [
-                // [Akun Aset, Jumlah]
                 [$validated['fixed_asset_account_id'], $validated['purchase_cost']]
             ];
             $creditEntries = [
-                // [Akun Kas/Bank, Jumlah]
                 [$validated['cash_bank_account_id'], $validated['purchase_cost']]
             ];
 
@@ -128,7 +164,8 @@ class FixedAssetController extends Controller
     }
 
     /**
-     * Menampilkan detail (show) - Kita tidak pakai, jadi redirect ke index.
+     * show()
+     * (Tidak ada perubahan)
      */
     public function show(FixedAsset $fixedAsset): RedirectResponse
     {
@@ -137,6 +174,7 @@ class FixedAssetController extends Controller
 
     /**
      * Menampilkan form untuk mengedit aset tetap.
+     * ✅ DIPERBARUI: Ambil data COA
      */
     public function edit(FixedAsset $fixedAsset): View
     {
@@ -146,29 +184,58 @@ class FixedAssetController extends Controller
                                 ->where('is_active', true)
                                 ->orderBy('account_number')
                                 ->get();
-        $cashAccounts = ChartOfAccount::where('account_type', 'Aset')
+        $cashAccounts = $assetAccounts->filter(function($account) {
+            return str_contains($account->account_name, 'Kas') || str_contains($account->account_name, 'Bank');
+        });
+        $contraAssetAccounts = $assetAccounts->filter(function($account) {
+            return str_contains($account->account_name, 'Akumulasi');
+        });
+        $expenseAccounts = ChartOfAccount::where('account_type', 'Beban')
                                 ->where('is_active', true)
                                 ->orderBy('account_number')
                                 ->get();
 
-        return view('fixed_assets.edit', compact('fixedAsset', 'assetAccounts', 'cashAccounts'));
+        return view('fixed_assets.edit', compact(
+            'fixedAsset', 
+            'assetAccounts', 
+            'cashAccounts', 
+            'contraAssetAccounts', 
+            'expenseAccounts'
+        ));
     }
 
     /**
      * Mengupdate data aset tetap di database.
+     * ✅ DIPERBARUI: Validasi & Update kolom penyusutan
      */
     public function update(Request $request, FixedAsset $fixedAsset): RedirectResponse
     {
         // $this->authorize('update', $fixedAsset);
+        
+        // Pengecekan apakah aset sudah mulai disusutkan
+        if ($fixedAsset->depreciations()->exists()) {
+             return back()->with('error', 'Gagal: Aset ini sudah memiliki riwayat penyusutan dan tidak dapat diubah lagi.');
+        }
+        
         $validated = $request->validate([
             'asset_name' => 'required|string|max:255',
             'purchase_date' => 'required|date',
             'purchase_cost' => 'required|numeric|min:1',
             'description' => 'nullable|string',
-            // ✅ Validasi kolom baru
             'fixed_asset_account_id' => 'required|exists:chart_of_accounts,account_id',
             'cash_bank_account_id' => 'required|exists:chart_of_accounts,account_id',
+            
+            // ✅ Validasi kolom baru
+            'accumulated_depreciation_account_id' => 'required|exists:chart_of_accounts,account_id',
+            'depreciation_expense_account_id' => 'required|exists:chart_of_accounts,account_id',
+            'depreciation_method' => 'required|in:straight_line',
+            'useful_life_months' => 'required|integer|min:1',
+            'salvage_value' => 'required|numeric|min:0',
         ]);
+        
+        if ($validated['salvage_value'] >= $validated['purchase_cost']) {
+            return back()->with('error', 'Nilai Sisa tidak boleh lebih besar atau sama dengan Harga Beli.')->withInput();
+        }
         
         DB::beginTransaction();
         try {
@@ -180,6 +247,14 @@ class FixedAssetController extends Controller
                 'description' => $validated['description'],
                 'fixed_asset_account_id' => $validated['fixed_asset_account_id'],
                 'cash_bank_account_id' => $validated['cash_bank_account_id'],
+                // ✅ Update data baru
+                'accumulated_depreciation_account_id' => $validated['accumulated_depreciation_account_id'],
+                'depreciation_expense_account_id' => $validated['depreciation_expense_account_id'],
+                'depreciation_method' => $validated['depreciation_method'],
+                'useful_life_months' => $validated['useful_life_months'],
+                'salvage_value' => $validated['salvage_value'],
+                // ✅ Update Nilai Buku Awal
+                'current_book_value' => $validated['purchase_cost'], 
             ]);
 
             // 2. Post ulang Jurnal Akuntansi (Service akan hapus yg lama)
@@ -213,11 +288,17 @@ class FixedAssetController extends Controller
 
     /**
      * Menghapus aset tetap dari database.
+     * (Tidak ada perubahan)
      */
     public function destroy(FixedAsset $fixedAsset): RedirectResponse
     {
         // $this->authorize('delete', $fixedAsset);
         
+        // Pengecekan apakah aset sudah mulai disusutkan
+        if ($fixedAsset->depreciations()->exists()) {
+             return back()->with('error', 'Gagal: Aset ini sudah memiliki riwayat penyusutan dan tidak dapat dihapus.');
+        }
+
         DB::beginTransaction();
         try {
             // 1. Post Jurnal Reversal (Pembalikan)
@@ -225,11 +306,9 @@ class FixedAssetController extends Controller
             $description = "Reversal Pembelian Aset: " . $fixedAsset->asset_name;
 
             $debitEntries = [
-                // [Akun Kas/Bank, Jumlah] (Kas kembali)
                 [$fixedAsset->cash_bank_account_id, $fixedAsset->purchase_cost]
             ];
             $creditEntries = [
-                // [Akun Aset, Jumlah] (Aset berkurang)
                 [$fixedAsset->fixed_asset_account_id, $fixedAsset->purchase_cost]
             ];
             

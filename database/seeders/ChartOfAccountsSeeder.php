@@ -54,6 +54,8 @@ class ChartOfAccountsSeeder extends Seeder
                     // Akun Anak untuk dihubungkan ke CompanyBankAccount
                     ChartOfAccount::create(['parent_account_id' => $kasBank->account_id, 'account_number' => '1101.01', 'account_name' => 'Kas Tunai', 'account_type' => 'Aset', 'normal_balance' => 'Debit', 'created_at' => $now, 'updated_at' => $now]);
                     ChartOfAccount::create(['parent_account_id' => $kasBank->account_id, 'account_number' => '1101.02', 'account_name' => 'Bank BCA', 'account_type' => 'Aset', 'normal_balance' => 'Debit', 'created_at' => $now, 'updated_at' => $now]);
+                    ChartOfAccount::create(['parent_account_id' => $kasBank->account_id, 'account_number' => '1101.03', 'account_name' => 'Bank Mandiri', 'account_type' => 'Aset', 'normal_balance' => 'Debit', 'created_at' => $now, 'updated_at' => $now]); // <-- TAMBAHAN (agar sesuai CompanyBankAccountSeeder)
+                    ChartOfAccount::create(['parent_account_id' => $kasBank->account_id, 'account_number' => '1101.99', 'account_name' => 'Kas Midtrans (Gateway)', 'account_type' => 'Aset', 'normal_balance' => 'Debit', 'created_at' => $now, 'updated_at' => $now]); // <-- TAMBAHAN
 
                 // == AKUN DEFAULT: Piutang Usaha ==
                 ChartOfAccount::create(['parent_account_id' => $asetLancar->account_id, 'account_number' => '1102', 'account_name' => 'Piutang Usaha', 'account_type' => 'Aset', 'normal_balance' => 'Debit', 'created_at' => $now, 'updated_at' => $now]);
@@ -75,6 +77,19 @@ class ChartOfAccountsSeeder extends Seeder
                 // Akun Anak untuk modul FixedAsset
                 ChartOfAccount::create(['parent_account_id' => $asetTetap->account_id, 'account_number' => '1501', 'account_name' => 'Kendaraan', 'account_type' => 'Aset', 'normal_balance' => 'Debit', 'created_at' => $now, 'updated_at' => $now]);
                 ChartOfAccount::create(['parent_account_id' => $asetTetap->account_id, 'account_number' => '1502', 'account_name' => 'Peralatan Kantor', 'account_type' => 'Aset', 'normal_balance' => 'Debit', 'created_at' => $now, 'updated_at' => $now]);
+
+                // <-- TAMBAHAN: Akun Akumulasi Penyusutan (Contra-Asset) -->
+                $akumulasiPenyusutan = ChartOfAccount::create([
+                    'parent_account_id' => $asetTetap->account_id,
+                    'account_number' => '1590',
+                    'account_name' => 'Akumulasi Penyusutan',
+                    'account_type' => 'Aset',
+                    'normal_balance' => 'Kredit', // Saldo Normal KREDIT
+                    'created_at' => $now, 'updated_at' => $now
+                ]);
+                    ChartOfAccount::create(['parent_account_id' => $akumulasiPenyusutan->account_id, 'account_number' => '1591', 'account_name' => 'Akumulasi Penyusutan - Kendaraan', 'account_type' => 'Aset', 'normal_balance' => 'Kredit', 'created_at' => $now, 'updated_at' => $now]);
+                    ChartOfAccount::create(['parent_account_id' => $akumulasiPenyusutan->account_id, 'account_number' => '1592', 'account_name' => 'Akumulasi Penyusutan - Peralatan', 'account_type' => 'Aset', 'normal_balance' => 'Kredit', 'created_at' => $now, 'updated_at' => $now]);
+                // <-- AKHIR TAMBAHAN -->
 
         /**
          * =================================
@@ -130,7 +145,7 @@ class ChartOfAccountsSeeder extends Seeder
             // Akun Anak untuk modul EquityTransaction
             ChartOfAccount::create(['parent_account_id' => $ekuitas->account_id, 'account_number' => '3101', 'account_name' => 'Modal Setor', 'account_type' => 'Ekuitas', 'normal_balance' => 'Kredit', 'created_at' => $now, 'updated_at' => $now]);
             ChartOfAccount::create(['parent_account_id' => $ekuitas->account_id, 'account_number' => '3102', 'account_name' => 'Prive (Penarikan Modal)', 'account_type' => 'Ekuitas', 'normal_balance' => 'Debit', 'created_at' => $now, 'updated_at' => $now]); // Saldo Normal DEBIT
-
+            ChartOfAccount::create(['parent_account_id' => $ekuitas->account_id, 'account_number' => '3103', 'account_name' => 'Laba Ditahan (Retained Earnings)', 'account_type' => 'Ekuitas', 'normal_balance' => 'Kredit', 'created_at' => $now, 'updated_at' => $now]);
         /**
          * =================================
          * 4000 - PENDAPATAN
@@ -188,5 +203,10 @@ class ChartOfAccountsSeeder extends Seeder
             ChartOfAccount::create(['parent_account_id' => $beban->account_id, 'account_number' => '6103', 'account_name' => 'Beban Bunga', 'account_type' => 'Beban', 'normal_balance' => 'Debit', 'created_at' => $now, 'updated_at' => $now]);
             ChartOfAccount::create(['parent_account_id' => $beban->account_id, 'account_number' => '6104', 'account_name' => 'Beban Sewa', 'account_type' => 'Beban', 'normal_balance' => 'Debit', 'created_at' => $now, 'updated_at' => $now]);
             ChartOfAccount::create(['parent_account_id' => $beban->account_id, 'account_number' => '6105', 'account_name' => 'Beban Pemasaran', 'account_type' => 'Beban', 'normal_balance' => 'Debit', 'created_at' => $now, 'updated_at' => $now]);
+
+            // <-- TAMBAHAN: Akun Beban Penyusutan -->
+            ChartOfAccount::create(['parent_account_id' => $beban->account_id, 'account_number' => '6109', 'account_name' => 'Beban Penyusutan - Kendaraan', 'account_type' => 'Beban', 'normal_balance' => 'Debit', 'created_at' => $now, 'updated_at' => $now]);
+            ChartOfAccount::create(['parent_account_id' => $beban->account_id, 'account_number' => '6110', 'account_name' => 'Beban Penyusutan - Peralatan', 'account_type' => 'Beban', 'normal_balance' => 'Debit', 'created_at' => $now, 'updated_at' => $now]);
+            // <-- AKHIR TAMBAHAN -->
     }
 }

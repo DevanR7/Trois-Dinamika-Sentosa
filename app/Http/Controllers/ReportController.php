@@ -9,10 +9,10 @@ use App\Models\Payment;
 use App\Models\PurchaseOrderPayment;
 use App\Models\Expense;
 use App\Models\LoanPayment;
-use App\Models\FixedAsset; // <-- Ditambahkan untuk Arus Kas
-use App\Models\EquityTransaction; // <-- Ditambahkan untuk Arus Kas
+use App\Models\FixedAsset;
+use App\Models\EquityTransaction;
 
-// ✅ Model BARU untuk Laporan Inti
+// Model BARU untuk Laporan Inti
 use App\Models\GeneralLedger;
 use App\Models\ChartOfAccount;
 
@@ -93,13 +93,30 @@ class ReportController extends Controller
             ->orderBy('coa.account_number')
             ->get()
             ->map(function ($acc) {
-                // Hitung saldo akhir berdasarkan saldo normal
+                // ✅ --- PERBAIKAN LOGIKA SALDO ---
+                // Hitung saldo akhir.
+                // Akun Kontra-Aset (spt Akum. Penyusutan) adalah 'Aset'
+                // tapi saldo normal 'Kredit'. Kita akan beri nilai NEGATIF.
                 if ($acc->normal_balance == 'Debit') {
+                    // Aset normal, Beban, HPP, Prive
                     $acc->balance = $acc->total_debit - $acc->total_credit;
                 } else {
+                    // Liabilitas, Ekuitas, Pendapatan
                     $acc->balance = $acc->total_credit - $acc->total_debit;
                 }
+
+                // ✅ Jika ini Kontra-Aset (Tipe Aset, Saldo Kredit), buat saldonya negatif
+                if ($acc->account_type == 'Aset' && $acc->normal_balance == 'Kredit') {
+                     $acc->balance = -$acc->balance;
+                }
+                // ✅ Jika ini Kontra-Pendapatan (Tipe Pendapatan, Saldo Debit), buat saldonya negatif
+                if ($acc->account_type == 'Pendapatan' && $acc->normal_balance == 'Debit') {
+                     $acc->balance = -$acc->balance;
+                }
+                // (Lakukan hal yg sama untuk Kontra-Liabilitas/Ekuitas jika ada)
+
                 return $acc;
+                // ✅ --- AKHIR PERBAIKAN ---
             })
             ->filter(function ($acc) {
                 // Sembunyikan akun dengan saldo 0
@@ -131,6 +148,8 @@ class ReportController extends Controller
         $ekuitas_labaRugiAkumulasi = $totalPendapatanAkumulasi - $totalHppAkumulasi - $totalBebanAkumulasi;
 
         // 3. Hitung Total Neraca
+        // ✅ PERBAIKAN: Total Aset sekarang hanya menjumlahkan 'balance'
+        // (karena Kontra-Aset sudah bernilai negatif)
         $totalAset = $neraca_aset->sum('balance');
         $totalLiabilitas = $neraca_liabilitas->sum('balance');
         $totalEkuitasNonPl = $neraca_ekuitas_non_pl->sum('balance');
