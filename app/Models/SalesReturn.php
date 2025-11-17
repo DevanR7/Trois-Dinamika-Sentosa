@@ -8,6 +8,43 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * App\Models\SalesReturn
+ *
+ * @property int $return_id
+ * @property string $return_number
+ * @property int $client_id
+ * @property int $sales_invoice_id
+ * @property int $user_id User yang memproses retur
+ * @property \Illuminate\Support\Carbon $return_date
+ * @property string $return_handling_type Aksi: potong tagihan atau simpan jadi kredit
+ * @property string|null $notes
+ * @property float $total_amount
+ * @property float $total_hpp_amount
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \App\Models\Client $client
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\SalesReturnItem> $items
+ * @property-read int|null $items_count
+ * @property-read \App\Models\SalesInvoice $salesInvoice
+ * @property-read \App\Models\User $user
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesReturn newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesReturn newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesReturn query()
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesReturn whereClientId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesReturn whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesReturn whereNotes($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesReturn whereReturnDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesReturn whereReturnHandlingType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesReturn whereReturnId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesReturn whereReturnNumber($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesReturn whereSalesInvoiceId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesReturn whereTotalAmount($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesReturn whereTotalHppAmount($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesReturn whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesReturn whereUserId($value)
+ * @mixin \Eloquent
+ */
 class SalesReturn extends Model
 {
     use HasFactory;

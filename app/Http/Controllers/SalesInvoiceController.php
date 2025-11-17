@@ -356,7 +356,8 @@ class SalesInvoiceController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $invoice
+                $invoice,
+                Auth::id()
             );
 
             DB::commit();
@@ -597,7 +598,8 @@ class SalesInvoiceController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $invoice
+                $invoice,
+                Auth::id()
             );
             
             // ✅ Hapus Jurnal Asli (INV-...)

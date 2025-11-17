@@ -7,6 +7,44 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
+/**
+ * App\Models\ClientLedger
+ *
+ * @property int $ledger_id
+ * @property int $client_id
+ * @property int|null $sales_invoice_id
+ * @property string $reference_type
+ * @property int $reference_id
+ * @property \Illuminate\Support\Carbon $transaction_date
+ * @property string $type
+ * @property float $amount
+ * @property string $status
+ * @property string $description
+ * @property int|null $user_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \App\Models\Client $client
+ * @property-read Model|\Eloquent $reference
+ * @property-read \App\Models\SalesInvoice|null $salesInvoice
+ * @property-read \App\Models\User|null $user
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientLedger newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientLedger newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientLedger query()
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientLedger whereAmount($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientLedger whereClientId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientLedger whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientLedger whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientLedger whereLedgerId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientLedger whereReferenceId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientLedger whereReferenceType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientLedger whereSalesInvoiceId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientLedger whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientLedger whereTransactionDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientLedger whereType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientLedger whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientLedger whereUserId($value)
+ * @mixin \Eloquent
+ */
 class ClientLedger extends Model
 {
     use HasFactory;

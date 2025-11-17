@@ -285,7 +285,8 @@ class SalesReturnController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $salesReturn // Model referensi
+                $salesReturn,
+                Auth::id() // Model referensi
             );
 
             DB::commit();
@@ -382,6 +383,7 @@ class SalesReturnController extends Controller
             $creditEntries = [];
             
             foreach ($originalJournalEntries as $entry) {
+                /** @var \App\Models\GeneralLedger $entry */
                 if ($entry->debit > 0) {
                     $creditEntries[] = [$entry->chart_of_account_id, $entry->debit, "Reversal: " . $entry->description];
                 }
@@ -397,7 +399,8 @@ class SalesReturnController extends Controller
                     $description,
                     $debitEntries,
                     $creditEntries,
-                    $salesReturn
+                    $salesReturn,
+                    Auth::id()
                 );
             }
             

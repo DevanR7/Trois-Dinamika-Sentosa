@@ -322,7 +322,8 @@ class BatchPaymentController extends Controller
                     $description,
                     $debitEntries,
                     $creditEntries,
-                    $batchPayment
+                    $batchPayment,
+                    Auth::id()
                 );
             }
 
@@ -557,7 +558,8 @@ class BatchPaymentController extends Controller
                     $description,
                     $debitEntries,
                     $creditEntries,
-                    $batchPayment
+                    $batchPayment,
+                    Auth::id()
                 );
             }
 
@@ -634,7 +636,7 @@ class BatchPaymentController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $batchPayment
+                $batchPayment,
             );
 
             DB::commit();

@@ -131,7 +131,8 @@ class InvoiceAdjustmentController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $adjustment // Model referensi
+                $adjustment, // Model referensi
+                Auth::id()
             );
             
             // 3. Perbarui status pembayaran invoice
@@ -296,7 +297,8 @@ class InvoiceAdjustmentController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $adjustment // Model referensi
+                $adjustment, // Model referensi
+                Auth::id()
             );
 
             // 3. Perbarui status pembayaran
@@ -475,7 +477,8 @@ class InvoiceAdjustmentController extends Controller
                     $description,
                     $debitEntries,
                     $creditEntries,
-                    $autoDebitNote // Referensi ke adjustment 'debit_note' otomatis
+                    $autoDebitNote, // Referensi ke adjustment 'debit_note' otomatis
+                    Auth::id()
                 );
 
                 // 4. Update status invoice terakhir kali
@@ -505,6 +508,7 @@ class InvoiceAdjustmentController extends Controller
         $creditEntries = [];
 
         foreach ($originalJournalEntries as $entry) {
+            /** @var \App\Models\GeneralLedger $entry */
             // Balikkan Debit jadi Kredit
             if ($entry->debit > 0) {
                 $creditEntries[] = [$entry->chart_of_account_id, $entry->debit, "Reversal: " . $entry->description];

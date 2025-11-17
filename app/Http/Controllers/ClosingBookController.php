@@ -104,6 +104,7 @@ class ClosingBookController extends Controller
         $totalNetIncome = 0;
 
         foreach ($plAccounts as $account) {
+            /** @var object{account_id: int, account_name: string, normal_balance: string, total_debit: float, total_credit: float} $account */
             if ($account->normal_balance == 'Debit') {
                 $balance = $account->total_debit - $account->total_credit;
                 if ($balance > 0) {
@@ -153,7 +154,8 @@ class ClosingBookController extends Controller
                 $manualJournal->description,
                 $debitEntriesForGL,
                 $creditEntriesForGL,
-                $manualJournal 
+                $manualJournal,
+                Auth::id()
             );
             
             // 8. Simpan entri ke tabel manual_journal_entries

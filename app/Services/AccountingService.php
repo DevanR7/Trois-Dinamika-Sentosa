@@ -13,12 +13,13 @@ class AccountingService
     /**
      * Mem-posting Jurnal Umum yang seimbang (balanced).
      *
-     * @param string $journalGroupId ID unik untuk grup jurnal ini (e.g., "INV-1001", "EXP-500")
+     * @param string $journalGroupId ID unik untuk grup jurnal ini
      * @param \Illuminate\Support\Carbon|string $entryDate Tanggal transaksi
      * @param string $description Deskripsi umum untuk grup jurnal
      * @param array $debitEntries Array [[account_id, amount, description_override (opsional)], ...]
      * @param array $creditEntries Array [[account_id, amount, description_override (opsional)], ...]
      * @param Model $referenceModel Model Eloquent yang menjadi sumber (e.g., $salesInvoice)
+     * @param int|null $userId ID user yang melakukan aksi (opsional)
      * @throws \Exception Jika jurnal tidak seimbang (unbalanced)
      */
     public function postJournal(
@@ -27,14 +28,15 @@ class AccountingService
         string $description,
         array $debitEntries,
         array $creditEntries,
-        Model $referenceModel
+        Model $referenceModel,
+        ?int $userId = null
     ) {
-        DB::transaction(function () use ($journalGroupId, $entryDate, $description, $debitEntries, $creditEntries, $referenceModel) {
+        DB::transaction(function () use ($journalGroupId, $entryDate, $description, $debitEntries, $creditEntries, $referenceModel, $userId) {
             
             $totalDebit = 0;
             $totalCredit = 0;
             $journalsToCreate = [];
-            $userId = Auth::id(); // Ambil user ID yang sedang login
+            //$userId = Auth::id(); // Ambil user ID yang sedang login
 
             // Proses entri Debit
             foreach ($debitEntries as $entry) {

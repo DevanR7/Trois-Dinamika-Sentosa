@@ -492,7 +492,8 @@ class PurchaseOrderController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $purchaseOrder
+                $purchaseOrder,
+                Auth::id()
             );
 
             DB::commit();
@@ -550,7 +551,8 @@ class PurchaseOrderController extends Controller
                     $description,
                     $debitEntries,
                     $creditEntries,
-                    $purchaseOrder
+                    $purchaseOrder,
+                    Auth::id()
                 );
 
                 // Hapus jurnal asli

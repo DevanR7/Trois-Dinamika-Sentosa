@@ -144,7 +144,8 @@ class EquityTransactionController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $transaction // Model referensi
+                $transaction, // Model referensi
+                Auth::id()
             );
 
             DB::commit();
@@ -229,7 +230,8 @@ class EquityTransactionController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $equityTransaction // Model referensi
+                $equityTransaction, // Model referensi
+                Auth::id()
             );
 
             DB::commit();
@@ -276,7 +278,8 @@ class EquityTransactionController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $equityTransaction
+                $equityTransaction,
+                Auth::id()
             );
             
             // 2. Hapus Jurnal Asli (EQ-...)

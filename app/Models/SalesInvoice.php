@@ -16,6 +16,69 @@ use App\Models\Payment;
 use App\Models\SalesReturn;
 
 
+/**
+ * App\Models\SalesInvoice
+ *
+ * @property int $invoice_id
+ * @property string $invoice_number
+ * @property int $client_id
+ * @property int|null $user_id_sales
+ * @property \Illuminate\Support\Carbon $order_date
+ * @property \Illuminate\Support\Carbon $due_date
+ * @property float $subtotal
+ * @property float $discount_percentage
+ * @property float $discount_amount
+ * @property float $total_amount
+ * @property string $amount_paid
+ * @property string $status
+ * @property string|null $pending_snap_token
+ * @property \Illuminate\Support\Carbon|null $pending_snap_expires_at
+ * @property string|null $notes
+ * @property string|null $payment_link
+ * @property string|null $payment_link_expires_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\InvoiceAdjustment> $adjustments
+ * @property-read int|null $adjustments_count
+ * @property-read Client $client
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SalesReturn> $deductingReturns
+ * @property-read int|null $deducting_returns_count
+ * @property-read float $remaining_balance
+ * @property-read float $total_deducting_returns
+ * @property-read float $total_due
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, InvoiceItem> $items
+ * @property-read int|null $items_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Payment> $payments
+ * @property-read int|null $payments_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SalesReturn> $returns
+ * @property-read int|null $returns_count
+ * @property-read User|null $sales
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Tax> $taxes
+ * @property-read int|null $taxes_count
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice query()
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice whereAmountPaid($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice whereClientId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice whereDiscountAmount($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice whereDiscountPercentage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice whereDueDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice whereInvoiceId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice whereInvoiceNumber($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice whereNotes($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice whereOrderDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice wherePaymentLink($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice wherePaymentLinkExpiresAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice wherePendingSnapExpiresAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice wherePendingSnapToken($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice whereSubtotal($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice whereTotalAmount($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|SalesInvoice whereUserIdSales($value)
+ * @mixin \Eloquent
+ */
 class SalesInvoice extends Model
 {
     use HasFactory;

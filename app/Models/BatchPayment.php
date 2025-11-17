@@ -7,6 +7,44 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * App\Models\BatchPayment
+ *
+ * @property int $batch_payment_id
+ * @property int $client_id
+ * @property int|null $processed_by_user_id
+ * @property \Illuminate\Support\Carbon $payment_date
+ * @property float $total_amount
+ * @property int|null $payment_method_id
+ * @property int|null $company_bank_account_id
+ * @property string $status
+ * @property string|null $notes
+ * @property array|null $details
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \App\Models\Client $client
+ * @property-read \App\Models\CompanyBankAccount|null $companyBankAccount
+ * @property-read \App\Models\PaymentMethod|null $paymentMethod
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Payment> $payments
+ * @property-read int|null $payments_count
+ * @property-read \App\Models\User|null $processor
+ * @method static \Illuminate\Database\Eloquent\Builder|BatchPayment newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|BatchPayment newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|BatchPayment query()
+ * @method static \Illuminate\Database\Eloquent\Builder|BatchPayment whereBatchPaymentId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|BatchPayment whereClientId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|BatchPayment whereCompanyBankAccountId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|BatchPayment whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|BatchPayment whereDetails($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|BatchPayment whereNotes($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|BatchPayment wherePaymentDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|BatchPayment wherePaymentMethodId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|BatchPayment whereProcessedByUserId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|BatchPayment whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|BatchPayment whereTotalAmount($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|BatchPayment whereUpdatedAt($value)
+ * @mixin \Eloquent
+ */
 class BatchPayment extends Model
 {
     use HasFactory;

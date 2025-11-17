@@ -116,7 +116,8 @@ class LoanController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $loan // Model referensi
+                $loan,
+                Auth::id() // Model referensi
             );
 
             DB::commit();
@@ -211,7 +212,8 @@ class LoanController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $loan // Model referensi
+                $loan,
+                Auth::id() // Model referensi
             );
 
             DB::commit();
@@ -255,7 +257,8 @@ class LoanController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $loan
+                $loan,
+                Auth::id()
             );
 
             // 2. Hapus Jurnal Asli (LOAN-...)

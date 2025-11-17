@@ -8,6 +8,32 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\Order;
 use App\Models\Product;
 
+/**
+ * App\Models\OrderItem
+ *
+ * @property int $item_id
+ * @property int $order_id
+ * @property int $product_id
+ * @property int $quantity
+ * @property string $price_per_unit
+ * @property string $subtotal
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read Order $order
+ * @property-read Product $product
+ * @method static \Illuminate\Database\Eloquent\Builder|OrderItem newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|OrderItem newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|OrderItem query()
+ * @method static \Illuminate\Database\Eloquent\Builder|OrderItem whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|OrderItem whereItemId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|OrderItem whereOrderId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|OrderItem wherePricePerUnit($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|OrderItem whereProductId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|OrderItem whereQuantity($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|OrderItem whereSubtotal($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|OrderItem whereUpdatedAt($value)
+ * @mixin \Eloquent
+ */
 class OrderItem extends Model
 {
     use HasFactory;

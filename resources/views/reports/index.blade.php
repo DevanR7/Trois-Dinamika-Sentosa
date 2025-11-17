@@ -254,6 +254,115 @@
     {{-- =================================== --}}
     <h3 class="fw-bold mb-3 mt-5">Laporan Pendukung</h3>
     <div class="row g-4">
+        
+        {{-- LAPORAN ARUS KAS (METODE TIDAK LANGSUNG) -- BARU DITAMBAHKAN --}}
+        <div class="col-lg-12">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-semibold">Laporan Arus Kas (Metode Tidak Langsung)</h5>
+                    <span class="badge bg-light text-success">Periode: {{ \Carbon\Carbon::parse($startDate)->format('d M') }} - {{ \Carbon\Carbon::parse($endDate)->format('d M Y') }}</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <tbody>
+                                {{-- 1. AKTIVITAS OPERASI --}}
+                                <tr class="table-light fw-bold"><td colspan="2">1. Arus Kas dari Aktivitas Operasi</td></tr>
+                                <tr>
+                                    <td class="ps-4">Laba Bersih</td>
+                                    <td class="text-end fw-bold">Rp {{ number_format($cf_operating_net_income, 0, ',', '.') }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4 text-muted fst-italic">Penyesuaian untuk item non-kas:</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-5">+ Penyusutan Aset Tetap</td>
+                                    <td class="text-end">Rp {{ number_format($cf_operating_depreciation, 0, ',', '.') }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4 text-muted fst-italic">Perubahan Modal Kerja:</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-5">Penurunan (Kenaikan) Piutang Usaha</td>
+                                    <td class="text-end {{ $cf_change_ar < 0 ? 'text-danger' : '' }}">Rp {{ number_format($cf_change_ar, 0, ',', '.') }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-5">Penurunan (Kenaikan) Persediaan</td>
+                                    <td class="text-end {{ $cf_change_inventory < 0 ? 'text-danger' : '' }}">Rp {{ number_format($cf_change_inventory, 0, ',', '.') }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-5">Penurunan (Kenaikan) Deposit ke Supplier</td>
+                                    <td class="text-end {{ $cf_change_supplier_deposit < 0 ? 'text-danger' : '' }}">Rp {{ number_format($cf_change_supplier_deposit, 0, ',', '.') }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-5">Kenaikan (Penurunan) Hutang Dagang</td>
+                                    <td class="text-end {{ $cf_change_ap < 0 ? 'text-danger' : '' }}">Rp {{ number_format($cf_change_ap, 0, ',', '.') }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-5">Kenaikan (Penurunan) Deposit dari Klien</td>
+                                    <td class="text-end {{ $cf_change_client_deposit < 0 ? 'text-danger' : '' }}">Rp {{ number_format($cf_change_client_deposit, 0, ',', '.') }}</td>
+                                </tr>
+                                <tr class="table-success border-top border-success">
+                                    <td class="fw-bold ps-4">Kas Bersih dari Aktivitas Operasi</td>
+                                    <td class="text-end fw-bold">Rp {{ number_format($total_cash_from_operations, 0, ',', '.') }}</td>
+                                </tr>
+
+                                {{-- 2. AKTIVITAS INVESTASI --}}
+                                <tr class="table-light fw-bold"><td colspan="2" class="pt-3">2. Arus Kas dari Aktivitas Investasi</td></tr>
+                                <tr>
+                                    <td class="ps-4">Pembelian Aset Tetap</td>
+                                    <td class="text-end text-danger">(Rp {{ number_format($cf_investing_purchase_asset, 0, ',', '.') }})</td>
+                                </tr>
+                                <tr class="table-warning border-top border-warning">
+                                    <td class="fw-bold ps-4">Kas Bersih untuk Aktivitas Investasi</td>
+                                    <td class="text-end fw-bold">Rp {{ number_format($total_cash_from_investing, 0, ',', '.') }}</td>
+                                </tr>
+
+                                {{-- 3. AKTIVITAS PENDANAAN --}}
+                                <tr class="table-light fw-bold"><td colspan="2" class="pt-3">3. Arus Kas dari Aktivitas Pendanaan</td></tr>
+                                <tr>
+                                    <td class="ps-4">Setoran Modal</td>
+                                    <td class="text-end">Rp {{ number_format($cf_financing_capital_in, 0, ',', '.') }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4">Penarikan Modal (Prive)</td>
+                                    <td class="text-end text-danger">(Rp {{ number_format($cf_financing_drawing, 0, ',', '.') }})</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4">Penerimaan Pinjaman</td>
+                                    <td class="text-end">Rp {{ number_format($cf_financing_loan_in, 0, ',', '.') }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4">Pelunasan Pokok Pinjaman</td>
+                                    <td class="text-end text-danger">(Rp {{ number_format($cf_financing_loan_pay, 0, ',', '.') }})</td>
+                                </tr>
+                                <tr class="table-info border-top border-info">
+                                    <td class="fw-bold ps-4">Kas Bersih dari Aktivitas Pendanaan</td>
+                                    <td class="text-end fw-bold">Rp {{ number_format($total_cash_from_financing, 0, ',', '.') }}</td>
+                                </tr>
+
+                                {{-- RINGKASAN --}}
+                                <tr class="table-dark border-top border-dark mt-3">
+                                    <td class="fw-bold ps-3 py-3">Kenaikan (Penurunan) Bersih Kas</td>
+                                    <td class="text-end fw-bold py-3">Rp {{ number_format($net_increase_cash, 0, ',', '.') }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-3">Saldo Kas Awal Periode</td>
+                                    <td class="text-end">Rp {{ number_format($cash_beginning, 0, ',', '.') }}</td>
+                                </tr>
+                                <tr class="table-secondary fw-bold fs-5">
+                                    <td class="ps-3">Saldo Kas Akhir Periode</td>
+                                    <td class="text-end text-primary">Rp {{ number_format($cash_ending, 0, ',', '.') }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {{-- ARUS KAS SEDERHANA (Basis Kas) --}}
         <div class="col-lg-12">
             <div class="card shadow-sm h-100">

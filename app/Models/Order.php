@@ -14,6 +14,45 @@ use App\Models\OrderItem;
 use App\Models\OrderChangeRequest;
 use App\Models\SalesInvoice; // Tambahkan ini jika relasi invoice_id digunakan
 
+/**
+ * App\Models\Order
+ *
+ * @property int $order_id
+ * @property string $order_number
+ * @property int $client_id
+ * @property int|null $user_id_sales
+ * @property int|null $invoice_id
+ * @property \Illuminate\Support\Carbon $order_date
+ * @property float $total_amount
+ * @property string $status
+ * @property string $order_source
+ * @property string|null $notes
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, OrderChangeRequest> $changeRequests
+ * @property-read int|null $change_requests_count
+ * @property-read Client $client
+ * @property-read SalesInvoice|null $invoice
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, OrderItem> $items
+ * @property-read int|null $items_count
+ * @property-read User|null $sales
+ * @method static \Illuminate\Database\Eloquent\Builder|Order newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Order newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Order query()
+ * @method static \Illuminate\Database\Eloquent\Builder|Order whereClientId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Order whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Order whereInvoiceId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Order whereNotes($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Order whereOrderDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Order whereOrderId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Order whereOrderNumber($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Order whereOrderSource($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Order whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Order whereTotalAmount($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Order whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Order whereUserIdSales($value)
+ * @mixin \Eloquent
+ */
 class Order extends Model
 {
     use HasFactory;

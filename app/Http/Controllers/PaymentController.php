@@ -7,6 +7,7 @@ use App\Models\SalesInvoice;
 use App\Models\ClientLedger;
 use App\Models\Client;
 use App\Models\PaymentMethod;
+use App\Models\GeneralLedger;
 use App\Models\CompanyBankAccount;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -235,7 +236,8 @@ class PaymentController extends Controller
                     $description,
                     $debitEntries,
                     $creditEntries,
-                    $payment
+                    $payment,
+                    Auth::id()
                 );
             }
 
@@ -299,7 +301,8 @@ class PaymentController extends Controller
                     $description,
                     $debitEntries,
                     $creditEntries,
-                    $payment
+                    $payment,
+                    Auth::id()
                 );
             }
 
@@ -365,14 +368,14 @@ class PaymentController extends Controller
                 $description = "Reversal Pembayaran Inv #" . $invoice->invoice_number;
 
                 // Ambil jurnal asli
-                $originalJournalEntries = DB::table('general_ledgers')
-                                            ->where('journal_group_id', "PAY-" . $payment->payment_id)
-                                            ->get();
+                $originalJournalEntries = GeneralLedger::where('journal_group_id', "PAY-" . $payment->payment_id)
+                                        ->get();
                 
                 $debitEntries = [];
                 $creditEntries = [];
 
                 foreach ($originalJournalEntries as $entry) {
+                    /** @var \App\Models\GeneralLedger $entry */
                     // Balikkan Debit jadi Kredit
                     if ($entry->debit > 0) {
                         $creditEntries[] = [$entry->chart_of_account_id, $entry->debit, "Reversal: " . $entry->description];

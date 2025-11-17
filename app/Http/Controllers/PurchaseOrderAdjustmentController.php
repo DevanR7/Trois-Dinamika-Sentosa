@@ -140,7 +140,8 @@ class PurchaseOrderAdjustmentController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $adjustment // Model referensi
+                $adjustment,
+                Auth::id() // Model referensi
             );
 
             // 3. Update status PO
@@ -300,7 +301,8 @@ class PurchaseOrderAdjustmentController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $adjustment // Model referensi
+                $adjustment,
+                Auth::id() // Model referensi
             );
 
             // 3. Update status PO
@@ -473,7 +475,8 @@ class PurchaseOrderAdjustmentController extends Controller
                     $description,
                     $debitEntries,
                     $creditEntries,
-                    $autoDebitNote // Referensi ke adjustment 'debit_note' otomatis
+                    $autoDebitNote,
+                    Auth::id() // Referensi ke adjustment 'debit_note' otomatis
                 );
 
                 // 4. Update status PO terakhir kali
@@ -503,6 +506,7 @@ class PurchaseOrderAdjustmentController extends Controller
         $creditEntries = [];
 
         foreach ($originalJournalEntries as $entry) {
+            /** @var \App\Models\GeneralLedger $entry */
             // Balikkan Debit jadi Kredit
             if ($entry->debit > 0) {
                 $creditEntries[] = [$entry->chart_of_account_id, $entry->debit, "Reversal: " . $entry->description];

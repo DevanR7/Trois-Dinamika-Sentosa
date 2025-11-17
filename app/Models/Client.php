@@ -16,6 +16,63 @@ use App\Notifications\ClientResetPasswordNotification;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Auth\Passwords\CanResetPassword as CanResetPasswordTrait;
 
+/**
+ * App\Models\Client
+ *
+ * @property int $client_id
+ * @property string|null $google_id
+ * @property string $client_name
+ * @property string|null $email
+ * @property \Illuminate\Support\Carbon|null $email_verified_at
+ * @property mixed|null $password
+ * @property bool $is_approved
+ * @property int $is_locked
+ * @property string|null $remember_token
+ * @property string|null $person_in_charge
+ * @property string|null $address
+ * @property string|null $phone_number
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Announcement> $announcements
+ * @property-read int|null $announcements_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Order> $clientOrders
+ * @property-read int|null $client_orders_count
+ * @property-read float $balance
+ * @property-read float $pending_balance
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ClientLedger> $ledgers
+ * @property-read int|null $ledgers_count
+ * @property-read \Illuminate\Notifications\DatabaseNotificationCollection<int, \Illuminate\Notifications\DatabaseNotification> $notifications
+ * @property-read int|null $notifications_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Order> $orders
+ * @property-read int|null $orders_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\SalesInvoice> $salesInvoices
+ * @property-read int|null $sales_invoices_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \Laravel\Sanctum\PersonalAccessToken> $tokens
+ * @property-read int|null $tokens_count
+ * @method static \Illuminate\Database\Eloquent\Builder|Client newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Client newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Client onlyTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|Client query()
+ * @method static \Illuminate\Database\Eloquent\Builder|Client whereAddress($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Client whereClientId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Client whereClientName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Client whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Client whereDeletedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Client whereEmail($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Client whereEmailVerifiedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Client whereGoogleId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Client whereIsApproved($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Client whereIsLocked($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Client wherePassword($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Client wherePersonInCharge($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Client wherePhoneNumber($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Client whereRememberToken($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Client whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Client withTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|Client withoutTrashed()
+ * @mixin \Eloquent
+ */
 class Client extends Authenticatable implements CanResetPassword
 {
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes, CanResetPasswordTrait;

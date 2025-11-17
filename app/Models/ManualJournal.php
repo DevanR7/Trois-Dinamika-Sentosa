@@ -8,6 +8,35 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * App\Models\ManualJournal
+ *
+ * @property int $journal_id
+ * @property string $journal_number
+ * @property \Illuminate\Support\Carbon $entry_date
+ * @property string $description
+ * @property float $total_debit
+ * @property float $total_credit
+ * @property int|null $user_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ManualJournalEntry> $entries
+ * @property-read int|null $entries_count
+ * @property-read \App\Models\User|null $user
+ * @method static \Illuminate\Database\Eloquent\Builder|ManualJournal newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|ManualJournal newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|ManualJournal query()
+ * @method static \Illuminate\Database\Eloquent\Builder|ManualJournal whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ManualJournal whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ManualJournal whereEntryDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ManualJournal whereJournalId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ManualJournal whereJournalNumber($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ManualJournal whereTotalCredit($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ManualJournal whereTotalDebit($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ManualJournal whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|ManualJournal whereUserId($value)
+ * @mixin \Eloquent
+ */
 class ManualJournal extends Model
 {
     use HasFactory;

@@ -234,7 +234,8 @@ class PurchaseReturnController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $purchaseReturn
+                $purchaseReturn,
+                Auth::id()
             );
 
             /**
@@ -280,7 +281,8 @@ class PurchaseReturnController extends Controller
                         $depositDescription,
                         $depositDebitEntries,
                         $depositCreditEntries,
-                        $supplierLedger
+                        $supplierLedger,
+                        Auth::id()
                     );
                 }
 
@@ -421,6 +423,7 @@ class PurchaseReturnController extends Controller
         $creditEntries = [];
 
         foreach ($originalJournalEntries as $entry) {
+            /** @var \App\Models\GeneralLedger $entry */
             // Balikkan Debit jadi Kredit
             if ($entry->debit > 0) {
                 $creditEntries[] = [$entry->chart_of_account_id, $entry->debit, "Reversal: " . $entry->description];

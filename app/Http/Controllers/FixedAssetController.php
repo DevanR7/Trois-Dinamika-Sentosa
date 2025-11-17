@@ -151,7 +151,8 @@ class FixedAssetController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $asset // Model referensi
+                $asset, // Model referensi
+                Auth::id()
             );
             
             DB::commit();
@@ -274,7 +275,8 @@ class FixedAssetController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $fixedAsset // Model referensi
+                $fixedAsset, // Model referensi
+                Auth::id()
             );
 
             DB::commit();
@@ -318,7 +320,8 @@ class FixedAssetController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $fixedAsset
+                $fixedAsset,
+                Auth::id()
             );
 
             // 2. Hapus Jurnal Asli (FASSET-...)

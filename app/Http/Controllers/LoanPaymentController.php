@@ -120,7 +120,8 @@ class LoanPaymentController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $payment // Model referensi
+                $payment,
+                Auth::id() // Model referensi
             );
 
             DB::commit();
@@ -173,7 +174,8 @@ class LoanPaymentController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $payment
+                $payment,
+                Auth::id()
             );
 
             // 3. Hapus Jurnal Asli (LOANPAY-...)

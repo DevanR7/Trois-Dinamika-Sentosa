@@ -134,7 +134,8 @@ class PaymentClearanceController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $payment
+                $payment,
+                Auth::id()
             );
 
             DB::commit();
@@ -255,7 +256,8 @@ class PaymentClearanceController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $payment
+                $payment,
+                Auth::id()
             );
             
             DB::commit();

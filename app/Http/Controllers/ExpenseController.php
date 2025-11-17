@@ -135,7 +135,8 @@ class ExpenseController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $expense // Model referensi
+                $expense, // Model referensi
+                Auth::id()
             );
 
             DB::commit();
@@ -215,7 +216,8 @@ class ExpenseController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $expense // Model referensi
+                $expense, // Model referensi
+                Auth::id()
             );
 
             DB::commit();
@@ -256,7 +258,8 @@ class ExpenseController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $expense
+                $expense,
+                Auth::id()
             );
             
             // 2. Hapus Jurnal Asli (EXP-...)
