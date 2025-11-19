@@ -1,11 +1,9 @@
 @extends('layouts.app')
 
 {{-- ==================================================================== --}}
-{{-- ✅ BLOK PHP GLOBAL UNTUK SEMUA PERHITUNGAN (WAJIB DI ATAS) --}}
+{{-- ✅ BLOK PHP GLOBAL (TIDAK PERLU DIUBAH) --}}
 {{-- ==================================================================== --}}
 @php
-    // Definisikan semua variabel di sini, di bagian atas
-    
     // 1. Untuk Ringkasan Keuangan
     $sisaUtang = $purchaseOrder->remaining_balance;
     $adjustments = $purchaseOrder->adjustments;
@@ -16,10 +14,10 @@
         ->sum('total_amount');
 
     // 2. Untuk Modal Pembayaran
-    $sisaTagihanPO = $sisaUtang; // Sama dengan sisa utang
+    $sisaTagihanPO = $sisaUtang; 
     $saldoDepositSupplier = $purchaseOrder->supplier->balance ?? 0;
     
-    // 3. $paymentMethods & $companyBankAccounts sekarang dikirim dari PurchaseOrderController@show
+    // 3. Payment Methods & Bank Accounts sudah dikirim dari Controller
 @endphp
 {{-- ==================================================================== --}}
 
@@ -29,26 +27,49 @@
     {{-- HEADER HALAMAN DENGAN TOMBOL AKSI --}}
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h2 class="fw-bold mb-0">Detail Pesanan: {{ $purchaseOrder->po_number }}</h2>
+        
         <div class="d-flex flex-wrap justify-content-end gap-2">
-            <a href="{{ route('purchase-orders.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Kembali</a>
+            <a href="{{ route('purchase-orders.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Kembali
+            </a>
+
+            {{-- TOMBOL TERIMA BARANG --}}
             @can('receive', $purchaseOrder)
                 @if(in_array($purchaseOrder->status, ['draft', 'ordered']))
                     <form id="receive-goods-form" action="{{ route('purchase-orders.receive', $purchaseOrder->po_id) }}" method="POST" class="d-inline">
                         @csrf
-                        <button type="submit" class="btn btn-success"><i class="bi bi-box-seam me-1"></i> Tandai Barang Diterima</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-box-seam me-1"></i> Terima Barang
+                        </button>
                     </form>
                 @endif
             @endcan
+
+            {{-- TOMBOL CATAT PEMBAYARAN --}}
+            {{-- Muncul JIKA sisa utang > 0 DAN belum lunas --}}
+            {{-- PENTING: Tombol ini sekarang FLEKSIBEL (bisa bayar DP sebelum terima barang) --}}
             @can('pay', $purchaseOrder)
                 @if($sisaUtang > 0.01 && $purchaseOrder->payment_status != 'paid')
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#paymentModal" id="add-payment-btn">
-                        <i class="bi bi-cash-coin me-1"></i> Catat Pembayaran
+                    @php
+                        $barangBelumDiterima = in_array($purchaseOrder->status, ['draft', 'ordered']);
+                        $btnClass = $barangBelumDiterima ? 'btn-warning text-dark' : 'btn-success';
+                        $btnText  = $barangBelumDiterima ? 'Catat DP (Uang Muka)' : 'Catat Pembayaran';
+                    @endphp
+                    
+                    <button type="button" class="btn {{ $btnClass }}" data-bs-toggle="modal" data-bs-target="#paymentModal" id="add-payment-btn">
+                        <i class="bi bi-cash-coin me-1"></i> {{ $btnText }}
                     </button>
                 @endif
             @endcan
+
+            {{-- DROPDOWN OPSI --}}
             <div class="btn-group">
-                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-gear"></i> Opsi</button>
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-gear"></i> Opsi
+                </button>
                 <ul class="dropdown-menu dropdown-menu-end">
+                    
+                    {{-- Edit Pesanan --}}
                     @if (in_array($purchaseOrder->status, ['draft', 'ordered']))
                     <li>
                         <a class="dropdown-item" href="{{ route('purchase-orders.edit', $purchaseOrder->po_id) }}">
@@ -56,32 +77,34 @@
                         </a>
                     </li>
                     @endif
+                    
                     <li><hr class="dropdown-divider"></li>
 
-                    {{-- =================================== --}}
-                    {{-- ✅ MODIFIKASI 1: Link Penyesuaian --}}
-                    {{-- =================================== --}}
+                    {{-- Buat Penyesuaian --}}
                     <li>
-                        {{-- Mengarah ke halaman 'create' (pemilihan) dengan query string --}}
                         <a class="dropdown-item" href="{{ route('purchase-order-adjustments.create') }}?purchase_order_id={{ $purchaseOrder->po_id }}">
                             <i class="bi bi-file-earmark-diff me-2"></i> Buat Penyesuaian PO
                         </a>
                     </li>
-                    {{-- =================================== --}}
 
-                    <li><a class="dropdown-item" href="{{ route('purchase-orders.pdf', $purchaseOrder->po_id) }}"><i class="bi bi-file-earmark-pdf me-2"></i> Download PDF</a></li> 
+                    <li>
+                        <a class="dropdown-item" href="{{ route('purchase-orders.pdf', $purchaseOrder->po_id) }}">
+                            <i class="bi bi-file-earmark-pdf me-2"></i> Download PDF
+                        </a>
+                    </li> 
+                    
+                    {{-- Batalkan Pesanan --}}
                     @can('cancel', $purchaseOrder)
-                        @if(in_array($purchaseOrder->status, ['draft', 'ordered']))
+                        @if(in_array($purchaseOrder->status, ['draft', 'ordered', 'completed'])) 
+                        {{-- UPDATE: 'completed' juga boleh dibatalkan (akan memicu reversal) --}}
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                                {{-- =================================== --}}
-                                {{-- ✅ MODIFIKASI 2: Form Batalkan Pesanan --}}
-                                {{-- =================================== --}}
                                 <form action="{{ route('purchase-orders.cancel', $purchaseOrder->po_id) }}" method="POST" class="form-cancel-po">
                                     @csrf
-                                    <button type="submit" class="dropdown-item text-danger"><i class="bi bi-x-circle me-2"></i> Batalkan Pesanan</button>
+                                    <button type="submit" class="dropdown-item text-danger">
+                                        <i class="bi bi-x-circle me-2"></i> Batalkan Pesanan
+                                    </button>
                                 </form>
-                                {{-- =================================== --}}
                             </li>
                         @endif
                     @endcan
@@ -90,6 +113,9 @@
         </div>
     </div>
 
+    {{-- ... (BAGIAN KARTU DETAIL & TABEL ITEM ANDA TETAP SAMA, TIDAK PERLU DIUBAH) ... --}}
+    {{-- ... (Langsung copy-paste dari kode Anda sebelumnya sampai sebelum @if($purchaseOrder->payments->isNotEmpty())) ... --}}
+    
     {{-- KARTU DETAIL UTAMA --}}
     <div class="card shadow-sm border-0">
         <div class="card-body p-4">
@@ -212,6 +238,8 @@
                 </table>
             </div>
             @endif
+            
+            {{-- ... (SISA FILE ANDA MULAI DARI TABEL PEMBAYARAN KE BAWAH SUDAH OK) ... --}}
 
             @if($purchaseOrder->payments->isNotEmpty())
             <h5 class="fw-semibold mt-4">Riwayat Pembayaran</h5>
@@ -246,11 +274,8 @@
                                 @endif
                             </td>
                             <td>
-                                {{-- =================================== --}}
-                                {{-- ✅ MODIFIKASI 3: Form Hapus Pembayaran --}}
-                                {{-- =================================== --}}
                                 @php
-                                    $paymentLabel = 'Pembayaran ' . $payment->paymentMethod->name . ' Rp ' . number_format($payment->amount, 0, ',', '.');
+                                    $paymentLabel = 'Pembayaran ' . ($payment->paymentMethod->name ?? 'N/A') . ' Rp ' . number_format($payment->amount, 0, ',', '.');
                                 @endphp
                                 <form action="{{ route('purchase-orders.payments.destroy', $payment) }}" method="POST" 
                                       class="d-inline form-delete-po-payment" 
@@ -261,7 +286,6 @@
                                         <i class="bi bi-trash-fill"></i>
                                     </button>
                                 </form>
-                                {{-- =================================== --}}
                             </td>
                         </tr>
                         @endforeach
@@ -322,7 +346,7 @@
     </div>
 </div>
 
-{{-- Modal Pembayaran --}}
+{{-- Modal Pembayaran (LANGSUNG TEMPEL KODE MODAL ANDA DI SINI JIKA TIDAK DIPISAH) --}}
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -338,16 +362,7 @@
                     <div class="alert alert-info">
                         <div class="d-flex justify-content-between"><span>Total Tagihan Awal:</span><span>Rp {{ number_format($purchaseOrder->total_amount, 0, ',', '.') }}</span></div>
                         
-                        @if($totalDebitNotesPO > 0)
-                            <div class="d-flex justify-content-between text-danger small"><span>Nota Debit (Tambahan):</span><span>(+) Rp {{ number_format($totalDebitNotesPO, 0, ',', '.') }}</span></div>
-                        @endif
-                        @if($totalCreditNotesPO > 0)
-                            <div class="d-flex justify-content-between text-success small"><span>Nota Kredit (Potongan):</span><span>(-) Rp {{ number_format($totalCreditNotesPO, 0, ',', '.') }}</span></div>
-                        @endif
-                        @if($purchaseOrder->total_returned > 0)
-                            <div class="d-flex justify-content-between text-warning small"><span>Total Retur (Potong):</span><span>(-) Rp {{ number_format($purchaseOrder->total_returned, 0, ',', '.') }}</span></div>
-                        @endif
-
+                        {{-- (Rincian ringkas di modal) --}}
                         <hr class="my-1">
                         <div class="d-flex justify-content-between small"><span>Sudah Dibayar:</span><span>(+) Rp {{ number_format($purchaseOrder->amount_paid, 0, ',', '.') }}</span></div>
                         <hr class="my-1">
@@ -462,13 +477,14 @@
 <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Script Konfirmasi Terima Barang
         const receiveGoodsForm = document.getElementById('receive-goods-form');
         if (receiveGoodsForm) {
             receiveGoodsForm.addEventListener('submit', function(event) {
                 event.preventDefault(); 
                 Swal.fire({
                     title: 'Konfirmasi Penerimaan',
-                    text: "Apakah Anda yakin semua barang untuk pesanan ini telah diterima? Stok akan diperbarui.",
+                    text: "Apakah Anda yakin semua barang untuk pesanan ini telah diterima? Stok akan diperbarui dan jurnal akan dibuat.",
                     icon: 'question',
                     showCancelButton: true,
                     confirmButtonColor: '#198754',
@@ -483,6 +499,52 @@
             });
         }
 
+        // Script Konfirmasi Batalkan PO
+        const cancelPOForm = document.querySelector('.form-cancel-po');
+        if (cancelPOForm) {
+            cancelPOForm.addEventListener('submit', function (event) {
+                event.preventDefault(); 
+                Swal.fire({
+                    title: 'Anda Yakin?',
+                    text: "Anda akan membatalkan Pesanan Pembelian (PO) ini. Jurnal akan dibalik jika barang sudah diterima.",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Ya, Batalkan!',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        event.target.submit();
+                    }
+                });
+            });
+        }
+
+        // Script Konfirmasi Hapus Pembayaran
+        const deletePOPaymentForms = document.querySelectorAll('.form-delete-po-payment');
+        deletePOPaymentForms.forEach(form => {
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                const paymentLabel = event.target.dataset.paymentLabel;
+                Swal.fire({
+                    title: 'Anda Yakin?',
+                    text: `Anda akan membatalkan pembayaran ini: "${paymentLabel}". Jurnal akan dibalik dan sisa utang dihitung ulang.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Ya, Batalkan Pembayaran!',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        event.target.submit();
+                    }
+                });
+            });
+        });
+
+        // Script AutoNumeric & Modal Pembayaran (SAMA SEPERTI KODE ANDA SEBELUMNYA)
         const addPaymentBtnPO = document.getElementById('add-payment-btn');
         const amountFormattedInputPO = document.getElementById('amount-formatted-po');
         const amountHiddenInputPO = document.getElementById('amount-po');
@@ -589,14 +651,13 @@
                     }
                 }
                 
-                // Panggil fungsi ini di akhir
                 handlePaymentMethodChangePO();
             }
 
             if (addPaymentBtnPO) {
                 addPaymentBtnPO.addEventListener('click', function() {
                     if (useDebitCheckboxPO) {
-                        useDebitCheckboxPO.checked = true;
+                        useDebitCheckboxPO.checked = true; // Default checked
                     }
                     toggleRequiredFieldsPO();
                     amountErrorPO.textContent = '';
@@ -628,82 +689,6 @@
                 }
             });
         }
-        
-        const cancelPOAdjustmentForms = document.querySelectorAll('.form-cancel-po-adjustment');
-        
-        cancelPOAdjustmentForms.forEach(form => {
-            form.addEventListener('submit', function (event) {
-                event.preventDefault();
-                
-                Swal.fire({
-                    title: 'Anda Yakin?',
-                    text: "Anda akan membatalkan penyesuaian PO ini. Sisa utang akan dihitung ulang.",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'Ya, Batalkan!',
-                    cancelButtonText: 'Batal'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        event.target.submit();
-                    }
-                });
-            });
-        });
-
-        {{-- =================================== --}}
-        {{-- ✅ MODIFIKASI 4: SCRIPT BARU --}}
-        {{-- =================================== --}}
-        
-        // Konfirmasi Batalkan Pesanan (PO)
-        const cancelPOForm = document.querySelector('.form-cancel-po');
-        if (cancelPOForm) {
-            cancelPOForm.addEventListener('submit', function (event) {
-                event.preventDefault(); 
-                Swal.fire({
-                    title: 'Anda Yakin?',
-                    text: "Anda akan membatalkan Pesanan Pembelian (PO) ini.",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'Ya, Batalkan!',
-                    cancelButtonText: 'Batal'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        event.target.submit();
-                    }
-                });
-            });
-        }
-
-        // Konfirmasi Hapus (Rollback) Pembayaran PO
-        const deletePOPaymentForms = document.querySelectorAll('.form-delete-po-payment');
-        deletePOPaymentForms.forEach(form => {
-            form.addEventListener('submit', function (event) {
-                event.preventDefault();
-                
-                const paymentLabel = event.target.dataset.paymentLabel;
-                
-                Swal.fire({
-                    title: 'Anda Yakin?',
-                    text: `Anda akan membatalkan pembayaran ini: "${paymentLabel}". Jurnal akan dibalik dan sisa utang dihitung ulang.`,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'Ya, Batalkan Pembayaran!',
-                    cancelButtonText: 'Batal'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        event.target.submit();
-                    }
-                });
-            });
-        });
-        {{-- =================================== --}}
-
     });
 </script>
 @endpush

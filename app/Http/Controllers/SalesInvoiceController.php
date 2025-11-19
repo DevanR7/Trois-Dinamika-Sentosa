@@ -111,7 +111,8 @@ class SalesInvoiceController extends Controller
             }, 
             'taxes', 
             'adjustments', 
-            'returns'
+            'returns',
+            'additionalCosts' // ✅ Load biaya tambahan
         ]);
 
         $paymentMethods = PaymentMethod::where('is_active', true)
@@ -156,18 +157,30 @@ class SalesInvoiceController extends Controller
 
     /**
      * Menyimpan invoice baru
+     * ✅ DIPERBARUI: Menambahkan fitur Custom Price, Update Master Price, dan Additional Costs
      */
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', SalesInvoice::class);
+        
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,client_id',
             'order_date' => 'required|date',
             'due_date' => 'required|date',
             'sales_order_id' => 'nullable|exists:orders,order_id',
+            
+            // Produk
             'products' => 'required|array|min:1',
             'products.*.product_id' => 'required|exists:products,product_id',
             'products.*.quantity' => 'required|integer|min:1',
+            'products.*.custom_price' => 'required|numeric|min:0', // ✅ Harga Custom
+            'products.*.update_master_price' => 'nullable|boolean', // ✅ Checkbox Update Master
+            
+            // Biaya Tambahan
+            'additional_costs' => 'nullable|array',
+            'additional_costs.*.description' => 'required_with:additional_costs|string|max:255',
+            'additional_costs.*.amount' => 'required_with:additional_costs|numeric|min:0',
+            
             'discount_percentage' => 'nullable|numeric|min:0|max:100',
             'taxes' => 'nullable|array',
             'taxes.*' => 'exists:taxes,id',
@@ -175,25 +188,31 @@ class SalesInvoiceController extends Controller
             'user_id_sales' => 'nullable|exists:users,user_id',
         ]);
 
-        $itemsToDecrementStock = [];
-
         try {
             DB::beginTransaction();
-
+            
             $originOrder = $request->filled('sales_order_id') ? Order::find($request->sales_order_id) : null;
-
-            // Kalkulasi subtotal dan persiapan item
-            $subtotal = 0;
+            $subtotalProducts = 0;
             $productsToSave = [];
+            $itemsToDecrementStock = [];
+
+            // 1. Proses Produk
             foreach ($validated['products'] as $productData) {
                 $product = Product::find($productData['product_id']); 
-                if (!$product) {
-                    throw new \Exception("Produk dengan ID {$productData['product_id']} tidak ditemukan.");
-                }
-
+                
+                // ✅ Gunakan harga dari input user (Custom Price)
+                $price = (float) $productData['custom_price'];
                 $quantity = $productData['quantity'];
+                $subtotalItem = $quantity * $price;
+                $subtotalProducts += $subtotalItem;
+                
+                // ✅ Update Harga Master jika dicentang
+                if (isset($productData['update_master_price']) && $productData['update_master_price']) {
+                    $product->update(['selling_price' => $price]);
+                }
+                
+                // Logika stok (tetap sama)
                 $isFromClientOrder = $originOrder && $originOrder->order_source === 'client';
-
                 if (!$isFromClientOrder) {
                     $itemsToDecrementStock[] = [
                         'product_id' => $product->product_id,
@@ -201,32 +220,44 @@ class SalesInvoiceController extends Controller
                     ];
                 }
 
-                $price = $product->selling_price ?? 0;
-                $itemSubtotal = $quantity * $price;
-                $subtotal += $itemSubtotal;
-
-                $hppSaatIni = $product->average_cost ?? 0;
-
                 $productsToSave[] = [
                     'product_id' => $product->product_id,
                     'quantity' => $quantity,
                     'price_per_unit' => $price,
-                    'hpp' => $hppSaatIni,
-                    'subtotal' => $itemSubtotal,
+                    'hpp' => $product->average_cost ?? 0,
+                    'subtotal' => $subtotalItem,
                 ];
             }
 
-            // Kalkulasi diskon
-            $discountPercentage = $request->input('discount_percentage', 0);
-            $discountAmount = $subtotal * ($discountPercentage / 100);
-            $subtotalAfterDiscount = $subtotal - $discountAmount;
+            // Kurangi stok untuk produk yang bukan dari client order
+            foreach ($itemsToDecrementStock as $item) {
+                Product::where('product_id', $item['product_id'])->decrement('stock_quantity', $item['quantity']);
+            }
 
-            // Kalkulasi pajak
+            // 2. Proses Biaya Tambahan
+            $totalAdditionalCosts = 0;
+            $additionalCostsToSave = [];
+            if (!empty($validated['additional_costs'])) {
+                foreach ($validated['additional_costs'] as $cost) {
+                    $totalAdditionalCosts += (float) $cost['amount'];
+                    $additionalCostsToSave[] = [
+                        'description' => $cost['description'],
+                        'amount' => $cost['amount']
+                    ];
+                }
+            }
+
+            // 3. Kalkulasi Akhir
+            $discountPercentage = $request->input('discount_percentage', 0);
+            $discountAmount = $subtotalProducts * ($discountPercentage / 100);
+            $subtotalAfterDiscount = $subtotalProducts - $discountAmount;
+            
             $totalTaxAmount = 0;
             $taxesToAttach = [];
             if (!empty($validated['taxes'])) {
                 $selectedTaxes = Tax::find($validated['taxes']);
                 foreach ($selectedTaxes as $tax) {
+                    // Pajak biasanya dikenakan ke (Produk - Diskon)
                     $taxAmountForItem = $subtotalAfterDiscount * ($tax->rate / 100);
                     $totalTaxAmount += $taxAmountForItem;
                     $taxesToAttach[$tax->id] = [
@@ -236,10 +267,11 @@ class SalesInvoiceController extends Controller
                     ];
                 }
             }
+            
+            // Total Akhir = (Produk - Diskon) + Pajak + Biaya Tambahan
+            $totalAmount = $subtotalAfterDiscount + $totalTaxAmount + $totalAdditionalCosts;
 
-            $totalAmount = $subtotalAfterDiscount + $totalTaxAmount;
-
-            // Generate nomor invoice
+            // 4. Simpan Invoice
             $salesUserId = $request->input('user_id_sales');
             $orderSource = 'sales'; 
             if ($originOrder) {
@@ -249,13 +281,12 @@ class SalesInvoiceController extends Controller
                 }
             }
 
-            // Simpan invoice
             $invoice = SalesInvoice::create([
                 'client_id' => $validated['client_id'],
                 'invoice_number' => SalesInvoice::generateInvoiceNumber($salesUserId, $orderSource),
                 'order_date' => $validated['order_date'],
                 'due_date' => $validated['due_date'],
-                'subtotal' => $subtotal,
+                'subtotal' => $subtotalProducts, // Subtotal murni produk
                 'discount_percentage' => $discountPercentage,
                 'discount_amount' => $discountAmount,
                 'total_amount' => $totalAmount,
@@ -264,9 +295,14 @@ class SalesInvoiceController extends Controller
                 'amount_paid' => 0,
                 'notes' => $request->input('notes'),
             ]);
-
+            
             $invoice->taxes()->attach($taxesToAttach);
             $invoice->items()->createMany($productsToSave);
+            
+            // ✅ Simpan Biaya Tambahan ke tabel baru
+            if (!empty($additionalCostsToSave)) {
+                $invoice->additionalCosts()->createMany($additionalCostsToSave);
+            }
 
             if ($originOrder) {
                 $originOrder->status = 'invoiced';
@@ -275,9 +311,7 @@ class SalesInvoiceController extends Controller
             }
 
             DB::commit();
-
             return redirect()->route('invoices.show', $invoice->invoice_id)->with('success', 'Invoice berhasil dibuat!');
-
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Gagal membuat invoice: ' . $e->getMessage())->withInput();
@@ -376,7 +410,7 @@ class SalesInvoiceController extends Controller
     public function edit(SalesInvoice $invoice): View
     {
         $this->authorize('update', $invoice);
-        $invoice->load(['items.product', 'taxes']);
+        $invoice->load(['items.product', 'taxes', 'additionalCosts']); // ✅ Load additional costs
         $clients = Client::all();
         $products = Product::all();
         $taxes = Tax::where('is_active', true)->get();
@@ -387,6 +421,7 @@ class SalesInvoiceController extends Controller
 
     /**
      * Mengupdate invoice
+     * ✅ DIPERBARUI: Menambahkan fitur Custom Price, Update Master Price, dan Additional Costs
      */
     public function update(Request $request, SalesInvoice $invoice): RedirectResponse
     {
@@ -395,9 +430,19 @@ class SalesInvoiceController extends Controller
             'client_id' => 'required|exists:clients,client_id',
             'order_date' => 'required|date',
             'due_date' => 'required|date',
+            
+            // Produk
             'products' => 'required|array|min:1',
             'products.*.product_id' => 'required|exists:products,product_id',
             'products.*.quantity' => 'required|integer|min:1',
+            'products.*.custom_price' => 'required|numeric|min:0', // ✅ Harga Custom
+            'products.*.update_master_price' => 'nullable|boolean', // ✅ Checkbox Update Master
+            
+            // Biaya Tambahan
+            'additional_costs' => 'nullable|array',
+            'additional_costs.*.description' => 'required_with:additional_costs|string|max:255',
+            'additional_costs.*.amount' => 'required_with:additional_costs|numeric|min:0',
+            
             'discount_percentage' => 'nullable|numeric|min:0|max:100',
             'taxes' => 'nullable|array',
             'taxes.*' => 'exists:taxes,id',
@@ -421,15 +466,22 @@ class SalesInvoiceController extends Controller
                 }
             }
 
-            // Kalkulasi ulang
-            $subtotal = 0;
+            // Kalkulasi ulang dengan fitur baru
+            $subtotalProducts = 0;
             $productsToSave = [];
             foreach ($validated['products'] as $productData) {
                 $product = Product::find($productData['product_id']);
-                $price = $product->selling_price ?? 0;
+                
+                // ✅ Gunakan harga dari input user (Custom Price)
+                $price = (float) $productData['custom_price'];
                 $quantity = $productData['quantity'];
                 $itemSubtotal = $quantity * $price;
-                $subtotal += $itemSubtotal;
+                $subtotalProducts += $itemSubtotal;
+                
+                // ✅ Update Harga Master jika dicentang
+                if (isset($productData['update_master_price']) && $productData['update_master_price']) {
+                    $product->update(['selling_price' => $price]);
+                }
 
                 $productsToSave[] = [
                     'product_id' => $product->product_id,
@@ -445,9 +497,22 @@ class SalesInvoiceController extends Controller
                 }
             }
 
+            // 2. Proses Biaya Tambahan
+            $totalAdditionalCosts = 0;
+            $additionalCostsToSave = [];
+            if (!empty($validated['additional_costs'])) {
+                foreach ($validated['additional_costs'] as $cost) {
+                    $totalAdditionalCosts += (float) $cost['amount'];
+                    $additionalCostsToSave[] = [
+                        'description' => $cost['description'],
+                        'amount' => $cost['amount']
+                    ];
+                }
+            }
+
             $discountPercentage = $request->input('discount_percentage', 0);
-            $discountAmount = $subtotal * ($discountPercentage / 100);
-            $subtotalAfterDiscount = $subtotal - $discountAmount;
+            $discountAmount = $subtotalProducts * ($discountPercentage / 100);
+            $subtotalAfterDiscount = $subtotalProducts - $discountAmount;
 
             $totalTaxAmount = 0;
             $taxesToSync = [];
@@ -464,14 +529,14 @@ class SalesInvoiceController extends Controller
                 }
             }
             
-            $totalAmount = $subtotalAfterDiscount + $totalTaxAmount;
+            $totalAmount = $subtotalAfterDiscount + $totalTaxAmount + $totalAdditionalCosts;
 
             // Update invoice
             $invoice->update([
                 'client_id' => $validated['client_id'],
                 'order_date' => $validated['order_date'],
                 'due_date' => $validated['due_date'],
-                'subtotal' => $subtotal,
+                'subtotal' => $subtotalProducts,
                 'discount_percentage' => $discountPercentage,
                 'discount_amount' => $discountAmount,
                 'total_amount' => $totalAmount,
@@ -484,6 +549,12 @@ class SalesInvoiceController extends Controller
             $invoice->payments()->delete();
             $invoice->items()->createMany($productsToSave);
             $invoice->taxes()->sync($taxesToSync);
+            
+            // ✅ Update Biaya Tambahan
+            $invoice->additionalCosts()->delete();
+            if (!empty($additionalCostsToSave)) {
+                $invoice->additionalCosts()->createMany($additionalCostsToSave);
+            }
 
             DB::commit();
 
@@ -517,6 +588,7 @@ class SalesInvoiceController extends Controller
             // Hapus item dan pajak terkait
             $invoice->items()->delete();
             $invoice->taxes()->detach();
+            $invoice->additionalCosts()->delete(); // ✅ Hapus biaya tambahan
             // Hapus invoice
             $invoice->delete();
             DB::commit();
@@ -621,7 +693,7 @@ class SalesInvoiceController extends Controller
     public function downloadPDF(SalesInvoice $invoice)
     {
         $this->authorize('view', $invoice);
-        $invoice->load(['client', 'items.product.unit', 'taxes', 'sales']);
+        $invoice->load(['client', 'items.product.unit', 'taxes', 'sales', 'additionalCosts']); // ✅ Load additional costs
 
         $paperSize = [0, 0, 684, 396];
         $pdf = Pdf::loadView('invoices.pdf_template', compact('invoice'));

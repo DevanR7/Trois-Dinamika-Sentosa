@@ -371,4 +371,9 @@ class SalesInvoice extends Model
 
         return (float) $total;
     }
+
+    public function additionalCosts()
+{
+    return $this->hasMany(InvoiceAdditionalCost::class, 'invoice_id', 'invoice_id');
+}
 }

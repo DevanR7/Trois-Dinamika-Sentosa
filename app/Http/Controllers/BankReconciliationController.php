@@ -4,26 +4,21 @@ namespace App\Http\Controllers;
 
 use App\Models\BankReconciliation;
 use App\Models\CompanyBankAccount;
-use App\Models\ChartOfAccount;
 use App\Models\GeneralLedger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Carbon;
 
 class BankReconciliationController extends Controller
 {
     public function __construct()
     {
-        // (Opsional) Ganti 'manage-settings' dengan permission baru jika Anda mau
-        $this->middleware('can:manage-settings');
+        // Ganti permission sesuai kebutuhan aplikasi Anda
+        // $this->middleware('can:manage-finance'); 
     }
 
-    /**
-     * Menampilkan daftar rekonsiliasi yang sudah selesai.
-     */
     public function index(): View
     {
         $reconciliations = BankReconciliation::with('account', 'user')
@@ -33,22 +28,15 @@ class BankReconciliationController extends Controller
         return view('bank_reconciliations.index', compact('reconciliations'));
     }
 
-    /**
-     * Menampilkan form untuk memulai rekonsiliasi baru.
-     */
     public function create(): View
     {
-        // Ambil hanya Akun Bank Perusahaan yang terhubung ke COA
         $bankAccounts = CompanyBankAccount::whereNotNull('chart_of_account_id')
-            ->with('account') // Load relasi COA
+            ->with('account')
             ->get();
             
         return view('bank_reconciliations.create', compact('bankAccounts'));
     }
 
-    /**
-     * Menyimpan header rekonsiliasi (draft) dan redirect ke halaman kerja.
-     */
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -60,17 +48,18 @@ class BankReconciliationController extends Controller
         $bankAccount = CompanyBankAccount::find($validated['company_bank_account_id']);
         $chartOfAccountId = $bankAccount->chart_of_account_id;
 
-        // Cek apakah sudah ada draft untuk akun & tanggal ini
+        // Cek draft existing
         $existing = BankReconciliation::where('chart_of_account_id', $chartOfAccountId)
             ->where('status', 'draft')
             ->first();
         
         if ($existing) {
             return redirect()->route('bank-reconciliations.show', $existing)
-                ->with('info', 'Melanjutkan draft rekonsiliasi yang sudah ada.');
+                ->with('info', 'Melanjutkan draft rekonsiliasi yang belum selesai.');
         }
 
-        // Hitung saldo akhir di Jurnal Umum
+        // Hitung Saldo Akhir Sistem (Closing Balance) per Tanggal Statement
+        // Rumus: Total Debit - Total Kredit s/d Tanggal Laporan
         $closingBalance = GeneralLedger::where('chart_of_account_id', $chartOfAccountId)
             ->where('entry_date', '<=', $validated['statement_date'])
             ->sum(DB::raw('debit - credit'));
@@ -80,8 +69,8 @@ class BankReconciliationController extends Controller
             'company_bank_account_id' => $validated['company_bank_account_id'],
             'statement_date' => $validated['statement_date'],
             'statement_balance' => $validated['statement_balance'],
-            'closing_balance' => $closingBalance,
-            'difference' => $closingBalance - $validated['statement_balance'],
+            'closing_balance' => $closingBalance, // Ini saldo buku besar
+            'difference' => $closingBalance - $validated['statement_balance'], // Selisih awal (sementara)
             'status' => 'draft',
             'user_id' => Auth::id(),
         ]);
@@ -89,70 +78,71 @@ class BankReconciliationController extends Controller
         return redirect()->route('bank-reconciliations.show', $reconciliation);
     }
 
-    /**
-     * Menampilkan Halaman Kerja Rekonsiliasi (Halaman Utama).
-     */
     public function show(BankReconciliation $bankReconciliation): View
     {
         $bankReconciliation->load('account');
         $accountId = $bankReconciliation->chart_of_account_id;
         $statementDate = $bankReconciliation->statement_date;
 
-        // 1. Ambil semua "Centang" yang sudah ada di rekonsiliasi INI
+        // 1. Ambil Item yang SUDAH dicentang (Cleared) di sesi ini
         $clearedEntries = GeneralLedger::where('bank_reconciliation_id', $bankReconciliation->reconciliation_id)
             ->orderBy('entry_date')
             ->get();
-            
-        // 2. Ambil semua "Belum Centang" (Unreconciled) SEBELUM tanggal statement
+
+        // 2. Ambil Item yang BELUM dicentang (Unreconciled) s/d tanggal laporan
         $unreconciledEntries = GeneralLedger::where('chart_of_account_id', $accountId)
             ->whereNull('bank_reconciliation_id')
             ->where('entry_date', '<=', $statementDate)
             ->orderBy('entry_date')
             ->get();
-            
-        // Pisahkan Debit (Setoran/Pemasukan) dan Kredit (Cek/Pembayaran)
-        $cleared_deposits = $clearedEntries->where('debit', '>', 0);
-        $cleared_payments = $clearedEntries->where('credit', '>', 0);
-        
-        $unreconciled_deposits = $unreconciledEntries->where('debit', '>', 0);
-        $unreconciled_payments = $unreconciledEntries->where('credit', '>', 0);
 
-        // 3. Hitung Kalkulasi
-        $totalCleared = $clearedEntries->sum(DB::raw('debit - credit'));
-        $totalUnreconciled = $unreconciledEntries->sum(DB::raw('debit - credit'));
-        
-        // Saldo Jurnal Umum (GL) pada tanggal statement
+        // 3. Hitung Total Secara Matematis untuk Controller & View
+        // Total Cleared (Net) = Deposit Cleared - Payment Cleared
+        $totalClearedNet = $clearedEntries->sum('debit') - $clearedEntries->sum('credit');
+
+        // Total Unreconciled (Net)
+        $totalUnreconciledNet = $unreconciledEntries->sum('debit') - $unreconciledEntries->sum('credit');
+
+        // Saldo Buku Besar (Sistem) Akhir
         $closingBalance = $bankReconciliation->closing_balance;
-        // Saldo Bank (Rekening Koran)
+        // Saldo Rekening Koran (Target)
         $statementBalance = $bankReconciliation->statement_balance;
 
-        // Saldo GL - item yg sdh dicentang + item yg blm dicentang = Saldo GL
-        // Kita hitung: Saldo GL - item yg blm dicentang = Saldo yg sudah bersih
-        $reconciledBalance = $closingBalance - $totalUnreconciled;
-        $difference = $reconciledBalance - $statementBalance;
-        
-        // Update selisih di DB
-        $bankReconciliation->update(['difference' => $difference]);
+        // --- LOGIKA UTAMA REKONSILIASI ---
+        // Cleared Balance (Saldo Sistem yg cocok) = Saldo Buku Besar - Item yg blm cocok
+        // Contoh: Buku besar 120jt. Ada cek gantung (outstanding) 20jt (kredit).
+        // Maka Cleared Balance = 120jt - (-20jt) = 140jt. (Salah logika minus)
+        // Rumus Benar: System Balance - (Unreconciled Debit - Unreconciled Credit)
+        $currentClearedBalance = $closingBalance - $totalUnreconciledNet;
+
+        // Update Difference di DB biar sync
+        $difference = $statementBalance - $currentClearedBalance;
+        if(abs($bankReconciliation->difference - $difference) > 0.01) {
+            $bankReconciliation->update(['difference' => $difference]);
+        }
+
+        // --- Kalkulasi Opening Balance (Virtual) untuk JavaScript ---
+        // JS butuh rumus: Opening + ClearedDebit - ClearedCredit = CurrentCleared
+        // Maka: Opening = CurrentCleared - (ClearedDebit - ClearedCredit)
+        // Kita kirim ini ke view agar JS bisa menghitung maju dari nol.
+        $calcOpeningBalance = $currentClearedBalance - $totalClearedNet;
+
+
+        // 4. Grouping untuk View
+        $cleared_deposits = $clearedEntries->where('debit', '>', 0);
+        $cleared_payments = $clearedEntries->where('credit', '>', 0);
+        $unreconciled_deposits = $unreconciledEntries->where('debit', '>', 0);
+        $unreconciled_payments = $unreconciledEntries->where('credit', '>', 0);
 
         return view('bank_reconciliations.show', compact(
             'bankReconciliation',
             'cleared_deposits', 'cleared_payments',
             'unreconciled_deposits', 'unreconciled_payments',
-            'closingBalance', 'statementBalance', 'difference'
+            'closingBalance', 'statementBalance', 'difference',
+            'calcOpeningBalance' // <--- Variabel penting buat JS
         ));
     }
 
-    /**
-     * (Tidak dipakai, kita gunakan update)
-     */
-    public function edit(BankReconciliation $bankReconciliation)
-    {
-        return redirect()->route('bank-reconciliations.show', $bankReconciliation);
-    }
-
-    /**
-     * Menyimpan perubahan (centang) dari Halaman Kerja.
-     */
     public function update(Request $request, BankReconciliation $bankReconciliation): RedirectResponse
     {
         $validated = $request->validate([
@@ -167,29 +157,29 @@ class BankReconciliationController extends Controller
 
         DB::beginTransaction();
         try {
-            // 1. Lepaskan semua centang LAMA yang terkait dengan draft INI
+            // 1. RESET: Lepaskan semua item dari recon ini (agar bersih)
             GeneralLedger::where('bank_reconciliation_id', $reconciliationId)
                 ->update(['bank_reconciliation_id' => null]);
             
-            // 2. Terapkan centang BARU
+            // 2. SET: Masukkan item yang dicentang user
             if (!empty($clearedEntryIds)) {
                 GeneralLedger::whereIn('ledger_id', $clearedEntryIds)
-                    ->where('chart_of_account_id', $accountId) // Keamanan
+                    ->where('chart_of_account_id', $accountId) // Security check
                     ->update(['bank_reconciliation_id' => $reconciliationId]);
             }
 
-            // 3. Hitung ulang selisih
+            // 3. HITUNG ULANG SELISIH (Validasi Server Side)
             $closingBalance = $bankReconciliation->closing_balance;
             $statementBalance = $bankReconciliation->statement_balance;
 
-            // Ambil semua yg BELUM tercentang (unreconciled)
-            $totalUnreconciled = GeneralLedger::where('chart_of_account_id', $accountId)
+            // Hitung ulang unreconciled
+            $totalUnreconciledNet = GeneralLedger::where('chart_of_account_id', $accountId)
                 ->whereNull('bank_reconciliation_id')
                 ->where('entry_date', '<=', $bankReconciliation->statement_date)
                 ->sum(DB::raw('debit - credit'));
             
-            $reconciledBalance = $closingBalance - $totalUnreconciled;
-            $difference = $reconciledBalance - $statementBalance;
+            $reconciledBalance = $closingBalance - $totalUnreconciledNet;
+            $difference = $statementBalance - $reconciledBalance;
 
             // 4. Update Header
             $bankReconciliation->update([
@@ -197,52 +187,49 @@ class BankReconciliationController extends Controller
                 'user_id' => Auth::id(),
             ]);
 
-            // 5. Jika user klik "Reconcile"
+            // 5. Finalisasi jika Action = Reconcile
             if ($request->action == 'reconcile') {
-                if (round($difference, 2) != 0) {
-                    throw new \Exception('Selisih belum nol (Rp ' . number_format($difference) . '). Jurnal tidak dapat direkonsiliasi.');
+                // Gunakan toleransi 0.01 untuk floating point
+                if (abs($difference) > 0.01) {
+                    throw new \Exception('Selisih belum nol (Rp ' . number_format($difference, 2) . '). Mohon cek kembali centangan Anda.');
                 }
-                // Kunci rekonsiliasi ini
+
                 $bankReconciliation->update(['status' => 'reconciled']);
+                DB::commit();
+                return redirect()->route('bank-reconciliations.index')
+                    ->with('success', 'Rekonsiliasi Berhasil! Periode ini telah dikunci.');
             }
             
             DB::commit();
-
-            if ($request->action == 'reconcile') {
-                return redirect()->route('bank-reconciliations.index')->with('success', 'Rekonsiliasi berhasil diselesaikan dan dikunci.');
-            }
-            return back()->with('success', 'Draft rekonsiliasi berhasil disimpan.');
+            return back()->with('success', 'Draft tersimpan. Anda bisa melanjutkannya nanti.');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Gagal memproses: ' . $e->getMessage());
+            return back()->with('error', 'Error: ' . $e->getMessage());
         }
     }
 
-    /**
-     * Menghapus draft rekonsiliasi.
-     */
     public function destroy(BankReconciliation $bankReconciliation): RedirectResponse
     {
         if ($bankReconciliation->status == 'reconciled') {
             return back()->with('error', 'Rekonsiliasi yang sudah selesai tidak dapat dihapus.');
         }
 
-        DB::beginTransaction();
-        try {
-            // Lepaskan semua centang
+        DB::transaction(function () use ($bankReconciliation) {
+            // Lepaskan semua relasi GL
             GeneralLedger::where('bank_reconciliation_id', $bankReconciliation->reconciliation_id)
                 ->update(['bank_reconciliation_id' => null]);
             
-            // Hapus header
+            // Hapus Header
             $bankReconciliation->delete();
-            
-            DB::commit();
-            return redirect()->route('bank-reconciliations.index')->with('success', 'Draft rekonsiliasi berhasil dihapus.');
-            
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->with('error', 'Gagal menghapus draft: ' . $e->getMessage());
-        }
+        });
+
+        return redirect()->route('bank-reconciliations.index')
+            ->with('success', 'Draft rekonsiliasi berhasil dihapus.');
+    }
+
+    public function edit(BankReconciliation $bankReconciliation)
+    {
+        return redirect()->route('bank-reconciliations.show', $bankReconciliation);
     }
 }
