@@ -55,6 +55,37 @@
         @endif
     </script>
 
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Ambil semua elemen yang memiliki submenu
+        const dropdowns = document.querySelectorAll('.has-submenu > .link');
+
+        dropdowns.forEach(trigger => {
+            trigger.addEventListener('click', function (e) {
+                // Cek apakah sidebar sedang dalam mode tertutup (closed)
+                const sidebar = document.querySelector('.sidebar');
+                if (sidebar.classList.contains('close')) {
+                    // Jika sidebar tertutup, dropdown tidak boleh diklik (atau sidebar harus dibuka dulu)
+                    // Opsional: sidebar.classList.remove('close'); 
+                    return; 
+                }
+
+                e.preventDefault(); // Mencegah link berpindah halaman (karena href="#")
+                
+                const parent = this.parentElement; // Element <li> pembungkus
+
+                // Opsional: Tutup menu lain saat satu menu dibuka (Accordion Effect)
+                // document.querySelectorAll('.has-submenu').forEach(item => {
+                //     if (item !== parent) item.classList.remove('open');
+                // });
+
+                // Toggle class 'open'
+                parent.classList.toggle('open');
+            });
+        });
+    });
+</script>
+
     @stack("scripts")
 </body>
 </html>

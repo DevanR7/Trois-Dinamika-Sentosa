@@ -1,7 +1,8 @@
 /* resources/css/app.css */
-/* HAPUS BARIS @import INI: */
-/* @import url('https://fonts.googleapis.com/css2?family=Hedvig+Letters+Sans&display=swap'); */
 
+/* ========================================================== */
+/* 1. RESET & VARIABLES */
+/* ========================================================== */
 * {
   margin: 0;
   padding: 0;
@@ -23,17 +24,26 @@
 body {
   min-height: 100vh;
   background: var(--body-bg);
-  font-family: 'Hedvig Letters Sans', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  font-family: 'Hedvig Letters Sans', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif;
 }
 
-/* --- Wrapper Konten Utama --- */
+/* Helper Flex */
+.flex {
+  display: flex;
+  align-items: center;
+}
+
+/* ========================================================== */
+/* 2. MAIN LAYOUT WRAPPER */
+/* ========================================================== */
 .main-wrapper {
   position: relative;
   margin-left: 270px;
   width: calc(100% - 270px);
   padding: 0;
-  transition: var(--sidebar-transition); /* Gunakan variabel transisi */
+  transition: var(--sidebar-transition);
 }
+
 /* Wrapper saat sidebar DITUTUP */
 .sidebar.close ~ .main-wrapper {
   margin-left: 75px;
@@ -43,13 +53,10 @@ body {
 .main-content { padding: 1.5rem; }
 .card { border: none; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border-radius: 12px; }
 
-/* --- Struktur Helper --- */
-.flex {
-  display: flex;
-  align-items: center;
-}
 
-/* --- Sidebar --- */
+/* ========================================================== */
+/* 3. SIDEBAR CONTAINER */
+/* ========================================================== */
 .sidebar {
   position: fixed;
   top: 0;
@@ -61,43 +68,46 @@ body {
   padding: 15px 10px;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
   transition: var(--sidebar-transition);
-  z-index: 1050; /* Z-index utama sidebar */
-  /* Hapus overflow visible dari sini */
+  z-index: 1050;
+  /* overflow: visible; -> Biarkan default agar dropdown bisa bekerja jika perlu, tapi kita handle scroll di menu_container */
 }
+
 .sidebar.close {
   width: 75px;
 }
 
-/* --- Header Sidebar (Logo & Lock) --- */
+
+/* ========================================================== */
+/* 4. SIDEBAR HEADER (LOGO & LOCK) */
+/* ========================================================== */
 .sidebar .logo_items {
   gap: 8px;
   padding: 0 10px;
   transition: var(--sidebar-transition);
-  overflow: hidden; /* Cegah elemen keluar saat transisi */
-  height: 60px; /* Beri tinggi fix untuk header */
-  align-items: center; /* Vertikal center */
+  overflow: hidden;
+  height: 60px;
+  align-items: center;
 }
+
 .sidebar .logo_name {
   font-size: 22px;
   color: #ffffff;
   font-weight: 500;
-  white-space: nowrap; /* Biarkan nowrap */
+  white-space: nowrap;
   transition: opacity 0.2s 0.1s ease;
-
-  /* === TAMBAHKAN INI UNTUK MENGONTROL OVERFLOW === */
-  overflow: hidden;         /* Sembunyikan teks yang meluber */
-  text-overflow: ellipsis;  /* Tampilkan "..." jika terpotong */
-  flex-shrink: 1;         /* Izinkan elemen ini menyusut jika perlu */
-  /* Optional: Beri sedikit margin kanan agar tidak terlalu mepet ikon */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
   margin-right: 5px;
-  /* ============================================== */
 }
+
 .sidebar .nav_image {
   display: flex;
-  min-width: 55px;
+  min-width: 55px; /* Lebar fix untuk icon/logo */
   justify-content: center;
   transition: var(--sidebar-transition);
 }
+
 .sidebar .nav_image img {
   height: 40px;
   width: 100%;
@@ -105,6 +115,7 @@ body {
   object-fit: contain;
   transition: var(--sidebar-transition);
 }
+
 #lock-icon,
 #sidebar-close {
   padding: 10px;
@@ -112,320 +123,370 @@ body {
   font-size: 25px;
   cursor: pointer;
   margin-left: auto;
-  transition: opacity 0.3s ease, transform 0.3s ease; /* Tambahkan transisi */
-}
-#sidebar-close {
-  display: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
-/* === FIX SIMETRI & ANIMASI LOGO (Final - Left Align) === */
+#sidebar-close { display: none; }
+
+/* Logo State saat Closed */
 .sidebar.close .logo_name,
 .sidebar.close #lock-icon {
-    /* Sembunyikan total dari layout saat close */
-    display: none;
+  display: none;
 }
 .sidebar.close .logo_items {
-    padding: 0;             /* Hapus padding */
-    /* justify-content: center; <-- Dihapus */
+  padding: 0;
 }
-/* Pastikan container logo punya lebar minimum */
 .sidebar.close .logo_items .nav_image {
-    min-width: 55px;
-    justify-content: center; /* Center image inside container */
+  min-width: 55px;
+  justify-content: center;
 }
-/* ======================================= */
 
-/* --- Menu Container --- */
+
+/* ========================================================== */
+/* 5. MENU SCROLL CONTAINER & FADE EFFECTS */
+/* ========================================================== */
 .menu_container {
   display: flex;
   flex-direction: column;
   margin-top: 20px;
-  overflow-y: auto; /* Memungkinkan scroll */
+  overflow-y: auto;
   overflow-x: hidden;
-  height: calc(100% - 80px - 70px); /* Sesuaikan tinggi jika perlu */
-  position: relative; /* <<<<<< PASTIKAN INI ADA >>>>>> */
-}
-.menu_container::-webkit-scrollbar {
-  display: none;
+  height: calc(100% - 80px - 70px);
+  position: relative;
 }
 
-/* === EFEK FADE PADA AREA SCROLL (Sticky) === */
+.menu_container::-webkit-scrollbar { display: none; }
+
+/* Fade Gradients (Sticky) */
 .menu_container::before,
 .menu_container::after {
     content: "";
-    position: sticky; /* <<<<<< GUNAKAN STICKY >>>>>> */
+    position: sticky;
     left: 0;
     right: 0;
-    height: 30px; /* Tinggi area fade (sesuaikan) */
-    z-index: 5; /* Di atas item menu */
-    pointer-events: none; /* Tidak mengganggu klik/scroll */
+    height: 30px;
+    z-index: 5;
+    pointer-events: none;
 }
-/* Gradient di ATAS area scroll */
+
 .menu_container::before {
     top: 0;
-    background: linear-gradient(
-        to bottom,
-        var(--sidebar-bg) 0%,       /* Mulai solid (warna sidebar) */
-        rgba(17, 24, 39, 0) 100% /* Transparan */
-    );
+    background: linear-gradient(to bottom, var(--sidebar-bg) 0%, rgba(17, 24, 39, 0) 100%);
 }
-/* Gradient di BAWAH area scroll */
+
 .menu_container::after {
     bottom: 0;
-    /* Sticky bottom (otomatis) */
-    background: linear-gradient(
-        to top,
-        var(--sidebar-bg) 0%,       /* Mulai solid (warna sidebar) */
-        rgba(17, 24, 39, 0) 100% /* Transparan */
-    );
-}
-/* ======================================== */
-
-.menu_item {
-  padding-left: 0;
+    background: linear-gradient(to top, var(--sidebar-bg) 0%, rgba(17, 24, 39, 0) 100%);
 }
 
-/* --- Menu Heading (Judul Seksi) --- */
-.menu_title {
-  position: relative;
-  margin-left: 10px;
-  margin-bottom: 8px;
-  display: flex; /* Gunakan flex untuk alignment */
+/* Fade Tambahan di Header/Footer Sidebar */
+.sidebar::before,
+.sidebar::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 35px;
+    z-index: 5;
+    pointer-events: none;
+}
+.sidebar::before {
+    top: 90px; /* Di bawah header */
+    background: linear-gradient(to bottom, var(--sidebar-bg) 0%, rgba(17, 24, 39, 0) 100%);
+}
+.sidebar::after {
+    bottom: 84px; /* Di atas profile */
+    background: linear-gradient(to top, var(--sidebar-bg) 0%, rgba(17, 24, 39, 0) 100%);
+}
+
+
+/* ========================================================== */
+/* 6. MENU ITEMS & LINKS */
+/* ========================================================== */
+.menu_item { padding-left: 0; }
+.item { list-style: none; }
+
+.link {
+  display: flex;
   align-items: center;
-  transition: margin-left 0.4s ease; /* Samakan dengan transisi sidebar */
-  height: 50px; /* Kembalikan height agar konsisten */
-  width: calc(100% - 10px); /* Lebar relatif */
-}
-.sidebar.close .menu_title {
-  margin-left: 0;
+  position: relative;
   width: 100%;
-  /* justify-content: center; <-- Dihapus */
+  text-decoration: none;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  color: var(--sidebar-link-text);
+  padding-left: 5px;
+  padding-right: 15px;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  overflow: hidden;
+  height: 50px;
 }
+
+.link:hover {
+  color: var(--sidebar-text-active);
+  background-color: var(--sidebar-link-hover);
+}
+
+.link.active {
+  color: var(--sidebar-text-active);
+  background-color: var(--sidebar-link-active);
+  font-weight: 500;
+}
+
+.link span {
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity 0.2s 0.1s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 185px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.link i {
+  height: 50px;
+  min-width: 55px; /* Lebar fix icon */
+  display: flex;
+  font-size: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: var(--sidebar-transition);
+}
+
+/* Badge Notification */
+.link .badge {
+  transition: opacity 0.3s ease;
+  position: absolute;
+  left: 15px;
+  top: 10px;
+  font-size: 0.6rem;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 50%;
+  min-width: 18px;
+  height: 18px;
+  text-align: center;
+  z-index: 6;
+}
+
+/* State Link saat Sidebar Closed */
+.sidebar.close .link {
+  padding: 0;
+  height: 50px !important;
+}
+.sidebar.close .link span,
+.sidebar.close .link .badge {
+  opacity: 0;
+  pointer-events: none;
+}
+
+
+/* ========================================================== */
+/* 7. MENU TITLE (DIVIDER) - FIXED SIMETRIS */
+/* ========================================================== */
+.menu_title {
+  display: flex;
+  align-items: center; /* Vertikal rata tengah */
+  height: 50px;
+  width: 100%;
+  padding: 0 10px 0 14px;
+  transition: all 0.4s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  position: relative;
+}
+
 .menu_title .title {
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--sidebar-heading-text);
   text-transform: uppercase;
   letter-spacing: .05em;
-  white-space: nowrap;
-  transition: opacity 0.2s ease; /* Fast fade out */
-}
-.sidebar.close .title {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.1s ease; /* Even faster fade out when closing */
-}
-.menu_title .line {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  height: 3px;
-  width: 20px;
-  border-radius: 25px;
-  background: var(--sidebar-link-hover);
-  opacity: 0;
-  transition: opacity 0.3s ease 0.1s; /* Sedikit delay agar muncul setelah text hilang */
-}
-.sidebar.close .menu_title .line {
+  transition: opacity 0.3s ease;
   opacity: 1;
-  left: 37.5px; /* Sesuaikan posisi horizontal garis saat close */
-  transform: translateX(-50%);
 }
 
-/* --- Menu Item (Link) --- */
-.item {
-  list-style: none;
+.menu_title .line {
+  height: 2px;
+  width: 20px;
+  background: var(--sidebar-link-hover);
+  border-radius: 10px;
+  opacity: 0;
+  position: absolute;
+  left: 0;
+  pointer-events: none;
 }
-.link {
+
+/* State Title saat Sidebar Closed */
+.sidebar.close .menu_title {
+  justify-content: center; /* KUNCI: Flexbox center */
+  padding: 0;
+}
+
+.sidebar.close .menu_title .title {
+  display: none;
+}
+
+.sidebar.close .menu_title .line {
+  position: static; /* KUNCI: Reset position */
+  opacity: 1;
+  transform: none;
+}
+
+
+/* ========================================================== */
+/* 8. DROPDOWN / SUBMENU STYLES (BARU) */
+/* ========================================================== */
+.submenu {
+    display: none;
+    list-style: none;
+    padding: 0;
+    background-color: rgba(0, 0, 0, 0.2);
+    margin-bottom: 5px;
+}
+
+.has-submenu.open .submenu {
+    display: block;
+    animation: slideDown 0.3s ease forwards;
+}
+
+.submenu .item .link {
+    /* Kurangi padding kiri (sebelumnya 50px) karena sekarang ada icon yang memakan tempat */
+    padding-left: 25px !important; 
+    height: 40px;
+    font-size: 0.9em;
+    background: transparent;
+    margin-bottom: 0;
+    border-radius: 0;
+}
+
+.submenu .link i {
+    font-size: 18px !important; /* Ukuran icon lebih kecil dari menu utama */
+    min-width: 30px !important; /* Lebar area icon diperkecil */
+    height: 30px !important;
+    margin-right: 5px; /* Jarak antara icon dan teks */
+    opacity: 0.7; /* Sedikit transparan agar hirarkinya di bawah menu utama */
+}
+
+.submenu .link:hover i,
+.submenu .link.active i {
+    opacity: 1;
+}
+.submenu .item .link:hover {
+    color: var(--sidebar-text-active);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+.submenu .item .link.active {
+    color: var(--sidebar-link-active);
+    font-weight: 600;
+}
+
+/* Icon Panah (Chevron) */
+.dropdown-icon {
+    margin-left: auto;
+    font-size: 1.2rem !important;
+    transition: transform 0.3s ease;
+    min-width: auto !important;
+    height: auto !important;
+}
+
+.has-submenu.open > .link .dropdown-icon {
+    transform: rotate(90deg);
+}
+
+/* Sembunyikan submenu jika sidebar closed */
+.sidebar.close .dropdown-icon,
+.sidebar.close .submenu {
+    display: none !important;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
+/* ========================================================== */
+/* 9. USER PROFILE (BOTTOM) - FIXED GLITCH */
+/* ========================================================== */
+.sidebar_profile {
+  position: relative;
+  margin-top: 15px;
+  padding: 10px 5px; /* Sesuaikan dengan .link */
   display: flex;
   align-items: center;
-  position: relative; /* Tambahkan ini untuk badge absolute */
-  width: 100%;
-  text-decoration: none;
-  border-radius: 8px;
-  margin-bottom: 8px;
-  color: var(--sidebar-link-text);
-  padding-left: 5px;  /* Padding kiri saja */
-  padding-right: 15px; /* Padding kanan normal */
-  transition: background-color 0.3s ease, color 0.3s ease; /* Transisi hover */
-  overflow: hidden; /* Sembunyikan teks yg keluar */
-  height: 50px; /* Fix height agar konsisten */
-}
-.link:hover {
-  color: var(--sidebar-text-active);
-  background-color: var(--sidebar-link-hover);
-}
-.link.active {
-  color: var(--sidebar-text-active);
-  background-color: var(--sidebar-link-active);
-  font-weight: 500;
-}
-.link span {
-  white-space: nowrap;
-  opacity: 1;
-  /* Hanya transisi opacity, delay fade-in */
-  transition: opacity 0.2s 0.1s ease;
+  border-top: 2px solid rgba(255, 255, 255, 0.1);
   overflow: hidden;
-  text-overflow: ellipsis;
-  /* Max-width agar ellipsis bekerja */
-  max-width: 185px;
-  display: inline-block;
-  vertical-align: middle;
+  height: 70px;
+  transition: all 0.4s ease;
 }
-.sidebar.close .link span {
-  opacity: 0;
-  pointer-events: none;
-  /* Faster fade-out */
-  transition: opacity 0.1s ease;
-}
-.link i {
-  height: 50px;
-  min-width: 55px;
+
+.sidebar_profile .nav_image {
   display: flex;
-  font-size: 1.25rem;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: var(--sidebar-transition); /* Ikon ikut transisi */
+  min-width: 55px; /* KUNCI: Lebar sama dengan icon menu */
+  height: 50px;
+  transition: all 0.4s ease;
 }
 
-/* --- Badge Notification (Absolute Top Left) --- */
-.link .badge {
-  transition: opacity 0.3s ease;
-  position: absolute;
-  left: 15px;  /* Jarak dari kiri container .link (sesuaikan) */
-  top: 10px;   /* Jarak dari atas container .link (sesuaikan) */
-  font-size: 0.6rem; /* Perkecil font */
-  line-height: 1; /* Hapus line-height berlebih */
-  padding: 3px 5px; /* Padding lebih kecil */
-  border-radius: 50%; /* Membuatnya bulat */
-  min-width: 18px; /* Lebar minimum */
-  height: 18px; /* Tinggi minimum */
-  text-align: center;
-  z-index: 6; /* Sedikit di atas fade */
-}
-/* =========================================== */
-
-.sidebar.close .link .badge {
-  opacity: 0;
-  pointer-events: none;
-}
-/* Styling saat sidebar DITUTUP (Left Align) */
-.sidebar.close .link {
-  padding: 0;
-  /* justify-content: center; <-- Dihapus */
-  height: 50px !important; /* Fix height saat close */
-}
-
-/* --- Profil di Bawah Sidebar --- */
-.sidebar_profile {
-  position: relative; /* Pastikan ini ada */
-  padding-top: 15px;
-  margin-top: 15px;
-  gap: 10px;
-  border-top: 2px solid rgba(255, 255, 255, 0.1);
-  padding: 15px 10px;
-  overflow: visible !important; /* <-- Pastikan ini ada */
-  height: 70px; /* Fix height */
-  transition: var(--sidebar-transition);
-}
 .sidebar_profile .nav_image img {
   height: 35px;
   width: 35px;
   border-radius: 50%;
   object-fit: cover;
 }
+
 .sidebar_profile .data_text {
-  /* Hanya transisi opacity, delay fade-in */
-  transition: opacity 0.2s 0.1s ease;
-  overflow: hidden; /* Pastikan teks tidak keluar */
-}
-.sidebar_profile .name,
-.sidebar_profile .email {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: block;
+  opacity: 1;
+  margin-left: 5px;
+  transition: opacity 0.2s ease;
 }
+
 .sidebar_profile .name {
   font-size: 0.9rem;
   color: #fff;
+  font-weight: 500;
+  display: block;
 }
 .sidebar_profile .email {
   font-size: 0.8rem;
   color: var(--sidebar-link-text);
-}
-.sidebar_profile .dropdown {
-    position: relative; /* Pastikan ini ada */
-    transition: opacity 0.3s ease;
+  display: block;
 }
 
-/* Sembunyikan elemen profil saat sidebar ditutup */
-.sidebar.close .sidebar_profile {
-    height: 50px;             /* Sesuaikan tinggi */
-    justify-content: center;  /* Pusatkan avatar */
-    padding: 7px 0;         /* Sesuaikan padding vertikal */
-    border-top: none;         /* Hapus border atas saat close */
+.sidebar_profile .dropdown {
+   margin-left: auto;
+   margin-right: 10px;
+   transition: opacity 0.3s ease;
+   position: relative;
 }
+.sidebar_profile .dropdown-menu {
+    z-index: 1051 !important;
+}
+
+/* State Profile saat Sidebar Closed */
+.sidebar.close .sidebar_profile {
+    height: 60px;
+    /* Padding dan alignment tidak perlu diubah drastis karena pakai min-width */
+}
+
 .sidebar.close .sidebar_profile .data_text,
 .sidebar.close .sidebar_profile .dropdown {
-    /* Sembunyikan total dari layout saat close */
-    display: none;
+    display: none !important; 
 }
-/* Pastikan container avatar punya lebar minimum */
-.sidebar.close .sidebar_profile .nav_image {
-    min-width: 55px;
-    margin: 0; /* Hapus margin otomatis jika ada */
-}
+/* Avatar tetap pada posisinya karena container .nav_image punya min-width: 55px */
 
-/* --- FIX Z-INDEX DROPDOWN PROFIL SIDEBAR --- */
-.sidebar_profile .dropdown-menu {
-    z-index: 1051 !important; /* Cukup pastikan selalu di atas sidebar & fade (10) */
-    /* Posisi diatur oleh Bootstrap via data-bs-placement */
-}
-/* ========================================= */
 
-.sidebar::before,
-.sidebar::after {
-    bottom: 60px; /* <-- KURANGI NILAI INI SEDIKIT */
-    background: linear-gradient(
-        to top,
-        var(--sidebar-bg) 0%,       /* Mulai solid */
-        rgba(17, 24, 39, 0) 100% /* Transparan ke atas */
-    );
-    
-    content: "";
-    position: absolute; /* Relatif terhadap .sidebar */
-    left: 0;
-    right: 0;
-    height: 35px; /* Tinggi area fade (sesuaikan) */
-    z-index: 5;   /* Di atas menu, di bawah dropdown */
-    pointer-events: none; /* Tidak mengganggu klik */
-}
-
-/* Gradient di BAWAH Header */
-.sidebar::before {
-    /* Mulai tepat di bawah header (tinggi header ~60px) */
-    top: 90px; 
-    background: linear-gradient(
-        to bottom,
-        var(--sidebar-bg) 0%,       /* Mulai solid */
-        rgba(17, 24, 39, 0) 100% /* Transparan ke bawah */
-    );
-}
-
-/* Gradient di ATAS Profile */
-.sidebar::after {
-    /* Akhiri tepat di atas profile (tinggi profile ~70px) */
-    bottom: 84px; 
-    background: linear-gradient(
-        to top,
-        var(--sidebar-bg) 0%,       /* Mulai solid */
-        rgba(17, 24, 39, 0) 100% /* Transparan ke atas */
-    );
-}
-
-/* --- Tombol Floating Mobile --- */
+/* ========================================================== */
+/* 10. RESPONSIVE (MOBILE) */
+/* ========================================================== */
 .floating-menu-btn {
   position: fixed;
   bottom: 20px;
@@ -437,108 +498,39 @@ body {
   z-index: 1040;
 }
 
-.notification-bell-top-right {
+.sidebar-overlay {
     position: fixed;
-    top: 20px;
-    right: 20px;
-    background-color: #111827;
-    color: white;
-    border: none;
-    border-radius: 0.375rem; /* Radius standar */
-    padding: 0.5rem; /* Menggunakan p-2 dari HTML, ini ~0.5rem */
-    line-height: 1; 
-    z-index: 1050;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1049;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+.sidebar-overlay.active {
+    opacity: 1;
+    visibility: visible;
 }
 
-/* Hover effect sederhana (opsional) */
-.notification-bell-top-right:hover {
-   opacity: 0.9;
-}
-
-/* Pastikan badge tetap terlihat */
-.notification-bell-top-right .badge {
-    /* Mungkin tidak perlu diubah */
-}
-
-
-
-/* --- Responsive (Mobile View) --- */
 @media screen and (max-width: 991px) {
   .sidebar {
-    left: -100%; /* Default: Sembunyi di kiri */
-    /* Pastikan transisi ada untuk efek slide */
+    left: -100%;
     transition: var(--sidebar-transition);
-    /* Pastikan tidak ada overflow: hidden di sini */
     overflow: visible !important;
   }
 
-  /* >>>>> INI ATURAN KUNCINYA <<<<< */
-  .sidebar.open {
-    left: 0; /* Pindahkan ke posisi terlihat saat .open ditambahkan */
-  }
-  /* >>>>> AKHIR ATURAN KUNCI <<<<< */
-
-  /* Saat close (default di mobile), pastikan tetap tersembunyi */
+  .sidebar.open { left: 0; }
+  
   .sidebar.close {
     left: -100%;
     width: 270px;
   }
 
-  #sidebar-close { /* Tombol X di dalam sidebar */
-    display: block;
-  }
-  #lock-icon {
-    display: none;
-  }
+  #sidebar-close { display: block; }
+  #lock-icon { display: none; }
 
-  .main-wrapper { /* Konten utama full width */
+  .main-wrapper {
     margin-left: 0 !important;
     width: 100% !important;
   }
-
-  .sidebar-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black */
-    z-index: 1049; /* Just below the sidebar (1050) */
-    opacity: 0; /* Hidden by default */
-    visibility: hidden;
-    transition: opacity 0.4s ease, visibility 0.4s ease;
-}
-.sidebar-overlay.active {
-    opacity: 1; /* Visible when active */
-    visibility: visible;
-}
-
-.notification-bell-top-right {
-        /* Beri ukuran tetap agar tidak memanjang */
-        width: 45px;  /* Sesuaikan ukuran jika perlu */
-        height: 45px; /* Sesuaikan ukuran jika perlu */
-        
-        /* Hapus padding default agar ukuran pas */
-        padding: 0; 
-        
-        /* Gunakan flexbox untuk menengahkan ikon di dalam tombol */
-        display: inline-flex; /* atau 'flex' */
-        align-items: center;
-        justify-content: center;
-
-        /* Atur ulang posisi pojok kanan bawah agar tidak overlap hamburger */
-        top: auto;    /* Hapus posisi atas */
-        bottom: 80px; /* Jarak dari bawah */
-        right: 20px;   /* Jarak dari kanan */
-    }
-
-    /* Sesuaikan ukuran ikon jika perlu di mobile */
-    .notification-bell-top-right i {
-        font-size: 1.1rem; /* Sedikit lebih kecil agar pas */
-    }
-
-    /* Posisikan ulang badge relatif terhadap ukuran tombol baru */
-     .notification-bell-top-right .badge {
-        /* Mungkin perlu sedikit penyesuaian lagi, coba dulu default */
-    }
 }
