@@ -208,5 +208,7 @@ class ChartOfAccountsSeeder extends Seeder
             ChartOfAccount::create(['parent_account_id' => $beban->account_id, 'account_number' => '6109', 'account_name' => 'Beban Penyusutan - Kendaraan', 'account_type' => 'Beban', 'normal_balance' => 'Debit', 'created_at' => $now, 'updated_at' => $now]);
             ChartOfAccount::create(['parent_account_id' => $beban->account_id, 'account_number' => '6110', 'account_name' => 'Beban Penyusutan - Peralatan', 'account_type' => 'Beban', 'normal_balance' => 'Debit', 'created_at' => $now, 'updated_at' => $now]);
             // <-- AKHIR TAMBAHAN -->
+
+            ChartOfAccount::create(['parent_account_id' => $beban->account_id, 'account_number' => '6201', 'account_name' => 'Beban Selisih Stok (Inventory Adjustment)', 'account_type' => 'Beban', 'normal_balance' => 'Debit', 'created_at' => $now, 'updated_at' => $now]);
     }
 }

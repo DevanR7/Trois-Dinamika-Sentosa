@@ -51,6 +51,12 @@
             <span>Produk</span>
         </a>
     </li>
+    <li class="item">
+    <a class="link flex {{ request()->routeIs('stock-opnames.*') ? 'active' : '' }}" href="{{ route('stock-opnames.index') }}">
+        <i class="material-icons">inventory</i>
+        <span>Stock Opname</span>
+    </a>
+</li>
 </ul>
 @endcan
 
@@ -466,6 +472,22 @@
     </li>
 </ul>
 @endcan
+
+@if(Auth::user()->hasRole(['superadmin', 'admin'])) 
+{{-- Atau gunakan @can('manage-settings') jika ingin berbasis permission --}}
+<div class="menu_title flex">
+    <span class="title">Utilities</span>
+    <span class="line"></span>
+</div>
+<ul class="menu_item">
+    <li class="item">
+        <a class="link flex {{ request()->routeIs('migration.*') ? 'active' : '' }}" href="{{ route('migration.index') }}">
+            <i class="material-icons">cloud_upload</i>
+            <span>Migrasi Data (Import)</span>
+        </a>
+    </li>
+</ul>
+@endif
 
 <div class="menu_title flex">
     <span class="title">Sistem</span>

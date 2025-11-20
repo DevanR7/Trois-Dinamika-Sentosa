@@ -24,118 +24,174 @@ class DashboardController extends Controller
      */
     public function index(Request $request): View
     {
-        // --- Filter input pengguna ---
+        $user = Auth::user();
         $selectedYear = $request->input('year', date('Y'));
         $selectedSalesId = $request->input('sales_id');
-        $user = Auth::user();
 
-        // Ambil daftar tahun unik dari data penjualan dan pembelian
+        // --- 1. DATA TAHUN (Sama) ---
         $invoiceYears = SalesInvoice::select(DB::raw('YEAR(order_date) as year'))->distinct()->pluck('year');
         $poYears = PurchaseOrder::select(DB::raw('YEAR(order_date) as year'))->distinct()->pluck('year');
         $availableYears = $invoiceYears->merge($poYears)->unique()->sortDesc();
 
-        // === Statistik ringkasan utama ===
-        $totalRevenue = Payment::whereYear('payment_date', $selectedYear)->sum('amount');
-        $totalHutang = PurchaseOrder::whereNotIn('payment_status', ['paid'])
-            ->whereYear('order_date', $selectedYear)
-            ->sum(DB::raw('total_amount - amount_paid - total_returned'));
-        $totalPiutang = SalesInvoice::whereNotIn('status', ['paid', 'cancelled'])
-            ->whereYear('order_date', $selectedYear)
-            ->sum(DB::raw('total_amount - amount_paid'));
-        $totalSalesReturn = SalesReturn::whereYear('return_date', $selectedYear)->sum('total_amount');
-        $totalPurchaseReturn = PurchaseReturn::whereYear('return_date', $selectedYear)->sum('total_amount');
+        // Inisialisasi Variabel
+        $stats = [];
+        $mainChartData = null;
+        $financialHealth = []; // ✅ BARU: Kesehatan Keuangan
+        $pendingActions = [];  // ✅ BARU: Daftar Tugas
+        
+        $canViewFinancials = $user->can('view-dashboard-financials');
 
-        // === Data untuk grafik bulanan (penjualan, pembelian, pendapatan) ===
-        $months = collect(range(1, 12))->map(fn ($month) => Carbon::create()->month($month)->format('M'));
+        // =====================================================================
+        // 2. LOGIKA KEUANGAN (PETINGGI)
+        // =====================================================================
+        if ($canViewFinancials) {
+            // A. Statistik Ringkasan (Sama seperti sebelumnya)
+            $stats['revenue'] = Payment::whereYear('payment_date', $selectedYear)->where('status', 'completed')->sum('amount');
+            
+            // Optimasi query hutang/piutang (hitung manual via DB agar cepat)
+            // Note: Accessor remaining_balance lambat untuk banyak data, kita pakai raw query sederhana untuk dashboard
+            $stats['hutang'] = PurchaseOrder::whereIn('payment_status', ['unpaid', 'partially_paid'])->whereYear('order_date', $selectedYear)
+                ->sum(DB::raw('total_amount - amount_paid - total_returned'));
+            
+            $stats['piutang'] = SalesInvoice::whereIn('status', ['unpaid', 'partially_paid'])->whereYear('order_date', $selectedYear)
+                ->sum(DB::raw('total_amount - amount_paid')); // Asumsi retur sudah memotong amount di logika invoice
 
-        $getDataForChart = function ($model, $dateColumn, $amountColumn = 'total_amount') use ($selectedYear) {
-            return $model::select(
-                DB::raw("MONTH({$dateColumn}) as month"),
-                DB::raw("SUM({$amountColumn}) as total")
-            )
-                ->whereYear($dateColumn, $selectedYear)
-                ->groupBy('month')
-                ->pluck('total', 'month')
-                ->all();
-        };
+            $stats['sales_return'] = SalesReturn::whereYear('return_date', $selectedYear)->sum('total_amount');
+            $stats['purchase_return'] = PurchaseReturn::whereYear('return_date', $selectedYear)->sum('total_amount');
+            
+            $stats['labels'] = [
+                'revenue' => 'Total Pendapatan (Rp)',
+                'hutang' => 'Total Hutang (Rp)',
+                'piutang' => 'Total Piutang (Rp)',
+                'sales_return' => 'Nilai Retur Penjualan',
+                'purchase_return' => 'Nilai Retur Pembelian'
+            ];
 
-        $penjualan = $getDataForChart(SalesInvoice::class, 'order_date');
-        $pembelian = $getDataForChart(PurchaseOrder::class, 'order_date');
-        $pendapatan = $getDataForChart(Payment::class, 'payment_date', 'amount');
+            // B. Grafik (Sama)
+            $months = collect(range(1, 12))->map(fn ($month) => Carbon::create()->month($month)->format('M'));
+            $getDataForChart = function ($model, $dateColumn, $amountColumn = 'total_amount') use ($selectedYear) {
+                return $model::select(DB::raw("MONTH({$dateColumn}) as month"), DB::raw("SUM({$amountColumn}) as total"))
+                    ->whereYear($dateColumn, $selectedYear)->groupBy('month')->pluck('total', 'month')->all();
+            };
+            $mainChartData = [
+                'labels' => $months,
+                'penjualan' => array_values(array_replace(array_fill(1, 12, 0), $getDataForChart(SalesInvoice::class, 'order_date'))),
+                'pembelian' => array_values(array_replace(array_fill(1, 12, 0), $getDataForChart(PurchaseOrder::class, 'order_date'))),
+                'pendapatan' => array_values(array_replace(array_fill(1, 12, 0), $getDataForChart(Payment::class, 'payment_date', 'amount'))),
+            ];
 
-        // Pastikan semua bulan (1–12) muncul di grafik, isi 0 jika tidak ada data
-        $mainChartData = [
-            'labels' => $months,
-            'penjualan' => array_values(array_replace(array_fill(1, 12, 0), $penjualan)),
-            'pembelian' => array_values(array_replace(array_fill(1, 12, 0), $pembelian)),
-            'pendapatan' => array_values(array_replace(array_fill(1, 12, 0), $pendapatan)),
+            // ✅ C. FINANCIAL HEALTH (BARU)
+            // 1. Saldo Kas Saat Ini (Real-time)
+            // Ambil akun aset yang namanya mengandung 'Kas' atau 'Bank'
+            $cashAccountIds = \App\Models\ChartOfAccount::where('account_type', 'Aset')
+                ->where(function($q) {
+                    $q->where('account_name', 'like', '%Kas%')->orWhere('account_name', 'like', '%Bank%');
+                })->pluck('account_id');
+            
+            $currentCashBalance = \App\Models\GeneralLedger::whereIn('chart_of_account_id', $cashAccountIds)
+                ->sum(DB::raw('debit - credit'));
+
+            // 2. Estimasi Laba Bersih Bulan Ini
+            $startMonth = now()->startOfMonth();
+            $endMonth = now()->endOfMonth();
+            
+            // Ambil saldo akun Laba Rugi (Pendapatan(K) - Beban(D) - HPP(D))
+            $plEntries = \App\Models\GeneralLedger::join('chart_of_accounts', 'general_ledgers.chart_of_account_id', '=', 'chart_of_accounts.account_id')
+                ->whereBetween('entry_date', [$startMonth, $endMonth])
+                ->whereIn('chart_of_accounts.account_type', ['Pendapatan', 'HPP', 'Beban'])
+                ->select(
+                    'chart_of_accounts.account_type',
+                    'chart_of_accounts.normal_balance',
+                    DB::raw('SUM(general_ledgers.debit) as total_debit'),
+                    DB::raw('SUM(general_ledgers.credit) as total_credit')
+                )
+                ->groupBy('chart_of_accounts.account_type', 'chart_of_accounts.normal_balance')
+                ->get();
+
+            $netProfitThisMonth = 0;
+            foreach($plEntries as $entry) {
+                $balance = ($entry->normal_balance == 'Kredit') 
+                    ? ($entry->total_credit - $entry->total_debit) 
+                    : ($entry->total_debit - $entry->total_credit);
+                
+                // Jika Pendapatan (+), Jika Beban/HPP (-)
+                if ($entry->account_type == 'Pendapatan') $netProfitThisMonth += $balance;
+                else $netProfitThisMonth -= $balance;
+            }
+
+            $financialHealth = [
+                'cash_balance' => $currentCashBalance,
+                'monthly_profit' => $netProfitThisMonth
+            ];
+        } 
+        else {
+            // MODE STAF (Sama seperti sebelumnya)
+            $stats['revenue'] = Payment::whereYear('payment_date', $selectedYear)->where('status', 'completed')->count();
+            $stats['hutang'] = PurchaseOrder::whereNotIn('payment_status', ['paid'])->whereYear('order_date', $selectedYear)->count();
+            $stats['piutang'] = SalesInvoice::whereNotIn('status', ['paid', 'cancelled'])->whereYear('order_date', $selectedYear)->count();
+            $stats['sales_return'] = SalesReturn::whereYear('return_date', $selectedYear)->count();
+            $stats['purchase_return'] = PurchaseReturn::whereYear('return_date', $selectedYear)->count();
+            $stats['labels'] = [
+                'revenue' => 'Transaksi Pembayaran Masuk',
+                'hutang' => 'Jumlah PO Belum Lunas',
+                'piutang' => 'Jumlah Invoice Belum Lunas',
+                'sales_return' => 'Jumlah Nota Retur Jual',
+                'purchase_return' => 'Jumlah Nota Retur Beli'
+            ];
+        }
+
+        // ✅ 3. LOGIKA PENDING ACTIONS (BARU - UNTUK SEMUA ROLE)
+        // Menghitung tugas yang "gantung"
+        $pendingActions = [
+            'po_draft' => PurchaseOrder::where('status', 'draft')->count(),
+            'invoice_draft' => SalesInvoice::where('status', 'draft')->count(),
+            'payment_clearance' => Payment::where('status', 'pending_clearance')->count() + PurchaseOrder::where('status', 'pending_clearance')->count(), // Asumsi PO juga punya status ini atau ambil dari payments PO
+            // Tambahkan PO Payment pending
+            'po_payment_pending' => \App\Models\PurchaseOrderPayment::where('status', 'pending_clearance')->count(),
         ];
+        $pendingActions['total_clearance'] = $pendingActions['payment_clearance'] + $pendingActions['po_payment_pending'];
 
-        // === Produk terlaris (berdasarkan kuantitas terjual) ===
+
+        // =====================================================================
+        // 4. DATA UMUM LAINNYA (Sama)
+        // =====================================================================
         $topProducts = DB::table('invoice_items')
             ->join('sales_invoices', 'invoice_items.invoice_id', '=', 'sales_invoices.invoice_id')
             ->join('products', 'invoice_items.product_id', '=', 'products.product_id')
             ->whereYear('sales_invoices.order_date', $selectedYear)
             ->select('products.product_name', DB::raw('SUM(invoice_items.quantity) as total_quantity'))
-            ->groupBy('products.product_name')
-            ->orderBy('total_quantity', 'desc')
-            ->limit(5)
-            ->get();
+            ->groupBy('products.product_name')->orderBy('total_quantity', 'desc')->limit(5)->get();
+        
+        $topProductsChartData = ['labels' => $topProducts->pluck('product_name'), 'data' => $topProducts->pluck('total_quantity')];
 
-        $topProductsChartData = [
-            'labels' => $topProducts->pluck('product_name'),
-            'data' => $topProducts->pluck('total_quantity'),
-        ];
+        $filterableUsers = [];
+        if ($canViewFinancials) {
+            $filterableUsers = User::whereHas('roles')->orderBy('full_name')->get()->groupBy(fn ($u) => Str::title($u->getRoleNames()->first() ?? 'Lainnya'));
+        }
 
-        // === Kinerja penjualan: daftar order terbaru dari sales ===
-        $filterableUsers = User::whereHas('roles')
-            ->orderBy('full_name')
-            ->get()
-            ->groupBy(fn ($user) => Str::title($user->getRoleNames()->first() ?? 'Lainnya'));
+        $ordersQuery = Order::with(['client', 'sales'])->whereYear('order_date', $selectedYear)->where('order_source', 'sales');
+        $runningInvoicesQuery = SalesInvoice::with(['client', 'sales'])->whereIn('status', ['unpaid', 'partially_paid'])->whereYear('order_date', $selectedYear);
 
-        $ordersQuery = Order::with(['client', 'sales'])
-            ->whereYear('order_date', $selectedYear)
-            ->where('order_source', 'sales');
-
-        if ($selectedSalesId) {
+        if ($user->hasRole('sales')) {
+            $ordersQuery->where('user_id_sales', $user->user_id);
+            $runningInvoicesQuery->where('user_id_sales', $user->user_id);
+        } elseif ($selectedSalesId && $canViewFinancials) {
             $ordersQuery->where('user_id_sales', $selectedSalesId);
+            $runningInvoicesQuery->where('user_id_sales', $selectedSalesId);
         }
 
         $latestOrders = $ordersQuery->latest('order_date')->take(5)->get();
-
-        // === Invoice berjalan (belum lunas) ===
-        $runningInvoicesQuery = SalesInvoice::with(['client', 'sales'])
-            ->whereIn('status', ['unpaid', 'partially_paid'])
-            ->whereYear('order_date', $selectedYear);
-
-        if ($user->hasRole('sales')) {
-            $runningInvoicesQuery->where('user_id_sales', $user->user_id);
-        }
-
         $latestRunningInvoices = $runningInvoicesQuery->latest('order_date')->take(5)->get();
 
-        // === Produk dengan stok menipis ===
-        $lowStockProducts = Product::where('stock_quantity', '<=', 10)
-            ->orderBy('stock_quantity', 'asc')
-            ->take(5)
-            ->get();
+        $lowStockProducts = [];
+        if ($user->can('view-dashboard-inventory')) {
+            $lowStockProducts = Product::where('stock_quantity', '<=', 10)->orderBy('stock_quantity', 'asc')->take(5)->get();
+        }
 
-        // === Kirim semua data ke view ===
         return view('dashboard', compact(
-            'totalRevenue',
-            'totalHutang',
-            'totalPiutang',
-            'totalSalesReturn',
-            'totalPurchaseReturn',
-            'mainChartData',
-            'topProductsChartData',
-            'lowStockProducts',
-            'filterableUsers',
-            'latestOrders',
-            'selectedSalesId',
-            'availableYears',
-            'selectedYear',
-            'latestRunningInvoices'
+            'stats', 'canViewFinancials', 'mainChartData', 'topProductsChartData', 'lowStockProducts',
+            'filterableUsers', 'latestOrders', 'selectedSalesId', 'availableYears', 'selectedYear', 'latestRunningInvoices',
+            'user', 'financialHealth', 'pendingActions' // ✅ Kirim variabel baru
         ));
     }
 }

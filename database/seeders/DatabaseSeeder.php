@@ -41,7 +41,6 @@ class DatabaseSeeder extends Seeder
         $this->call([
             // Panggil seeder sesuai urutan dependensi
             RoleAndPermissionSeeder::class,
-            SettingSeeder::class,
             UserSeeder::class,
             SupplierSeeder::class,
             ClientSeeder::class,
@@ -50,11 +49,11 @@ class DatabaseSeeder extends Seeder
             TaxSeeder::class,
             PaymentMethodSeeder::class,
             ChartOfAccountsSeeder::class,
-            //PurchaseOrderSeeder::class,
-            //SalesInvoiceSeeder::class,
+            SettingSeeder::class,
             CompanyBankAccountSeeder::class,
+            PurchaseOrderSeeder::class,
+            SalesInvoiceSeeder::class,
             // Opsional: aktifkan jika ingin generate data invoice juga
-            // SalesInvoiceSeeder::class,
             // InvoiceItemSeeder::class,
         ]);
 

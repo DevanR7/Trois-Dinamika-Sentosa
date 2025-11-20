@@ -73,6 +73,7 @@ class SettingController extends Controller
             'acct_default_supplier_deposit' => 'nullable|exists:chart_of_accounts,account_id',
             'acct_default_client_deposit' => 'nullable|exists:chart_of_accounts,account_id',
             'acct_default_gateway' => 'nullable|exists:chart_of_accounts,account_id',
+            'acct_default_inventory_adjustment' => 'nullable|exists:chart_of_accounts,account_id',
             
             // Validasi data perusahaan (dari view Anda)
             'company_name' => 'required|string|max:255',

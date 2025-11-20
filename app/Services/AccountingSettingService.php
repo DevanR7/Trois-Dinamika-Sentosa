@@ -96,7 +96,12 @@ class AccountingSettingService
     }
 
     public function getRetainedEarningsId(): ?int
-{
+    {
     return (int) Setting::getValue('acct_default_retained_earnings');
-}
+    }
+        
+    public function getInventoryAdjustmentId(): ?int
+    {
+        return (int) Setting::getValue('acct_default_inventory_adjustment');
+    }
 }

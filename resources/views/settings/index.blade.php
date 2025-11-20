@@ -340,6 +340,20 @@
                                             </select>
                                             @error('acct_default_ap') <div class="invalid-feedback">{{ $message }}</div> @enderror
                                         </div>
+
+                                        <div class="col-md-6">
+        <label for="acct_default_inventory_adjustment" class="form-label">Akun Beban Selisih Stok</label>
+        <select class="form-select" id="acct_default_inventory_adjustment" name="acct_default_inventory_adjustment">
+            <option value="">-- Pilih Akun Beban --</option>
+            @foreach ($expenseOrRevenueAccounts as $account) 
+            {{-- Atau gunakan variabel $bebanAccounts jika Anda membuatnya spesifik --}}
+                <option value="{{ $account->account_id }}" {{ (isset($settings['acct_default_inventory_adjustment']) && $settings['acct_default_inventory_adjustment'] == $account->account_id) ? 'selected' : '' }}>
+                    {{ $account->account_number }} - {{ $account->account_name }}
+                </option>
+            @endforeach
+        </select>
+        <div class="form-text">Untuk mencatat kerugian akibat barang hilang/rusak saat Stock Opname.</div>
+    </div>
                                         
                                         <div class="col-md-6">
                                             <label for="acct_default_inventory" class="form-label">Akun Persediaan Barang</label>

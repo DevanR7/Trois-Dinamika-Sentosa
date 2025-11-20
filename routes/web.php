@@ -64,6 +64,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Resource Controllers
     Route::resource('users', UserController::class);
     Route::resource('products', ProductController::class);
+    Route::get('/stock-opnames/worksheet', [\App\Http\Controllers\StockOpnameController::class, 'downloadWorksheet'])
+         ->name('stock-opnames.worksheet');
+    Route::resource('stock-opnames', \App\Http\Controllers\StockOpnameController::class)->only(['index', 'create', 'store', 'show']);
+    Route::resource('stock-opnames', \App\Http\Controllers\StockOpnameController::class)
+         ->only(['index', 'create', 'store', 'show', 'destroy']); // ✅ Tambahkan destroy
     Route::resource('sales-orders', SalesOrderController::class)
           ->parameters(['sales-orders' => 'order']);
     Route::resource('invoices', SalesInvoiceController::class);
@@ -324,6 +329,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->except(['show'])
         ->middleware('permission:manage-bank-accounts');
     
+    // Data Migration
+    Route::get('/migration', [\App\Http\Controllers\DataMigrationController::class, 'index'])->name('migration.index');
+    Route::post('/migration/products', [\App\Http\Controllers\DataMigrationController::class, 'importProducts'])->name('migration.import-products');
+    Route::post('/migration/clients', [\App\Http\Controllers\DataMigrationController::class, 'importClients'])->name('migration.import-clients');
     
 });
 require __DIR__.'/auth.php';

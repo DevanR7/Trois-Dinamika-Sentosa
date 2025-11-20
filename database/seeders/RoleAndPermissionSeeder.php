@@ -107,6 +107,13 @@ class RoleAndPermissionSeeder extends Seeder
 
         Permission::updateOrCreate(['name' => 'manage-payment-methods']);
 
+        // === PERMISSION KHUSUS DASHBOARD ===
+        // Izin untuk melihat Ringkasan Keuangan (Total Pendapatan, Hutang, Piutang, Grafik)
+        Permission::updateOrCreate(['name' => 'view-dashboard-financials']);
+        
+        // Izin untuk melihat Stok Menipis (Mungkin Kasir perlu tahu)
+        Permission::updateOrCreate(['name' => 'view-dashboard-inventory']);
+        Permission::updateOrCreate(['name' => 'manage-stock-opnames']);
         // Announcements
         Permission::updateOrCreate(['name' => 'manage-announcements']);
         Permission::updateOrCreate(['name' => 'manage-manual-journals']);
