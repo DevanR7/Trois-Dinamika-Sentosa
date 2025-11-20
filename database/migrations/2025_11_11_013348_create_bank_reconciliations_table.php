@@ -11,23 +11,23 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // 1. Cukup buat tabel Bank Reconciliations saja.
+        // Jangan mengotak-atik tabel general_ledgers di sini.
         Schema::create('bank_reconciliations', function (Blueprint $table) {
             $table->id('reconciliation_id');
 
-            // Akun COA yang sedang direkonsiliasi (e.g., 1101.02 - Bank BCA)
             $table->foreignId('chart_of_account_id')
                   ->constrained('chart_of_accounts', 'account_id');
             
-            // (Opsional) Tautkan juga ke CompanyBankAccount
             $table->foreignId('company_bank_account_id')
                   ->nullable()
                   ->constrained('company_bank_accounts', 'company_bank_account_id')
                   ->nullOnDelete();
 
-            $table->date('statement_date'); // Tanggal akhir rekening koran
-            $table->decimal('statement_balance', 15, 2); // Saldo akhir dari bank
-            $table->decimal('closing_balance', 15, 2)->default(0); // Saldo akhir di Jurnal Umum
-            $table->decimal('difference', 15, 2)->default(0); // Selisih
+            $table->date('statement_date'); 
+            $table->decimal('statement_balance', 15, 2); 
+            $table->decimal('closing_balance', 15, 2)->default(0); 
+            $table->decimal('difference', 15, 2)->default(0); 
             
             $table->enum('status', ['draft', 'reconciled'])->default('draft');
             $table->foreignId('user_id')->nullable()->constrained('users', 'user_id')->nullOnDelete();

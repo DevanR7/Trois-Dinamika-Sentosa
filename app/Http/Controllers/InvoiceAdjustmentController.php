@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Model; // <-- Pastikan ini ada
 // ✅ IMPORT SERVICE AKUNTANSI
 use App\Services\AccountingService;
 use App\Services\AccountingSettingService;
+// 1. Import Trait
+use App\Traits\ValidatesAccountingPeriod;
 
 class InvoiceAdjustmentController extends Controller
 {
@@ -27,6 +29,9 @@ class InvoiceAdjustmentController extends Controller
      */
     protected $accountingService;
     protected $accountingSettings;
+
+    // 2. Gunakan Trait
+    use ValidatesAccountingPeriod;
 
     public function __construct(
         AccountingService $accountingService, 
@@ -70,6 +75,7 @@ class InvoiceAdjustmentController extends Controller
     /**
      * Menyimpan penyesuaian manual (credit note atau debit note).
      * ✅ DIPERBARUI: Menambahkan Jurnal Akuntansi.
+     * ✅ DIPERBARUI: Menambahkan validasi periode akuntansi
      */
     public function storeManual(Request $request): RedirectResponse
     {
@@ -81,6 +87,12 @@ class InvoiceAdjustmentController extends Controller
             'reason' => 'required|string|max:1000',
             'overpayment_action' => 'required|string|in:deposit,refund',
         ]);
+
+        // --- 🔒 VALIDASI PERIODE AKUNTANSI ---
+        if ($this->isDateClosed($request->adjustment_date)) {
+            return back()->with('error', 'Gagal: Tanggal penyesuaian masuk periode tutup buku.')->withInput();
+        }
+        // -------------------------------------
 
         $invoice = SalesInvoice::findOrFail($validated['sales_invoice_id']);
         if ($invoice->status === 'cancelled') {
@@ -174,6 +186,7 @@ class InvoiceAdjustmentController extends Controller
     /**
      * Menyimpan penyesuaian otomatis berdasarkan perubahan struktur invoice.
      * ✅ DIPERBARUI: Menambahkan Jurnal Akuntansi.
+     * ✅ DIPERBARUI: Menambahkan validasi periode akuntansi
      */
     public function storeAuto(Request $request, SalesInvoice $invoice): RedirectResponse
     {
@@ -187,6 +200,13 @@ class InvoiceAdjustmentController extends Controller
             'notes' => 'required|string|min:5|max:1000',
             'overpayment_action' => 'required|string|in:deposit,refund',
         ]);
+
+        // --- 🔒 VALIDASI PERIODE AKUNTANSI ---
+        // Penyesuaian otomatis menggunakan now() sebagai tanggal
+        if ($this->isDateClosed(now())) {
+            return back()->with('error', 'Gagal: Periode akuntansi saat ini sudah ditutup. Tidak bisa membuat penyesuaian otomatis.')->withInput();
+        }
+        // -------------------------------------
         
         // ✅ Validasi Akun Akuntansi
         $arAccountId = $this->accountingSettings->getAccountsReceivableId();
@@ -324,10 +344,19 @@ class InvoiceAdjustmentController extends Controller
      * ======================================================
      * FUNGSI 'DESTROY' YANG DIPERBARUI
      * ✅ DIPERBARUI: Menambahkan Jurnal Reversal.
+     * ✅ DIPERBARUI: Menambahkan validasi periode akuntansi
      * ======================================================
      */
     public function destroy(InvoiceAdjustment $invoiceAdjustment): RedirectResponse
     {
+        // --- 🔒 VALIDASI PERIODE AKUNTANSI ---
+        $journalGroupId = "INV-ADJ-" . $invoiceAdjustment->adjustment_id;
+
+        if ($error = $this->checkTransactionLock($invoiceAdjustment->adjustment_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Hapus Penyesuaian: " . $error);
+        }
+        // -------------------------------------
+
         // --- PENCEGAHAN (Logika Anda) ---
         if ($invoiceAdjustment->type === 'debit_note' && str_contains($invoiceAdjustment->reason, 'Otomatis: Memindahkan kelebihan bayar')) {
             return back()->with('error', 'Gagal: Ini adalah Nota Debit otomatis. Untuk membatalkan, hapus Nota Kredit asli yang memicu pemindahan deposit ini.');

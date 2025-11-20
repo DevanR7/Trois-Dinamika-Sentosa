@@ -22,6 +22,8 @@ use Illuminate\Database\Eloquent\Model; // <-- Pastikan ini ada
 // ✅ TAMBAHKAN IMPORT BARU
 use App\Services\AccountingService;
 use App\Services\AccountingSettingService;
+// 1. Import Trait
+use App\Traits\ValidatesAccountingPeriod;
 
 class PurchaseOrderAdjustmentController extends Controller
 {
@@ -30,6 +32,9 @@ class PurchaseOrderAdjustmentController extends Controller
      */
     protected $accountingService;
     protected $accountingSettings;
+
+    // 2. Gunakan Trait
+    use ValidatesAccountingPeriod;
 
     /**
      * Middleware untuk kontrol akses
@@ -79,6 +84,7 @@ class PurchaseOrderAdjustmentController extends Controller
     /**
      * Menyimpan penyesuaian manual
      * ✅ DIPERBARUI: Menambahkan Jurnal Akuntansi.
+     * ✅ DIPERBARUI: Menambahkan validasi periode akuntansi
      */
     public function storeManual(Request $request): RedirectResponse
     {
@@ -90,6 +96,12 @@ class PurchaseOrderAdjustmentController extends Controller
             'reason' => 'required|string|max:1000',
             'overpayment_action' => 'required|string|in:deposit,refund',
         ]);
+
+        // --- 🔒 VALIDASI PERIODE AKUNTANSI ---
+        if ($this->isDateClosed($request->adjustment_date)) {
+            return back()->with('error', 'Gagal: Tanggal penyesuaian masuk periode tutup buku.');
+        }
+        // -------------------------------------
         
         $purchaseOrder = PurchaseOrder::findOrFail($validated['purchase_order_id']);
         if ($purchaseOrder->status == 'cancelled') {
@@ -188,12 +200,20 @@ class PurchaseOrderAdjustmentController extends Controller
     /**
      * Menyimpan penyesuaian otomatis
      * ✅ DIPERBARUI: Menambahkan Jurnal Akuntansi.
+     * ✅ DIPERBARUI: Menambahkan validasi periode akuntansi
      */
     public function storeAuto(Request $request, PurchaseOrder $purchaseOrder): RedirectResponse
     {
         if ($purchaseOrder->status == 'cancelled') {
             return back()->with('error', 'PO yang sudah dibatalkan tidak dapat disesuaikan.');
         }
+
+        // --- 🔒 VALIDASI PERIODE AKUNTANSI ---
+        // Penyesuaian otomatis menggunakan now() sebagai tanggal
+        if ($this->isDateClosed(now())) {
+            return back()->with('error', 'Gagal: Periode akuntansi saat ini sudah ditutup.');
+        }
+        // -------------------------------------
         
         $validated = $request->validate([
             'products' => 'required|array|min:1',
@@ -327,10 +347,19 @@ class PurchaseOrderAdjustmentController extends Controller
      * ======================================================
      * FUNGSI 'DESTROY' YANG DIPERBARUI
      * ✅ DIPERBARUI: Menambahkan Jurnal Reversal.
+     * ✅ DIPERBARUI: Menambahkan validasi periode akuntansi
      * ======================================================
      */
     public function destroy(PurchaseOrderAdjustment $purchaseOrderAdjustment): RedirectResponse
     {
+        // --- 🔒 VALIDASI PERIODE AKUNTANSI ---
+        $journalGroupId = "PO-ADJ-" . $purchaseOrderAdjustment->adjustment_id;
+
+        if ($error = $this->checkTransactionLock($purchaseOrderAdjustment->adjustment_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Hapus Penyesuaian: " . $error);
+        }
+        // -------------------------------------
+
         // --- PENCEGAHAN (Logika Anda) ---
         if ($purchaseOrderAdjustment->type === 'debit_note' && str_contains($purchaseOrderAdjustment->reason, 'Otomatis: Memindahkan kelebihan bayar')) {
             return back()->with('error', 'Gagal: Ini adalah Nota Debit otomatis. Untuk membatalkan, hapus Nota Kredit asli yang memicu pemindahan deposit ini.');

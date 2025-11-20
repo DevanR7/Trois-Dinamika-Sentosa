@@ -9,11 +9,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
+use App\Traits\ValidatesAccountingPeriod;
 
 use Illuminate\Support\Facades\DB;
 
 class ExpenseController extends Controller
 {   
+    use ValidatesAccountingPeriod;
+    
     protected $accountingService;
 
     public function __construct(AccountingService $accountingService)

@@ -10,9 +10,11 @@ use Illuminate\Http\RedirectResponse;
 use App\Models\ChartOfAccount;
 use App\Services\AccountingService;
 use Illuminate\Support\Facades\DB;
+use App\Traits\ValidatesAccountingPeriod;   
 
 class FixedAssetController extends Controller
 {
+    use ValidatesAccountingPeriod;
     protected $accountingService;
 
     public function __construct(AccountingService $accountingService)

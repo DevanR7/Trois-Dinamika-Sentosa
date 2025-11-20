@@ -20,9 +20,14 @@ use App\Models\User;
 use App\Services\AccountingService;
 use App\Services\AccountingSettingService;
 use Illuminate\Support\Facades\Log;
+// 1. Import Trait
+use App\Traits\ValidatesAccountingPeriod;
 
 class SalesInvoiceController extends Controller
 {
+    // 2. Gunakan Trait
+    use ValidatesAccountingPeriod;
+
     /**
      * ✅ Inject Service Akuntansi
      */
@@ -158,10 +163,16 @@ class SalesInvoiceController extends Controller
     /**
      * Menyimpan invoice baru
      * ✅ DIPERBARUI: Menambahkan fitur Custom Price, Update Master Price, dan Additional Costs
+     * ✅ DIPERBARUI: Menambahkan validasi periode akuntansi
      */
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', SalesInvoice::class);
+        
+        // ✅ VALIDASI PERIODE AKUNTANSI
+        if ($this->isDateClosed($request->order_date)) {
+            return back()->with('error', 'Gagal: Tanggal invoice berada dalam periode tahun buku yang sudah ditutup.')->withInput();
+        }
         
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,client_id',
@@ -422,10 +433,25 @@ class SalesInvoiceController extends Controller
     /**
      * Mengupdate invoice
      * ✅ DIPERBARUI: Menambahkan fitur Custom Price, Update Master Price, dan Additional Costs
+     * ✅ DIPERBARUI: Menambahkan validasi periode akuntansi
      */
     public function update(Request $request, SalesInvoice $invoice): RedirectResponse
     {
         $this->authorize('update', $invoice);
+
+        // --- 🔒 VALIDASI KEAMANAN (TRAIT) ---
+        // 1. Cek Invoice Lama (Apakah terkunci?)
+        $journalGroupId = "INV-" . $invoice->invoice_number;
+        if ($error = $this->checkTransactionLock($invoice->order_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Update: " . $error);
+        }
+
+        // 2. Cek Tanggal Baru (Jika tanggal diubah ke tahun yang ditutup)
+        if ($request->filled('order_date') && $this->isDateClosed($request->order_date)) {
+            return back()->with('error', 'Gagal Update: Tanggal baru berada dalam periode tahun buku yang sudah ditutup.')->withInput();
+        }
+        // ------------------------------------
+
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,client_id',
             'order_date' => 'required|date',
@@ -568,10 +594,18 @@ class SalesInvoiceController extends Controller
     /**
      * Menghapus invoice
      * ✅ DIPERBARUI: Lebih aman, hanya izinkan hapus 'draft' atau 'cancelled'
+     * ✅ DIPERBARUI: Menambahkan validasi periode akuntansi
      */
     public function destroy(SalesInvoice $invoice): RedirectResponse
     { 
         $this->authorize('delete', $invoice); 
+
+        // --- 🔒 VALIDASI KEAMANAN (TRAIT) ---
+        // Cek Invoice Draft sekalipun (jika tanggalnya ada di tahun tertutup)
+        if ($error = $this->checkTransactionLock($invoice->order_date)) { // Draft belum punya Jurnal, jadi cek tanggal saja
+            return back()->with('error', "Gagal Hapus: " . $error);
+        }
+        // ------------------------------------
 
         // ✅ Cek status. Jangan hapus invoice yg sudah terkonfirmasi.
         if (!in_array($invoice->status, ['draft', 'cancelled'])) {
@@ -602,11 +636,19 @@ class SalesInvoiceController extends Controller
     /**
      * Membatalkan invoice
      * ✅ DIPERBARUI: Menambahkan Jurnal Reversal dan Kembalikan Stok
+     * ✅ DIPERBARUI: Menambahkan validasi periode akuntansi
      */
     public function cancel(SalesInvoice $invoice): RedirectResponse
     {
         $this->authorize('cancel', $invoice);
-        
+
+        // --- 🔒 VALIDASI KEAMANAN (TRAIT) ---
+        $journalGroupId = "INV-" . $invoice->invoice_number;
+        if ($error = $this->checkTransactionLock($invoice->order_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Membatalkan: " . $error);
+        }
+        // ------------------------------------
+
         // Cek status
         if (in_array($invoice->status, ['paid', 'partially_paid'])) {
              return back()->with('error', 'Invoice yang sudah lunas atau dicicil tidak bisa dibatalkan.');

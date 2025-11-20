@@ -16,6 +16,8 @@ use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Log;
 use App\Services\AccountingService;
 use App\Services\AccountingSettingService;
+// 1. Import Trait
+use App\Traits\ValidatesAccountingPeriod;
 
 class PurchaseOrderPaymentController extends Controller
 {
@@ -24,6 +26,9 @@ class PurchaseOrderPaymentController extends Controller
      */
     protected $accountingService;
     protected $accountingSettings;
+
+    // 2. Gunakan Trait
+    use ValidatesAccountingPeriod;
 
     public function __construct(
         AccountingService $accountingService, 
@@ -36,6 +41,7 @@ class PurchaseOrderPaymentController extends Controller
     /**
      * Menyimpan pembayaran untuk purchase order tertentu.
      * ✅ DIPERBARUI: Menambahkan Jurnal Akuntansi.
+     * ✅ DIPERBARUI: Menambahkan validasi periode akuntansi
      */
     public function store(Request $request, PurchaseOrder $purchaseOrder): \Illuminate\Http\RedirectResponse
     {
@@ -79,6 +85,12 @@ class PurchaseOrderPaymentController extends Controller
         }
 
         $validated = $request->validate($rules);
+
+        // --- 🔒 VALIDASI PERIODE AKUNTANSI ---
+        if ($this->isDateClosed($request->payment_date)) {
+            return back()->with('error', 'Gagal: Tanggal pembayaran masuk periode tutup buku.')->withInput();
+        }
+        // -------------------------------------
 
         // --- Persiapan Data ---
         $supplier = $purchaseOrder->supplier;
@@ -250,11 +262,20 @@ class PurchaseOrderPaymentController extends Controller
     /**
      * ✅ (BARU) Menghapus/Membatalkan Pembayaran
      * Ini penting untuk akuntansi.
+     * ✅ DIPERBARUI: Menambahkan validasi periode akuntansi
      */
     public function destroy(PurchaseOrderPayment $payment): \Illuminate\Http\RedirectResponse
     {
         // $this->authorize('delete', $payment); // Anda bisa tambahkan Policy nanti
         
+        // --- 🔒 VALIDASI PERIODE AKUNTANSI ---
+        $journalGroupId = "PO-PAY-" . $payment->id;
+        
+        if ($error = $this->checkTransactionLock($payment->payment_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Hapus Pembayaran: " . $error);
+        }
+        // -------------------------------------
+
         DB::beginTransaction();
         try {
             $purchaseOrder = $payment->purchaseOrder;
