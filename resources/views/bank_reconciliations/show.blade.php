@@ -217,30 +217,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- 1. INITIAL VARIABLES ---
     const statementBalance = {{ $bankReconciliation->statement_balance }};
     
-    // Asumsi: Kita butuh saldo awal (Beginning Balance) jika rekonsiliasi bersifat kumulatif.
-    // Jika Controller Anda mengirimkan selisih berdasarkan (Opening + Mutasi), 
-    // maka kita perlu variabel Opening Balance di sini.
-    // Untuk simplifikasi berdasarkan kode Anda sebelumnya yang menggunakan $closingBalance (System Balance):
-    // Kita akan menghitung System Balance secara manual: (Opening Balance + Checked Debits - Checked Credits)
-    
-    // Namun, karena variable $closingBalance dari server mungkin sudah termasuk transaksi Checkbox Checked,
-    // Kita gunakan pendekatan kalkulasi murni Client Side untuk UI:
-    // Cleared Balance = (Total Checked Debit - Total Checked Credit) + Beginning Balance.
-    // Karena kita tidak punya variable Beginning Balance eksplisit di view ini, 
-    // kita asumsikan logika: 
-    // Difference = Statement Balance - (Opening + ClearedDebit - ClearedCredit).
-    
-    // Workaround: Kita hitung selisih awal dari Server PHP, lalu sesuaikan dengan perubahan checkbox.
-    // Tapi cara paling bersih adalah menghitung total dari nol.
-    
-    // Mari kita asumsikan Opening Balance adalah 0 atau sudah masuk dalam perhitungan ledger.
-    // Jika ini rekonsiliasi periode berjalan, kita butuh Opening Balance Akun di buku besar.
-    // SAYA AKAN MENGGUNAKAN LOGIKA: 
-    // Target (Statement) vs (Opening + Mutasi). 
-    // Kita ambil Opening Balance dari selisih Closing Balance sistem dikurangi mutasi yang ada.
-    
-    // Agar aman dan sesuai kode controller Anda sebelumnya:
-    // Kita hanya perlu memantau TOTAL NILAI CHECKED dan membandingkan dengan selisih yang diharapkan.
+    // Kalkulasi Opening Balance (Logic Controller Baru)
+    // $calcOpeningBalance dikirim dari Controller. Jika null, gunakan 0.
+    // Jika Anda belum update controller, gunakan fallback logic sebelumnya.
+    const openingBalance = {{ $calcOpeningBalance ?? ($bankReconciliation->closing_balance - ($cleared_deposits->sum('debit') - $cleared_payments->sum('credit'))) }};
     
     const checkboxes = document.querySelectorAll('.recon-check');
     const displayCleared = document.getElementById('display-cleared');
@@ -249,21 +229,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const sumCreditEl = document.getElementById('sum-credit');
     const btnFinish = document.getElementById('btn-finish');
     const statusBadge = document.getElementById('status-badge');
-
-    // Kita perlu "Beginning Balance" dari sistem (Saldo Buku Besar SEBELUM transaksi periode ini).
-    // Karena tidak ada di variabel view, kita hitung mundur:
-    // $closingBalance (dari Controller) adalah Saldo Akhir Sistem SAAT INI (termasuk semua transaksi, atau hanya yang cleared?)
-    // Biasanya $closingBalance di controller = Opening + Cleared Deposits - Cleared Payments.
-    
-    // Mari kita hitung "Cleared Balance" murni dari checkbox yang ada.
-    // Dan kita butuh konstanta "Opening Balance".
-    // PHP: $openingBalance = $bankReconciliation->closing_balance - ($cleared_deposits->sum('debit') - $cleared_payments->sum('credit'));
-    
-    const openingBalance = {{ 
-        $bankReconciliation->closing_balance - (
-            $cleared_deposits->sum('debit') - $cleared_payments->sum('credit')
-        ) 
-    }};
 
     // Format Currency Helper
     const fmt = (num) => new Intl.NumberFormat('id-ID').format(num);
@@ -363,6 +328,10 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     }
+
+    // Notifikasi Flash
+    @if(session('success')) Swal.fire('Berhasil!', "{{ session('success') }}", 'success'); @endif
+    @if(session('error')) Swal.fire('Gagal!', "{{ session('error') }}", 'error'); @endif
 
     // Run First Calculation
     calculate();

@@ -5,8 +5,8 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card shadow-sm">
-                <div class="card-header">
-                    <h2 class="fw-bold mb-0">Edit Akun: {{ $chartOfAccount->account_name }}</h2>
+                <div class="card-header bg-dark text-white">
+                    <h2 class="fw-bold mb-0 fs-4">Edit Akun: {{ $chartOfAccount->account_name }}</h2>
                 </div>
                 <div class="card-body">
                     <form action="{{ route('chart-of-accounts.update', $chartOfAccount) }}" method="POST">
@@ -59,12 +59,15 @@
                                 <select class="form-select @error('parent_account_id') is-invalid @enderror" id="parent_account_id" name="parent_account_id">
                                     <option value="">-- Tidak Ada Induk (Jadikan Akun Parent) --</option>
                                     @foreach ($parentAccounts as $parent)
-                                        <option value="{{ $parent->account_id }}" {{ old('parent_account_id', $chartOfAccount->parent_account_id) == $parent->account_id ? 'selected' : '' }}>
-                                            {{ $parent->account_number }} - {{ $parent->account_name }}
-                                        </option>
+                                        {{-- Prevent selecting self as parent --}}
+                                        @if($parent->account_id != $chartOfAccount->account_id)
+                                            <option value="{{ $parent->account_id }}" {{ old('parent_account_id', $chartOfAccount->parent_account_id) == $parent->account_id ? 'selected' : '' }}>
+                                                {{ $parent->account_number }} - {{ $parent->account_name }}
+                                            </option>
+                                        @endif
                                     @endforeach
                                 </select>
-                                <div class="form-text">Pilih ini jika Anda ingin mengelompokkan akun (e.g., Kas BCA di bawah Kas & Bank).</div>
+                                <div class="form-text small text-muted">Pilih ini jika Anda ingin mengelompokkan akun.</div>
                                 @error('parent_account_id')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror

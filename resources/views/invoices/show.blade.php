@@ -1,22 +1,36 @@
 @extends('layouts.app')
 
+{{-- ==================================================================== --}}
+{{-- ✅ BLOK PHP GLOBAL (Hitung Variabel di Sini) --}}
+{{-- ==================================================================== --}}
 @php
+    // 1. Sisa Tagihan
     $sisaTagihan = $invoice->remaining_balance;
+
+    // 2. Retur
     $totalReturDipotong = $invoice->total_deducting_returns;
     $totalReturKredit = $invoice->returns
         ->where('return_handling_type', 'store_as_credit')
         ->sum('total_amount');
+
+    // 3. Saldo Klien
     $saldoKreditKlien = $invoice->client->balance;
 @endphp
+{{-- ==================================================================== --}}
+
 
 @section('content')
 <div class="container py-4">
+    {{-- HEADER HALAMAN DENGAN TOMBOL AKSI --}}
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h2 class="fw-bold mb-0">Detail Invoice: {{ $invoice->invoice_number }}</h2>
         
         <div class="d-flex flex-wrap justify-content-end gap-2">
-            <a href="{{ route('invoices.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Kembali</a>
+            <a href="{{ route('invoices.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Kembali
+            </a>
             
+            {{-- TOMBOL KONFIRMASI (Hanya jika Draft) --}}
             @if($invoice->status == 'draft')
                 <form id="confirm-form-show" action="{{ route('invoices.confirm', $invoice->invoice_id) }}" method="POST">
                     @csrf
@@ -26,35 +40,55 @@
                 </form>
             @endif
             
+            {{-- TOMBOL CATAT PEMBAYARAN (Hanya jika Belum Lunas & Bukan Draft/Cancel) --}}
             @if(!in_array($invoice->status, ['cancelled', 'draft']) && $sisaTagihan > 0.01)
                 <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal" id="add-payment-btn">
                     <i class="bi bi-cash-coin me-1"></i> Catat Pembayaran
                 </button>
             @endif
             
+            {{-- DROPDOWN OPSI --}}
             <div class="btn-group">
                 <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="bi bi-gear"></i> Opsi
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
+                    {{-- Edit Invoice --}}
                     @if(!in_array($invoice->status, ['paid', 'cancelled']))
-                        <li><a class="dropdown-item" href="{{ route('invoices.edit', $invoice->invoice_id) }}"><i class="bi bi-pencil-square me-2"></i> Edit Invoice</a></li>
+                        <li>
+                            <a class="dropdown-item" href="{{ route('invoices.edit', $invoice->invoice_id) }}">
+                                <i class="bi bi-pencil-square me-2"></i> Edit Invoice
+                            </a>
+                        </li>
                     @endif
+                    
                     <li><hr class="dropdown-divider"></li>
+                    
+                    {{-- Buat Penyesuaian --}}
                     <li>
                         <a class="dropdown-item" href="{{ route('invoice-adjustments.create') }}?sales_invoice_id={{ $invoice->invoice_id }}">
                             <i class="bi bi-file-earmark-diff me-2"></i> Buat Penyesuaian
                         </a>
                     </li>
+                    
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="{{ route('invoices.pdf', $invoice->invoice_id) }}"><i class="bi bi-file-earmark-pdf me-2"></i> Download PDF</a></li>
+                    
+                    {{-- Download PDF --}}
+                    <li>
+                        <a class="dropdown-item" href="{{ route('invoices.pdf', $invoice->invoice_id) }}">
+                            <i class="bi bi-file-earmark-pdf me-2"></i> Download PDF
+                        </a>
+                    </li>
+                    
+                    {{-- Batalkan Invoice --}}
                     @if(!in_array($invoice->status, ['draft', 'paid', 'cancelled']))
                         <li><hr class="dropdown-divider"></li>
                         <li>
-                            {{-- ✅ MODIFIKASI: Menghapus onsubmit dan menambah class --}}
                             <form action="{{ route('invoices.cancel', $invoice->invoice_id) }}" method="POST" class="form-cancel-invoice">
                                 @csrf
-                                <button type="submit" class="dropdown-item text-danger"><i class="bi bi-x-circle me-2"></i> Batalkan Invoice</button>
+                                <button type="submit" class="dropdown-item text-danger">
+                                    <i class="bi bi-x-circle me-2"></i> Batalkan Invoice
+                                </button>
                             </form>
                         </li>
                     @endif
@@ -63,6 +97,7 @@
         </div>
     </div>
 
+    {{-- KARTU DETAIL UTAMA --}}
     <div class="card shadow-sm border-0">
         <div class="card-body p-4">
             <div class="row mb-4">
@@ -116,6 +151,7 @@
                 </table>
             </div>
 
+            {{-- TABEL PEMBAYARAN PENDING --}}
             @php
                 $pendingPayments = $invoice->payments->where('status', 'pending_verification');
             @endphp
@@ -153,12 +189,10 @@
                             </div>
                             
                             <div class="d-flex gap-2">
-                                {{-- ✅ MODIFIKASI: Menambah class --}}
                                 <form action="{{ route('payments.reject', $payment->payment_id) }}" method="POST" class="d-inline mb-0 form-reject-payment">
                                     @csrf
                                     <button type="submit" class="btn btn-sm btn-danger">Tolak</button>
                                 </form>
-                                {{-- ✅ MODIFIKASI: Menambah class --}}
                                 <form action="{{ route('payments.approve', $payment->payment_id) }}" method="POST" class="d-inline mb-0 form-approve-payment">
                                     @csrf
                                     <button type="submit" class="btn btn-sm btn-success">Setujui</button>
@@ -171,6 +205,7 @@
             </div>
             @endif
 
+            {{-- TABEL RIWAYAT PENYESUAIAN --}}
             @if($invoice->adjustments->isNotEmpty())
             <h5 class="fw-semibold mt-4">Riwayat Penyesuaian (Koreksi)</h5>
             <div class="table-responsive">
@@ -202,7 +237,6 @@
                             <td>{{ $adjustment->reason }}</td>
                             <td>{{ $adjustment->user->full_name ?? 'N/A' }}</td>
                             <td>
-                                {{-- Form ini sudah ada SweetAlert-nya dari script Anda sebelumnya --}}
                                 <form action="{{ route('invoice-adjustments.destroy', $adjustment->adjustment_id) }}" method="POST" class="form-cancel-adjustment">
                                     @csrf
                                     @method('DELETE')
@@ -218,6 +252,7 @@
             </div>
             @endif
 
+            {{-- TABEL RIWAYAT PEMBAYARAN --}}
             <h5 class="fw-semibold mt-4">Riwayat Pembayaran</h5>
             <div class="table-responsive">
                 <table class="table table-sm table-bordered">
@@ -254,7 +289,6 @@
                                 @endif
                             </td>
                             <td>
-                                {{-- ✅ MODIFIKASI: Menghapus onsubmit dan menambah class --}}
                                 <form action="{{ route('payments.destroy', $payment) }}" method="POST" class="d-inline form-delete-payment">
                                     @csrf
                                     @method('DELETE')
@@ -273,6 +307,7 @@
                 </table>
             </div>
 
+            {{-- RINGKASAN KEUANGAN --}}
             <div class="row mt-4">
                 <div class="col-md-7">
                     @if($invoice->notes)
@@ -324,7 +359,9 @@
     </div>
 </div>
 
-{{-- MODAL PEMBAYARAN (Tidak ada perubahan di sini) --}}
+{{-- ==================================================================== --}}
+{{-- MODAL PEMBAYARAN --}}
+{{-- ==================================================================== --}}
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -333,7 +370,7 @@
                 @csrf
                 
                 <div class="modal-body">
-                    
+                    {{-- Rincian Singkat di Modal --}}
                     <div class="alert alert-info">
                         <div class="d-flex justify-content-between"><span>Total Tagihan Awal:</span><span>Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span></div>
 
@@ -358,6 +395,7 @@
                         </div>
                     </div>
 
+                    {{-- Opsi Pakai Saldo Kredit --}}
                     @if($saldoKreditKlien > 0)
                     <div id="credit-info-container" class="alert alert-success">
                         <div class="d-flex justify-content-between fw-bold">
@@ -371,6 +409,7 @@
                     </div>
                     @endif
 
+                    {{-- Form Input --}}
                     <div class="mb-3">
                         <label for="amount-formatted" class="form-label">Jumlah Dibayar (Non-Kredit)</label>
                         <input type="text" class="form-control" id="amount-formatted" required>
@@ -434,15 +473,150 @@
 @endsection
 
 @push('scripts')
-{{-- AutoNumeric tidak perlu di-load lagi karena sudah ada di app.blade.php, tapi tidak masalah jika ada --}}
 <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Inisialisasi Tooltip & Popover Bootstrap
     const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
     [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl));
     const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
     [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
 
+    // === SweetAlert Konfirmasi ===
+
+    // Konfirmasi Batalkan Invoice
+    const cancelInvoiceForm = document.querySelector('.form-cancel-invoice');
+    if (cancelInvoiceForm) {
+        cancelInvoiceForm.addEventListener('submit', function (event) {
+            event.preventDefault(); 
+            Swal.fire({
+                title: 'Anda Yakin?',
+                text: "Anda akan membatalkan invoice ini. Tindakan ini tidak dapat diurungkan.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Batalkan!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    event.target.submit();
+                }
+            });
+        });
+    }
+
+    // Konfirmasi Hapus (Rollback) Pembayaran
+    const deletePaymentForms = document.querySelectorAll('.form-delete-payment');
+    deletePaymentForms.forEach(form => {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault(); 
+            Swal.fire({
+                title: 'Anda Yakin?',
+                text: "Anda akan membatalkan pembayaran ini. Jurnal akan dibalik dan sisa tagihan dihitung ulang. Ini adalah tindakan 'rollback'.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Batalkan Pembayaran!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    event.target.submit();
+                }
+            });
+        });
+    });
+
+    // Konfirmasi Tolak Pembayaran
+    const rejectPaymentForms = document.querySelectorAll('.form-reject-payment');
+    rejectPaymentForms.forEach(form => {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault(); 
+            Swal.fire({
+                title: 'Tolak Pembayaran?',
+                text: "Anda yakin ingin menolak pembayaran ini? Status akan dikembalikan.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Tolak!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    event.target.submit();
+                }
+            });
+        });
+    });
+
+    // Konfirmasi Setujui Pembayaran
+    const approvePaymentForms = document.querySelectorAll('.form-approve-payment');
+    approvePaymentForms.forEach(form => {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault(); 
+            Swal.fire({
+                title: 'Setujui Pembayaran?',
+                text: "Anda akan menyetujui pembayaran ini. Sisa tagihan akan di-update.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#198754',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Setujui!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    event.target.submit();
+                }
+            });
+        });
+    });
+
+    // Konfirmasi Invoice
+    const confirmFormShow = document.getElementById('confirm-form-show');
+    if (confirmFormShow) {
+        confirmFormShow.addEventListener('submit', function(event) {
+            event.preventDefault(); 
+            Swal.fire({
+                title: 'Konfirmasi Invoice Ini?',
+                text: "Stok akan diperiksa dan dikurangi. Status akan berubah menjadi 'Belum Lunas'.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#198754', 
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Konfirmasi!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    event.target.submit(); 
+                }
+            });
+        });
+    }
+
+    // Konfirmasi Batalkan Penyesuaian (Adjustment)
+    const cancelAdjustmentForms = document.querySelectorAll('.form-cancel-adjustment');
+    cancelAdjustmentForms.forEach(form => {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault(); 
+            Swal.fire({
+                title: 'Anda Yakin?',
+                text: "Anda akan membatalkan penyesuaian ini. Sisa tagihan invoice akan dihitung ulang.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Batalkan!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    event.target.submit();
+                }
+            });
+        });
+    });
+
+    // === LOGIKA MODAL PEMBAYARAN (AUTONUMERIC & TOGGLE) ===
     const addPaymentBtn = document.getElementById('add-payment-btn');
     const amountFormattedInput = document.getElementById('amount-formatted');
     const amountHiddenInput = document.getElementById('amount');
@@ -451,10 +625,44 @@ document.addEventListener('DOMContentLoaded', function() {
     const paymentMethodSelect = document.getElementById('payment_method');
     const companyBankAccountSelect = document.getElementById('company_bank_account_id');
     
+    const referenceGroup = document.getElementById('payment-reference-group');
+    const referenceInput = document.getElementById('reference_number');
+    const proofGroup = document.getElementById('payment-proof-group');
+    const proofInput = document.getElementById('proof_of_payment');
+
     const remainingBalance = {{ $sisaTagihan ?? 0 }};
     const currentCreditBalance = {{ $saldoKreditKlien ?? 0 }};
     const defaultPaymentMethodId = "{{ $paymentMethods->first()->payment_method_id ?? '' }}";
     const defaultBankAccountId = "{{ $companyBankAccounts->first()->company_bank_account_id ?? '' }}";
+
+    function handlePaymentMethodChange() {
+        if (!paymentMethodSelect) return; 
+        
+        const selectedOption = paymentMethodSelect.options[paymentMethodSelect.selectedIndex];
+        const config = (selectedOption && !paymentMethodSelect.disabled) ? selectedOption.dataset.config : 'none';
+
+        referenceGroup.style.display = 'none';
+        referenceInput.required = false;
+        proofGroup.style.display = 'none';
+        proofInput.required = false;
+
+        if (config === 'proof_only') {
+            proofGroup.style.display = 'block';
+            proofInput.required = true;
+        } else if (config === 'reference_only') {
+            referenceGroup.style.display = 'block';
+            referenceInput.required = true;
+        } else if (config === 'proof_and_reference') {
+            proofGroup.style.display = 'block';
+            proofInput.required = true;
+            referenceGroup.style.display = 'block';
+            referenceInput.required = true;
+        }
+    }
+
+    if (paymentMethodSelect) {
+        paymentMethodSelect.addEventListener('change', handlePaymentMethodChange);
+    }
 
     if (amountFormattedInput) {
         const autoNumericInstance = new AutoNumeric(amountFormattedInput, { 
@@ -546,174 +754,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 amountError.textContent = '';
             }
         });
-    }
-
-    // --- (SCRIPT ANDA YANG SUDAH ADA) ---
-    const cancelAdjustmentForms = document.querySelectorAll('.form-cancel-adjustment');
-    cancelAdjustmentForms.forEach(form => {
-        form.addEventListener('submit', function (event) {
-            event.preventDefault(); 
-            Swal.fire({
-                title: 'Anda Yakin?',
-                text: "Anda akan membatalkan penyesuaian ini. Sisa tagihan invoice akan dihitung ulang.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Ya, Batalkan!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    event.target.submit();
-                }
-            });
-        });
-    });
-
-    const confirmFormShow = document.getElementById('confirm-form-show');
-    if (confirmFormShow) {
-        confirmFormShow.addEventListener('submit', function(event) {
-            event.preventDefault(); 
-            Swal.fire({
-                title: 'Konfirmasi Invoice Ini?',
-                text: "Stok akan diperiksa dan dikurangi. Status akan berubah menjadi 'Belum Lunas'.",
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#198754', 
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Ya, Konfirmasi!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    event.target.submit(); 
-                }
-            });
-        });
-    }
-
-    // --- (SCRIPT BARU DITAMBAHKAN) ---
-
-    // Konfirmasi Batalkan Invoice
-    const cancelInvoiceForm = document.querySelector('.form-cancel-invoice');
-    if (cancelInvoiceForm) {
-        cancelInvoiceForm.addEventListener('submit', function (event) {
-            event.preventDefault(); 
-            Swal.fire({
-                title: 'Anda Yakin?',
-                text: "Anda akan membatalkan invoice ini. Tindakan ini tidak dapat diurungkan.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Ya, Batalkan!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    event.target.submit();
-                }
-            });
-        });
-    }
-
-    // Konfirmasi Tolak Pembayaran
-    const rejectPaymentForms = document.querySelectorAll('.form-reject-payment');
-    rejectPaymentForms.forEach(form => {
-        form.addEventListener('submit', function (event) {
-            event.preventDefault(); 
-            Swal.fire({
-                title: 'Tolak Pembayaran?',
-                text: "Anda yakin ingin menolak pembayaran ini? Status akan dikembalikan.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Ya, Tolak!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    event.target.submit();
-                }
-            });
-        });
-    });
-
-    // Konfirmasi Setujui Pembayaran
-    const approvePaymentForms = document.querySelectorAll('.form-approve-payment');
-    approvePaymentForms.forEach(form => {
-        form.addEventListener('submit', function (event) {
-            event.preventDefault(); 
-            Swal.fire({
-                title: 'Setujui Pembayaran?',
-                text: "Anda akan menyetujui pembayaran ini. Sisa tagihan akan di-update.",
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#198754',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Ya, Setujui!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    event.target.submit();
-                }
-            });
-        });
-    });
-
-    // Konfirmasi Hapus (Rollback) Pembayaran
-    const deletePaymentForms = document.querySelectorAll('.form-delete-payment');
-    deletePaymentForms.forEach(form => {
-        form.addEventListener('submit', function (event) {
-            event.preventDefault(); 
-            Swal.fire({
-                title: 'Anda Yakin?',
-                text: "Anda akan membatalkan pembayaran ini. Jurnal akan dibalik dan sisa tagihan dihitung ulang. Ini adalah tindakan 'rollback'.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Ya, Batalkan Pembayaran!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    event.target.submit();
-                }
-            });
-        });
-    });
-
-    // --- (SCRIPT ANDA YANG SUDAH ADA) ---
-    const referenceGroup = document.getElementById('payment-reference-group');
-    const referenceInput = document.getElementById('reference_number');
-    const proofGroup = document.getElementById('payment-proof-group');
-    const proofInput = document.getElementById('proof_of_payment');
-    
-    function handlePaymentMethodChange() {
-        if (!paymentMethodSelect) return; 
-        
-        const selectedOption = paymentMethodSelect.options[paymentMethodSelect.selectedIndex];
-        const config = (selectedOption && !paymentMethodSelect.disabled) ? selectedOption.dataset.config : 'none';
-
-        referenceGroup.style.display = 'none';
-        referenceInput.required = false;
-        proofGroup.style.display = 'none';
-        proofInput.required = false;
-
-        if (config === 'proof_only') {
-            proofGroup.style.display = 'block';
-            proofInput.required = true;
-        } else if (config === 'reference_only') {
-            referenceGroup.style.display = 'block';
-            referenceInput.required = true;
-        } else if (config === 'proof_and_reference') {
-            proofGroup.style.display = 'block';
-            proofInput.required = true;
-            referenceGroup.style.display = 'block';
-            referenceInput.required = true;
-        }
-    }
-
-    if (paymentMethodSelect) {
-        paymentMethodSelect.addEventListener('change', handlePaymentMethodChange);
     }
 });
 </script>

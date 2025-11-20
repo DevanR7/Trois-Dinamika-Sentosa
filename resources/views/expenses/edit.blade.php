@@ -5,11 +5,11 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card shadow-sm">
-                <div class="card-header">
-                    <h2 class="fw-bold mb-0">Edit Pengeluaran</h2>
+                <div class="card-header bg-dark text-white">
+                    <h2 class="fw-bold mb-0 fs-4">Edit Pengeluaran</h2>
                 </div>
                 <div class="card-body">
-                    <form action="{{ route('expenses.update', $expense) }}" method="POST">
+                    <form action="{{ route('expenses.update', $expense) }}" method="POST" id="expense-form">
                         @csrf
                         @method('PUT')
                         
@@ -21,15 +21,22 @@
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
+
                             <div class="col-md-6 mb-3">
-                                <label for="amount" class="form-label">Jumlah (Rp) <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control @error('amount') is-invalid @enderror" id="amount" name="amount" value="{{ old('amount', $expense->amount) }}" required>
+                                <label for="amount_display" class="form-label">Jumlah (Rp) <span class="text-danger">*</span></label>
+                                {{-- Input Visual --}}
+                                <div class="input-group">
+                                    <span class="input-group-text">Rp</span>
+                                    <input type="text" class="form-control rupiah-input @error('amount') is-invalid @enderror" id="amount_display" required>
+                                </div>
+                                {{-- Input Hidden --}}
+                                <input type="hidden" name="amount" id="amount" value="{{ old('amount', intval($expense->amount)) }}">
+                                
                                 @error('amount')
-                                    <div class="invalid-feedback">{{ $message }}</div>
+                                    <div class="text-danger small mt-1">{{ $message }}</div>
                                 @enderror
                             </div>
                             
-                            {{-- ✅ FIELD KATEGORI (DIUBAH) --}}
                             <div class="col-md-6 mb-3">
                                 <label for="chart_of_account_id" class="form-label">Kategori Beban <span class="text-danger">*</span></label>
                                 <select class="form-select @error('chart_of_account_id') is-invalid @enderror" id="chart_of_account_id" name="chart_of_account_id" required>
@@ -45,7 +52,6 @@
                                 @enderror
                             </div>
 
-                            {{-- ✅ FIELD SUMBER DANA (BARU) --}}
                             <div class="col-md-6 mb-3">
                                 <label for="cash_bank_account_id" class="form-label">Sumber Dana <span class="text-danger">*</span></label>
                                 <select class="form-select @error('cash_bank_account_id') is-invalid @enderror" id="cash_bank_account_id" name="cash_bank_account_id" required>
@@ -82,3 +88,46 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    const amountDisplay = document.getElementById('amount_display');
+    const amountInput = document.getElementById('amount');
+    const form = document.getElementById('expense-form');
+
+    // Helper Format Rupiah
+    function formatRupiah(angka) {
+        let number_string = angka.toString(),
+            sisa    = number_string.length % 3,
+            rupiah  = number_string.substr(0, sisa),
+            ribuan  = number_string.substr(sisa).match(/\d{3}/g);
+            
+        if (ribuan) {
+            let separator = sisa ? '.' : '';
+            rupiah += separator + ribuan.join('.');
+        }
+        return rupiah;
+    }
+
+    // 1. Init Value (Saat halaman dimuat, format angka dari DB/Old)
+    if(amountInput.value) {
+        amountDisplay.value = formatRupiah(amountInput.value);
+    }
+
+    // 2. Live Typing
+    amountDisplay.addEventListener('keyup', function(e) {
+        let val = this.value.replace(/[^0-9]/g, '');
+        this.value = formatRupiah(val);
+        amountInput.value = val;
+    });
+
+    // 3. Submit Handler
+    form.addEventListener('submit', function(e) {
+        if(amountInput.value === '' || amountInput.value == 0) {
+            e.preventDefault();
+            Swal.fire('Error', 'Jumlah nominal tidak boleh kosong!', 'error');
+        }
+    });
+</script>
+@endpush

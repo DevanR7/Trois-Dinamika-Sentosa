@@ -212,7 +212,16 @@ class FixedAssetController extends Controller
      * ✅ DIPERBARUI: Validasi & Update kolom penyusutan
      */
     public function update(Request $request, FixedAsset $fixedAsset): RedirectResponse
-    {
+    {   
+        $journalGroupId = "FASSET-" . $fixedAsset->asset_id;
+        if ($error = $this->checkTransactionLock($fixedAsset->purchase_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Update: " . $error);
+        }
+        
+        if ($request->filled('purchase_date') && $this->isDateClosed($request->purchase_date)) {
+             return back()->with('error', "Gagal Update: Tanggal pembelian baru masuk periode tutup buku.");
+        }
+
         // $this->authorize('update', $fixedAsset);
         
         // Pengecekan apakah aset sudah mulai disusutkan
@@ -295,7 +304,12 @@ class FixedAssetController extends Controller
      * (Tidak ada perubahan)
      */
     public function destroy(FixedAsset $fixedAsset): RedirectResponse
-    {
+    {   
+        $journalGroupId = "FASSET-" . $fixedAsset->asset_id;
+        if ($error = $this->checkTransactionLock($fixedAsset->purchase_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Hapus: " . $error);
+        }
+        
         // $this->authorize('delete', $fixedAsset);
         
         // Pengecekan apakah aset sudah mulai disusutkan

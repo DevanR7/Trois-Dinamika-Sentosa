@@ -3,31 +3,31 @@
 @section('content')
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold mb-0">Daftar Akun (Chart of Accounts)</h2>
-        <a href="{{ route('chart-of-accounts.create') }}" class="btn btn-dark">
+        <h2 class="fw-bold mb-0 text-dark">Daftar Akun (Chart of Accounts)</h2>
+        <a href="{{ route('chart-of-accounts.create') }}" class="btn btn-dark shadow-sm">
             <i class="bi bi-plus-lg"></i> Tambah Akun Baru
         </a>
     </div>
 
-    <div class="card shadow-sm">
-        <div class="card-body">
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle">
+                <table class="table table-hover align-middle mb-0">
                     <thead class="table-dark">
                         <tr>
-                            <th style="width: 15%;">No. Akun</th>
-                            <th style="width: 35%;">Nama Akun</th>
-                            <th style="width: 15%;">Tipe Akun</th>
-                            <th style="width: 10%;">Saldo Normal</th>
-                            <th style="width: 10%;">Status</th>
-                            <th style="width: 15%;">Aksi</th>
+                            <th class="ps-4 py-3" style="width: 15%;">No. Akun</th>
+                            <th class="py-3" style="width: 35%;">Nama Akun</th>
+                            <th class="py-3" style="width: 15%;">Tipe Akun</th>
+                            <th class="py-3" style="width: 10%;">Saldo Normal</th>
+                            <th class="py-3" style="width: 10%;">Status</th>
+                            <th class="text-center py-3" style="width: 15%;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($parentAccounts as $parent)
                             {{-- Baris Akun Induk --}}
-                            <tr class="table-light fw-bold">
-                                <td>{{ $parent->account_number }}</td>
+                            <tr class="table-secondary fw-bold">
+                                <td class="ps-4">{{ $parent->account_number }}</td>
                                 <td>{{ $parent->account_name }}</td>
                                 <td>{{ $parent->account_type }}</td>
                                 <td>{{ $parent->normal_balance }}</td>
@@ -38,29 +38,30 @@
                                         <span class="badge bg-secondary">Non-Aktif</span>
                                     @endif
                                 </td>
-                                <td>
-                                    <a href="{{ route('chart-of-accounts.edit', $parent) }}" class="btn btn-sm btn-outline-dark" title="Edit">
-                                        <i class="bi bi-pencil-fill"></i>
-                                    </a>
-                                    
-                                    {{-- ✅ MODIFIKASI: Hapus onsubmit, tambah class & data attribute --}}
-                                    <form action="{{ route('chart-of-accounts.destroy', $parent) }}" method="POST" 
-                                          class="d-inline form-delete-account" 
-                                          data-account-name="{{ $parent->account_name }}" 
-                                          data-is-parent="true">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
-                                            <i class="bi bi-trash-fill"></i>
-                                        </button>
-                                    </form>
+                                <td class="text-center">
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ route('chart-of-accounts.edit', $parent) }}" class="btn btn-sm btn-outline-dark" title="Edit">
+                                            <i class="bi bi-pencil-fill"></i>
+                                        </a>
+                                        
+                                        <form action="{{ route('chart-of-accounts.destroy', $parent) }}" method="POST" 
+                                            class="d-inline form-delete-account" 
+                                            data-account-name="{{ $parent->account_name }}" 
+                                            data-is-parent="true">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
+                                                <i class="bi bi-trash-fill"></i>
+                                            </button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                             
                             {{-- Baris Akun Anak --}}
                             @foreach ($parent->children as $child)
                             <tr>
-                                <td class="ps-4"><i class="bi bi-arrow-return-right me-2"></i>{{ $child->account_number }}</td>
+                                <td class="ps-5"><i class="bi bi-arrow-return-right me-2 text-muted"></i>{{ $child->account_number }}</td>
                                 <td class="ps-4">{{ $child->account_name }}</td>
                                 <td>{{ $child->account_type }}</td>
                                 <td>{{ $child->normal_balance }}</td>
@@ -71,28 +72,29 @@
                                         <span class="badge bg-secondary">Non-Aktif</span>
                                     @endif
                                 </td>
-                                <td>
-                                    <a href="{{ route('chart-of-accounts.edit', $child) }}" class="btn btn-sm btn-outline-dark" title="Edit">
-                                        <i class="bi bi-pencil-fill"></i>
-                                    </a>
+                                <td class="text-center">
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ route('chart-of-accounts.edit', $child) }}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                            <i class="bi bi-pencil-fill"></i>
+                                        </a>
 
-                                    {{-- ✅ MODIFIKASI: Hapus onsubmit, tambah class & data attribute --}}
-                                    <form action="{{ route('chart-of-accounts.destroy', $child) }}" method="POST" 
-                                          class="d-inline form-delete-account" 
-                                          data-account-name="{{ $child->account_name }}" 
-                                          data-is-parent="false">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
-                                            <i class="bi bi-trash-fill"></i>
-                                        </button>
-                                    </form>
+                                        <form action="{{ route('chart-of-accounts.destroy', $child) }}" method="POST" 
+                                            class="d-inline form-delete-account" 
+                                            data-account-name="{{ $child->account_name }}" 
+                                            data-is-parent="false">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
+                                                <i class="bi bi-trash-fill"></i>
+                                            </button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                             @endforeach
                         @empty
                         <tr>
-                            <td colspan="6" class="text-center text-muted">Belum ada data akun. Silakan buat yang baru.</td>
+                            <td colspan="6" class="text-center py-5 text-muted">Belum ada data akun. Silakan buat yang baru.</td>
                         </tr>
                         @endforelse
                     </tbody>
@@ -103,10 +105,11 @@
 </div>
 @endsection
 
-{{-- ✅ MODIFIKASI: Tambah script SweetAlert --}}
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    
     const deleteForms = document.querySelectorAll('.form-delete-account');
     
     deleteForms.forEach(form => {
@@ -116,30 +119,32 @@ document.addEventListener('DOMContentLoaded', function() {
             const accountName = event.target.dataset.accountName;
             const isParent = event.target.dataset.isParent === 'true';
             
-            let warningText = `Anda yakin ingin menghapus akun "${accountName}"?`;
+            let warningHtml = `Anda yakin ingin menghapus akun <b>"${accountName}"</b>?`;
             if (isParent) {
-                // Beri peringatan khusus jika ini akun induk
-                warningText = `Anda akan menghapus AKUN INDUK "${accountName}". Ini MUNGKIN akan menghapus semua akun anaknya.`;
+                warningHtml = `Anda akan menghapus <b>AKUN INDUK "${accountName}"</b>.<br><br><small class="text-danger fw-bold">PERHATIAN: Ini MUNGKIN akan menghapus semua akun anaknya!</small>`;
             }
-            warningText += " Tindakan ini tidak dapat diurungkan.";
+            warningHtml += "<br><br>Tindakan ini tidak dapat diurungkan.";
 
             Swal.fire({
-                title: 'Anda Yakin?',
-                text: warningText,
+                title: 'Hapus Akun?',
+                html: warningHtml,
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonColor: '#d33',
+                confirmButtonColor: '#dc3545',
                 cancelButtonColor: '#6c757d',
                 confirmButtonText: 'Ya, Hapus!',
                 cancelButtonText: 'Batal'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    // Jika dikonfirmasi, submit form-nya
                     event.target.submit();
                 }
             });
         });
     });
+
+    // Notifikasi
+    @if(session('success')) Swal.fire('Berhasil!', "{{ session('success') }}", 'success'); @endif
+    @if(session('error')) Swal.fire('Gagal!', "{{ session('error') }}", 'error'); @endif
 });
 </script>
 @endpush

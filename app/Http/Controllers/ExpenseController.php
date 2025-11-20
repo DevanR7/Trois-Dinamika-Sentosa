@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 class ExpenseController extends Controller
 {   
     use ValidatesAccountingPeriod;
-    
+
     protected $accountingService;
 
     public function __construct(AccountingService $accountingService)
@@ -176,7 +176,18 @@ class ExpenseController extends Controller
      * Mengupdate data pengeluaran di database.
      */
     public function update(Request $request, Expense $expense): RedirectResponse
-    {
+    {   
+        // 1. Cek Data Lama (Apakah terkunci?)
+        $journalGroupId = "EXP-" . $expense->expense_id;
+        if ($error = $this->checkTransactionLock($expense->expense_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Update: " . $error);
+        }
+        
+        // 2. Cek Tanggal Baru (Apakah masuk tahun yang ditutup?)
+        if ($request->filled('expense_date') && $this->isDateClosed($request->expense_date)) {
+            return back()->with('error', "Gagal Update: Tanggal baru masuk periode tutup buku.");
+        }
+
         // $this->authorize('update', $expense);
         
         $validated = $request->validate([
@@ -236,7 +247,12 @@ class ExpenseController extends Controller
      * Menghapus data pengeluaran dari database.
      */
     public function destroy(Expense $expense): RedirectResponse
-    {
+    {   
+        $journalGroupId = "EXP-" . $expense->expense_id;
+        if ($error = $this->checkTransactionLock($expense->expense_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Hapus: " . $error);
+        }
+        
         // $this->authorize('delete', $expense);
         
         DB::beginTransaction();

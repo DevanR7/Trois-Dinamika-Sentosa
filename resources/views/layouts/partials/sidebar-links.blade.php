@@ -273,45 +273,17 @@
 
 
 {{-- ======================================================================== --}}
-{{--  8. LAPORAN --}}
+{{--  8. AKUNTANSI & KEUANGAN (GABUNGAN BARU) --}}
 {{-- ======================================================================== --}}
-@can('view-reports')
+{{-- Cek apakah user punya hak akses ke salah satu fitur akuntansi --}}
+@if(Auth::user()->canany(['view-reports', 'manage-settings', 'manage-bank-accounts']))
 <div class="menu_title flex">
-    <span class="title">Laporan</span>
+    <span class="title">Akuntansi & Keuangan</span>
     <span class="line"></span>
 </div>
-
 <ul class="menu_item">
-    <li class="item">
-        <a class="link flex {{ request()->routeIs("reports.index") ? "active" : "" }}" href="{{ route("reports.index") }}">
-            <i class="material-icons">analytics</i>
-            <span>Laporan Keuangan</span>
-        </a>
-    </li>
 
-    <li class="item">
-        <a class="link flex {{ request()->routeIs("reports.general-ledger") ? "active" : "" }}" href="{{ route("reports.general-ledger") }}">
-            <i class="material-icons">book</i>
-            <span>Jurnal Umum</span>
-        </a>
-    </li>
-
-    @can('manage-settings')
-    <li class="item">
-        <a class="link flex {{ request()->routeIs("manual-journals.*") ? "active" : "" }}" href="{{ route("manual-journals.index") }}">
-            <i class="material-icons">post_add</i>
-            <span>Jurnal Umum Manual</span>
-        </a>
-    </li>
-
-    <li class="item">
-        <a class="link flex {{ request()->routeIs("bank-reconciliations.*") ? "active" : "" }}" href="{{ route("bank-reconciliations.index") }}">
-            <i class="material-icons">account_balance</i>
-            <span>Rekonsiliasi Bank</span>
-        </a>
-    </li>
-    @endcan
-
+    {{-- A. Input Operasional --}}
     <li class="item">
         <a class="link flex {{ request()->routeIs('expenses.*') ? 'active' : '' }}" href="{{ route('expenses.index') }}">
             <i class="material-icons">account_balance_wallet</i>
@@ -329,69 +301,48 @@
     <li class="item">
         <a class="link flex {{ request()->routeIs('equity-transactions.*') ? 'active' : '' }}" href="{{ route('equity-transactions.index') }}">
             <i class="material-icons">savings</i>
-            <span>Transaksi Modal</span>
+            <span>Modal & Prive</span>
         </a>
     </li>
 
     <li class="item">
         <a class="link flex {{ request()->routeIs('loans.*') ? 'active' : '' }}" href="{{ route('loans.index') }}">
             <i class="material-icons">account_balance</i>
-            <span>Pinjaman</span>
+            <span>Pinjaman / Utang</span>
         </a>
     </li>
-</ul>
-@endcan
 
-
-{{-- ======================================================================== --}}
-{{--  9. PENGATURAN --}}
-{{-- ======================================================================== --}}
-@if(Auth::user()->canany(["manage-settings", "manage-payment-methods", "manage-bank-accounts"]))
-<div class="menu_title flex">
-    <span class="title">Pengaturan</span>
-    <span class="line"></span>
-</div>
-<ul class="menu_item">
-
-    @can("manage-settings")
+    {{-- B. Proses Akuntansi (Admin/Akuntan) --}}
+    @can('manage-settings')
     <li class="item">
-        <a class="link flex {{ request()->routeIs("units.*") ? "active" : "" }}" href="{{ route("units.index") }}">
-            <i class="material-icons">straighten</i>
-            <span>Pengaturan Satuan</span>
+        <a class="link flex {{ request()->routeIs("manual-journals.*") ? "active" : "" }}" href="{{ route("manual-journals.index") }}">
+            <i class="material-icons">post_add</i>
+            <span>Jurnal Umum Manual</span>
         </a>
     </li>
 
     <li class="item">
-        <a class="link flex {{ request()->routeIs("taxes.*") ? "active" : "" }}" href="{{ route("taxes.index") }}">
-            <i class="material-icons">percent</i>
-            <span>Pengaturan Pajak</span>
+        <a class="link flex {{ request()->routeIs("bank-reconciliations.*") ? "active" : "" }}" href="{{ route("bank-reconciliations.index") }}">
+            <i class="material-icons">fact_check</i>
+            <span>Rekonsiliasi Bank</span>
         </a>
     </li>
-
+    
     <li class="item">
-    <a class="link flex {{ request()->routeIs("closing-book.*") ? "active" : "" }}" href="{{ route("closing-book.index") }}">
-        <i class="material-icons">gpp_good</i>
-        <span>Tutup Buku Tahunan</span>
-    </a>
+        <a class="link flex {{ request()->routeIs("closing-book.*") ? "active" : "" }}" href="{{ route("closing-book.index") }}">
+            <i class="material-icons">lock_clock</i>
+            <span>Tutup Buku Tahunan</span>
+        </a>
     </li>
-
     @endcan
 
+    {{-- C. Data Induk Akuntansi --}}
     <li class="item">
         <a class="link flex {{ request()->routeIs("chart-of-accounts.*") ? "active" : "" }}" href="{{ route("chart-of-accounts.index") }}">
             <i class="material-icons">account_tree</i>
             <span>Daftar Akun (COA)</span>
         </a>
     </li>
-
-    @can("manage-payment-methods")
-    <li class="item">
-        <a class="link flex {{ request()->routeIs("payment-methods.*") ? "active" : "" }}" href="{{ route("payment-methods.index") }}">
-            <i class="material-icons">payment</i>
-            <span>Metode Pembayaran</span>
-        </a>
-    </li>
-    @endcan
 
     @can("manage-bank-accounts")
     <li class="item">
@@ -407,15 +358,75 @@
 
 
 {{-- ======================================================================== --}}
-{{--  10. MANAJEMEN SISTEM --}}
+{{--  9. LAPORAN (KHUSUS OUTPUT) --}}
 {{-- ======================================================================== --}}
-@if(Auth::user()->canany(['manage-users', 'manage-roles']))
+@can('view-reports')
 <div class="menu_title flex">
-    <span class="title">Manajemen Sistem</span>
+    <span class="title">Laporan</span>
     <span class="line"></span>
 </div>
 <ul class="menu_item">
+    <li class="item">
+        <a class="link flex {{ request()->routeIs("reports.index") ? "active" : "" }}" href="{{ route("reports.index") }}">
+            <i class="material-icons">analytics</i>
+            <span>Laporan Keuangan</span>
+        </a>
+    </li>
 
+    <li class="item">
+        <a class="link flex {{ request()->routeIs("reports.general-ledger") ? "active" : "" }}" href="{{ route("reports.general-ledger") }}">
+            <i class="material-icons">menu_book</i>
+            <span>Buku Besar Detail</span>
+        </a>
+    </li>
+</ul>
+@endcan
+
+
+{{-- ======================================================================== --}}
+{{--  10. PENGATURAN SISTEM & UMUM --}}
+{{-- ======================================================================== --}}
+@if(Auth::user()->canany(["manage-settings", "manage-payment-methods", "manage-users", "manage-roles"]))
+<div class="menu_title flex">
+    <span class="title">Pengaturan</span>
+    <span class="line"></span>
+</div>
+<ul class="menu_item">
+    
+    {{-- Pengaturan Bisnis --}}
+    @can("manage-settings")
+    <li class="item">
+        <a class="link flex {{ request()->routeIs("settings.*") ? "active" : "" }}" href="{{ route("settings.index") }}">
+            <i class="material-icons">business</i>
+            <span>Profil Perusahaan</span>
+        </a>
+    </li>
+
+    <li class="item">
+        <a class="link flex {{ request()->routeIs("units.*") ? "active" : "" }}" href="{{ route("units.index") }}">
+            <i class="material-icons">straighten</i>
+            <span>Satuan</span>
+        </a>
+    </li>
+
+    <li class="item">
+        <a class="link flex {{ request()->routeIs("taxes.*") ? "active" : "" }}" href="{{ route("taxes.index") }}">
+            <i class="material-icons">percent</i>
+            <span>Pajak</span>
+        </a>
+    </li>
+    @endcan
+
+    @can("manage-payment-methods")
+    <li class="item">
+        <a class="link flex {{ request()->routeIs("payment-methods.*") ? "active" : "" }}" href="{{ route("payment-methods.index") }}">
+            <i class="material-icons">payment</i>
+            <span>Metode Pembayaran</span>
+        </a>
+    </li>
+    @endcan
+
+    {{-- Manajemen User & Role --}}
     @can("manage-users")
     <li class="item">
         <a class="link flex {{ request()->routeIs("users.*") ? "active" : "" }}" href="{{ route("users.index") }}">
@@ -439,26 +450,7 @@
 
 
 {{-- ======================================================================== --}}
-{{--  11. MANAJEMEN PERUSAHAAN --}}
-{{-- ======================================================================== --}}
-@can("manage-settings")
-<div class="menu_title flex">
-    <span class="title">Manajemen Perusahaan</span>
-    <span class="line"></span>
-</div>
-<ul class="menu_item">
-    <li class="item">
-        <a class="link flex {{ request()->routeIs("settings.*") ? "active" : "" }}" href="{{ route("settings.index") }}">
-            <i class="material-icons">business</i>
-            <span>Pengaturan Perusahaan</span>
-        </a>
-    </li>
-</ul>
-@endcan
-
-
-{{-- ======================================================================== --}}
-{{--  12. KOMUNIKASI --}}
+{{--  11. KOMUNIKASI --}}
 {{-- ======================================================================== --}}
 @can("manage-announcements")
 <div class="menu_title flex">
@@ -481,10 +473,8 @@
 </div>
 <ul class="menu_item">
     <li class="item">
-        {{-- Kita gunakan <a> tapi non-aktifkan kliknya --}}
         <a class="link flex" href="#" style="cursor: default; background: none; box-shadow: none; opacity: 0.7;">
             <i class="material-icons">info_outline</i>
-            {{-- Panggil variabel $systemVersion yang kita buat di AppServiceProvider --}}
             <span>Versi: {{ $systemVersion ?? '1.0.0' }}</span>
         </a>
     </li>

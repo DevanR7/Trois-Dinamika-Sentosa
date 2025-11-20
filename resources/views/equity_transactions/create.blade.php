@@ -5,11 +5,11 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card shadow-sm">
-                <div class="card-header">
-                    <h2 class="fw-bold mb-0">Catat Transaksi Modal Baru</h2>
+                <div class="card-header bg-dark text-white">
+                    <h2 class="fw-bold mb-0 fs-4">Catat Transaksi Modal Baru</h2>
                 </div>
                 <div class="card-body">
-                    <form action="{{ route('equity-transactions.store') }}" method="POST">
+                    <form action="{{ route('equity-transactions.store') }}" method="POST" id="equity-form">
                         @csrf
                         
                         <div class="row g-3">
@@ -20,15 +20,22 @@
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
+
+                            {{-- INPUT JUMLAH DENGAN FORMAT RUPIAH --}}
                             <div class="col-md-6 mb-3">
-                                <label for="amount" class="form-label">Jumlah (Rp) <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control @error('amount') is-invalid @enderror" id="amount" name="amount" value="{{ old('amount') }}" placeholder="Contoh: 50000000" required>
+                                <label for="amount_display" class="form-label">Jumlah (Rp) <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Rp</span>
+                                    <input type="text" class="form-control rupiah-input @error('amount') is-invalid @enderror" id="amount_display" placeholder="0" required>
+                                </div>
+                                {{-- Input Hidden untuk kirim ke database --}}
+                                <input type="hidden" name="amount" id="amount" value="{{ old('amount') }}">
+                                
                                 @error('amount')
-                                    <div class="invalid-feedback">{{ $message }}</div>
+                                    <div class="text-danger small mt-1">{{ $message }}</div>
                                 @enderror
                             </div>
                             
-                            {{-- ✅ FIELD TIPE (DIGANTI) --}}
                             <div class="col-md-6 mb-3">
                                 <label for="equity_account_id" class="form-label">Akun Modal <span class="text-danger">*</span></label>
                                 <select class="form-select @error('equity_account_id') is-invalid @enderror" id="equity_account_id" name="equity_account_id" required>
@@ -39,13 +46,12 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <div class="form-text">Akun Saldo Kredit (Modal Setor), Akun Saldo Debit (Prive/Penarikan).</div>
+                                <div class="form-text small text-muted">Pilih Akun Modal (untuk setoran) atau Prive (untuk penarikan).</div>
                                 @error('equity_account_id')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
 
-                            {{-- ✅ FIELD SUMBER DANA (BARU) --}}
                             <div class="col-md-6 mb-3">
                                 <label for="cash_bank_account_id" class="form-label">Akun Kas/Bank <span class="text-danger">*</span></label>
                                 <select class="form-select @error('cash_bank_account_id') is-invalid @enderror" id="cash_bank_account_id" name="cash_bank_account_id" required>
@@ -56,7 +62,7 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <div class="form-text">Sumber/Tujuan dana (Kas atau Bank).</div>
+                                <div class="form-text small text-muted">Akun Kas yang bertambah/berkurang.</div>
                                 @error('cash_bank_account_id')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -83,3 +89,46 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    const amountDisplay = document.getElementById('amount_display');
+    const amountInput = document.getElementById('amount');
+    const form = document.getElementById('equity-form');
+
+    function formatRupiah(angka) {
+        let number_string = angka.toString().replace(/[^,\d]/g, "").toString(),
+            split = number_string.split(","),
+            sisa = split[0].length % 3,
+            rupiah = split[0].substr(0, sisa),
+            ribuan = split[0].substr(sisa).match(/\d{3}/gi);
+
+        if (ribuan) {
+            let separator = sisa ? "." : "";
+            rupiah += separator + ribuan.join(".");
+        }
+        return rupiah;
+    }
+
+    // 1. Init jika old value ada
+    if(amountInput.value) {
+        amountDisplay.value = formatRupiah(amountInput.value);
+    }
+
+    // 2. Live Typing
+    amountDisplay.addEventListener('keyup', function(e) {
+        let val = this.value.replace(/\./g, ''); // hapus titik
+        this.value = formatRupiah(val);
+        amountInput.value = val;
+    });
+
+    // 3. Validasi Submit
+    form.addEventListener('submit', function(e) {
+        if(amountInput.value === '' || amountInput.value == 0) {
+            e.preventDefault();
+            Swal.fire('Error', 'Jumlah nominal tidak boleh kosong!', 'error');
+        }
+    });
+</script>
+@endpush

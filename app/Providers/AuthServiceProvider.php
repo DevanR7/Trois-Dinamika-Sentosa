@@ -8,7 +8,7 @@ use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvid
 // DAFTAR MODEL
 use App\Models\User;
 use App\Models\Product;
-use App\Models\Order; // ✅ BERUBAH: Menggunakan model Order
+use App\Models\Order; 
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Models\SalesInvoice;
@@ -18,7 +18,7 @@ use App\Models\Announcement;
 
 // DAFTAR POLICY
 use App\Policies\ProductPolicy;
-use App\Policies\OrderPolicy; // ✅ BERUBAH: Menggunakan policy OrderPolicy
+use App\Policies\OrderPolicy;
 use App\Policies\PurchaseOrderPolicy;
 use App\Policies\SupplierPolicy;
 use App\Policies\SalesInvoicePolicy;
@@ -34,7 +34,6 @@ class AuthServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     protected $policies = [
-        // ✅ PERBAIKAN 1: Mapping yang benar
         Order::class => OrderPolicy::class, 
         PurchaseOrder::class => PurchaseOrderPolicy::class,
         Supplier::class => SupplierPolicy::class,
@@ -43,9 +42,6 @@ class AuthServiceProvider extends ServiceProvider
         SalesReturn::class => SalesReturnPolicy::class,
         PurchaseReturn::class => PurchaseReturnPolicy::class,
         Announcement::class => AnnouncementPolicy::class,
-
-        // ❗️ PERBAIKAN 3: Baris ini dihapus karena salah
-        // User::class => SupplierPolicy::class, 
     ];
 
     /**
@@ -53,6 +49,45 @@ class AuthServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        $this->registerPolicies();
+
+        // --- 1. SUPER ADMIN (Bypass semua cek) ---
+        // Jika role user adalah 'admin', otomatis boleh melakukan apa saja
+        Gate::before(function ($user, $ability) {
+            if ($user->role === 'admin') { 
+                return true;
+            }
+        });
+
+        // --- 2. GATE AKUNTANSI & PENGATURAN ---
+        // Digunakan di: ClosingBook, ManualJournal, Settings, PaymentMethod
+        Gate::define('manage-settings', function (User $user) {
+            return in_array($user->role, ['admin', 'accountant']); 
+        });
+
+        // Digunakan di: BankReconciliation, PaymentClearance
+        Gate::define('manage-finance', function (User $user) {
+            return in_array($user->role, ['admin', 'accountant', 'finance']); 
+        });
+
+        // --- 3. GATE LAPORAN (View Reports) ---
+        // Digunakan di: ReportController, GeneralLedger, Expense, Loan (Index)
+        Gate::define('view-reports', function (User $user) {
+             return in_array($user->role, ['admin', 'accountant', 'manager', 'finance']);
+        });
+
+        // --- 4. GATE PENYESUAIAN INVOICE/PO (Adjustments) ---
+        Gate::define('create-invoice-adjustments', function (User $user) {
+            return in_array($user->role, ['admin', 'accountant']);
+        });
+        
+        Gate::define('delete-invoice-adjustments', function (User $user) {
+            return $user->role === 'admin'; // Hanya admin yang boleh hapus
+        });
+        
+        // Gate khusus untuk manage payment methods (jika belum ada)
+        Gate::define('manage-payment-methods', function (User $user) {
+            return $user->role === 'admin';
+        });
     }   
 }

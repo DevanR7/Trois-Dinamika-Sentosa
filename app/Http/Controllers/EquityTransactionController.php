@@ -184,7 +184,16 @@ class EquityTransactionController extends Controller
      * Mengupdate data transaksi di database.
      */
     public function update(Request $request, EquityTransaction $equityTransaction): RedirectResponse
-    {
+    {   
+        $journalGroupId = "EQ-" . $equityTransaction->transaction_id;
+        if ($error = $this->checkTransactionLock($equityTransaction->transaction_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Update: " . $error);
+        }
+
+        if ($request->filled('transaction_date') && $this->isDateClosed($request->transaction_date)) {
+             return back()->with('error', "Gagal Update: Tanggal baru masuk periode tutup buku.");
+        }
+
         // $this->authorize('update', $equityTransaction);
         
         $validated = $request->validate([
@@ -249,7 +258,12 @@ class EquityTransactionController extends Controller
      * Menghapus data transaksi dari database.
      */
     public function destroy(EquityTransaction $equityTransaction): RedirectResponse
-    {
+    {   
+        $journalGroupId = "EQ-" . $equityTransaction->transaction_id;
+        if ($error = $this->checkTransactionLock($equityTransaction->transaction_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Hapus: " . $error);
+        }
+        
         // $this->authorize('delete', $equityTransaction);
         
         DB::beginTransaction();

@@ -167,7 +167,12 @@ class LoanController extends Controller
      * Mengupdate data pinjaman di database.
      */
     public function update(Request $request, Loan $loan): RedirectResponse
-    {
+    {   
+        $journalGroupId = "LOAN-" . $loan->loan_id;
+        if ($error = $this->checkTransactionLock($loan->loan_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Update: " . $error);
+        }
+
         // $this->authorize('update', $loan);
         
         if ($loan->payments()->exists()) {
@@ -231,7 +236,12 @@ class LoanController extends Controller
      * Menghapus pinjaman (hanya jika belum ada pembayaran).
      */
     public function destroy(Loan $loan): RedirectResponse
-    {
+    {   
+        $journalGroupId = "LOAN-" . $loan->loan_id;
+        if ($error = $this->checkTransactionLock($loan->loan_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Hapus: " . $error);
+        }
+        
         // $this->authorize('delete', $loan);
         
         if ($loan->payments()->exists()) {

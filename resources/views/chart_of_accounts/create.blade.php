@@ -5,23 +5,23 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card shadow-sm">
-                <div class="card-header">
-                    <h2 class="fw-bold mb-0">Buat Akun Baru (COA)</h2>
+                <div class="card-header bg-dark text-white">
+                    <h2 class="fw-bold mb-0 fs-4">Buat Akun Baru (COA)</h2>
                 </div>
                 <div class="card-body">
-                    <form action="{{ route('chart-of-accounts.store') }}" method="POST">
+                    <form action="{{ route('chart-of-accounts.store') }}" method="POST" id="coa-form">
                         @csrf
                         <div class="row g-3">
                             <div class="col-md-6 mb-3">
                                 <label for="account_number" class="form-label">Nomor Akun <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control @error('account_number') is-invalid @enderror" id="account_number" name="account_number" value="{{ old('account_number') }}" required>
+                                <input type="text" class="form-control @error('account_number') is-invalid @enderror" id="account_number" name="account_number" value="{{ old('account_number') }}" placeholder="Contoh: 1001, 5102" required>
                                 @error('account_number')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="account_name" class="form-label">Nama Akun <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control @error('account_name') is-invalid @enderror" id="account_name" name="account_name" value="{{ old('account_name') }}" required>
+                                <input type="text" class="form-control @error('account_name') is-invalid @enderror" id="account_name" name="account_name" value="{{ old('account_name') }}" placeholder="Contoh: Kas Besar, Biaya Listrik" required>
                                 @error('account_name')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -63,7 +63,7 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <div class="form-text">Pilih ini jika Anda ingin mengelompokkan akun (e.g., Kas BCA di bawah Kas & Bank).</div>
+                                <div class="form-text small text-muted">Pilih ini jika Anda ingin mengelompokkan akun (e.g., Kas BCA di bawah Kas & Bank).</div>
                                 @error('parent_account_id')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -95,3 +95,18 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    // Validasi sederhana
+    document.getElementById('coa-form').addEventListener('submit', function(e) {
+        const accNum = document.getElementById('account_number').value;
+        const accName = document.getElementById('account_name').value;
+        if(!accNum || !accName) {
+            e.preventDefault();
+            Swal.fire('Error', 'Nomor dan Nama Akun wajib diisi.', 'error');
+        }
+    });
+</script>
+@endpush

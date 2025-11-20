@@ -11,9 +11,12 @@ use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use App\Models\ChartOfAccount;
 use App\Services\AccountingService;
+use App\Traits\ValidatesAccountingPeriod;
 
 class LoanPaymentController extends Controller
 {   
+    use ValidatesAccountingPeriod;
+
     protected $accountingService;
 
     public function __construct(AccountingService $accountingService)
@@ -61,6 +64,10 @@ class LoanPaymentController extends Controller
             'interest_expense_account_id' => 'required_with:interest_paid|nullable|exists:chart_of_accounts,account_id',
             'cash_bank_account_id' => 'required|exists:chart_of_accounts,account_id',
         ]);
+
+        if ($this->isDateClosed($request->payment_date)) {
+            return back()->with('error', 'Gagal: Tanggal pembayaran masuk periode tutup buku.')->withInput();
+        }
         
         $totalPaid = $validated['principal_paid'] + $validated['interest_paid'];
         $sisaPokok = $loan->remaining_balance;
@@ -138,7 +145,12 @@ class LoanPaymentController extends Controller
      * Route: loans/{loan}/payments/{payment}
      */
     public function destroy(Loan $loan, LoanPayment $payment): RedirectResponse
-    {
+    {   
+        $journalGroupId = "LOANPAY-" . $payment->payment_id;
+        if ($error = $this->checkTransactionLock($payment->payment_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Hapus Pembayaran: " . $error);
+        }
+        
         // $this->authorize('delete', $payment);
         
         try {
