@@ -106,7 +106,7 @@ class FixedAssetController extends Controller
             // ✅ Validasi kolom baru
             'accumulated_depreciation_account_id' => 'required|exists:chart_of_accounts,account_id',
             'depreciation_expense_account_id' => 'required|exists:chart_of_accounts,account_id',
-            'depreciation_method' => 'required|in:straight_line',
+            'depreciation_method' => 'required|in:straight_line,double_declining',
             'useful_life_months' => 'required|integer|min:1',
             'salvage_value' => 'required|numeric|min:0',
         ]);
@@ -240,7 +240,7 @@ class FixedAssetController extends Controller
             // ✅ Validasi kolom baru
             'accumulated_depreciation_account_id' => 'required|exists:chart_of_accounts,account_id',
             'depreciation_expense_account_id' => 'required|exists:chart_of_accounts,account_id',
-            'depreciation_method' => 'required|in:straight_line',
+            'depreciation_method' => 'required|in:straight_line,double_declining',
             'useful_life_months' => 'required|integer|min:1',
             'salvage_value' => 'required|numeric|min:0',
         ]);

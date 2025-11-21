@@ -14,22 +14,14 @@ class RunDepreciation extends Command
 {
     /**
      * Nama dan signature dari console command.
-     * Kita tambahkan opsi --month (YYYY-MM) agar bisa menyusutkan bulan tertentu.
-     *
-     * @var string
      */
     protected $signature = 'accounting:run-depreciation {--month= : Bulan dan tahun (YYYY-MM) yang akan disusutkan. Default: bulan lalu.}';
 
     /**
      * Deskripsi console command.
-     *
-     * @var string
      */
     protected $description = 'Menghitung dan mem-posting jurnal penyusutan aset tetap untuk bulan yang ditentukan.';
 
-    /**
-     * Inject AccountingService
-     */
     protected $accountingService;
 
     public function __construct(AccountingService $accountingService)
@@ -57,9 +49,9 @@ class RunDepreciation extends Command
             $this->warn('Menjalankan penyusutan untuk periode: ' . $targetDate->format('F Y'));
 
             // 2. Ambil semua aset yang memenuhi syarat
-            $assets = FixedAsset::where('useful_life_months', '>', 0) // Punya masa manfaat
-                                ->where('purchase_date', '<=', $targetDate) // Dibeli sebelum periode ini berakhir
-                                ->where('current_book_value', '>', DB::raw('salvage_value')) // Belum habis nilainya
+            $assets = FixedAsset::where('useful_life_months', '>', 0)
+                                ->where('purchase_date', '<=', $targetDate)
+                                ->where('current_book_value', '>', DB::raw('salvage_value'))
                                 ->get();
             
             if ($assets->isEmpty()) {
@@ -84,12 +76,34 @@ class RunDepreciation extends Command
                     continue;
                 }
 
-                // 4. Hitung Beban Penyusutan Bulanan (Garis Lurus)
-                $depreciableBase = $asset->purchase_cost - $asset->salvage_value;
-                $monthlyDepreciation = $depreciableBase / $asset->useful_life_months;
-
-                // 5. Cek apakah ini penyusutan terakhir (pastikan tidak minus)
+                // ========================================================
+                // 4. ✅ LOGIKA BARU: DUAL METHOD (GARIS LURUS / SALDO MENURUN)
+                // ========================================================
+                
+                $monthlyDepreciation = 0;
                 $remainingValue = $asset->current_book_value - $asset->salvage_value;
+
+                if ($asset->depreciation_method === 'double_declining') {
+                    // --- METODE SALDO MENURUN GANDA (Double Declining) ---
+                    // Rumus: (Nilai Buku Saat Ini x Rate) / 12
+                    // Rate = (100% / Umur Tahun) * 2
+                    
+                    // Konversi bulan ke tahun (misal 48 bulan = 4 tahun)
+                    $usefulLifeYears = $asset->useful_life_months / 12;
+                    
+                    if ($usefulLifeYears > 0) {
+                         $rate = (1 / $usefulLifeYears) * 2; // Double rate
+                         $monthlyDepreciation = ($asset->current_book_value * $rate) / 12;
+                    }
+                } else {
+                    // --- METODE GARIS LURUS (Straight Line) - DEFAULT ---
+                    // Rumus: (Harga Beli - Residu) / Umur Bulan
+                    $depreciableBase = $asset->purchase_cost - $asset->salvage_value;
+                    $monthlyDepreciation = $depreciableBase / $asset->useful_life_months;
+                }
+
+                // 5. Cek Batas Nilai Sisa (Safety Net)
+                // Penyusutan tidak boleh membuat nilai buku turun di bawah nilai sisa
                 $depreciationAmount = min($monthlyDepreciation, $remainingValue);
 
                 if ($depreciationAmount <= 0.01) {
@@ -98,9 +112,13 @@ class RunDepreciation extends Command
                     continue;
                 }
                 
+                // ========================================================
+                // AKHIR LOGIKA BARU
+                // ========================================================
+
                 // 6. Validasi Akun
                 if (!$asset->depreciation_expense_account_id || !$asset->accumulated_depreciation_account_id) {
-                    $this->error("  -> GAGAL: Aset '{$asset->asset_name}' (ID: {$asset->asset_id}) tidak memiliki Akun Beban atau Akun Akumulasi. Dilewati.");
+                    $this->error("  -> GAGAL: Aset '{$asset->asset_name}' (ID: {$asset->asset_id}) tidak memiliki Akun COA. Dilewati.");
                     Log::error("Penyusutan Gagal: Aset ID {$asset->asset_id} tidak punya akun COA.");
                     $skippedCount++;
                     continue;
@@ -122,13 +140,15 @@ class RunDepreciation extends Command
                         [$asset->accumulated_depreciation_account_id, $depreciationAmount, $description]
                     ];
                     
+                    // Panggil service tanpa User ID (karena ini command otomatis/robot)
                     $this->accountingService->postJournal(
                         $journalGroupId,
                         $targetDate,
                         $description,
                         $debitEntries,
                         $creditEntries,
-                        $asset // Referensi ke Aset
+                        $asset,
+                        null // User ID null untuk sistem
                     );
 
                     // B. Simpan Riwayat Penyusutan

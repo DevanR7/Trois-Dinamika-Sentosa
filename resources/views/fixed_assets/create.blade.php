@@ -116,6 +116,7 @@
                                 <label for="depreciation_method" class="form-label">Metode Penyusutan <span class="text-danger">*</span></label>
                                 <select class="form-select" id="depreciation_method" name="depreciation_method" required>
                                     <option value="straight_line" selected>Garis Lurus (Straight Line)</option>
+                                    <option value="double_declining">Saldo Menurun Ganda (Double Declining)</option>
                                 </select>
                             </div>
 
