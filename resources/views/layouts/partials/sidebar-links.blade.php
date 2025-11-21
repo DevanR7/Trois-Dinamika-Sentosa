@@ -446,6 +446,17 @@
 </ul>
 @endcan
 
+@can('manage-settings') {{-- Atau gunakan permission yang lebih spesifik jika ada --}}
+<ul class="menu_item">
+    <li class="item">
+        <a class="link flex {{ request()->routeIs("migration.*") ? "active" : "" }}" href="{{ route("migration.index") }}">
+            <i class="material-icons">cloud_upload</i> {{-- Icon Upload --}}
+            <span>Migrasi Data</span>
+        </a>
+    </li>
+</ul>
+@endcan
+
 <ul class="menu_item">
     <li class="item">
         <a class="link flex" href="#" style="cursor: default; background: none; box-shadow: none; opacity: 0.7;">
