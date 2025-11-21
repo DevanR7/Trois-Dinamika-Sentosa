@@ -1,10 +1,10 @@
 @extends('layouts.app')
 
 {{-- ==================================================================== --}}
-{{-- ✅ BLOK PHP GLOBAL (TIDAK PERLU DIUBAH) --}}
+{{-- ✅ BLOK PHP GLOBAL --}}
 {{-- ==================================================================== --}}
 @php
-    // 1. Untuk Ringkasan Keuangan
+    // 1. Ringkasan Keuangan
     $sisaUtang = $purchaseOrder->remaining_balance;
     $adjustments = $purchaseOrder->adjustments;
     $totalCreditNotesPO = $adjustments->where('type', 'credit_note')->sum('amount');
@@ -13,23 +13,25 @@
         ->where('return_handling_type', 'store_as_deposit')
         ->sum('total_amount');
 
-    // 2. Untuk Modal Pembayaran
+    // 2. Modal Pembayaran
     $sisaTagihanPO = $sisaUtang; 
     $saldoDepositSupplier = $purchaseOrder->supplier->balance ?? 0;
-    
-    // 3. Payment Methods & Bank Accounts sudah dikirim dari Controller
 @endphp
-{{-- ==================================================================== --}}
-
 
 @section('content')
-<div class="container py-4">
-    {{-- HEADER HALAMAN DENGAN TOMBOL AKSI --}}
+<div class="container-fluid py-2">
+    
+    {{-- HEADER HALAMAN --}}
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <h2 class="fw-bold mb-0">Detail Pesanan: {{ $purchaseOrder->po_number }}</h2>
+        <div>
+            <h3 class="fw-bold text-dark mb-1">Detail Pesanan: {{ $purchaseOrder->po_number }}</h3>
+            <p class="text-muted mb-0 small">
+                Tanggal Transaksi: {{ optional($purchaseOrder->order_date)->format('d F Y') }}
+            </p>
+        </div>
         
         <div class="d-flex flex-wrap justify-content-end gap-2">
-            <a href="{{ route('purchase-orders.index') }}" class="btn btn-outline-secondary">
+            <a href="{{ route('purchase-orders.index') }}" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-arrow-left me-1"></i> Kembali
             </a>
 
@@ -38,7 +40,7 @@
                 @if(in_array($purchaseOrder->status, ['draft', 'ordered']))
                     <form id="receive-goods-form" action="{{ route('purchase-orders.receive', $purchaseOrder->po_id) }}" method="POST" class="d-inline">
                         @csrf
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary btn-sm">
                             <i class="bi bi-box-seam me-1"></i> Terima Barang
                         </button>
                     </form>
@@ -46,8 +48,6 @@
             @endcan
 
             {{-- TOMBOL CATAT PEMBAYARAN --}}
-            {{-- Muncul JIKA sisa utang > 0 DAN belum lunas --}}
-            {{-- PENTING: Tombol ini sekarang FLEKSIBEL (bisa bayar DP sebelum terima barang) --}}
             @can('pay', $purchaseOrder)
                 @if($sisaUtang > 0.01 && $purchaseOrder->payment_status != 'paid')
                     @php
@@ -56,7 +56,7 @@
                         $btnText  = $barangBelumDiterima ? 'Catat DP (Uang Muka)' : 'Catat Pembayaran';
                     @endphp
                     
-                    <button type="button" class="btn {{ $btnClass }}" data-bs-toggle="modal" data-bs-target="#paymentModal" id="add-payment-btn">
+                    <button type="button" class="btn btn-sm {{ $btnClass }}" data-bs-toggle="modal" data-bs-target="#paymentModal" id="add-payment-btn">
                         <i class="bi bi-cash-coin me-1"></i> {{ $btnText }}
                     </button>
                 @endif
@@ -64,12 +64,10 @@
 
             {{-- DROPDOWN OPSI --}}
             <div class="btn-group">
-                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="bi bi-gear"></i> Opsi
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
-                    
-                    {{-- Edit Pesanan --}}
                     @if (in_array($purchaseOrder->status, ['draft', 'ordered']))
                     <li>
                         <a class="dropdown-item" href="{{ route('purchase-orders.edit', $purchaseOrder->po_id) }}">
@@ -80,7 +78,6 @@
                     
                     <li><hr class="dropdown-divider"></li>
 
-                    {{-- Buat Penyesuaian --}}
                     <li>
                         <a class="dropdown-item" href="{{ route('purchase-order-adjustments.create') }}?purchase_order_id={{ $purchaseOrder->po_id }}">
                             <i class="bi bi-file-earmark-diff me-2"></i> Buat Penyesuaian PO
@@ -93,10 +90,8 @@
                         </a>
                     </li> 
                     
-                    {{-- Batalkan Pesanan --}}
                     @can('cancel', $purchaseOrder)
                         @if(in_array($purchaseOrder->status, ['draft', 'ordered', 'completed'])) 
-                        {{-- UPDATE: 'completed' juga boleh dibatalkan (akan memicu reversal) --}}
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <form action="{{ route('purchase-orders.cancel', $purchaseOrder->po_id) }}" method="POST" class="form-cancel-po">
@@ -113,240 +108,253 @@
         </div>
     </div>
 
-    {{-- ... (BAGIAN KARTU DETAIL & TABEL ITEM ANDA TETAP SAMA, TIDAK PERLU DIUBAH) ... --}}
-    {{-- ... (Langsung copy-paste dari kode Anda sebelumnya sampai sebelum @if($purchaseOrder->payments->isNotEmpty())) ... --}}
-    
-    {{-- KARTU DETAIL UTAMA --}}
-    <div class="card shadow-sm border-0">
-        <div class="card-body p-4">
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <h5 class="fw-semibold">Supplier</h5>
-                    <p class="mb-0">{{ $purchaseOrder->supplier->supplier_name }}</p>
-                    <p class="text-muted">{{ $purchaseOrder->supplier->address ?? 'Alamat tidak tersedia' }}</p>
-                </div>
-                <div class="col-md-6 text-md-end">
-                    <p class="mb-1"><strong>No. Faktur Supplier:</strong> 
-                        <a href="#" data-bs-toggle="modal" data-bs-target="#supplierInvoiceModal" class="text-decoration-none" title="Klik untuk input/edit">
-                            @if($purchaseOrder->supplier_invoice_number)
-                                <span class="fw-bold text-primary">{{ $purchaseOrder->supplier_invoice_number }}</span>
-                            @else
-                                <span class="text-muted fst-italic">(Belum Diinput)</span>
-                            @endif
-                        </a>
-                    </p>
-                    <p class="mb-1"><strong>Tanggal Pesanan:</strong> {{ optional($purchaseOrder->order_date)->format('d F Y') }}</p>
-                    @if($purchaseOrder->due_date)<p class="mb-1"><strong>Jatuh Tempo:</strong> {{ optional($purchaseOrder->due_date)->format('d F Y') }}</p>@endif
-                    <p class="mb-1"><strong>Status Barang:</strong>
-                        @if($purchaseOrder->status == 'completed') <span class="badge bg-success">Diterima</span>
-                        @elseif($purchaseOrder->status == 'cancelled') <span class="badge bg-danger">Dibatalkan</span>
-                        @else <span class="badge bg-warning text-dark">{{ Str::title($purchaseOrder->status) }}</span>
-                        @endif
-                    </p>
-                    <p class="mb-1"><strong>Status Pembayaran:</strong>
-                        @if($purchaseOrder->payment_status == 'paid') <span class="badge bg-primary">Lunas</span>
-                        @elseif($purchaseOrder->payment_status == 'partially_paid') <span class="badge bg-info text-dark">Cicil</span>
-                        @else <span class="badge bg-danger">Belum Lunas</span>
-                        @endif
-                    </p>
-                </div>
-            </div>
-            <hr>
-            
-            <h5 class="fw-semibold mt-4">Rincian Item Dipesan</h5>
-            <div class="table-responsive">
-                <table class="table table-bordered align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="text-center" style="width: 5%;">No</th>
-                            <th>Produk</th>
-                            <th class="text-center" style="width: 15%;">Kuantitas</th>
-                            <th class="text-end" style="width: 20%;">Harga Final / Unit</th>
-                            <th class="text-end" style="width: 20%;">Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($purchaseOrder->items as $item)
-                        <tr>
-                            <td class="text-center">{{ $loop->iteration }}</td>
-                            <td>
-                                {{ $item->product->product_name ?? 'Produk Dihapus' }}
-                                @if(isset($item->discounts) && $item->discounts->isNotEmpty())
-                                <small class="d-block text-muted">
-                                    Harga Awal: Rp {{ number_format($item->price_per_unit, 0, ',', '.') }} |
-                                    Diskon: {{ $item->discounts->pluck('percentage')->join('%, ') }}%
-                                </small>
-                                @endif
-                            </td>
-                            <td class="text-center">{{ $item->quantity }} {{ $item->product->unit->name ?? '' }}</td>
-                            <td class="text-end">
-                                @if($item->quantity > 0)
-                                    Rp {{ number_format($item->subtotal / $item->quantity, 0, ',', '.') }}
-                                @else
-                                    Rp 0
-                                @endif
-                            </td>
-                            <td class="text-end fw-semibold">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-
-            @if($purchaseOrder->adjustments->isNotEmpty())
-            <h5 class="fw-semibold mt-4">Riwayat Penyesuaian PO (Koreksi)</h5>
-            <div class="table-responsive">
-                <table class="table table-sm table-bordered table-warning">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Tanggal</th>
-                            <th>Tipe</th>
-                            <th class="text-end">Nilai</th>
-                            <th>Alasan</th>
-                            <th>Dibuat Oleh</th>
-                            <th>Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($purchaseOrder->adjustments as $adjustment)
-                        <tr>
-                            <td>{{ $adjustment->adjustment_date->format('d M Y') }}</td>
-                            <td>
-                                @if($adjustment->type == 'credit_note')
-                                    <span class="badge bg-success">Nota Kredit</span>
-                                @else
-                                    <span class="badge bg-danger">Nota Debit</span>
-                                @endif
-                            </td>
-                            <td class="text-end fw-bold">
-                                Rp {{ number_format($adjustment->amount, 0, ',', '.') }}
-                            </td>
-                            <td style="white-space: pre-wrap; word-break: break-word;">{{ $adjustment->reason }}</td>
-                            <td>{{ $adjustment->user->full_name ?? 'N/A' }}</td>
-                            <td>
-                                <form action="{{ route('purchase-order-adjustments.destroy', $adjustment->adjustment_id) }}" method="POST" class="form-cancel-po-adjustment">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-xs btn-danger" title="Batalkan Penyesuaian">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-            @endif
-            
-            {{-- ... (SISA FILE ANDA MULAI DARI TABEL PEMBAYARAN KE BAWAH SUDAH OK) ... --}}
-
-            @if($purchaseOrder->payments->isNotEmpty())
-            <h5 class="fw-semibold mt-4">Riwayat Pembayaran</h5>
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th>Tanggal Bayar</th>
-                            <th>Metode</th>
-                            <th class="text-end">Jumlah</th>
-                            <th>Referensi</th>
-                            <th>Dicatat Oleh</th>
-                            <th>Status</th>
-                            <th>Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($purchaseOrder->payments as $payment)
-                        <tr>
-                            <td>{{ $payment->payment_date->format('d/m/Y') }}</td>
-                            <td>{{ $payment->paymentMethod->name ?? 'N/A' }}</td>
-                            <td class="text-end">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
-                            <td>{{ $payment->reference_number ?? '-' }}</td>
-                            <td>{{ $payment->receivedBy->full_name ?? 'N/A' }}</td>
-                            <td>
-                                @if($payment->status == 'completed')
-                                    <span class="badge bg-success">Completed</span>
-                                @elseif($payment->status == 'pending_clearance')
-                                    <span class="badge bg-warning text-dark">Pending</span>
-                                @else
-                                    <span class="badge bg-danger">{{ $payment->status }}</span>
-                                @endif
-                            </td>
-                            <td>
-                                @php
-                                    $paymentLabel = 'Pembayaran ' . ($payment->paymentMethod->name ?? 'N/A') . ' Rp ' . number_format($payment->amount, 0, ',', '.');
-                                @endphp
-                                <form action="{{ route('purchase-orders.payments.destroy', $payment) }}" method="POST" 
-                                      class="d-inline form-delete-po-payment" 
-                                      data-payment-label="{{ $paymentLabel }}">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus (Rollback)">
-                                        <i class="bi bi-trash-fill"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-            @endif
-
-            <div class="row mt-4">
-                <div class="col-md-6">
-                    <h5 class="fw-semibold mb-3">Rincian Perhitungan</h5>
-                    <div class="border rounded p-3">
-                        <div class="d-flex justify-content-between mb-2"><span>Subtotal Barang</span><span class="fw-medium">Rp {{ number_format($purchaseOrder->subtotal ?? 0, 0, ',', '.') }}</span></div>
-                        <div class="d-flex justify-content-between mb-2"><span>Diskon / Fee @if($purchaseOrder->disc_fee_percent > 0) <small>({{ $purchaseOrder->disc_fee_percent }}%)</small> @endif</span><span class="text-danger">(-) Rp {{ number_format($purchaseOrder->disc_fee_amount ?? 0, 0, ',', '.') }}</span></div>
-                        <div class="d-flex justify-content-between mb-2"><span>Diskon Pembulatan</span><span class="text-danger">(-) Rp {{ number_format($purchaseOrder->rounding_discount_amount ?? 0, 0, ',', '.') }}</span></div>
-                        <hr class="my-1">
-                        <div class="d-flex justify-content-between mb-2"><span>DPP <small class="text-muted">@if($purchaseOrder->custom_dpp_factor) (Faktor: {{ $purchaseOrder->custom_dpp_factor }}) @endif</small></span><span class="fw-medium">Rp {{ number_format($purchaseOrder->dpp ?? 0, 0, ',', '.') }}</span></div>
-                        <div class="d-flex justify-content-between mb-2"><span>PPN ({{ $purchaseOrder->tax->rate ?? 0 }}%)</span><span>(+) Rp {{ number_format($purchaseOrder->ppn ?? 0, 0, ',', '.') }}</span></div>
-                        <div class="d-flex justify-content-between mb-2"><span>Ongkos Kirim</span><span>(+) Rp {{ number_format($purchaseOrder->shipping_amount ?? 0, 0, ',', '.') }}</span></div>
-                        <hr class="my-1">
-                        <div class="d-flex justify-content-between fw-bold"><span>Grand Total Pembelian</span><span>Rp {{ number_format($purchaseOrder->total_amount ?? 0, 0, ',', '.') }}</span></div>
+    <div class="row g-4">
+        {{-- KOLOM KIRI --}}
+        <div class="col-lg-8 col-xl-9">
+            {{-- KARTU DETAIL UTAMA --}}
+            <div class="card card-transaction border-0 shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <div class="form-section-title mb-0"><i class="bi bi-info-circle"></i> Data Transaksi</div>
+                    <div class="text-end">
+                         {{-- Status Badges --}}
+                         @if($purchaseOrder->status == 'completed') <span class="badge bg-success">Barang Diterima</span>
+                         @elseif($purchaseOrder->status == 'cancelled') <span class="badge bg-danger">Dibatalkan</span>
+                         @else <span class="badge bg-warning text-dark">{{ Str::title($purchaseOrder->status) }}</span>
+                         @endif
+ 
+                         @if($purchaseOrder->payment_status == 'paid') <span class="badge bg-primary">Lunas</span>
+                         @elseif($purchaseOrder->payment_status == 'partially_paid') <span class="badge bg-info text-dark">Cicil</span>
+                         @else <span class="badge bg-danger">Belum Lunas</span>
+                         @endif
                     </div>
                 </div>
+                <div class="card-body p-4">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-secondary small text-uppercase">Supplier</h6>
+                            <h5 class="fw-bold text-dark mb-1">{{ $purchaseOrder->supplier->supplier_name }}</h5>
+                            <p class="text-muted small mb-0">{{ $purchaseOrder->supplier->address ?? 'Alamat tidak tersedia' }}</p>
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <h6 class="fw-bold text-secondary small text-uppercase">Informasi Lain</h6>
+                            <p class="mb-1 small"><strong>No. Faktur Supplier:</strong> 
+                                <a href="#" data-bs-toggle="modal" data-bs-target="#supplierInvoiceModal" class="text-decoration-none border-bottom border-primary border-opacity-25" title="Klik untuk input/edit">
+                                    @if($purchaseOrder->supplier_invoice_number)
+                                        <span class="fw-bold text-primary">{{ $purchaseOrder->supplier_invoice_number }}</span>
+                                    @else
+                                        <span class="text-muted fst-italic">-- Input Faktur --</span>
+                                    @endif
+                                </a>
+                            </p>
+                            @if($purchaseOrder->due_date)
+                                <p class="mb-1 small"><strong>Jatuh Tempo:</strong> {{ optional($purchaseOrder->due_date)->format('d F Y') }}</p>
+                            @endif
+                            <p class="mb-0 small"><strong>Dibuat Oleh:</strong> {{ $purchaseOrder->creator->full_name ?? 'System' }}</p>
+                        </div>
+                    </div>
+                    
+                    {{-- Tabel Item --}}
+                    <h5 class="fw-semibold mb-3" style="font-size: 0.9rem;">Rincian Item</h5>
+                    <div class="table-responsive">
+                        <table class="table table-transaction table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width: 5%;">No</th>
+                                    <th>Produk</th>
+                                    <th class="text-center" style="width: 15%;">Qty</th>
+                                    <th class="text-end" style="width: 20%;">Harga (@)</th>
+                                    <th class="text-end" style="width: 20%;">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($purchaseOrder->items as $item)
+                                <tr>
+                                    <td class="text-center">{{ $loop->iteration }}</td>
+                                    <td style="white-space: normal; word-wrap: break-word; max-width: 300px;">
+                                        <div class="fw-bold text-dark">{{ $item->product->product_name ?? 'Produk Dihapus' }}</div>
+                                        @if(isset($item->discounts) && $item->discounts->isNotEmpty())
+                                        <small class="d-block text-muted" style="font-size: 0.75rem;">
+                                            <i class="bi bi-tag"></i> Disc: {{ $item->discounts->pluck('percentage')->join('%, ') }}%
+                                        </small>
+                                        @endif
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-light text-dark border">{{ $item->quantity }} {{ $item->product->unit->name ?? '' }}</span>
+                                    </td>
+                                    <td class="text-end text-muted small">
+                                        Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}
+                                    </td>
+                                    <td class="text-end fw-semibold">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            {{-- TABEL KOREKSI (ADJUSTMENT) --}}
+            @if($purchaseOrder->adjustments->isNotEmpty())
+            <div class="card card-transaction border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <div class="form-section-title mb-0"><i class="bi bi-exclamation-circle"></i> Riwayat Koreksi (Adjustment)</div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-transaction align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Tipe</th>
+                                    <th class="text-end">Nilai</th>
+                                    <th>Alasan</th>
+                                    <th>User</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($purchaseOrder->adjustments as $adjustment)
+                                <tr>
+                                    <td>{{ $adjustment->adjustment_date->format('d/m/Y') }}</td>
+                                    <td>
+                                        @if($adjustment->type == 'credit_note')
+                                            <span class="badge bg-success bg-opacity-10 text-success">Nota Kredit</span>
+                                        @else
+                                            <span class="badge bg-danger bg-opacity-10 text-danger">Nota Debit</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-end fw-bold">Rp {{ number_format($adjustment->amount, 0, ',', '.') }}</td>
+                                    <td class="small text-muted" style="white-space: normal; max-width: 250px;">{{ $adjustment->reason }}</td>
+                                    <td class="small">{{ $adjustment->user->full_name ?? '-' }}</td>
+                                    <td class="text-end">
+                                        <form action="{{ route('purchase-order-adjustments.destroy', $adjustment->adjustment_id) }}" method="POST" class="form-cancel-po-adjustment d-inline">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn btn-link text-danger p-0" title="Hapus">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            @endif
 
-                <div class="col-md-6">
-                    <h5 class="fw-semibold mb-3">Ringkasan Keuangan</h5>
-                    <div class="border rounded p-3">
+            {{-- TABEL PEMBAYARAN --}}
+            @if($purchaseOrder->payments->isNotEmpty())
+            <div class="card card-transaction border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <div class="form-section-title mb-0"><i class="bi bi-wallet2"></i> Riwayat Pembayaran</div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-transaction align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Metode</th>
+                                    <th class="text-end">Jumlah</th>
+                                    <th>Ref</th>
+                                    <th>Status</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($purchaseOrder->payments as $payment)
+                                <tr>
+                                    <td>{{ $payment->payment_date->format('d/m/Y') }}</td>
+                                    <td>{{ $payment->paymentMethod->name ?? '-' }}</td>
+                                    <td class="text-end fw-bold text-success">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
+                                    <td class="small text-muted">{{ $payment->reference_number ?? '-' }}</td>
+                                    <td>
+                                        @if($payment->status == 'completed') <i class="bi bi-check-circle-fill text-success"></i>
+                                        @elseif($payment->status == 'pending_clearance') <i class="bi bi-clock-fill text-warning"></i>
+                                        @else <span class="badge bg-secondary">{{ $payment->status }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-end">
+                                        @php $paymentLabel = 'Pembayaran Rp ' . number_format($payment->amount, 0, ',', '.'); @endphp
+                                        <form action="{{ route('purchase-orders.payments.destroy', $payment) }}" method="POST" class="d-inline form-delete-po-payment" data-payment-label="{{ $paymentLabel }}">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn btn-link text-danger p-0">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            @endif
+            
+            @if($purchaseOrder->notes)
+            <div class="p-3 bg-light rounded border border-light">
+                <h6 class="fw-semibold text-secondary small"><i class="bi bi-sticky"></i> Catatan:</h6>
+                <p class="text-muted mb-0 fst-italic">{{ $purchaseOrder->notes }}</p>
+            </div>
+            @endif
+        </div>
+
+        {{-- KOLOM KANAN (SUMMARY) --}}
+        <div class="col-lg-4 col-xl-3">
+            <div class="card card-transaction border-0 shadow-sm sticky-top" style="top: 20px; z-index: 99;">
+                <div class="card-header bg-white">
+                    <div class="form-section-title mb-0"><i class="bi bi-calculator"></i> Ringkasan Biaya</div>
+                </div>
+                <div class="card-body p-4">
+                    {{-- RINCIAN PERHITUNGAN --}}
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between mb-2 small"><span>Subtotal Barang</span><span class="fw-medium">Rp {{ number_format($purchaseOrder->subtotal ?? 0, 0, ',', '.') }}</span></div>
+                        <div class="d-flex justify-content-between mb-2 small"><span>Diskon/Fee</span><span class="text-danger">(-) Rp {{ number_format($purchaseOrder->disc_fee_amount ?? 0, 0, ',', '.') }}</span></div>
+                        <div class="d-flex justify-content-between mb-2 small"><span>Pembulatan</span><span class="text-danger">(-) Rp {{ number_format($purchaseOrder->rounding_discount_amount ?? 0, 0, ',', '.') }}</span></div>
                         
-                        <div class="d-flex justify-content-between mb-2"><span>Total Tagihan Awal</span><span>Rp {{ number_format($purchaseOrder->total_amount, 0, ',', '.') }}</span></div>
+                        <div class="border-top border-dashed my-2"></div>
+                        
+                        <div class="d-flex justify-content-between mb-2 small text-muted"><span>DPP</span><span>Rp {{ number_format($purchaseOrder->dpp ?? 0, 0, ',', '.') }}</span></div>
+                        <div class="d-flex justify-content-between mb-2 small"><span>PPN ({{ $purchaseOrder->tax->rate ?? 0 }}%)</span><span>(+) Rp {{ number_format($purchaseOrder->ppn ?? 0, 0, ',', '.') }}</span></div>
+                        <div class="d-flex justify-content-between mb-2 small"><span>Ongkir</span><span>(+) Rp {{ number_format($purchaseOrder->shipping_amount ?? 0, 0, ',', '.') }}</span></div>
+                        
+                        <div class="border-top border-dashed my-2"></div>
+                        
+                        <div class="d-flex justify-content-between fw-bold text-dark"><span>GRAND TOTAL</span><span>Rp {{ number_format($purchaseOrder->total_amount ?? 0, 0, ',', '.') }}</span></div>
+                    </div>
+
+                    {{-- RINGKASAN KEUANGAN (UTANG/LUNAS) --}}
+                    <div class="bg-light p-3 rounded border">
+                        <h6 class="fw-bold small text-uppercase text-secondary mb-3">Status Keuangan</h6>
                         
                         @if($totalDebitNotesPO > 0)
-                            <div class="d-flex justify-content-between text-danger mb-2"><span>Nota Debit (Tambahan)</span><span>(+) Rp {{ number_format($totalDebitNotesPO, 0, ',', '.') }}</span></div>
+                            <div class="d-flex justify-content-between text-danger small mb-1"><span>Nota Debit</span><span>(+) {{ number_format($totalDebitNotesPO, 0, ',', '.') }}</span></div>
                         @endif
                         @if($totalCreditNotesPO > 0)
-                            <div class="d-flex justify-content-between text-success mb-2"><span>Nota Kredit (Potongan)</span><span>(-) Rp {{ number_format($totalCreditNotesPO, 0, ',', '.') }}</span></div>
+                            <div class="d-flex justify-content-between text-success small mb-1"><span>Nota Kredit</span><span>(-) {{ number_format($totalCreditNotesPO, 0, ',', '.') }}</span></div>
                         @endif
                         @if($purchaseOrder->total_returned > 0)
-                            <div class="d-flex justify-content-between text-warning mb-2"><span>Total Retur (Potong Tagihan)</span><span>(-) Rp {{ number_format($purchaseOrder->total_returned, 0, ',', '.') }}</span></div>
+                            <div class="d-flex justify-content-between text-warning small mb-1"><span>Retur</span><span>(-) {{ number_format($purchaseOrder->total_returned, 0, ',', '.') }}</span></div>
                         @endif
 
-                        <hr class="my-1">
-                        <div class="d-flex justify-content-between text-success mb-2"><span>Sudah Dibayar</span><span>(+) Rp {{ number_format($purchaseOrder->amount_paid, 0, ',', '.') }}</span></div>
-                        <hr class="my-1">
+                        <div class="d-flex justify-content-between text-success small mb-2"><span>Sudah Dibayar</span><span>(-) {{ number_format($purchaseOrder->amount_paid, 0, ',', '.') }}</span></div>
                         
-                        @if($totalReturDeposit > 0)
-                            <div class="d-flex justify-content-between text-info small"><span>(Nilai retur jadi deposit: Rp {{ number_format($totalReturDeposit, 0, ',', '.') }})</span></div>
-                        @endif
+                        <div class="border-top border-secondary border-opacity-25 my-2"></div>
                         
-                        <div class="d-flex justify-content-between fw-bold fs-5 {{ $sisaUtang > 0.01 ? 'text-danger' : 'text-success' }}">
-                            <span>Sisa Utang</span>
+                        <div class="d-flex justify-content-between fw-bold {{ $sisaUtang > 0.01 ? 'text-danger' : 'text-success' }}">
+                            <span>SISA TAGIHAN</span>
                             <span>Rp {{ number_format($sisaUtang, 0, ',', '.') }}</span>
                         </div>
                     </div>
                 </div>
             </div>
-            @if($purchaseOrder->notes)<div class="mt-4"><h6 class="fw-semibold">Catatan:</h6><p class="text-muted fst-italic bg-light p-3 rounded">{{ $purchaseOrder->notes }}</p></div>@endif
         </div>
     </div>
 </div>
 
-{{-- Modal Pembayaran (LANGSUNG TEMPEL KODE MODAL ANDA DI SINI JIKA TIDAK DIPISAH) --}}
+{{-- MODAL PEMBAYARAN --}}
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -361,12 +369,9 @@
                     
                     <div class="alert alert-info">
                         <div class="d-flex justify-content-between"><span>Total Tagihan Awal:</span><span>Rp {{ number_format($purchaseOrder->total_amount, 0, ',', '.') }}</span></div>
-                        
-                        {{-- (Rincian ringkas di modal) --}}
                         <hr class="my-1">
                         <div class="d-flex justify-content-between small"><span>Sudah Dibayar:</span><span>(+) Rp {{ number_format($purchaseOrder->amount_paid, 0, ',', '.') }}</span></div>
                         <hr class="my-1">
-                        
                         <div class="d-flex justify-content-between fw-bold">
                             <span>Sisa Utang:</span>
                             <span id="modal-po-sisa-tagihan-display">Rp {{ number_format($sisaTagihanPO, 0, ',', '.') }}</span>
@@ -402,8 +407,7 @@
                         <select class="form-select" id="payment_method_id_po" name="payment_method_id" required>
                             <option value="">-- Pilih Metode --</option>
                             @foreach($paymentMethods as $method)
-                                <option value="{{ $method->payment_method_id }}" 
-                                        data-config="{{ $method->required_fields_config }}">
+                                <option value="{{ $method->payment_method_id }}" data-config="{{ $method->required_fields_config }}">
                                     {{ $method->name }}
                                 </option>
                             @endforeach
@@ -446,7 +450,7 @@
     </div>
 </div>
 
-{{-- Modal No Faktur Supplier --}}
+{{-- MODAL FAKTUR --}}
 <div class="modal fade" id="supplierInvoiceModal" tabindex="-1" aria-labelledby="supplierInvoiceModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -471,13 +475,14 @@
         </div>
     </div>
 </div>
+
 @endsection
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Script Konfirmasi Terima Barang
+        
         const receiveGoodsForm = document.getElementById('receive-goods-form');
         if (receiveGoodsForm) {
             receiveGoodsForm.addEventListener('submit', function(event) {
@@ -499,7 +504,6 @@
             });
         }
 
-        // Script Konfirmasi Batalkan PO
         const cancelPOForm = document.querySelector('.form-cancel-po');
         if (cancelPOForm) {
             cancelPOForm.addEventListener('submit', function (event) {
@@ -521,7 +525,6 @@
             });
         }
 
-        // Script Konfirmasi Hapus Pembayaran
         const deletePOPaymentForms = document.querySelectorAll('.form-delete-po-payment');
         deletePOPaymentForms.forEach(form => {
             form.addEventListener('submit', function (event) {
@@ -544,7 +547,6 @@
             });
         });
 
-        // Script AutoNumeric & Modal Pembayaran (SAMA SEPERTI KODE ANDA SEBELUMNYA)
         const addPaymentBtnPO = document.getElementById('add-payment-btn');
         const amountFormattedInputPO = document.getElementById('amount-formatted-po');
         const amountHiddenInputPO = document.getElementById('amount-po');
@@ -657,7 +659,7 @@
             if (addPaymentBtnPO) {
                 addPaymentBtnPO.addEventListener('click', function() {
                     if (useDebitCheckboxPO) {
-                        useDebitCheckboxPO.checked = true; // Default checked
+                        useDebitCheckboxPO.checked = true; 
                     }
                     toggleRequiredFieldsPO();
                     amountErrorPO.textContent = '';

@@ -1,32 +1,51 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container py-4">
+<div class="container-fluid py-2">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold text-dark mb-1">Edit User</h3>
+            <p class="text-muted mb-0 small">Perbarui informasi: <span class="text-primary fw-bold">{{ $user->full_name }}</span></p>
+        </div>
+        <div>
+            <a href="{{ route('users.index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Kembali
+            </a>
+        </div>
+    </div>
+
     <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-success text-white"><h4 class="mb-0">Edit User: {{ $user->full_name }}</h4></div>
-                <div class="card-body p-4">
-                    <form action="{{ route('users.update', $user->user_id) }}" method="POST">
-                        @csrf
-                        @method('PUT')
+        <div class="col-lg-10">
+            <form action="{{ route('users.update', $user->user_id) }}" method="POST">
+                @csrf
+                @method('PUT')
+                
+                <div class="card card-transaction border-0 shadow-sm">
+                    <div class="card-header bg-white p-4 border-bottom">
+                        <div class="form-section-title mb-0"><i class="bi bi-pencil-square"></i> Edit Data User</div>
+                    </div>
+                    
+                    <div class="card-body p-4">
                         @include('users._form')
-                        <div class="d-flex justify-content-end mt-4">
-                            <a href="{{ route('users.index') }}" class="btn btn-secondary me-2">Batal</a>
-                            <button type="submit" class="btn btn-success">Update User</button>
+                        
+                        <div class="d-flex justify-content-end mt-4 pt-3 border-top">
+                            <a href="{{ route('users.index') }}" class="btn btn-light border me-2">Batal</a>
+                            <button type="submit" class="btn btn-success px-4 fw-bold">Update User</button>
                         </div>
-                    </form>
+                    </div>
                 </div>
-            </div>
+            </form>
         </div>
     </div>
 </div>
 @endsection
 
-{{-- ✅ SCRIPT DIGABUNGKAN MENJADI SATU BLOK --}}
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Init Select2 untuk Role
+    $('#role').select2({ theme: 'bootstrap-5', placeholder: 'Pilih Role...', width: '100%' });
+    
     // --- LOGIKA UNTUK HIDE/UNHIDE PASSWORD ---
     function setupPasswordToggle(inputId, toggleId) {
         const passwordInput = document.getElementById(inputId);
@@ -60,7 +79,7 @@ document.addEventListener('DOMContentLoaded', function() {
         passwordConfirmationInput.addEventListener('input', validatePasswordMatch);
     }
     
-    // --- LOGIKA UNTUK MENAMPILKAN KODE SALES ---
+    // --- LOGIKA UNTUK MENAMPILkan KODE SALES (SAMA DENGAN CREATE) ---
     const roleSelect = document.getElementById('role');
     const salesCodeContainer = document.getElementById('sales-code-container');
     if (roleSelect && salesCodeContainer) {

@@ -1,160 +1,157 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container py-4">
+<div class="container-fluid py-2">
     {{-- HEADER HALAMAN --}}
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        {{-- ✅ BERUBAH: $salesOrder -> $order --}}
-        <h2 class="fw-bold mb-0">Detail Pesanan: {{ $order->order_number }}</h2>
+        <div>
+            <h3 class="fw-bold text-dark mb-1">Detail Pesanan: <span class="text-primary">{{ $order->order_number }}</span></h3>
+            <p class="text-muted mb-0 small">Tanggal Pesan: {{ $order->order_date->format('d F Y') }}</p>
+        </div>
     
         <div class="d-flex flex-wrap justify-content-end gap-2">
-            <a href="{{ route('sales-orders.index') }}" class="btn btn-outline-secondary">
+            <a href="{{ route('sales-orders.index') }}" class="btn btn-outline-secondary btn-sm shadow-sm">
                 <i class="bi bi-arrow-left me-1"></i> Kembali
             </a>
 
-            {{-- Tombol untuk membuat Invoice dari Sales Order ini --}}
             @can('create', App\Models\SalesInvoice::class)
-                {{-- ✅ BERUBAH: $salesOrder -> $order --}}
                 @if($order->status !== 'invoiced' && $order->status !== 'rejected')
-                    {{-- ✅ BERUBAH: $salesOrder -> $order --}}
-                    <a href="{{ route('invoices.createFromOrder', $order) }}" class="btn btn-primary">
+                    <a href="{{ route('invoices.createFromOrder', $order) }}" class="btn btn-primary btn-sm shadow-sm">
                         <i class="bi bi-receipt-cutoff me-1"></i> Buat Invoice
                     </a>
                 @endif
             @endcan
             
-            {{-- Dropdown untuk Opsi Edit & Hapus --}}
-            <div class="btn-group">
-                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="bi bi-gear"></i> Opsi
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    {{-- Tombol Edit & Hapus hanya muncul jika statusnya belum final --}}
-                    {{-- ✅ BERUBAH: $salesOrder -> $order --}}
-                    @if (!in_array($order->status, ['invoiced', 'rejected']))
-                        {{-- ✅ BERUBAH: $salesOrder -> $order (logika @can sudah benar) --}}
-                        @can("update", $order)
-                        <li>
-                            {{-- ✅ BERUBAH: $salesOrder -> $order --}}
-                            <a class="dropdown-item" href="{{ route('sales-orders.edit', $order->order_id) }}">
-                                <i class="bi bi-pencil-square me-2"></i> Edit Pesanan
-                            </a>
-                        </li>
-                        @endcan
-                        @can("delete", $order)
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            {{-- ✅ BERUBAH: $salesOrder -> $order --}}
-                            <form class="delete-form" action="{{ route('sales-orders.destroy', $order->order_id) }}" method="POST">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="dropdown-item text-danger">
-                                        <i class="bi bi-trash me-2"></i> Hapus Pesanan
-                                    </button>
-                                </form>
-                        </li>
-                        @endcan
-                    @endif
-                    {{-- Jika tidak ada menu di atas, bisa tampilkan pesan --}}
-                    {{-- ✅ BERUBAH: $salesOrder -> $order --}}
-                    @if (in_array($order->status, ['invoiced', 'rejected']) && auth()->user()->cannot('update', $order) && auth()->user()->cannot('delete', $order))
-                        <li><span class="dropdown-item disabled text-muted">Tidak ada aksi tersedia</span></li>
-                    @endif
-                </ul>
-            </div>
+            @if (!in_array($order->status, ['invoiced', 'rejected']))
+                @can("update", $order)
+                    <a href="{{ route('sales-orders.edit', $order->order_id) }}" class="btn btn-warning btn-sm shadow-sm text-dark">
+                        <i class="bi bi-pencil-square me-1"></i> Edit
+                    </a>
+                @endcan
+                @can("delete", $order)
+                    <form class="delete-form d-inline" action="{{ route('sales-orders.destroy', $order->order_id) }}" method="POST">
+                        @csrf @method('DELETE')
+                        <button type="submit" class="btn btn-danger btn-sm shadow-sm">
+                            <i class="bi bi-trash me-1"></i> Hapus
+                        </button>
+                    </form>
+                @endcan
+            @endif
         </div>
     </div>
 
-    {{-- KARTU DETAIL --}}
-    <div class="card shadow-sm border-0">
-        <div class="card-body p-4">
-            {{-- Info Klien & Status --}}
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <h5 class="fw-semibold">Klien:</h5>
-                    {{-- ✅ BERUBAH: $salesOrder -> $order --}}
-                    <p class="mb-0">{{ $order->client->client_name }}</p>
-                    <p class="text-muted">{{ $order->client->address ?? 'Alamat tidak tersedia' }}</p>
+    <div class="row g-4">
+        {{-- KOLOM KIRI: Detail & Item --}}
+        <div class="col-lg-8">
+            <div class="card card-transaction border-0 shadow-sm h-100">
+                <div class="card-header bg-white p-3 border-bottom d-flex justify-content-between align-items-center">
+                    <div class="form-section-title mb-0"><i class="bi bi-info-circle"></i> Informasi Pesanan</div>
+                    
+                    {{-- Status Badge --}}
+                    @if($order->status == 'invoiced')
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">Invoiced</span>
+                    @elseif($order->status == 'rejected')
+                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25">Ditolak</span>
+                    @else
+                        <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25">{{ Str::title($order->status) }}</span>
+                    @endif
                 </div>
-                <div class="col-md-6 text-md-end">
-                    {{-- ✅ BERUBAH: $salesOrder -> $order --}}
-                    <p class="mb-1"><strong>Tanggal Pesanan:</strong> {{ optional($order->order_date)->format('d F Y') }}</p>
-                    <p class="mb-1"><strong>Sales:</strong> {{ $order->sales->full_name ?? 'N/A' }} ({{ $order->sales->sales_code ?? '' }})</p>
-                    <p class="mb-1"><strong>Status:</strong>
-                        {{-- ✅ BERUBAH: $salesOrder -> $order --}}
-                        @if($order->status == 'invoiced')
-                            <span class="badge bg-success">Sudah Dibuat Invoice</span>
-                        @elseif($order->status == 'rejected')
-                            <span class="badge bg-danger">Ditolak</span>
-                        @else
-                            <span class="badge bg-secondary">{{ Str::title($order->status) }}</span>
-                        @endif
-                    </p>
+                
+                <div class="card-body p-4">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-secondary small text-uppercase">Klien</h6>
+                            <h5 class="fw-bold text-dark mb-1">{{ $order->client->client_name }}</h5>
+                            <p class="text-muted small mb-0">{{ $order->client->address ?? 'Alamat tidak tersedia' }}</p>
+                            <p class="text-muted small">{{ $order->client->phone_number ?? '-' }}</p>
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <h6 class="fw-bold text-secondary small text-uppercase">Sales Person</h6>
+                            <p class="mb-1 fw-medium">{{ $order->sales->full_name ?? 'N/A' }}</p>
+                            <p class="text-muted small mb-0">{{ $order->sales->sales_code ?? '' }}</p>
+                        </div>
+                    </div>
+                    
+                    <h5 class="fw-semibold mt-4 mb-3" style="font-size: 0.9rem;">Rincian Item</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-transaction align-middle mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="ps-4">Produk</th>
+                                    <th class="text-center">Qty</th>
+                                    <th class="text-end">Harga (@)</th>
+                                    <th class="text-end pe-4">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($order->items as $item)
+                                <tr>
+                                    <td class="ps-4 fw-medium">{{ $item->product->product_name ?? 'Produk Dihapus' }}</td>
+                                    <td class="text-center">
+                                        <span class="badge bg-light text-dark border">{{ $item->quantity }} {{ $item->product->unit->name ?? '' }}</span>
+                                    </td>
+                                    <td class="text-end text-muted small">Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}</td>
+                                    <td class="text-end pe-4 fw-bold">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                                </tr>
+                                @empty
+                                <tr><td colspan="4" class="text-center py-3 text-muted">Tidak ada item.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if($order->notes)
+                    <div class="mt-4 p-3 bg-light rounded border border-light">
+                        <h6 class="fw-semibold text-secondary small mb-1"><i class="bi bi-sticky"></i> Catatan:</h6>
+                        <p class="text-muted mb-0 fst-italic small">{{ $order->notes }}</p>
+                    </div>
+                    @endif
                 </div>
             </div>
-            <hr>
+        </div>
 
-            {{-- Tabel Rincian Item --}}
-            <h5 class="fw-semibold mt-4">Rincian Item Dipesan</h5>
-            <div class="table-responsive">
-                <table class="table table-bordered">
-                    <thead class="table-light">
-                        <tr>
-                            <th>#</th>
-                            <th>Produk</th>
-                            <th class="text-center">Kuantitas</th>
-                            <th class="text-end">Harga Satuan</th>
-                            <th class="text-end">Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {{-- ✅ BERUBAH: $salesOrder -> $order --}}
-                        @forelse($order->items as $item)
-                        <tr>
-                            <td>{{ $loop->iteration }}</td>
-                            <td>{{ $item->product->product_name ?? 'Produk Dihapus' }}</td>
-                            <td class="text-center">{{ $item->quantity }} {{ $item->product->unit->name ?? '' }}</td>
-                            <td class="text-end">Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}</td>
-                            <td class="text-end">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
-                        </tr>
-                        @empty
-                        <tr><td colspan="5" class="text-center">Tidak ada item dalam pesanan ini.</td></tr>
-                        @endforelse
-                    </tbody>
-                    <tfoot>
-                        <tr class="table-light">
-                            <td colspan="4" class="text-end fw-bold fs-5">Total Pesanan</td>
-                            {{-- ✅ BERUBAH: $salesOrder -> $order --}}
-                            <td class="text-end fw-bold fs-5">Rp {{ number_format($order->total_amount, 0, ',', '.') }}</td>
-                        </tr>
-                    </tfoot>
-                </table>
+        {{-- KOLOM KANAN: Summary --}}
+        <div class="col-lg-4">
+            <div class="card card-transaction border-0 shadow-sm">
+                <div class="card-header bg-white p-3 border-bottom">
+                    <div class="form-section-title mb-0"><i class="bi bi-calculator"></i> Ringkasan</div>
+                </div>
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small">Jumlah Item</span>
+                        <span class="fw-medium">{{ $order->items->count() }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small">Total Kuantitas</span>
+                        <span class="fw-medium">{{ $order->items->sum('quantity') }}</span>
+                    </div>
+                    
+                    <hr class="border-dashed my-3">
+                    
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold text-dark">TOTAL TAGIHAN</span>
+                        <span class="fs-4 fw-bold text-primary">Rp {{ number_format($order->total_amount, 0, ',', '.') }}</span>
+                    </div>
+                </div>
+                <div class="card-footer bg-light p-3 text-center border-top-0">
+                    <small class="text-muted">Dibuat pada {{ $order->created_at->format('d M Y H:i') }}</small>
+                </div>
             </div>
-
-            {{-- ✅ BERUBAH: $salesOrder -> $order --}}
-            @if($order->notes)
-            <div class="mt-4">
-                <h6 class="fw-semibold">Catatan:</h6>
-                <p class="text-muted fst-italic">{{ $order->notes }}</p>
-            </div>
-            @endif
         </div>
     </div>
 </div>
 @endsection
+
 @push('scripts')
-{{-- JavaScript di file ini tidak perlu diubah --}}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const deleteForm = document.querySelector('.delete-form');
-
     if (deleteForm) {
         deleteForm.addEventListener('submit', function(event) {
             event.preventDefault(); 
-            
             Swal.fire({
-                title: 'Anda Yakin?',
-                text: "Pesanan yang dihapus tidak bisa dikembalikan!",
+                title: 'Hapus Pesanan?',
+                text: "Data yang dihapus tidak bisa dikembalikan.",
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#d33',
@@ -163,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 cancelButtonText: 'Batal'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    event.target.submit();
+                    deleteForm.submit();
                 }
             });
         });

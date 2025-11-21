@@ -22,7 +22,7 @@
                         </div>
                     </div>
 
-                    <form action="{{ route('bank-reconciliations.store') }}" method="POST">
+                    <form action="{{ route('bank-reconciliations.store') }}" method="POST" id="recon-create-form">
                         @csrf
                         <div class="row g-4">
                             {{-- Pilih Akun --}}
@@ -49,12 +49,17 @@
                                 @error('statement_date')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                             </div>
 
-                            {{-- Saldo Akhir --}}
+                            {{-- Saldo Akhir (DENGAN FORMAT RUPIAH) --}}
                             <div class="col-md-6">
-                                <label for="statement_balance" class="form-label fw-bold">Saldo Akhir (di Bank) <span class="text-danger">*</span></label>
+                                <label for="statement_balance_display" class="form-label fw-bold">Saldo Akhir (di Bank) <span class="text-danger">*</span></label>
                                 <div class="input-group input-group-lg">
                                     <span class="input-group-text">Rp</span>
-                                    <input type="number" step="0.01" class="form-control text-end" id="statement_balance" name="statement_balance" value="{{ old('statement_balance') }}" placeholder="0" required>
+                                    
+                                    {{-- Input Visual (Untuk User lihat ada titiknya) --}}
+                                    <input type="text" class="form-control text-end" id="statement_balance_display" placeholder="0" required>
+                                    
+                                    {{-- Input Hidden (Untuk dikirim ke Database, angka murni) --}}
+                                    <input type="hidden" name="statement_balance" id="statement_balance" value="{{ old('statement_balance') }}">
                                 </div>
                                 <div class="form-text">Nominal saldo akhir yang tertera di PDF/Kertas Bank.</div>
                                 @error('statement_balance')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
@@ -78,12 +83,66 @@
 @push('scripts')
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     $(document).ready(function() {
+        // Init Select2
         $('.select2').select2({
             theme: 'bootstrap-5',
             placeholder: '-- Pilih Akun Kas/Bank --',
             width: '100%'
+        });
+
+        // --- LOGIKA FORMAT RUPIAH ---
+        const displayInput = document.getElementById('statement_balance_display');
+        const hiddenInput = document.getElementById('statement_balance');
+
+        function formatRupiah(angka) {
+            let number_string = angka.toString().replace(/[^,\d-]/g, "").toString(), // Izinkan minus (-)
+                split = number_string.split(","),
+                sisa = split[0].length % 3,
+                rupiah = split[0].substr(0, sisa),
+                ribuan = split[0].substr(sisa).match(/\d{3}/gi);
+
+            // Tambahkan titik jika yang diinput sudah menjadi ribuan
+            if (ribuan) {
+                separator = sisa ? "." : "";
+                rupiah += separator + ribuan.join(".");
+            }
+
+            rupiah = split[1] != undefined ? rupiah + "," + split[1] : rupiah;
+            
+            // Tambahkan tanda minus di depan jika ada
+            if (angka.toString().indexOf('-') !== -1 && rupiah.indexOf('-') === -1) {
+                return '-' + rupiah;
+            }
+            
+            return rupiah;
+        }
+
+        // 1. Jika ada old value (misal habis error validasi), format dulu
+        if(hiddenInput.value) {
+            displayInput.value = formatRupiah(hiddenInput.value);
+        }
+
+        // 2. Event saat mengetik
+        displayInput.addEventListener('keyup', function(e) {
+            // Izinkan angka dan tanda minus
+            let val = this.value.replace(/[^\d-]/g, ''); 
+            
+            // Update tampilan visual
+            this.value = formatRupiah(val);
+            
+            // Update nilai asli ke hidden input (hapus titik, biarkan minus)
+            hiddenInput.value = val; 
+        });
+
+        // 3. Validasi Submit
+        $('#recon-create-form').on('submit', function(e) {
+            if (hiddenInput.value === '' || hiddenInput.value === '-') {
+                e.preventDefault();
+                Swal.fire('Error', 'Saldo Akhir tidak boleh kosong!', 'error');
+            }
         });
     });
 </script>

@@ -2,62 +2,67 @@
 
 @section('content')
 <div class="container-fluid py-4">
-    <h2 class="fw-bold mb-4">Verifikasi Pembayaran Batch</h2>
-    
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Tgl. Lapor</th>
-                            <th>Klien</th>
-                            <th>Metode Lapor</th>
-                            <th class="text-end">Jumlah Dilaporkan</th>
-                            <th class="text-center">Status</th>
-                            <th class="text-center">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($pendingBatches as $batch)
-                            <tr>
-                                <td>{{ $batch->created_at->format('d M Y H:i') }}</td>
-                                <td>{{ $batch->client->client_name ?? 'N/A' }}</td>
-                                
-                                {{-- ✅ PERBAIKAN: Tampilkan nama metode dari relasi --}}
-                                <td>
-                                    @if($batch->paymentMethod)
-                                        <span class="badge bg-primary">{{ $batch->paymentMethod->name }}</span>
-                                    @else
-                                        {{-- Fallback jika ID null (misal: data lama) --}}
-                                        <span class="badge bg-secondary">{{ $batch->payment_method ?? 'N/A' }}</span>
-                                    @endif
-                                </td>
-                                
-                                <td class="text-end fw-bold">Rp {{ number_format($batch->total_amount, 0, ',', '.') }}</td>
-                                <td class="text-center">
-                                    <span class="badge bg-warning text-dark">{{ Str::title(str_replace('_', ' ', $batch->status)) }}</span>
-                                </td>
-                                <td class="text-center">
-                                    <a href="{{ route('batch-payments.showPending', $batch->batch_payment_id) }}" class="btn btn-sm btn-info">
-                                        Lihat & Proses
-                                    </a>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="text-center py-4 text-muted">
-                                    Tidak ada pembayaran batch yang menunggu verifikasi.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-            <div class="mt-3 d-flex justify-content-center">
-                {{ $pendingBatches->links() }}
-            </div>
+    {{-- HEADER --}}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold text-dark mb-0">Verifikasi Pembayaran Batch</h3>
+            <p class="text-muted small mb-0">Pembayaran masuk yang perlu dikonfirmasi</p>
         </div>
+        <div></div> {{-- Spacer --}}
+    </div>
+
+    {{-- CARD LIST --}}
+    <div class="d-flex flex-column gap-3">
+        @forelse ($pendingBatches as $batch)
+            <div class="card card-transaction shadow-sm border-0 border-start border-5 border-warning">
+                <div class="card-header bg-white p-3">
+                    <div class="row align-items-center">
+                        {{-- Kolom 1: Info Utama --}}
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-center">
+                                <div class="me-3 bg-light rounded-circle d-flex align-items-center justify-content-center" style="width:45px; height:45px;">
+                                    <i class="bi bi-wallet-fill text-warning fs-5"></i>
+                                </div>
+                                <div>
+                                    <span class="fw-bold text-dark d-block">{{ $batch->client->client_name ?? 'N/A' }}</span>
+                                    <span class="text-muted small">{{ $batch->created_at->format('d M Y, H:i') }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Kolom 2: Metode & Total --}}
+                        <div class="col-md-4">
+                            <small class="text-muted d-block" style="font-size: 0.7rem;">METODE & TOTAL</small>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25">
+                                    {{ $batch->paymentMethod->name ?? 'N/A' }}
+                                </span>
+                                <span class="fw-bold text-dark fs-5">Rp {{ number_format($batch->total_amount, 0, ',', '.') }}</span>
+                            </div>
+                        </div>
+
+                        {{-- Kolom 3: Aksi --}}
+                        <div class="col-md-4 text-end">
+                            <a href="{{ route('batch-payments.showPending', $batch->batch_payment_id) }}" class="btn btn-sm btn-primary shadow-sm px-3 fw-bold">
+                                <i class="bi bi-arrow-right-circle me-1"></i> Proses
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @empty
+            <div class="text-center py-5 my-3 bg-white rounded shadow-sm border border-dashed">
+                <div class="mb-3">
+                    <i class="bi bi-check2-circle text-muted" style="font-size: 3rem; opacity: 0.5;"></i>
+                </div>
+                <h5 class="fw-bold text-dark">Tidak Ada Data</h5>
+                <p class="text-muted mb-0">Semua pembayaran batch telah diproses.</p>
+            </div>
+        @endforelse
+    </div>
+
+    <div class="mt-4 d-flex justify-content-center">
+        {{ $pendingBatches->links() }}
     </div>
 </div>
 @endsection

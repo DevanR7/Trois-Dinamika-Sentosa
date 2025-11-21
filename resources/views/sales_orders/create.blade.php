@@ -1,26 +1,51 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container py-4">
+<div class="container-fluid py-2">
+    
+    {{-- HEADER --}}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold text-dark mb-1">Buat Pesanan Penjualan</h3>
+            <p class="text-muted mb-0 small">Input pesanan baru dari pelanggan.</p>
+        </div>
+        <div>
+            <a href="{{ route('sales-orders.index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Kembali
+            </a>
+        </div>
+    </div>
+
     <div class="row justify-content-center">
         <div class="col-lg-10">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">Buat Pesanan Baru</h4>
+            
+            @if ($errors->any())
+                <div class="alert alert-danger border-0 shadow-sm rounded-3 mb-4">
+                    <ul class="mb-0 small ps-3">
+                        @foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach
+                    </ul>
                 </div>
-                <div class="card-body p-4">
-                    @if ($errors->any())
-                        <div class="alert alert-danger"><ul class="mb-0">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
-                    @endif
-                    @if (session('error'))
-                        <div class="alert alert-danger">{{ session('error') }}</div>
-                    @endif
+            @endif
+            @if (session('error'))
+                <div class="alert alert-danger border-0 shadow-sm rounded-3 mb-4">
+                    {{ session('error') }}
+                </div>
+            @endif
 
-                    <form action="{{ route('sales-orders.store') }}" method="POST">
-                        @csrf
-                        <div class="row mb-4">
+            <form action="{{ route('sales-orders.store') }}" method="POST">
+                @csrf
+                
+                <div class="card card-transaction border-0 shadow-sm">
+                    <div class="card-header bg-white p-4 border-bottom">
+                        <div class="form-section-title mb-0"><i class="bi bi-cart-plus"></i> Form Pesanan</div>
+                    </div>
+                    
+                    <div class="card-body p-4">
+                        
+                        {{-- 1. INFO KLIEN --}}
+                        <div class="row g-3 mb-4">
                             <div class="col-md-6">
-                                <label for="client_id" class="form-label fw-semibold">Pilih Klien</label>
+                                <label for="client_id" class="form-label fw-bold small text-muted">PELANGGAN (KLIEN)</label>
                                 <select name="client_id" id="client_id" class="form-select" required>
                                     <option value="" disabled selected>-- Pilih Klien --</option>
                                     @foreach ($clients as $client)
@@ -29,74 +54,91 @@
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label for="order_date" class="form-label fw-semibold">Tanggal Pesanan</label>
+                                <label for="order_date" class="form-label fw-bold small text-muted">TANGGAL PESANAN</label>
                                 <input type="date" class="form-control" id="order_date" name="order_date" value="{{ now()->format('Y-m-d') }}" required>
                             </div>
                         </div>
 
-                        <h5 class="fw-semibold mb-3">Rincian Item</h5>
-                        <div class="table-responsive">
-                            <table class="table table-bordered">
-                                <thead class="table-light">
+                        <hr class="border-dashed">
+
+                        {{-- 2. ITEM PESANAN --}}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold text-dark mb-0">Rincian Item</h6>
+                            <button type="button" id="add-product-btn" class="btn btn-primary btn-sm rounded-pill px-3">
+                                <i class="bi bi-plus-lg me-1"></i> Tambah Item
+                            </button>
+                        </div>
+
+                        <div class="table-responsive mb-3">
+                            <table class="table table-hover table-transaction align-middle mb-0">
+                                <thead class="bg-light">
                                     <tr>
                                         <th style="width: 40%;">Produk</th>
                                         <th style="width: 15%;">Kuantitas</th>
                                         <th style="width: 20%;">Harga Satuan</th>
                                         <th class="text-end" style="width: 20%;">Subtotal</th>
-                                        <th class="text-center">Aksi</th>
+                                        <th class="text-center" style="width: 5%;"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="product-items"></tbody>
                             </table>
                         </div>
-                        <button type="button" id="add-product-btn" class="btn btn-secondary btn-sm">
-                            <i class="bi bi-plus-circle me-1"></i> Tambah Item
-                        </button>
 
-                        <hr class="my-4">
-                        
-                        <div class="row justify-content-between">
-                            <div class="col-md-6">
-                                <label for="notes" class="form-label fw-semibold">Catatan</label>
-                                <textarea class="form-control" name="notes" id="notes" rows="3">{{ old('notes') }}</textarea>
+                        {{-- 3. TOTAL & CATATAN --}}
+                        <div class="row mt-4">
+                            <div class="col-md-7">
+                                <label for="notes" class="form-label fw-bold small text-muted">CATATAN / INSTRUKSI</label>
+                                <textarea class="form-control bg-light" name="notes" id="notes" rows="3" placeholder="Contoh: Kirim sebelum jam 5 sore...">{{ old('notes') }}</textarea>
                             </div>
-                            <div class="col-md-5 text-end">
-                                <h4 class="fw-bold">Total Pesanan: <span id="grand-total" class="text-primary">Rp 0</span></h4>
+                            <div class="col-md-5">
+                                <div class="card bg-light border-0 p-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="fw-bold text-secondary">TOTAL PESANAN</span>
+                                        <span class="fw-bold fs-4 text-primary" id="grand-total">Rp 0</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="d-flex justify-content-end mt-4">
-                            <a href="{{ route('sales-orders.index') }}" class="btn btn-light me-2">Batal</a>
-                            <button type="submit" class="btn btn-primary">Simpan Pesanan</button>
+                        {{-- ACTIONS --}}
+                        <div class="d-flex justify-content-end mt-4 pt-3 border-top">
+                            <a href="{{ route('sales-orders.index') }}" class="btn btn-light border me-2">Batal</a>
+                            <button type="submit" class="btn btn-primary px-4 fw-bold">Simpan Pesanan</button>
                         </div>
-                    </form>
+
+                    </div>
                 </div>
-            </div>
+            </form>
         </div>
     </div>
 </div>
 
+{{-- TEMPLATE ROW --}}
 <template id="product-row-template">
     <tr>
         <td>
            <select class="form-select form-select-sm product-select" required>
                 <option></option>
                 @foreach ($products as $product)
-                    {{-- PERUBAHAN DI SINI --}}
                     <option value="{{ $product->product_id }}" data-price="{{ $product->selling_price ?? 0 }}">
                         {{ $product->product_name }}
                     </option>
                 @endforeach
             </select>
         </td>
-        <td><input type="number" class="form-control form-control-sm quantity" value="1" min="1" required></td>
         <td>
-            <input type="text" class="form-control form-control-sm price-display" readonly>
+            <input type="number" class="form-control form-control-sm quantity text-center" value="1" min="1" required>
+        </td>
+        <td>
+            <div class="input-group input-group-sm">
+                <span class="input-group-text border-0 bg-transparent px-1 text-muted">Rp</span>
+                <input type="text" class="form-control border-0 bg-transparent px-0 price-display" readonly>
+            </div>
             <input type="hidden" class="price-raw">
         </td>
-        <td class="text-end"><span class="subtotal">Rp 0</span></td>
+        <td class="text-end fw-bold text-dark"><span class="subtotal">Rp 0</span></td>
         <td class="text-center">
-            <button type="button" class="btn btn-danger btn-sm remove-product-btn"><i class="bi bi-trash"></i></button>
+            <button type="button" class="btn btn-link text-danger btn-sm remove-product-btn p-0"><i class="bi bi-trash"></i></button>
         </td>
     </tr>
 </template>
@@ -106,9 +148,11 @@
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         $('#client_id').select2({
-        theme: 'bootstrap-5',
-        placeholder: '-- Pilih Klien --'
-    });
+            theme: 'bootstrap-5',
+            placeholder: '-- Pilih Klien --',
+            width: '100%'
+        });
+
         const productItemsContainer = document.getElementById('product-items');
         const productRowTemplate = document.getElementById('product-row-template');
         const addProductBtn = document.getElementById('add-product-btn');
@@ -142,20 +186,21 @@
 
             productSelect.name = `products[${productIndex}][product_id]`;
             quantityInput.name = `products[${productIndex}][quantity]`;
-            priceRaw.name = `products[${productIndex}][price]`; // Nama untuk dikirim ke controller
+            priceRaw.name = `products[${productIndex}][price]`; 
 
             productItemsContainer.appendChild(newRow);
 
             const select2 = $(productSelect).select2({
                 placeholder: '-- Pilih Produk --',
                 theme: 'bootstrap-5',
-                dropdownParent: $(productSelect).parent()
+                dropdownParent: $(productSelect).parent(),
+                width: '100%'
             });
 
             select2.on('select2:select', function(e) {
                 const selectedOption = e.params.data.element;
                 const price = selectedOption.getAttribute('data-price') || 0;
-                priceDisplay.value = formatRupiah(price);
+                priceDisplay.value = formatRupiah(price).replace('Rp', '').trim();
                 priceRaw.value = price;
                 calculateTotals();
             });
@@ -171,7 +216,7 @@
         }
 
         addProductBtn.addEventListener('click', addProductRow);
-        addProductRow(); // Tambah satu baris kosong saat halaman dimuat
+        addProductRow(); 
     });
 </script>
 @endpush

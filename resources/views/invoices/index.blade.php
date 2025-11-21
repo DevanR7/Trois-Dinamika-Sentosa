@@ -2,24 +2,45 @@
 
 @section('content')
 <div class="container-fluid py-4">
+    {{-- HEADER --}}
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold">Daftar Invoice</h2>
-        <a href="{{ route('invoices.create') }}" class="btn btn-primary">
-            <i class="bi bi-plus-circle me-2"></i>Buat Invoice Baru
+        <div>
+            <h3 class="fw-bold text-dark mb-0">Daftar Invoice Penjualan</h3>
+            <p class="text-muted small mb-0">Tagihan ke pelanggan</p>
+        </div>
+        <a href="{{ route('invoices.create') }}" class="btn btn-primary shadow-sm">
+            <i class="bi bi-plus-lg me-2"></i> Buat Invoice Baru
         </a>
     </div>
 
-    {{-- FORM FILTER --}}
-    <div class="card shadow-sm mb-4">
-        <div class="card-body">
-            <form action="{{ route("invoices.index") }}" method="GET" class="row g-3 align-items-center">
-                <div class="col-md-3"><input type="text" name="search" class="form-control" placeholder="Cari No. Invoice / Klien..." value="{{ request("search") }}"></div>
-                <div class="col-md-2"><input type="date" name="start_date" class="form-control" value="{{ request("start_date") }}" title="Tanggal Mulai"></div>
-                <div class="col-md-2"><input type="date" name="end_date" class="form-control" value="{{ request("end_date") }}" title="Tanggal Akhir"></div>
+    {{-- ALERT --}}
+    @if (session('success'))
+        <div class="alert alert-success border-0 shadow-sm d-flex align-items-center mb-4">
+            <i class="bi bi-check-circle-fill fs-4 me-2"></i>
+            <div>{{ session('success') }}</div>
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+
+    {{-- FILTER CARD --}}
+    <div class="card card-transaction border-0 shadow-sm mb-4">
+        <div class="card-body p-3">
+            <form action="{{ route('invoices.index') }}" method="GET" class="row g-2 align-items-center">
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                        <input type="text" name="search" class="form-control border-start-0 ps-0" placeholder="Cari No. Invoice / Klien..." value="{{ request('search') }}">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <input type="date" name="start_date" class="form-control" value="{{ request('start_date') }}" title="Tanggal Mulai">
+                </div>
+                <div class="col-md-2">
+                    <input type="date" name="end_date" class="form-control" value="{{ request('end_date') }}" title="Tanggal Akhir">
+                </div>
                 <div class="col-md-2">
                     <select name="status" class="form-select">
-                        <option value="">-- Semua Status --</option>
-                        {{-- ✅ TAMBAHKAN OPSI 'DRAFT' DI FILTER --}}
+                        <option value="">-- Status --</option>
                         <option value="draft" @selected(request("status") == "draft")>Draft</option>
                         <option value="unpaid" @selected(request("status") == "unpaid")>Belum Lunas</option>
                         <option value="partially_paid" @selected(request("status") == "partially_paid")>Cicil</option>
@@ -27,120 +48,125 @@
                         <option value="cancelled" @selected(request("status") == "cancelled")>Dibatalkan</option>
                     </select>
                 </div>
-                <div class="col-md-2"><button type="submit" class="btn btn-dark w-100">Filter</button></div>
-                <div class="col-md-1"><a href="{{ route('invoices.index') }}" class="btn btn-outline-secondary w-100" title="Reset">Reset</a></div>
+                <div class="col-md-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-dark w-100">Filter</button>
+                    <a href="{{ route('invoices.index') }}" class="btn btn-light border w-100" title="Reset"><i class="bi bi-arrow-clockwise"></i></a>
+                </div>
             </form>
         </div>
     </div>
 
-    @if (session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
-    @if (session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
-
-    {{-- TAMPILAN DAFTAR INVOICE MODEL DROPDOWN BARU --}}
-    <div class="list-group">
+    {{-- CARD LIST VIEW --}}
+    <div class="d-flex flex-column gap-3">
         @forelse ($invoices as $invoice)
             @php
-                // ✅ Gunakan Accessor 'remaining_balance' yang sudah ada
                 $sisaPiutang = $invoice->remaining_balance;
-                $totalRetur = $invoice->returns->sum('total_amount'); // Ini hanya untuk info
+                $borderClass = 'border-warning'; // Default unpaid
+                if($invoice->status == 'paid') $borderClass = 'border-success';
+                elseif($invoice->status == 'cancelled') $borderClass = 'border-secondary';
+                elseif($invoice->status == 'draft') $borderClass = 'border-secondary';
+                elseif(optional($invoice->due_date)->isPast() && $invoice->status != 'paid') $borderClass = 'border-danger';
             @endphp
-            <div class="list-group-item list-group-item-action mb-2 shadow-sm border-0 rounded">
-                {{-- Bagian Header yang Selalu Terlihat --}}
-                <a class="d-flex w-100 justify-content-between align-items-center text-decoration-none" data-bs-toggle="collapse" href="#collapse-{{ $invoice->invoice_id }}" role="button" aria-expanded="false" aria-controls="collapse-{{ $invoice->invoice_id }}">
-                    <div class="row w-100 align-items-center">
-                        <div class="col-md-3 col-6 mb-2 mb-md-0">
-                            <strong class="text-primary">{{ $invoice->invoice_number }}</strong>
-                            <small class="d-block text-muted">{{ $invoice->client->client_name ?? 'N/A' }}</small>
-                        </div>
-                        <div class="col-md-3 col-6 mb-2 mb-md-0">
-                            <span class="text-dark">{{ optional($invoice->order_date)->format('d M Y') }}</span>
-                            <small class="d-block text-muted">Tgl. Invoice</small>
-                        </div>
-                        <div class="col-md-3 col-6">
-                            <span class="text-dark {{ optional($invoice->due_date)->isPast() && $invoice->status != 'paid' ? 'text-danger fw-bold' : '' }}">
-                                {{ optional($invoice->due_date)->format('d M Y') ?? '-' }}
-                            </span>
-                            <small class="d-block text-muted">Jatuh Tempo</small>
-                        </div>
-                        <div class="col-md-3 col-6 text-md-end">
-                            {{-- Badge status Anda sudah benar --}}
-                            @if($invoice->status == 'paid')
-                                <span class="badge bg-success">Lunas</span>
-                            @elseif($invoice->status == 'partially_paid')
-                                <span class="badge bg-info text-dark">Cicil</span>
-                            @elseif($invoice->status == 'cancelled')
-                                <span class="badge bg-danger">Dibatalkan</span>
-                            @elseif($invoice->status == 'unpaid')
-                                <span class="badge bg-warning text-dark">Belum Lunas</span>
-                            @elseif($invoice->status == 'draft')
-                                <span class="badge bg-secondary">Draft</span>
-                            @else
-                                <span class="badge bg-secondary">{{ $invoice->status }}</span>
-                            @endif
-                        </div>
-                    </div>
-                </a>
 
-                {{-- Bagian Detail yang Bisa Dibuka-Tutup --}}
-                <div class="collapse" id="collapse-{{ $invoice->invoice_id }}">
-                    <hr>
+            <div class="card card-transaction shadow-sm border-0 border-start border-5 {{ $borderClass }}">
+                
+                {{-- HEADER KARTU --}}
+                <div class="card-header bg-white p-3 cursor-pointer" data-bs-toggle="collapse" data-bs-target="#collapse-{{ $invoice->invoice_id }}" aria-expanded="false">
                     <div class="row align-items-center">
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <h6 class="fw-semibold mb-0">{{ $invoice->sales->full_name ?? 'Umum' }}</h6>
-                            <small class="text-muted d-block">Sales</small>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="row text-md-end">
-                                <div class="col">
-                                    <h6 class="fw-semibold">Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</h6>
-                                    <small class="text-muted d-block">Total Tagihan</small>
+                        {{-- Kolom 1: No Invoice & Klien --}}
+                        <div class="col-md-4 mb-2 mb-md-0">
+                            <div class="d-flex align-items-center">
+                                <div class="me-3 bg-light rounded-circle d-flex align-items-center justify-content-center" style="width:45px; height:45px;">
+                                    <i class="bi bi-receipt text-primary fs-5"></i>
                                 </div>
-                                <div class="col">
-                                    <h6 class="fw-semibold text-warning">Rp {{ number_format($totalRetur, 0, ',', '.') }}</h6>
-                                    <small class="text-muted d-block">Total Retur</small>
-                                </div>
-                                <div class="col">
-                                    <h6 class="fw-bold {{ $sisaPiutang > 0.01 ? 'text-danger' : 'text-success' }}">Rp {{ number_format($sisaPiutang, 0, ',', '.') }}</h6>
-                                    <small class="text-muted d-block">Sisa Piutang</small>
+                                <div>
+                                    <h6 class="fw-bold text-dark mb-0">{{ $invoice->invoice_number }}</h6>
+                                    <span class="fw-semibold text-secondary small">{{ $invoice->client->client_name ?? 'N/A' }}</span>
                                 </div>
                             </div>
                         </div>
+
+                        {{-- Kolom 2: Tanggal & Total --}}
+                        <div class="col-md-4 col-6 mb-2 mb-md-0">
+                            <div class="row">
+                                <div class="col-6">
+                                    <small class="text-muted d-block" style="font-size: 0.7rem;">TANGGAL INVOICE</small>
+                                    <span class="text-dark fw-medium">{{ optional($invoice->order_date)->format('d M Y') }}</span>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted d-block" style="font-size: 0.7rem;">TOTAL TAGIHAN</small>
+                                    <span class="fw-bold text-dark">Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Kolom 3: Status & Sisa --}}
+                        <div class="col-md-4 text-md-end d-flex justify-content-between justify-content-md-end align-items-center gap-3">
+                            <div class="text-end">
+                                @if($invoice->status == 'paid') <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3">Lunas</span>
+                                @elseif($invoice->status == 'partially_paid') <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 rounded-pill px-3">Cicil</span>
+                                @elseif($invoice->status == 'cancelled') <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-3">Batal</span>
+                                @elseif($invoice->status == 'draft') <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-3">Draft</span>
+                                @else 
+                                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-3">
+                                        {{ optional($invoice->due_date)->isPast() ? 'Jatuh Tempo' : 'Belum Lunas' }}
+                                    </span>
+                                @endif
+                                
+                                @if($sisaPiutang > 0 && $invoice->status != 'cancelled')
+                                    <div class="small text-danger fw-bold mt-1">Sisa: Rp {{ number_format($sisaPiutang, 0, ',', '.') }}</div>
+                                @endif
+                            </div>
+                            <i class="bi bi-chevron-down text-muted transition-icon"></i>
+                        </div>
                     </div>
-                    <div class="d-flex justify-content-end gap-1 mt-3">
-                        
-                        {{-- ====================================================== --}}
-                        {{-- ✅ TOMBOL KONFIRMASI BARU DITAMBAHKAN DI SINI --}}
-                        {{-- ====================================================== --}}
-                        @if($invoice->status == 'draft')
-                            <form class="confirm-form" action="{{ route('invoices.confirm', $invoice->invoice_id) }}" method="POST">
-                                @csrf
-                                <button type="submit" class="btn btn-sm btn-primary fw-bold" title="Konfirmasi Invoice">
-                                    <i class="bi bi-check-circle-fill"></i> Konfirmasi
-                                </button>
-                            </form>
-                        @endif
-                        
-                        <a href="{{ route('invoices.show', $invoice->invoice_id) }}" class="btn btn-sm btn-outline-info" title="Detail"><i class="bi bi-eye"></i> Detail Lengkap</a>
-                        
-                        {{-- ✅ PERBAIKI LOGIKA @if --}}
-                        {{-- Tombol Edit/Batal hanya muncul jika BUKAN Lunas atau Batal --}}
-                        @if(!in_array($invoice->status, ['paid', 'cancelled']))
-                            <a href="{{ route('invoices.edit', $invoice->invoice_id) }}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil-square"></i> Edit</a>
-                            
-                            {{-- Tombol Batal hanya muncul jika BUKAN Draft --}}
-                            @if($invoice->status != 'draft')
-                                <form class="cancel-form" action="{{ route('invoices.cancel', $invoice->invoice_id) }}" method="POST">
-                                    @csrf
-                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Batalkan"><i class="bi bi-x-circle"></i> Batalkan</button>
-                                </form>
-                            @endif
-                        @endif
+                </div>
+
+                {{-- DETAIL KARTU (COLLAPSE) --}}
+                <div class="collapse" id="collapse-{{ $invoice->invoice_id }}">
+                    <div class="card-body bg-light bg-opacity-25 border-top p-3">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                            <div class="d-flex gap-4 text-muted small">
+                                <div><strong>Jatuh Tempo:</strong> {{ optional($invoice->due_date)->format('d M Y') }}</div>
+                                <div><strong>Sales:</strong> {{ $invoice->sales->full_name ?? '-' }}</div>
+                            </div>
+
+                            <div class="btn-group">
+                                <a href="{{ route('invoices.show', $invoice->invoice_id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i> Detail</a>
+                                
+                                @if(!in_array($invoice->status, ['paid', 'cancelled']))
+                                    <a href="{{ route('invoices.edit', $invoice->invoice_id) }}" class="btn btn-sm btn-outline-warning text-dark"><i class="bi bi-pencil"></i> Edit</a>
+                                    
+                                    @if($invoice->status != 'draft')
+                                    <form class="cancel-form d-inline" action="{{ route('invoices.cancel', $invoice->invoice_id) }}" method="POST">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i> Batal</button>
+                                    </form>
+                                    @endif
+                                @endif
+
+                                @if($invoice->status == 'draft')
+                                    <form class="confirm-form d-inline" action="{{ route('invoices.confirm', $invoice->invoice_id) }}" method="POST">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-circle"></i> Konfirmasi</button>
+                                    </form>
+                                @endif
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         @empty
-            <div class="alert alert-info text-center">
-                Tidak ada data invoice ditemukan.
+            {{-- EMPTY STATE --}}
+            <div class="text-center py-5 my-3 bg-white rounded shadow-sm border border-dashed">
+                <div class="mb-3">
+                    <i class="bi bi-receipt-cutoff text-muted" style="font-size: 3rem; opacity: 0.5;"></i>
+                </div>
+                <h5 class="fw-bold text-dark">Belum ada Invoice</h5>
+                <p class="text-muted mb-4">Data tagihan belum tersedia.</p>
+                <a href="{{ route('invoices.create') }}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-lg me-1"></i> Buat Invoice Baru
+                </a>
             </div>
         @endforelse
     </div>
@@ -154,49 +180,34 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Script untuk Tombol Batal (Cancel)
-    const cancelForms = document.querySelectorAll('.cancel-form');
-    cancelForms.forEach(form => {
-        form.addEventListener('submit', function(event) {
-            event.preventDefault();
-            Swal.fire({
-                title: 'Anda Yakin?',
-                text: "Invoice yang dibatalkan akan mengubah statusnya!",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Ya, Batalkan!',
-                cancelButtonText: 'Tidak'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    event.target.submit();
-                }
+    // Script Konfirmasi
+    function confirmAction(selector, title, text, btnText, btnColor) {
+        document.querySelectorAll(selector).forEach(form => {
+            form.addEventListener('submit', function(event) {
+                event.preventDefault();
+                Swal.fire({
+                    title: title, text: text, icon: 'warning',
+                    showCancelButton: true, confirmButtonColor: btnColor, cancelButtonColor: '#6c757d',
+                    confirmButtonText: btnText, cancelButtonText: 'Batal'
+                }).then((result) => { if (result.isConfirmed) event.target.submit(); });
             });
         });
-    });
+    }
+    confirmAction('.cancel-form', 'Batalkan Invoice?', 'Status akan berubah menjadi Cancelled.', 'Ya, Batalkan!', '#d33');
+    confirmAction('.confirm-form', 'Konfirmasi Invoice?', 'Stok akan dikurangi dan invoice menjadi Unpaid.', 'Ya, Konfirmasi!', '#198754');
 
-    // ======================================================
-    // ✅ SCRIPT BARU UNTUK TOMBOL KONFIRMASI
-    // ======================================================
-    const confirmForms = document.querySelectorAll('.confirm-form');
-    confirmForms.forEach(form => {
-        form.addEventListener('submit', function(event) {
-            event.preventDefault();
-            Swal.fire({
-                title: 'Konfirmasi Invoice Ini?',
-                text: "Stok akan diperiksa dan dikurangi. Status akan berubah menjadi 'Belum Lunas'.",
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#198754', // Warna hijau
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Ya, Konfirmasi!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    event.target.submit();
-                }
-            });
+    // Rotasi Icon
+    const collapses = document.querySelectorAll('.collapse');
+    collapses.forEach(el => {
+        el.addEventListener('show.bs.collapse', function () {
+            const parent = this.closest('.card');
+            const icon = parent.querySelector('.bi-chevron-down');
+            if(icon) icon.style.transform = 'rotate(180deg)';
+        });
+        el.addEventListener('hide.bs.collapse', function () {
+            const parent = this.closest('.card');
+            const icon = parent.querySelector('.bi-chevron-down');
+            if(icon) icon.style.transform = 'rotate(0deg)';
         });
     });
 });

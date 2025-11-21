@@ -1,229 +1,303 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container py-4">
-    <div class="row justify-content-center">
-        <div class="col-lg-10">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">Buat Pesanan Pembelian Baru</h4>
-                </div>
-
-                <div class="card-body p-4">
-                    @if ($errors->any())
-                        <div class="alert alert-danger"><ul class="mb-0">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
-                    @endif
-
-                    <form action="{{ route('purchase-orders.store') }}" method="POST" id="po-form">
-                        @csrf
-
-                        <div class="row mb-4 g-3">
-                            <div class="col-md-4">
-                                <label for="supplier_id" class="form-label fw-semibold">Pilih Supplier</label>
-                                <select name="supplier_id" id="supplier_id" class="form-select" required>
-                                    <option value="" disabled selected>-- Pilih Supplier --</option>
-                                    @foreach ($suppliers as $supplier)
-                                        <option value="{{ $supplier->supplier_id }}">{{ $supplier->supplier_name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="order_date" class="form-label fw-semibold">Tanggal Pesanan</label>
-                                <input type="date" class="form-control" id="order_date" name="order_date" value="{{ now()->format('Y-m-d') }}" required>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="due_date" class="form-label fw-semibold">Jatuh Tempo (Opsional)</label>
-                                <input type="date" class="form-control" id="due_date" name="due_date" value="{{ old('due_date') }}">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="requester_user_id" class="form-label fw-semibold">Dipesan Oleh (Opsional)</label>
-                                <select name="requester_user_id" id="requester_user_id" class="form-select">
-                                    <option value="">-- Pembelian Umum / Stok --</option>
-                                    @foreach ($users as $user)
-                                        <option value="{{ $user->user_id }}">{{ $user->full_name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-
-                        {{-- Bulk controls --}}
-                        <div class="d-flex gap-2 mb-2 align-items-center">
-                            <div>
-                                <button type="button" id="select-all-btn" class="btn btn-sm btn-outline-secondary">Select All</button>
-                                <button type="button" id="deselect-all-btn" class="btn btn-sm btn-outline-secondary">Deselect All</button>
-                            </div>
-
-                            <div class="input-group input-group-sm ms-3" style="width: 420px;">
-                                <input id="bulk-discount-input" type="number" step="any" min="0" class="form-control" placeholder="Diskon (%) yang akan diterapkan">
-                                <button type="button" id="apply-bulk-discount-btn" class="btn btn-success">Apply to Selected</button>
-                                <button type="button" id="apply-all-discount-btn" class="btn btn-primary">Apply to All</button>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-12">
-                                <h5 class="fw-semibold mb-3">Rincian Item</h5>
-                                <div class="table-responsive">
-                                    <table class="table table-bordered align-middle">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th class="text-center" style="width:40px;"><input type="checkbox" class="form-check-input" id="header-row-select"></th>
-                                                <th style="width: 30%;">Produk</th>
-                                                <th style="width: 12%;">Kuantitas</th>
-                                                <th style="width: 15%;">Harga Beli</th>
-                                                <th style="width: 12%;">Diskon (%)</th>
-                                                <th class="text-end" style="width: 20%;">Subtotal</th>
-                                                <th class="text-center">Aksi</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="product-items"></tbody>
-                                    </table>
-                                </div>
-
-                                <div class="mb-3">
-                                    <button type="button" id="add-product-btn" class="btn btn-secondary btn-sm">
-                                        <i class="bi bi-plus-circle me-1"></i> Tambah Item
-                                    </button>
-                                </div>
-
-                                <div class="mb-3 mt-4">
-                                    <label for="notes" class="form-label fw-semibold">Catatan</label>
-                                    <textarea class="form-control" name="notes" id="notes" rows="3">{{ old('notes') }}</textarea>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row mt-4">
-                            <div class="col-12">
-                                <h5 class="fw-semibold mb-3">Opsi Perhitungan & Ringkasan</h5>
-                                <div class="row">
-                                    {{-- OPTIONS --}}
-                                    <div class="col-md-6">
-                                        <div class="card mb-3">
-                                            <div class="card-body">
-                                                <div class="mb-2 form-check form-switch">
-                                                    <input class="form-check-input" type="checkbox" id="apply_disc_fee" name="apply_disc_fee" value="1">
-                                                    <label class="form-check-label" for="apply_disc_fee">Gunakan Diskon/Fee</label>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label small mb-1">Diskon (%)</label>
-                                                    <input type="number" step="any" min="0" class="form-control form-control-sm" name="disc_fee_percent" id="disc_fee_percent" placeholder="0">
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label small mb-1">Atau Diskon (Rp)</label>
-                                                    <input type="number" step="any" min="0" class="form-control form-control-sm" name="disc_fee_amount" id="disc_fee_amount" placeholder="0">
-                                                </div>
-
-                                                <hr/>
-
-                                                <div class="mb-2 form-check form-switch">
-                                                    <input class="form-check-input" type="checkbox" id="apply_rounding_discount" name="apply_rounding_discount" value="1">
-                                                    <label class="form-check-label" for="apply_rounding_discount">Gunakan Diskon Pembulatan</label>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label small mb-1">Jumlah Pembulatan (Rp)</label>
-                                                    <input type="number" step="any" min="0" class="form-control form-control-sm" name="rounding_discount_amount" id="rounding_discount_amount" placeholder="0">
-                                                </div>
-
-                                                <hr/>
-
-                                                <div class="mb-2">
-                                                    <label class="form-label small mb-1">Tarif Pajak (opsional)</label>
-                                                    <select name="tax_id" id="tax_id" class="form-select form-select-sm">
-                                                        <option value="">-- Pilih Tarif Pajak (opsional) --</option>
-                                                        @foreach(\App\Models\Tax::where('is_active', true)->get() as $tax)
-                                                            <option value="{{ $tax->id }}" data-rate="{{ $tax->rate }}">{{ $tax->name }} ({{ $tax->rate }}%)</option>
-                                                        @endforeach
-                                                    </select>
-                                                </div>
-                                                <hr/>
-                                                <div class="mb-2 form-check form-switch">
-                                                    <input class="form-check-input" type="checkbox" id="use_custom_dpp_factor" name="use_custom_dpp_factor" value="1">
-                                                    <label class="form-check-label" for="use_custom_dpp_factor">Override Faktor DPP</label>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label small mb-1">Faktor DPP (mis. 11/12 atau 0.9167)</label>
-                                                    <input type="text" class="form-control form-control-sm" name="custom_dpp_factor" id="custom_dpp_factor" placeholder="11/12">
-                                                    <small class="text-muted">Default untuk PPN Inklusif: 100/(100+Tarif PPN)</small>
-                                                </div>
-
-                                                <hr/>
-
-                                                <div class="mb-2">
-                                                    <label class="form-label small mb-1">Ongkos Kirim (Rp)</label>
-                                                    <input type="number" step="any" min="0" class="form-control form-control-sm" name="shipping_amount" id="shipping_amount" value="0">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {{-- SUMMARY --}}
-                                    <div class="col-md-6">
-                                        <div class="card">
-                                            <div class="card-body">
-                                                <h6 class="fw-semibold">Ringkasan</h6>
-                                                <div class="d-flex justify-content-between">
-                                                    <div>Subtotal Barang</div>
-                                                    <div id="summary-subtotal">Rp 0</div>
-                                                </div>
-                                                <div class="d-flex justify-content-between">
-                                                    <div>Diskon/Fee</div>
-                                                    <div id="summary-disc">Rp 0</div>
-                                                </div>
-                                                <div class="d-flex justify-content-between">
-                                                    <div>Diskon Pembulatan</div>
-                                                    <div id="summary-rounding">Rp 0</div>
-                                                </div>
-                                                <hr/>
-                                                <div class="d-flex justify-content-between">
-                                                    <div>Taxable Base</div>
-                                                    <div id="summary-taxable">Rp 0</div>
-                                                </div>
-                                                <div class="d-flex justify-content-between">
-                                                    <div>DPP</div>
-                                                    <div id="summary-dpp">Rp 0</div>
-                                                </div>
-                                                <div class="d-flex justify-content-between">
-                                                    <div>PPN (<span id="summary-tax-rate">0</span>%)</div>
-                                                    <div id="summary-ppn">Rp 0</div>
-                                                </div>
-                                                <div class="d-flex justify-content-between">
-                                                    <div>Ongkos Kirim</div>
-                                                    <div id="summary-shipping">Rp 0</div>
-                                                </div>
-                                                <hr/>
-                                                <div class="d-flex justify-content-between fw-bold fs-5">
-                                                    <div>Grand Total</div>
-                                                    <div id="summary-grand">Rp 0</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-
-                        <div class="d-flex justify-content-end mt-4">
-                            <a href="{{ route('purchase-orders.index') }}" class="btn btn-light me-2">Batal</a>
-                            <button type="submit" class="btn btn-primary" id="submit-btn">Simpan Pesanan</button>
-                        </div>
-                    </form>
+<div class="container-fluid py-2">
+    
+    {{-- Indikator Auto Save --}}
+    <div id="autosave-indicator" class="position-fixed top-0 end-0 p-3" style="z-index: 1050; display: none;">
+        <div class="toast show align-items-center text-white bg-success border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body small">
+                    <i class="bi bi-cloud-check me-1"></i> Draft disimpan otomatis
                 </div>
             </div>
         </div>
     </div>
+
+    {{-- HEADER HALAMAN --}}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold text-dark mb-1">Buat Purchase Order Baru</h3>
+            <p class="text-muted mb-0 small">Isi formulir di bawah untuk membuat pesanan pembelian ke supplier.</p>
+        </div>
+        <div>
+            <a href="{{ route('purchase-orders.index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Kembali ke List
+            </a>
+        </div>
+    </div>
+
+    {{-- ALERT ERROR --}}
+    @if ($errors->any())
+        <div class="alert alert-danger border-0 shadow-sm rounded-3 mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <i class="bi bi-exclamation-triangle-fill fs-4"></i>
+                <ul class="mb-0 ps-3">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        </div>
+    @endif
+
+    {{-- FORM UTAMA --}}
+    <form action="{{ route('purchase-orders.store') }}" method="POST" id="po-form">
+        @csrf
+
+        <div class="row g-4">
+            {{-- KOLOM KIRI: INFORMASI & ITEM --}}
+            <div class="col-lg-8 col-xl-9">
+                
+                {{-- 1. CARD INFORMASI PESANAN --}}
+                <div class="card card-transaction border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <div class="form-section-title mb-0"><i class="bi bi-info-circle"></i> Informasi Pesanan</div>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="supplier_id" class="form-label fw-semibold text-secondary small">Pilih Supplier <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-building"></i></span>
+                                    <select name="supplier_id" id="supplier_id" class="form-select border-start-0 ps-0" required>
+                                        <option value="" disabled selected>-- Pilih Supplier --</option>
+                                        @foreach ($suppliers as $supplier)
+                                            <option value="{{ $supplier->supplier_id }}">{{ $supplier->supplier_name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="order_date" class="form-label fw-semibold text-secondary small">Tanggal Pesanan <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" id="order_date" name="order_date" value="{{ now()->format('Y-m-d') }}" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="due_date" class="form-label fw-semibold text-secondary small">Jatuh Tempo <span class="fw-normal text-muted">(Opsional)</span></label>
+                                <input type="date" class="form-control" id="due_date" name="due_date" value="{{ old('due_date') }}">
+                            </div>
+                            <div class="col-md-12">
+                                <label for="requester_user_id" class="form-label fw-semibold text-secondary small">Dipesan Oleh (User)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-person"></i></span>
+                                    <select name="requester_user_id" id="requester_user_id" class="form-select border-start-0 ps-0">
+                                        <option value="">-- Pembelian Umum / Stok --</option>
+                                        @foreach ($users as $user)
+                                            <option value="{{ $user->user_id }}">{{ $user->full_name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- 2. CARD RINCIAN BARANG --}}
+                <div class="card card-transaction border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <div class="form-section-title mb-0"><i class="bi bi-box-seam"></i> Rincian Item</div>
+                    </div>
+
+                    {{-- Toolbar Bulk Action --}}
+                    <div class="px-4 pt-3">
+                        <div class="transaction-toolbar d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-muted small fw-bold text-uppercase"><i class="bi bi-check-all me-1"></i> Bulk:</span>
+                                <button type="button" id="select-all-btn" class="btn btn-xs btn-outline-secondary py-0 small" style="font-size: 0.75rem;">All</button>
+                                <button type="button" id="deselect-all-btn" class="btn btn-xs btn-outline-secondary py-0 small" style="font-size: 0.75rem;">None</button>
+                            </div>
+                            <div class="input-group input-group-sm" style="max-width: 380px;">
+                                <span class="input-group-text bg-white text-muted small">Diskon Massal</span>
+                                <input id="bulk-discount-input" type="number" step="any" min="0" class="form-control" placeholder="%">
+                                <button type="button" id="apply-bulk-discount-btn" class="btn btn-success text-white">Apply Selected</button>
+                                <button type="button" id="apply-all-discount-btn" class="btn btn-outline-primary">Apply All</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body p-0 mt-2">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-transaction mb-0 align-middle">
+                                <thead>
+                                    <tr>
+                                        <th class="text-center ps-4" style="width:40px;">
+                                            <input type="checkbox" class="form-check-input cursor-pointer" id="header-row-select">
+                                        </th>
+                                        <th style="width: 30%;">Produk</th>
+                                        <th style="width: 15%;">Qty</th>
+                                        <th style="width: 20%;">Harga Beli (@)</th>
+                                        <th style="width: 15%;">Diskon</th>
+                                        <th class="text-end pe-4" style="width: 15%;">Subtotal</th>
+                                        <th class="text-center" style="width: 50px;"><i class="bi bi-gear"></i></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="product-items">
+                                    {{-- JavaScript akan mengisi baris di sini --}}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        {{-- Tombol Tambah Item --}}
+                        <div class="p-3 bg-light border-top text-center">
+                             <button type="button" id="add-product-btn" class="btn btn-primary rounded-pill px-4 shadow-sm">
+                                <i class="bi bi-plus-lg me-1"></i> Tambah Item Baru
+                            </button>
+                        </div>
+
+                        {{-- Catatan Tambahan --}}
+                        <div class="p-4 bg-white border-top mt-0">
+                            <label for="notes" class="form-label fw-semibold text-secondary small">Catatan / Keterangan</label>
+                            <textarea class="form-control bg-light border-muted" name="notes" id="notes" rows="2" placeholder="Contoh: Pengiriman tolong dilakukan lewat pintu gudang belakang...">{{ old('notes') }}</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- KOLOM KANAN: KALKULASI & SUMMARY --}}
+            <div class="col-lg-4 col-xl-3">
+                <div class="card card-transaction border-0 shadow-sm sticky-top" style="top: 20px; z-index: 99;">
+                    <div class="card-header bg-white">
+                        <div class="form-section-title mb-0"><i class="bi bi-calculator"></i> Ringkasan Biaya</div>
+                    </div>
+                    <div class="card-body p-4">
+                        
+                        {{-- OPSI KALKULASI --}}
+                        <div class="mb-4">
+                            {{-- 1. Diskon / Fee Tambahan --}}
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <label class="form-check-label small fw-bold text-dark" for="apply_disc_fee">Diskon / Fee Tambahan</label>
+                                <div class="form-check form-switch m-0">
+                                    <input class="form-check-input cursor-pointer" type="checkbox" id="apply_disc_fee" name="apply_disc_fee" value="1">
+                                </div>
+                            </div>
+                            <div class="p-3 bg-light rounded-3 mb-3 border border-light shadow-sm collapse show" id="disc-fee-container">
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <label class="small text-muted mb-1">Diskon %</label>
+                                        <input type="number" step="any" min="0" class="form-control form-control-sm" name="disc_fee_percent" id="disc_fee_percent" placeholder="0">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="small text-muted mb-1">Nominal (Rp)</label>
+                                        <input type="number" step="any" min="0" class="form-control form-control-sm" name="disc_fee_amount" id="disc_fee_amount" placeholder="0">
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- 2. Diskon Pembulatan --}}
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <label class="form-check-label small fw-bold text-dark" for="apply_rounding_discount">Diskon Pembulatan</label>
+                                <div class="form-check form-switch m-0">
+                                    <input class="form-check-input cursor-pointer" type="checkbox" id="apply_rounding_discount" name="apply_rounding_discount" value="1">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text border-end-0 bg-light text-muted">Rp</span>
+                                    <input type="number" step="any" min="0" class="form-control border-start-0" name="rounding_discount_amount" id="rounding_discount_amount" placeholder="0">
+                                </div>
+                            </div>
+
+                            <hr class="border-dashed">
+
+                            {{-- 3. Pajak --}}
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold text-dark">Pajak (PPN)</label>
+                                <select name="tax_id" id="tax_id" class="form-select form-select-sm">
+                                    <option value="">-- Tidak Ada Pajak --</option>
+                                    @foreach(\App\Models\Tax::where('is_active', true)->get() as $tax)
+                                        <option value="{{ $tax->id }}" data-rate="{{ $tax->rate }}">{{ $tax->name }} ({{ $tax->rate }}%)</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            {{-- 4. Opsi Lanjutan --}}
+                            <div class="mb-3">
+                                <a class="text-decoration-none small text-primary cursor-pointer fw-semibold" data-bs-toggle="collapse" href="#advancedTaxOptions" role="button" aria-expanded="false">
+                                    <i class="bi bi-sliders me-1"></i> Opsi Pajak Lanjutan
+                                </a>
+                                <div class="collapse mt-2 p-2 bg-light rounded border" id="advancedTaxOptions">
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="use_custom_dpp_factor" name="use_custom_dpp_factor" value="1">
+                                        <label class="form-check-label small" for="use_custom_dpp_factor">Override Faktor DPP</label>
+                                    </div>
+                                    <input type="text" class="form-control form-control-sm" name="custom_dpp_factor" id="custom_dpp_factor" placeholder="Contoh: 11/12">
+                                </div>
+                            </div>
+
+                            {{-- 5. Ongkir --}}
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold text-dark">Ongkos Kirim (Rp)</label>
+                                <input type="number" step="any" min="0" class="form-control form-control-sm" name="shipping_amount" id="shipping_amount" value="0">
+                            </div>
+                        </div>
+
+                        {{-- SUMMARY BOX --}}
+                        <div class="summary-box mt-4">
+                            <div class="summary-item">
+                                <span>Subtotal Barang</span>
+                                <span class="fw-semibold text-dark" id="summary-subtotal">Rp 0</span>
+                            </div>
+                            <div class="summary-item text-danger">
+                                <span>Diskon/Fee</span>
+                                <span id="summary-disc">- Rp 0</span>
+                            </div>
+                            <div class="summary-item text-danger">
+                                <span>Pembulatan</span>
+                                <span id="summary-rounding">- Rp 0</span>
+                            </div>
+                            
+                            <div class="summary-item text-muted small border-top border-light pt-2">
+                                <span>Taxable Base</span>
+                                <span id="summary-taxable">Rp 0</span>
+                            </div>
+
+                            <div class="summary-item text-muted small fst-italic">
+                                <span>DPP</span>
+                                <span id="summary-dpp">Rp 0</span>
+                            </div>
+                            <div class="summary-item">
+                                <span>PPN (<span id="summary-tax-rate">0</span>%)</span>
+                                <span class="fw-semibold text-dark" id="summary-ppn">Rp 0</span>
+                            </div>
+                            <div class="summary-item">
+                                <span>Ongkos Kirim</span>
+                                <span class="fw-semibold text-dark" id="summary-shipping">Rp 0</span>
+                            </div>
+                            
+                            <div class="summary-total">
+                                <span class="label">GRAND TOTAL</span>
+                                <span class="value" id="summary-grand">Rp 0</span>
+                            </div>
+                        </div>
+
+                        {{-- ACTION BUTTONS --}}
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg fw-bold shadow-sm" id="submit-btn">
+                                <i class="bi bi-save me-2"></i> Simpan Pesanan
+                            </button>
+                            <a href="{{ route('purchase-orders.index') }}" class="btn btn-light text-muted border">Batal</a>
+                        </div>
+                        <div class="text-center mt-2">
+                            <button type="button" class="btn btn-link text-danger small p-0" onclick="clearDraft()" style="font-size: 0.7rem;">
+                                <i class="bi bi-trash"></i> Hapus Draft
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
 </div>
 
-{{-- Template row --}}
+{{-- TEMPLATE ROW PRODUK --}}
 <template id="product-row-template">
     <tr>
-        <td class="text-center align-middle" style="width:40px;">
-            <input type="checkbox" class="row-select form-check-input">
+        <td class="text-center align-middle ps-4">
+            <input type="checkbox" class="row-select form-check-input cursor-pointer">
         </td>
-        <td>
-            <select class="form-select form-select-sm product-select" required>
-                <option value="" data-unit="-" data-default-discounts="[]" disabled selected>-- Pilih Produk --</option>
+        <td class="align-middle">
+            <select class="form-select form-select-sm product-select table-input" required>
+                <option value="" data-unit="-" data-default-discounts="[]" disabled selected>-- Cari Produk --</option>
                 @foreach ($products as $product)
                     <option value="{{ $product->product_id }}"
                             data-unit="{{ $product->unit->name ?? '' }}"
@@ -234,28 +308,39 @@
                 @endforeach
             </select>
         </td>
-        <td>
+        <td class="align-middle">
             <div class="input-group input-group-sm">
-                <input type="number" class="form-control quantity" value="1" min="1" step="any" required>
-                <span class="input-group-text unit-display">-</span>
+                <input type="number" class="form-control table-input quantity text-center fw-bold" value="1" min="1" step="any" required>
+                <span class="input-group-text bg-light unit-display text-muted small">-</span>
             </div>
         </td>
-        <td>
-            {{-- Input Harga Beli dengan Opsi Update --}}
-            <input type="text" class="form-control form-control-sm purchase-price-formatted mb-1" placeholder="0">
+        <td class="align-middle">
+            {{-- Harga Beli dengan Input Group --}}
+            <div class="input-group input-group-sm mb-1">
+                <span class="input-group-text bg-transparent border-0 px-1 text-muted" style="font-size: 0.8rem;">Rp</span>
+                <input type="text" class="form-control table-input purchase-price-formatted text-end" placeholder="0">
+            </div>
             
-            {{-- CHECKBOX BARU --}}
-            <div class="form-check form-check-inline">
-                <input class="form-check-input update-master-price" type="checkbox" value="1">
-                <label class="form-check-label small" style="font-size: 0.75rem;">Update Harga Master</label>
+            {{-- Checkbox Update Master --}}
+            <div class="form-check mb-0 ps-1 text-end">
+                <input class="form-check-input update-master-price float-none me-1" type="checkbox" value="1" style="transform: scale(0.8);">
+                <label class="form-check-label text-muted fst-italic" style="font-size: 0.7rem;">Update Master</label>
             </div>
         </td>
-        <td>
-            <div class="discount-container"></div>
-            <button type="button" class="btn btn-outline-success btn-sm mt-1 add-discount-btn w-100">+ Diskon</button>
+        <td class="align-middle">
+            <div class="discount-container mb-1"></div>
+            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none add-discount-btn small fw-bold" style="font-size: 0.75rem;">
+                <i class="bi bi-plus-circle"></i> Disc
+            </button>
         </td>
-        <td class="text-end fw-bold"><span class="subtotal">Rp 0</span></td>
-        <td class="text-center"><button type="button" class="btn btn-danger btn-sm remove-product-btn"><i class="bi bi-trash"></i></button></td>
+        <td class="text-end pe-4 align-middle fw-bold text-dark">
+            <span class="subtotal">Rp 0</span>
+        </td>
+        <td class="text-center align-middle">
+            <button type="button" class="btn btn-icon btn-sm text-danger remove-product-btn p-1 rounded-circle hover-bg-light" title="Hapus Item">
+                <i class="bi bi-trash"></i>
+            </button>
+        </td>
     </tr>
 </template>
 
@@ -263,18 +348,21 @@
 
 @push('scripts')
 <script>
+// Variabel global agar bisa diakses fungsi inline
+let clearDraft; 
+
 document.addEventListener('DOMContentLoaded', function () {
-    const DRAFT_KEY = 'purchaseOrderDraft';
+    // === CONFIGURATION ===
+    const DRAFT_KEY = 'po_draft_fix_v1'; 
     const form = document.getElementById('po-form');
     const productItemsContainer = document.getElementById('product-items');
     const productRowTemplate = document.getElementById('product-row-template');
+    
+    // Elements
     const addProductBtn = document.getElementById('add-product-btn');
-    const selectAllBtn = document.getElementById('select-all-btn');
-    const deselectAllBtn = document.getElementById('deselect-all-btn');
-    const applyBulkBtn = document.getElementById('apply-bulk-discount-btn');
-    const applyAllBtn = document.getElementById('apply-all-discount-btn');
-    const bulkDiscountInput = document.getElementById('bulk-discount-input');
-    const headerRowSelect = document.getElementById('header-row-select');
+    const autosaveIndicator = document.getElementById('autosave-indicator');
+    
+    // Summary Elements
     const elSummarySubtotal = document.getElementById('summary-subtotal');
     const elSummaryDisc = document.getElementById('summary-disc');
     const elSummaryRounding = document.getElementById('summary-rounding');
@@ -284,288 +372,79 @@ document.addEventListener('DOMContentLoaded', function () {
     const elSummaryGrand = document.getElementById('summary-grand');
     const elSummaryShipping = document.getElementById('summary-shipping');
     const elSummaryTaxRate = document.getElementById('summary-tax-rate');
-    const inputApplyDiscFee = document.getElementById('apply_disc_fee');
-    const inputDiscFeePercent = document.getElementById('disc_fee_percent');
-    const inputDiscFeeAmount = document.getElementById('disc_fee_amount');
-    const inputApplyRounding = document.getElementById('apply_rounding_discount');
-    const inputRoundingAmount = document.getElementById('rounding_discount_amount');
-    const inputTaxId = document.getElementById('tax_id');
-    const inputUseCustomDpp = document.getElementById('use_custom_dpp_factor');
-    const inputCustomDppFactor = document.getElementById('custom_dpp_factor');
-    const inputShipping = document.getElementById('shipping_amount');
+
     let productIndex = 0;
+    let isRestoring = false; // Flag untuk mencegah save saat restore berjalan
 
-    //==============================================
-    // FITUR SIMPAN DRAFT OTOMATIS
-    //==============================================
-    function saveFormState() {
-        const productRowsData = getAllRows().map(row => {
-            return {
-                productId: row.querySelector('.product-select').value,
-                quantity: row.querySelector('.quantity').value,
-                priceFormatted: row.querySelector('.purchase-price-formatted').value,
-                priceHidden: row.querySelector('.purchase-price-hidden')?.value || '0',
-                discounts: Array.from(row.querySelectorAll('.discount-percentage')).map(d => d.value),
-            };
-        });
+    // === INITIALIZE SELECT2 ===
+    $('#supplier_id').select2({ theme: 'bootstrap-5', placeholder: '-- Pilih Supplier --', width: '100%' });
+    $('#requester_user_id').select2({ theme: 'bootstrap-5', placeholder: '-- Pembelian Umum --', allowClear: true, width: '100%' });
 
-        const formData = {
-            supplier_id: document.getElementById('supplier_id').value,
-            order_date: document.getElementById('order_date').value,
-            requester_user_id: document.getElementById('requester_user_id').value,
-            notes: document.getElementById('notes').value,
-            apply_disc_fee: inputApplyDiscFee.checked,
-            disc_fee_percent: inputDiscFeePercent.value,
-            disc_fee_amount: inputDiscFeeAmount.value,
-            apply_rounding_discount: inputApplyRounding.checked,
-            rounding_discount_amount: inputRoundingAmount.value,
-            tax_id: inputTaxId.value,
-            use_custom_dpp_factor: inputUseCustomDpp.checked,
-            custom_dpp_factor: inputCustomDppFactor.value,
-            shipping_amount: inputShipping.value,
-            products: productRowsData,
-        };
-
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
-    }
-
-    function loadFormState() {
-        const savedData = localStorage.getItem(DRAFT_KEY);
-        if (!savedData) {
-            addProductRow();
-            return;
-        }
-
-        try {
-            const data = JSON.parse(savedData);
-            document.getElementById('supplier_id').value = data.supplier_id;
-            document.getElementById('order_date').value = data.order_date;
-            document.getElementById('requester_user_id').value = data.requester_user_id;
-            document.getElementById('notes').value = data.notes;
-            inputApplyDiscFee.checked = data.apply_disc_fee;
-            inputDiscFeePercent.value = data.disc_fee_percent;
-            inputDiscFeeAmount.value = data.disc_fee_amount;
-            inputApplyRounding.checked = data.apply_rounding_discount;
-            inputRoundingAmount.value = data.rounding_discount_amount;
-            inputTaxId.value = data.tax_id;
-            inputUseCustomDpp.checked = data.use_custom_dpp_factor;
-            inputCustomDppFactor.value = data.custom_dpp_factor;
-            inputShipping.value = data.shipping_amount;
-
-            productItemsContainer.innerHTML = '';
-            
-            if (data.products && data.products.length > 0) {
-                data.products.forEach(p => {
-                    const newRow = addProductRow(false);
-                    $(newRow.querySelector('.product-select')).val(p.productId).trigger('change.select2');
-                    
-                    setTimeout(() => {
-                        newRow.querySelector('.quantity').value = p.quantity;
-                        const formattedPriceInput = newRow.querySelector('.purchase-price-formatted');
-                        const hiddenPriceInput = newRow.querySelector('.purchase-price-hidden');
-                        if (formattedPriceInput) formattedPriceInput.value = p.priceFormatted;
-                        if (hiddenPriceInput) hiddenPriceInput.value = p.priceHidden;
-                        
-                        const discountContainer = newRow.querySelector('.discount-container');
-                        if(discountContainer) discountContainer.innerHTML = ''; 
-                        p.discounts.forEach(dVal => createDiscountInputForRow(newRow, dVal));
-                        
-                        calculateRowSubtotal(newRow);
-                        calculateTotals();
-                    }, 150);
-                });
-            } else {
-                addProductRow();
-            }
-
-            calculateTotals();
-        } catch (error) {
-            console.error('Gagal memuat draf:', error);
-            localStorage.removeItem(DRAFT_KEY);
-            addProductRow();
-        }
-    }
-
-    //==============================================
-    // FUNGSI-FUNGSI UTAMA
-    //==============================================
-    function formatCurrency(n) {
-        if (n === null || n === undefined) return 'Rp 0';
-        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Math.round(n));
-    }
-    function formatThousands(n) {
-        if (n === '' || n === null || isNaN(n)) return '';
-        return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Math.floor(Number(n)));
-    }
-    function parseNumericForInput(str) {
-        if (!str && str !== 0) return 0;
-        let s = String(str).replace(/[^\d\-\.\,]/g, '');
-        s = s.replace(/\./g, '').replace(/,/g, '.');
-        const v = parseFloat(s);
-        return isNaN(v) ? 0 : v;
-    }
-    function getAllRows() {
-        return Array.from(productItemsContainer.querySelectorAll('tr'));
-    }
-    function parseFractionOrNumber(val) {
-        if (typeof val !== 'string' || !val) return 1;
-        val = val.trim().replace(',', '.');
-        if (val.includes('/')) {
-            const parts = val.split('/');
-            if (parts.length === 2) {
-                const num = parseFloat(parts[0]);
-                const den = parseFloat(parts[1]);
-                if (!isNaN(num) && !isNaN(den) && den !== 0) return num / den;
-            }
-        }
-        const parsed = parseFloat(val);
-        return isNaN(parsed) ? 1 : parsed;
-    }
+    // === CALCULATION FUNCTIONS ===
     function calculateRowSubtotal(row) {
         const quantity = parseFloat(row.querySelector('.quantity').value) || 0;
         const price = parseFloat(row.querySelector('.purchase-price-hidden')?.value || 0);
-        let finalPrice = price;
-        row.querySelectorAll('.discount-percentage').forEach(d => {
-            const rate = parseFloat(d.value) || 0;
-            if (rate > 0 && rate <= 100) finalPrice *= (1 - rate / 100);
+        
+        let finalUnitPrice = price;
+        row.querySelectorAll('.discount-percentage').forEach(input => {
+            const rate = parseFloat(input.value) || 0;
+            if (rate > 0 && rate <= 100) {
+                finalUnitPrice = finalUnitPrice * (1 - (rate / 100));
+            }
         });
-        row.querySelector('.subtotal').textContent = formatCurrency(quantity * finalPrice);
-    }
-    function createDiscountInputForRow(row, value = '') {
-        const index = row.dataset.index;
-        const container = row.querySelector('.discount-container');
-        const div = document.createElement('div');
-        div.className = 'input-group input-group-sm mb-1';
-        div.innerHTML = `
-            <input type="number" step="any" class="form-control discount-percentage" placeholder="0" value="${value}" name="products[${index}][discounts][]">
-            <button type="button" class="btn btn-outline-danger remove-discount-btn">x</button>
-        `;
-        div.querySelector('.remove-discount-btn').onclick = () => {
-            div.remove();
-            calculateRowSubtotal(row);
-            calculateTotals();
-        };
-        div.querySelector('.discount-percentage').oninput = () => {
-            calculateRowSubtotal(row);
-            calculateTotals();
-        };
-        container.appendChild(div);
-    }
-    function addProductRow(shouldCalculate = true) {
-        const newRow = productRowTemplate.content.cloneNode(true).querySelector('tr');
-        newRow.dataset.index = productIndex;
+
+        const subtotal = quantity * finalUnitPrice;
+        const subtotalEl = row.querySelector('.subtotal');
+        if(subtotalEl) subtotalEl.textContent = formatCurrency(subtotal);
         
-        const productSelect = newRow.querySelector('.product-select');
-        const quantityInput = newRow.querySelector('.quantity');
-        const formattedPriceInput = newRow.querySelector('.purchase-price-formatted');
-        const addDiscountBtn = newRow.querySelector('.add-discount-btn');
-        const removeBtn = newRow.querySelector('.remove-product-btn');
-        const updateMasterCheckbox = newRow.querySelector('.update-master-price');
-        
-        const priceHiddenInput = document.createElement('input');
-        priceHiddenInput.type = 'hidden';
-        priceHiddenInput.className = 'purchase-price-hidden';
-        priceHiddenInput.name = `products[${productIndex}][price_per_unit]`;
-        priceHiddenInput.value = '0';
-        formattedPriceInput.parentElement.appendChild(priceHiddenInput);
-
-        productSelect.name = `products[${productIndex}][product_id]`;
-        quantityInput.name = `products[${productIndex}][quantity]`;
-        updateMasterCheckbox.name = `products[${productIndex}][update_master_price]`;
-        
-        productItemsContainer.appendChild(newRow);
-
-        $(productSelect).select2({ placeholder: '-- Pilih Produk --', theme: 'bootstrap-5', dropdownParent: $(productSelect).parent() })
-            .on('select2:select', function(e) {
-                const el = e.params.data.element;
-                newRow.querySelector('.unit-display').textContent = el.dataset.unit || '-';
-                const defaultPrice = el.dataset.defaultPrice || 0;
-                priceHiddenInput.value = defaultPrice;
-                formattedPriceInput.value = formatThousands(defaultPrice);
-                
-                newRow.querySelector('.discount-container').innerHTML = '';
-                try {
-                    JSON.parse(el.dataset.defaultDiscounts || '[]').forEach(d => createDiscountInputForRow(newRow, d));
-                } catch (err) {}
-                
-                calculateRowSubtotal(newRow);
-                if (shouldCalculate) calculateTotals();
-            });
-
-        addDiscountBtn.onclick = () => createDiscountInputForRow(newRow, '');
-        removeBtn.onclick = () => {
-            $(productSelect).select2('destroy');
-            newRow.remove();
-            if (shouldCalculate) calculateTotals();
-        };
-
-        const updatePrice = () => {
-            const raw = parseNumericForInput(formattedPriceInput.value);
-            priceHiddenInput.value = raw;
-            calculateRowSubtotal(newRow);
-            if (shouldCalculate) calculateTotals();
-        };
-        formattedPriceInput.oninput = updatePrice;
-        formattedPriceInput.onblur = () => {
-            formattedPriceInput.value = formatThousands(priceHiddenInput.value);
-            updatePrice();
-        };
-        quantityInput.oninput = () => {
-            calculateRowSubtotal(newRow);
-            if (shouldCalculate) calculateTotals();
-        };
-
-        productIndex++;
-        return newRow;
+        return subtotal;
     }
-    function getSelectedTaxRate() {
-        const opt = inputTaxId.selectedOptions[0];
-        return (opt && opt.value) ? parseFloat(opt.dataset.rate) : null;
-    }
+
     function calculateTotals() {
-        let subtotalBarang = getAllRows().reduce((total, row) => {
-            const quantity = parseFloat(row.querySelector('.quantity').value) || 0;
-            const price = parseFloat(row.querySelector('.purchase-price-hidden')?.value || 0);
-            let finalPrice = price;
-            row.querySelectorAll('.discount-percentage').forEach(d => {
-                const rate = parseFloat(d.value) || 0;
-                if (rate > 0 && rate <= 100) finalPrice *= (1 - rate / 100);
-            });
-            return total + (quantity * finalPrice);
-        }, 0);
+        let subtotalBarang = 0;
+        getAllRows().forEach(row => {
+            subtotalBarang += calculateRowSubtotal(row);
+        });
 
+        // Hitungan Header
         let discFeeAmount = 0;
-        if (inputApplyDiscFee.checked) {
-            const percent = parseFloat(inputDiscFeePercent.value) || 0;
-            const fixed = parseFloat(inputDiscFeeAmount.value) || 0;
+        if (document.getElementById('apply_disc_fee').checked) {
+            const percent = parseFloat(document.getElementById('disc_fee_percent').value) || 0;
+            const fixed = parseFloat(document.getElementById('disc_fee_amount').value) || 0;
             if (percent > 0) discFeeAmount = (percent / 100.0) * subtotalBarang;
             else if (fixed > 0) discFeeAmount = fixed;
         }
 
-        const roundingAmount = inputApplyRounding.checked ? (parseFloat(inputRoundingAmount.value) || 0) : 0;
+        const roundingAmount = document.getElementById('apply_rounding_discount').checked ? 
+            (parseFloat(document.getElementById('rounding_discount_amount').value) || 0) : 0;
+
         const taxableBase = Math.max(0, subtotalBarang - discFeeAmount - roundingAmount);
+
+        // Tax
         let dpp = 0, ppn = 0;
-        let taxRate = getSelectedTaxRate();
+        let taxRate = 0;
+        const taxOpt = document.getElementById('tax_id').selectedOptions[0];
         
-        if (taxRate !== null) {
+        if (taxOpt && taxOpt.value) {
+            taxRate = parseFloat(taxOpt.dataset.rate);
             let dppFactor = 100 / (100 + taxRate);
-            if (inputUseCustomDpp.checked) {
-                const customFactor = parseFractionOrNumber(inputCustomDppFactor.value);
-                if (customFactor > 0) dppFactor = customFactor;
+            
+            if (document.getElementById('use_custom_dpp_factor').checked) {
+                dppFactor = parseFractionOrNumber(document.getElementById('custom_dpp_factor').value);
             }
+            
             dpp = Math.round(taxableBase * dppFactor);
             ppn = Math.round(dpp * (taxRate / 100.0));
-        } else {
-             taxRate = 0;
         }
 
-        const shipping = parseFloat(inputShipping.value || 0);
+        const shipping = parseFloat(document.getElementById('shipping_amount').value || 0);
         const grandTotal = Math.round(taxableBase + ppn + shipping);
 
+        // Render View
         elSummarySubtotal.textContent = formatCurrency(subtotalBarang);
         elSummaryDisc.textContent = formatCurrency(discFeeAmount);
         elSummaryRounding.textContent = formatCurrency(roundingAmount);
-        elSummaryTaxable.textContent = formatCurrency(taxableBase);
+        if(elSummaryTaxable) elSummaryTaxable.textContent = formatCurrency(taxableBase);
         elSummaryDpp.textContent = formatCurrency(dpp);
         elSummaryPpn.textContent = formatCurrency(ppn);
         elSummaryShipping.textContent = formatCurrency(shipping);
@@ -573,59 +452,283 @@ document.addEventListener('DOMContentLoaded', function () {
         elSummaryTaxRate.textContent = taxRate;
     }
 
-    //==============================================
-    // EVENT LISTENERS
-    //==============================================
-    headerRowSelect.onchange = (e) => getAllRows().forEach(r => r.querySelector('.row-select').checked = e.target.checked);
-    selectAllBtn.onclick = () => getAllRows().forEach(r => r.querySelector('.row-select').checked = true);
-    deselectAllBtn.onclick = () => getAllRows().forEach(r => r.querySelector('.row-select').checked = false);
+    // === HELPER FORMATTERS ===
+    function formatCurrency(n) {
+        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Math.round(n || 0));
+    }
+    function formatThousands(n) {
+        return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Math.floor(Number(n || 0)));
+    }
+    function parseNumericForInput(str) {
+        if (!str) return 0;
+        return parseFloat(String(str).replace(/\./g, '').replace(/,/g, '.')) || 0;
+    }
+    function parseFractionOrNumber(val) {
+        if (!val) return 1;
+        if (val.includes('/')) {
+            const [n, d] = val.split('/');
+            return parseFloat(n) / parseFloat(d);
+        }
+        return parseFloat(val) || 1;
+    }
+    function getAllRows() { return Array.from(productItemsContainer.querySelectorAll('tr')); }
 
-    const applyDiscount = (rows) => {
-        const v = parseFloat(bulkDiscountInput.value);
-        if (isNaN(v)) return alert('Masukkan angka diskon valid');
-        rows.forEach(r => createDiscountInputForRow(r, v));
-        rows.forEach(r => calculateRowSubtotal(r));
-        calculateTotals();
-    };
+    // === SAVE & LOAD LOGIC (CORE FIX) ===
+    function showSaveIndicator() {
+        autosaveIndicator.style.display = 'block';
+        setTimeout(() => { autosaveIndicator.style.display = 'none'; }, 2000);
+    }
 
-    applyBulkBtn.onclick = () => {
-        const rows = getAllRows().filter(r => r.querySelector('.row-select').checked);
-        if (rows.length === 0) return alert('Pilih baris terlebih dahulu atau gunakan Apply to All.');
-        applyDiscount(rows);
-    };
-    applyAllBtn.onclick = () => applyDiscount(getAllRows());
+    function saveFormState() {
+        if (isRestoring) return; // Jangan save saat sedang loading data
+
+        const productRowsData = getAllRows().map(row => {
+            // Ambil nilai dengan aman
+            const select = row.querySelector('.product-select');
+            const productId = $(select).val(); // Gunakan jQuery utk Select2 value
+            
+            return {
+                productId: productId, 
+                quantity: row.querySelector('.quantity').value,
+                priceFormatted: row.querySelector('.purchase-price-formatted').value,
+                priceHidden: row.querySelector('.purchase-price-hidden').value,
+                discounts: Array.from(row.querySelectorAll('.discount-percentage')).map(d => d.value),
+                updateMaster: row.querySelector('.update-master-price').checked
+            };
+        });
+
+        const state = {
+            supplier_id: $('#supplier_id').val(),
+            order_date: document.getElementById('order_date').value,
+            due_date: document.getElementById('due_date').value,
+            requester_user_id: $('#requester_user_id').val(),
+            notes: document.getElementById('notes').value,
+            
+            apply_disc_fee: document.getElementById('apply_disc_fee').checked,
+            disc_fee_percent: document.getElementById('disc_fee_percent').value,
+            disc_fee_amount: document.getElementById('disc_fee_amount').value,
+            
+            apply_rounding_discount: document.getElementById('apply_rounding_discount').checked,
+            rounding_discount_amount: document.getElementById('rounding_discount_amount').value,
+            
+            tax_id: document.getElementById('tax_id').value,
+            use_custom_dpp_factor: document.getElementById('use_custom_dpp_factor').checked,
+            custom_dpp_factor: document.getElementById('custom_dpp_factor').value,
+            shipping_amount: document.getElementById('shipping_amount').value,
+            
+            products: productRowsData
+        };
+
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(state));
+        showSaveIndicator();
+    }
+
+    function loadFormState() {
+        const savedData = localStorage.getItem(DRAFT_KEY);
+        if (!savedData) {
+            addProductRow(); // Default 1 baris kosong
+            return;
+        }
+
+        isRestoring = true; // Pause saving
+        try {
+            const data = JSON.parse(savedData);
+            
+            // Restore Header Fields
+            if(data.supplier_id) $('#supplier_id').val(data.supplier_id).trigger('change.select2');
+            if(data.requester_user_id) $('#requester_user_id').val(data.requester_user_id).trigger('change.select2');
+            document.getElementById('order_date').value = data.order_date || '';
+            document.getElementById('due_date').value = data.due_date || '';
+            document.getElementById('notes').value = data.notes || '';
+
+            // Restore Checkboxes & Inputs
+            document.getElementById('apply_disc_fee').checked = data.apply_disc_fee;
+            document.getElementById('disc_fee_percent').value = data.disc_fee_percent;
+            document.getElementById('disc_fee_amount').value = data.disc_fee_amount;
+            document.getElementById('apply_rounding_discount').checked = data.apply_rounding_discount;
+            document.getElementById('rounding_discount_amount').value = data.rounding_discount_amount;
+            document.getElementById('tax_id').value = data.tax_id;
+            document.getElementById('use_custom_dpp_factor').checked = data.use_custom_dpp_factor;
+            document.getElementById('custom_dpp_factor').value = data.custom_dpp_factor;
+            document.getElementById('shipping_amount').value = data.shipping_amount;
+
+            // Trigger UI Collapses
+            if(data.apply_disc_fee) new bootstrap.Collapse(document.getElementById('disc-fee-container'), {toggle:false}).show();
+            if(data.use_custom_dpp_factor) new bootstrap.Collapse(document.getElementById('advancedTaxOptions'), {toggle:false}).show();
+
+            // Restore Products
+            productItemsContainer.innerHTML = ''; // Kosongkan dulu
+            if (data.products && data.products.length > 0) {
+                data.products.forEach(p => {
+                    const row = addProductRow(false); // Buat row tapi jangan hitung dulu
+                    
+                    // Set Select2 Value
+                    const select = $(row.querySelector('.product-select'));
+                    select.val(p.productId).trigger('change.select2'); 
+                    
+                    // Set Inputs Manual
+                    row.querySelector('.quantity').value = p.quantity;
+                    row.querySelector('.purchase-price-formatted').value = p.priceFormatted;
+                    row.querySelector('.purchase-price-hidden').value = p.priceHidden;
+                    row.querySelector('.update-master-price').checked = p.updateMaster;
+
+                    // Restore Discounts per row
+                    if(p.discounts) {
+                        p.discounts.forEach(val => createDiscountInputForRow(row, val));
+                    }
+                });
+            } else {
+                addProductRow();
+            }
+
+            // Trigger Calculation Akhir
+            setTimeout(() => {
+                calculateTotals();
+                isRestoring = false; // Resume saving
+                console.log('Draft loaded successfully');
+            }, 500);
+
+        } catch (e) {
+            console.error("Gagal load draft:", e);
+            isRestoring = false;
+            addProductRow();
+        }
+    }
+
+    // === ROW MANAGEMENT ===
+    function createDiscountInputForRow(row, value = '') {
+        const index = row.dataset.index;
+        const container = row.querySelector('.discount-container');
+        const div = document.createElement('div');
+        div.className = 'input-group input-group-sm mb-1';
+        div.innerHTML = `
+            <input type="number" step="any" class="form-control discount-percentage table-input" placeholder="%" value="${value}" name="products[${index}][discounts][]">
+            <button type="button" class="btn btn-outline-danger remove-discount-btn px-2"><i class="bi bi-x"></i></button>
+        `;
+        
+        // Event Listener untuk diskon dinamis
+        const input = div.querySelector('.discount-percentage');
+        input.addEventListener('input', () => {
+            calculateTotals();
+            saveFormState();
+        });
+
+        div.querySelector('.remove-discount-btn').onclick = () => { 
+            div.remove(); 
+            calculateTotals(); 
+            saveFormState(); 
+        };
+        
+        container.appendChild(div);
+    }
+
+    function addProductRow() {
+        const newRow = productRowTemplate.content.cloneNode(true).querySelector('tr');
+        newRow.dataset.index = productIndex;
+
+        // Set Names
+        newRow.querySelector('.product-select').name = `products[${productIndex}][product_id]`;
+        newRow.querySelector('.quantity').name = `products[${productIndex}][quantity]`;
+        newRow.querySelector('.update-master-price').name = `products[${productIndex}][update_master_price]`;
+
+        // Hidden Price Input creation
+        const priceHidden = document.createElement('input');
+        priceHidden.type = 'hidden';
+        priceHidden.className = 'purchase-price-hidden';
+        priceHidden.name = `products[${productIndex}][price_per_unit]`;
+        priceHidden.value = '0';
+        newRow.querySelector('.purchase-price-formatted').parentElement.appendChild(priceHidden);
+
+        productItemsContainer.appendChild(newRow);
+
+        // Initialize Select2 on new row
+        const selectElem = $(newRow.querySelector('.product-select'));
+        selectElem.select2({ placeholder: '-- Cari Produk --', theme: 'bootstrap-5', width: '100%' });
+
+        // EVENT: Select2 Changed
+        selectElem.on('select2:select', function(e) {
+            const el = e.params.data.element;
+            newRow.querySelector('.unit-display').textContent = el.dataset.unit || '-';
+            
+            // Set harga default jika hidden masih 0 (baru pilih)
+            if(priceHidden.value == 0 || priceHidden.value == '0') {
+                const defPrice = el.dataset.defaultPrice || 0;
+                priceHidden.value = defPrice;
+                newRow.querySelector('.purchase-price-formatted').value = formatThousands(defPrice);
+            }
+
+            calculateTotals();
+            saveFormState(); // Save saat pilih produk
+        });
+
+        // EVENT: Inputs Changed
+        const qtyInput = newRow.querySelector('.quantity');
+        const priceInput = newRow.querySelector('.purchase-price-formatted');
+        const addDiscBtn = newRow.querySelector('.add-discount-btn');
+        const delBtn = newRow.querySelector('.remove-product-btn');
+
+        qtyInput.addEventListener('input', () => { calculateTotals(); saveFormState(); });
+        
+        priceInput.addEventListener('input', () => {
+            priceHidden.value = parseNumericForInput(priceInput.value);
+            calculateTotals();
+            saveFormState();
+        });
+        
+        priceInput.addEventListener('blur', () => {
+            priceInput.value = formatThousands(priceHidden.value);
+        });
+
+        addDiscBtn.onclick = () => createDiscountInputForRow(newRow, '');
+        
+        delBtn.onclick = () => {
+            selectElem.select2('destroy');
+            newRow.remove();
+            calculateTotals();
+            saveFormState();
+        };
+
+        productIndex++;
+        return newRow;
+    }
+
+    // === GLOBAL LISTENERS ===
+    // Simpan saat input text/number berubah
+    form.addEventListener('input', () => {
+        // Debounce sedikit agar tidak terlalu sering
+        clearTimeout(window.saveTimeout);
+        window.saveTimeout = setTimeout(saveFormState, 500);
+    });
+
+    // Simpan saat checkbox/select native berubah
+    form.addEventListener('change', (e) => {
+        if (!e.target.classList.contains('product-select')) { // Select2 dihandle terpisah
+            saveFormState();
+        }
+    });
+
+    // Simpan saat Select2 Supplier Header berubah
+    $('#supplier_id, #requester_user_id').on('change', function() {
+        saveFormState();
+    });
 
     addProductBtn.onclick = () => addProductRow();
-    
-    [inputApplyDiscFee, inputDiscFeePercent, inputDiscFeeAmount, inputApplyRounding, inputRoundingAmount, inputUseCustomDpp, inputCustomDppFactor, inputTaxId, inputShipping].forEach(el => {
-        el.addEventListener('input', calculateTotals);
-        el.addEventListener('change', calculateTotals);
-    });
-    
-    loadFormState();
 
-    let saveTimeout;
-    form.addEventListener('input', () => {
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(saveFormState, 500);
-    });
-    form.addEventListener('change', saveFormState);
-
-    form.addEventListener('submit', (e) => {
-        if (getAllRows().length === 0) {
-            e.preventDefault();
-            alert('Harap tambahkan setidaknya satu item produk.');
-            return;
-        }
-        if (!document.getElementById('supplier_id').value) {
-            e.preventDefault();
-            alert('Harap pilih supplier terlebih dahulu.');
-            return;
-        }
-        
-        inputCustomDppFactor.value = parseFractionOrNumber(inputCustomDppFactor.value);
+    // Hapus draft saat submit sukses
+    form.addEventListener('submit', () => {
         localStorage.removeItem(DRAFT_KEY);
     });
+
+    // Expose function hapus draft
+    clearDraft = function() {
+        if(confirm('Hapus draft form ini?')) {
+            localStorage.removeItem(DRAFT_KEY);
+            location.reload();
+        }
+    };
+
+    // START
+    loadFormState();
 });
 </script>
 @endpush

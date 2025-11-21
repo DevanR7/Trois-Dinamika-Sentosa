@@ -1,187 +1,146 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid py-4">
+<div class="container-fluid py-2">
+    {{-- HEADER --}}
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold mb-0">Proses Pembayaran Batch: {{ $batchPayment->client->client_name ?? 'N/A' }}</h2>
-        <a href="{{ route('batch-payments.pending') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Kembali ke Daftar
-        </a>
+        <div>
+            <h3 class="fw-bold text-dark mb-1">Proses Pembayaran</h3>
+            <p class="text-muted mb-0 small">Klien: <span class="text-primary fw-bold">{{ $batchPayment->client->client_name ?? 'N/A' }}</span></p>
+        </div>
+        <div>
+            <a href="{{ route('batch-payments.pending') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Kembali
+            </a>
+        </div>
     </div>
-
-    @if ($errors->any() || session('error'))
-    <div class="alert alert-danger">
-        <ul class="mb-0">
-            @foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach
-            @if (session('error'))<li>{{ session('error') }}</li>@endif
-        </ul>
-    </div>
-    @endif
 
     <div class="row g-4">
-        {{-- Kolom Kiri: Detail Pembayaran & Invoice --}}
+        {{-- KOLOM KIRI: DETAIL --}}
         <div class="col-lg-8">
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0 fw-semibold">Detail Pembayaran Dilaporkan</h5>
+            <div class="card card-transaction border-0 shadow-sm mb-4">
+                <div class="card-header bg-white p-3 border-bottom">
+                    <div class="form-section-title mb-0"><i class="bi bi-info-circle"></i> Detail Laporan</div>
                 </div>
-                <div class="card-body">
-                    <dl class="row">
-                        <dt class="col-sm-4">Metode Pembayaran</dt>
-                        <dd class="col-sm-8">
-                            {{-- ✅ PERBAIKAN: Tampilkan nama metode dari relasi --}}
-                            @if($batchPayment->paymentMethod)
-                                <span class="badge bg-primary fs-6">{{ $batchPayment->paymentMethod->name }}</span>
+                <div class="card-body p-4">
+                    <div class="row g-4">
+                        <div class="col-sm-6">
+                            <label class="small fw-bold text-muted d-block mb-1">METODE PEMBAYARAN</label>
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 fs-6">
+                                {{ $batchPayment->paymentMethod->name ?? 'N/A' }}
+                            </span>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="small fw-bold text-muted d-block mb-1">TANGGAL LAPOR</label>
+                            <span class="text-dark">{{ $batchPayment->created_at->format('d F Y, H:i') }}</span>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="small fw-bold text-muted d-block mb-1">DITERIMA OLEH</label>
+                            @if($batchPayment->paymentMethod && str_contains(strtolower($batchPayment->paymentMethod->name), 'cash'))
+                                <span class="text-dark fw-medium">{{ $salesUser->full_name ?? 'N/A' }}</span>
                             @else
-                                <span class="badge bg-secondary fs-6">N/A</span>
+                                <span class="text-muted">-</span>
                             @endif
-                        </dd>
-
-                        <dt class="col-sm-4">Jumlah Dilaporkan</dt>
-                        <dd class="col-sm-8 fw-bold fs-5">Rp {{ number_format($batchPayment->total_amount, 0, ',', '.') }}</dd>
-
-                        <dt class="col-sm-4">Tanggal Lapor</dt>
-                        <dd class="col-sm-8">{{ $batchPayment->created_at->format('d M Y H:i') }}</dd>
-                        
-                        <dt class="col-sm-4">Catatan Klien</dt>
-                        <dd class="col-sm-8">{{ $details['notes'] ?? '-' }}</dd>
-
-                        {{-- ====================================================== --}}
-                        {{-- ✅ PERBAIKAN: Logika if untuk Bukti/Sales --}}
-                        {{-- ====================================================== --}}
-                        @if($batchPayment->paymentMethod && str_contains(strtolower($batchPayment->paymentMethod->name), 'cash'))
-                            <dt class="col-sm-4">Diterima Sales</dt>
-                            <dd class="col-sm-8">{{ $salesUser->full_name ?? 'N/A' }}</dd>
-                        @else
-                            <dt class="col-sm-4">Bukti Transfer</dt>
-                            <dd class="col-sm-8">
-                                @if(!empty($details['proof_path']))
-                                    <a href="{{ asset('storage/' . $details['proof_path']) }}" target="_blank" class="btn btn-sm btn-outline-info">
-                                        <i class="bi bi-eye me-1"></i> Lihat Bukti
-                                    </a>
-                                @else
-                                    <span class="text-danger">Bukti tidak terlampir.</span>
-                                @endif
-                            </dd>
-                        @endif
-                        {{-- ====================================================== --}}
-
-                    </dl>
-                </div>
-            </div>
-            
-            {{-- Daftar Invoice --}}
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0 fw-semibold">Invoice yang Akan Dibayar</h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>No. Invoice</th>
-                                    <th>Tgl. Jatuh Tempo</th>
-                                    <th class="text-end">Sisa Tagihan</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @php $totalTagihan = 0; @endphp
-                                @forelse ($invoices as $invoice)
-                                    @php $sisa = $invoice->remaining_balance; $totalTagihan += $sisa; @endphp
-                                    <tr>
-                                        <td>{{ $invoice->invoice_number }}</td>
-                                        <td>{{ $invoice->due_date->format('d M Y') }}</td>
-                                        <td class="text-end">Rp {{ number_format($sisa, 0, ',', '.') }}</td>
-                                    </tr>
-                                @empty
-                                    <tr><td colspan="3" class="text-center p-3 text-danger">Invoice tidak ditemukan atau sudah dihapus.</td></tr>
-                                @endforelse
-                            </tbody>
-                            <tfoot class="table-group-divider">
-                                <tr class="fw-bold">
-                                    <td colspan="2" class="text-end">Total Tagihan Dipilih:</td>
-                                    <td class="text-end">Rp {{ number_format($totalTagihan, 0, ',', '.') }}</td>
-                                </tr>
-                            </tfoot>
-                        </table>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="small fw-bold text-muted d-block mb-1">BUKTI TRANSFER</label>
+                            @if(!empty($details['proof_path']))
+                                <a href="{{ asset('storage/' . $details['proof_path']) }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-file-earmark-image me-1"></i> Lihat Bukti
+                                </a>
+                            @else
+                                <span class="text-muted fst-italic">Tidak ada bukti terlampir.</span>
+                            @endif
+                        </div>
+                        <div class="col-12">
+                            <label class="small fw-bold text-muted d-block mb-1">CATATAN KLIEN</label>
+                            <p class="mb-0 bg-light p-3 rounded border border-light fst-italic text-muted small">
+                                {{ $details['notes'] ?? 'Tidak ada catatan.' }}
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        {{-- Kolom Kanan: Ringkasan Alokasi & Aksi --}}
+        {{-- KOLOM KANAN: SUMMARY & ACTION --}}
         <div class="col-lg-4">
-            <div class="card shadow-sm border-0 sticky-top" style="top: 20px;">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0 fw-semibold">Ringkasan Alokasi</h5>
+            <div class="card card-transaction border-0 shadow-sm sticky-top" style="top: 20px;">
+                <div class="card-header bg-white p-3 border-bottom">
+                    <div class="form-section-title mb-0"><i class="bi bi-calculator"></i> Ringkasan Alokasi</div>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-4">
+                    {{-- PERHITUNGAN PHP --}}
                     @php
-                        // Variabel $totalTagihan sudah dihitung di atas
+                        $totalTagihan = 0;
+                        foreach($invoices as $inv) { $totalTagihan += $inv->remaining_balance; }
+                        
                         $kreditDipakai = (float)($details['credit_amount_to_use'] ?? 0);
                         $inputDana = (float)$batchPayment->total_amount;
                         $totalDana = $kreditDipakai + $inputDana;
                         $overpayment = max(0, $totalDana - $totalTagihan);
                     @endphp
-                    
-                    <div class="d-flex justify-content-between">
-                        <span>Total Tagihan</span>
-                        <span>Rp {{ number_format($totalTagihan, 0, ',', '.') }}</span>
+
+                    <div class="d-flex justify-content-between mb-2 small">
+                        <span>Total Tagihan ({{ count($invoices) }} Invoice)</span>
+                        <span class="fw-medium">Rp {{ number_format($totalTagihan, 0, ',', '.') }}</span>
                     </div>
-                    <hr class="my-2">
-                    <div class="d-flex justify-content-between">
+                    <hr class="border-dashed my-2">
+                    <div class="d-flex justify-content-between mb-2 small">
                         <span>Dana Transfer/Cash</span>
-                        <span>(+) Rp {{ number_format($inputDana, 0, ',', '.') }}</span>
+                        <span class="text-primary fw-bold">(+) Rp {{ number_format($inputDana, 0, ',', '.') }}</span>
                     </div>
-                    <div class="d-flex justify-content-between text-success">
+                    <div class="d-flex justify-content-between mb-2 small text-success">
                         <span>Saldo Kredit Dipakai</span>
                         <span>(+) Rp {{ number_format($kreditDipakai, 0, ',', '.') }}</span>
                     </div>
-                    <hr class="my-2">
-                    <div class="d-flex justify-content-between fw-bold">
-                        <span>Total Dana</span>
-                        <span>Rp {{ number_format($totalDana, 0, ',', '.') }}</span>
-                    </div>
                     
+                    <div class="bg-light p-3 rounded border border-light mt-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="fw-bold text-dark">TOTAL DANA</span>
+                            <span class="fs-4 fw-bold text-success">Rp {{ number_format($totalDana, 0, ',', '.') }}</span>
+                        </div>
+                    </div>
+
                     @if($overpayment > 0)
-                        <div class="alert alert-success mt-3 p-2 small">
-                            <strong>Overpayment:</strong> Sejumlah <strong>Rp {{ number_format($overpayment, 0, ',', '.') }}</strong> akan dikembalikan sebagai Saldo Kredit Klien.
+                        <div class="alert alert-success mt-3 mb-0 p-2 small border-0 d-flex align-items-start">
+                            <i class="bi bi-info-circle-fill me-2 mt-1"></i>
+                            <div>
+                                <strong>Overpayment:</strong><br>
+                                Rp {{ number_format($overpayment, 0, ',', '.') }} akan masuk ke Saldo Kredit Klien.
+                            </div>
                         </div>
                     @endif
-                    
-                    <hr>
-                    <div class="d-grid gap-2 mt-4">
-                        <form action="{{ route('batch-payments.approve', $batchPayment->batch_payment_id) }}" method="POST" id="form-approve">
-        @csrf
-        
-        {{-- ✅ 2. TAMBAHKAN DROPDOWN INI --}}
-        <div class="mb-3">
-            <label for="company_bank_account_id" class="form-label fw-semibold">Setor ke Akun <span class="text-danger">*</span></label>
-            <select name="company_bank_account_id" id="company_bank_account_id" class="form-select @error('company_bank_account_id') is-invalid @enderror" required>
-                <option value="">-- Pilih Akun Bank/Kas --</option>
-                @foreach($companyBankAccounts as $account)
-                    <option value="{{ $account->company_bank_account_id }}">
-                        {{ $account->bank_name }} - {{ $account->account_number ?? $account->account_name }}
-                    </option>
-                @endforeach
-            </select>
-            @error('company_bank_account_id')
-                <div class="invalid-feedback">{{ $message }}</div>
-            @enderror
-        </div>
-        {{-- ------------------------------ --}}
 
-        <div class="d-grid gap-2 mt-4">
-            <button type="submit" class="btn btn-success btn-lg w-100">Setujui & Alokasikan</button>
-        </div>
-    </form>
-    
-    <form action="{{ route('batch-payments.reject', $batchPayment->batch_payment_id) }}" method="POST" id="form-reject" class="d-grid gap-2 mt-2">
-        @csrf
-        <button type="submit" class="btn btn-danger w-100">Tolak Pembayaran</button>
-    </form>
-                    </div>
+                    <hr class="border-dashed my-4">
+
+                    {{-- FORM APPROVE --}}
+                    <form action="{{ route('batch-payments.approve', $batchPayment->batch_payment_id) }}" method="POST" id="form-approve">
+                        @csrf
+                        <div class="mb-3">
+                            <label for="company_bank_account_id" class="form-label small fw-bold text-muted">SETOR KE AKUN</label>
+                            <select name="company_bank_account_id" id="company_bank_account_id" class="form-select form-select-sm" required>
+                                <option value="">-- Pilih Akun --</option>
+                                @foreach($companyBankAccounts as $account)
+                                    <option value="{{ $account->company_bank_account_id }}">
+                                        {{ $account->bank_name }} - {{ $account->account_number }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100 fw-bold shadow-sm mb-2">
+                            <i class="bi bi-check-circle-fill me-1"></i> Setujui & Alokasikan
+                        </button>
+                    </form>
+
+                    {{-- FORM REJECT --}}
+                    <form action="{{ route('batch-payments.reject', $batchPayment->batch_payment_id) }}" method="POST" id="form-reject">
+                        @csrf
+                        <button type="submit" class="btn btn-outline-danger w-100">
+                            <i class="bi bi-x-circle me-1"></i> Tolak Pembayaran
+                        </button>
+                    </form>
+
                 </div>
             </div>
         </div>
@@ -190,55 +149,42 @@
 @endsection
 
 @push('scripts')
-{{-- Script SweetAlert --}}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    
-    // --- Konfirmasi Setujui ---
     const approveForm = document.getElementById('form-approve');
     if (approveForm) {
         approveForm.addEventListener('submit', function (e) {
-            e.preventDefault(); // Hentikan form
+            e.preventDefault(); 
             Swal.fire({
-                title: 'Setujui Pembayaran Ini?',
-                text: "Aksi ini akan mengalokasikan dana, memotong saldo kredit, dan memperbarui status invoice. Aksi ini tidak dapat dibatalkan.",
+                title: 'Setujui Pembayaran?',
+                text: "Dana akan dialokasikan ke invoice dan saldo diperbarui.",
                 icon: 'question',
                 showCancelButton: true,
-                confirmButtonColor: '#198754', // Hijau
+                confirmButtonColor: '#198754',
                 cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Ya, Setujui & Alokasikan!',
+                confirmButtonText: 'Ya, Setujui!',
                 cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    this.submit(); // Lanjutkan submit form
-                }
-            });
+            }).then((result) => { if (result.isConfirmed) this.submit(); });
         });
     }
 
-    // --- Konfirmasi Tolak ---
     const rejectForm = document.getElementById('form-reject');
     if (rejectForm) {
         rejectForm.addEventListener('submit', function (e) {
-            e.preventDefault(); // Hentikan form
+            e.preventDefault(); 
             Swal.fire({
-                title: 'Anda Yakin?',
-                text: "Anda akan MENOLAK laporan pembayaran ini. Status akan diubah menjadi 'Rejected'.",
+                title: 'Tolak Pembayaran?',
+                text: "Status pembayaran akan diubah menjadi Rejected.",
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonColor: '#d33', // Merah
+                confirmButtonColor: '#d33',
                 cancelButtonColor: '#6c757d',
                 confirmButtonText: 'Ya, Tolak!',
                 cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    this.submit(); // Lanjutkan submit form
-                }
-            });
+            }).then((result) => { if (result.isConfirmed) this.submit(); });
         });
     }
-
 });
 </script>
 @endpush

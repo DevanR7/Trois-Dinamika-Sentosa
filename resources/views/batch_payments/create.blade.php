@@ -6,88 +6,128 @@
 @endpush
 
 @php
-    // Ambil default dari collection yang benar
     $defaultPaymentMethodId = $paymentMethods->first()->payment_method_id ?? '';
     $defaultBankAccountId = $companyBankAccounts->first()->company_bank_account_id ?? '';
 @endphp
 
 @section('content')
-<div class="container py-4">
+<div class="container-fluid py-2">
+    {{-- HEADER --}}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold text-dark mb-1">Pembayaran Piutang (Batch)</h3>
+            <p class="text-muted mb-0 small">Catat satu pembayaran untuk beberapa invoice sekaligus.</p>
+        </div>
+        <div>
+            <a href="{{ route('invoices.index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Kembali ke List Invoice
+            </a>
+        </div>
+    </div>
+
     <div class="row justify-content-center">
         <div class="col-lg-10">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-success text-white">
-                    <h4 class="mb-0">Catat Pembayaran Piutang (Batch) 💰</h4>
-                </div>
-                <div class="card-body p-4">
-
-                    @if ($errors->any() || session('error'))
-                    <div class="alert alert-danger">
-                        <ul class="mb-0">
+            
+            @if ($errors->any() || session('error'))
+                <div class="alert alert-danger border-0 shadow-sm rounded-3 mb-4">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+                        <ul class="mb-0 small ps-3">
                             @foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach
                             @if (session('error'))<li>{{ session('error') }}</li>@endif
                         </ul>
                     </div>
-                    @endif
+                </div>
+            @endif
 
-                    <form action="{{ route('batch-payments.store') }}" method="POST" id="batch-payment-form" enctype="multipart/form-data">
-                        @csrf
-                        <div class="row mb-3">
+            <form action="{{ route('batch-payments.store') }}" method="POST" id="batch-payment-form" enctype="multipart/form-data">
+                @csrf
+
+                {{-- 1. PILIH KLIEN --}}
+                <div class="card card-transaction border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white p-4 border-bottom">
+                        <div class="form-section-title mb-0"><i class="bi bi-person-check"></i> 1. Pilih Klien</div>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row align-items-center">
                             <div class="col-md-6">
-                                <label for="client_id" class="form-label fw-semibold">1. Pilih Klien</label>
+                                <label for="client_id" class="form-label fw-bold small text-muted">NAMA KLIEN</label>
                                 <select name="client_id" id="client_id" class="form-select" required>
                                     <option value="" disabled selected>-- Cari Klien --</option>
                                     @foreach ($clients as $client)
-                                    <option value="{{ $client->client_id }}">{{ $client->client_name }}</option>
+                                        <option value="{{ $client->client_id }}">{{ $client->client_name }}</option>
                                     @endforeach
                                 </select>
                             </div>
-                            <div class="col-md-6 align-self-end">
-                                <div id="client-credit-info" class="alert alert-info py-2 d-none">
-                                    Saldo Kredit Tersedia: <strong id="client-credit-balance">Rp 0</strong>
-                                    <br>
-                                    <small class="text-muted">Kredit Tertahan: <strong id="client-pending-balance">Rp 0</strong></small>
+                            <div class="col-md-6 mt-3 mt-md-0">
+                                {{-- Info Saldo Kredit (Hidden by default) --}}
+                                <div id="client-credit-info" class="alert alert-success border-0 bg-success bg-opacity-10 d-none mb-0">
+                                    <div class="d-flex align-items-center">
+                                        <div class="me-3 text-success">
+                                            <i class="bi bi-wallet2 fs-2"></i>
+                                        </div>
+                                        <div>
+                                            <span class="d-block text-muted small">Saldo Kredit Tersedia</span>
+                                            <strong class="fs-5 text-dark" id="client-credit-balance">Rp 0</strong>
+                                            <div class="small text-muted fst-italic border-top border-success border-opacity-25 mt-1 pt-1">
+                                                Pending / Tertahan: <span id="client-pending-balance">Rp 0</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
 
-                        <hr>
-
-                        <h5 class="fw-semibold">2. Detail Pembayaran</h5>
-                        <div class="row mb-3 g-3">
-                            <div class="col-12 mb-2">
-                                <div class="form-check form-switch" id="use-credit-container" style="display: none;">
-                                    <input class="form-check-input" type="checkbox" role="switch" id="use_credit" name="use_credit" value="1">
-                                    <label class="form-check-label" for="use_credit">Gunakan Saldo Kredit untuk pembayaran ini?</label>
-                                </div>
+                {{-- 2. DETAIL PEMBAYARAN --}}
+                <div class="card card-transaction border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white p-4 border-bottom">
+                        <div class="form-section-title mb-0"><i class="bi bi-credit-card"></i> 2. Detail Pembayaran</div>
+                    </div>
+                    <div class="card-body p-4">
+                        
+                        {{-- Switch Kredit --}}
+                        <div class="mb-4 p-3 bg-light rounded border" id="use-credit-container" style="display: none;">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input cursor-pointer" type="checkbox" role="switch" id="use_credit" name="use_credit" value="1" style="transform: scale(1.2);">
+                                <label class="form-check-label fw-bold ms-2 pt-1 cursor-pointer" for="use_credit">
+                                    Gunakan Saldo Kredit untuk pembayaran ini?
+                                </label>
                             </div>
-                            <div class="col-md-4">
-                                <label for="total_amount_formatted" class="form-label">Total Dana Diterima (Non-Kredit)</label>
-                                <input type="text" class="form-control" id="total_amount_formatted">
+                        </div>
+
+                        <div class="row g-4">
+                            {{-- Baris 1 --}}
+                            <div class="col-md-6">
+                                <label for="total_amount_formatted" class="form-label fw-bold small text-muted">TOTAL DANA DITERIMA (NON-KREDIT)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white text-muted">Rp</span>
+                                    <input type="text" class="form-control fw-bold fs-5 text-success" id="total_amount_formatted">
+                                </div>
                                 <input type="hidden" name="total_amount" id="total_amount" value="0">
                             </div>
-                            <div class="col-md-4">
-                                <label for="payment_date" class="form-label">Tanggal Bayar</label>
+                            <div class="col-md-6">
+                                <label for="payment_date" class="form-label fw-bold small text-muted">TANGGAL BAYAR</label>
                                 <input type="date" class="form-control" name="payment_date" value="{{ now()->format('Y-m-d') }}" required>
                             </div>
-                            
-                            <div class="col-md-4">
-                                <label for="payment_method_id" class="form-label">Metode Bayar (Non-Kredit)</label>
+
+                            {{-- Baris 2 --}}
+                            <div class="col-md-6">
+                                <label for="payment_method_id" class="form-label fw-bold small text-muted">METODE BAYAR</label>
                                 <select name="payment_method_id" id="payment_method_id" class="form-select">
                                     <option value="">-- Pilih Metode --</option>
                                     @foreach ($paymentMethods as $method)
-                                    <option value="{{ $method->payment_method_id }}" 
-                                            data-config="{{ $method->required_fields_config }}">
-                                        {{ $method->name }}
-                                    </option>
+                                        <option value="{{ $method->payment_method_id }}" data-config="{{ $method->required_fields_config }}">
+                                            {{ $method->name }}
+                                        </option>
                                     @endforeach
                                 </select>
                             </div>
-
-                            <div class="col-md-4">
-                                <label for="company_bank_account_id_batch_payment" class="form-label">Masuk ke Akun <span class="text-danger">*</span></label>
+                            <div class="col-md-6">
+                                <label for="company_bank_account_id_batch_payment" class="form-label fw-bold small text-muted">MASUK KE AKUN (KAS/BANK)</label>
                                 <select name="company_bank_account_id" id="company_bank_account_id_batch_payment" class="form-select">
-                                    <option value="">-- Pilih Akun Bank/Kas --</option>
+                                    <option value="">-- Pilih Akun --</option>
                                     @foreach($companyBankAccounts as $account)
                                         <option value="{{ $account->company_bank_account_id }}">
                                             {{ $account->bank_name }} - {{ $account->account_number ?? $account->account_name }}
@@ -96,48 +136,72 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4" id="payment-reference-group-batch-payment" style="display: none;">
-                                <label for="reference_number_batch_payment" class="form-label">Nomor Referensi (Giro/Cek)</label>
-                                <input type="text" class="form-control" name="reference_number" id="reference_number_batch_payment">
+                            {{-- Baris 3 (Conditional) --}}
+                            <div class="col-md-6" id="payment-reference-group-batch-payment" style="display: none;">
+                                <label for="reference_number_batch_payment" class="form-label fw-bold small text-muted">NOMOR REFERENSI</label>
+                                <input type="text" class="form-control" name="reference_number" id="reference_number_batch_payment" placeholder="No. Cek / Giro / Transfer">
                             </div>
-                            <div class="col-md-4" id="payment-proof-group-batch-payment" style="display: none;">
-                                <label for="proof_of_payment_batch_payment" class="form-label">Bukti Pembayaran (Foto)</label>
+                            <div class="col-md-6" id="payment-proof-group-batch-payment" style="display: none;">
+                                <label for="proof_of_payment_batch_payment" class="form-label fw-bold small text-muted">BUKTI TRANSFER</label>
                                 <input type="file" class="form-control" name="proof_of_payment" id="proof_of_payment_batch_payment" accept="image/jpeg,image/png,image/jpg">
                             </div>
-                            
-                            <div class="col-md-4">
-                                <label for="notes" class="form-label">Catatan (Opsional)</label>
-                                <textarea name="notes" class="form-control" rows="2"></textarea>
+
+                            <div class="col-12">
+                                <label for="notes" class="form-label fw-bold small text-muted">CATATAN (OPSIONAL)</label>
+                                <textarea name="notes" class="form-control" rows="2" placeholder="Tambahkan keterangan pembayaran..."></textarea>
                             </div>
                         </div>
+                    </div>
+                </div>
 
-                        <hr>
+                {{-- 3. ALOKASI INVOICE --}}
+                <div class="card card-transaction border-0 shadow-sm mb-5">
+                    <div class="card-header bg-white p-4 border-bottom">
+                        <div class="form-section-title mb-0"><i class="bi bi-list-check"></i> 3. Alokasi ke Invoice</div>
+                        <p class="text-muted small mt-1 mb-0">Sistem akan melunasi Invoice secara berurutan mulai dari yang paling lama jatuh temponya.</p>
+                    </div>
+                    <div class="card-body p-0">
+                        
+                        <div id="invoice-list-container" class="p-0" style="max-height: 500px; overflow-y: auto;">
+                            {{-- Placeholder State --}}
+                            <div id="invoice-placeholder" class="text-center py-5 text-muted">
+                                <i class="bi bi-search fs-1 d-block mb-2 opacity-25"></i>
+                                Silakan pilih klien di atas untuk memuat tagihan.
+                            </div>
 
-                        <h5 class="fw-semibold">3. Alokasi ke Invoice (Diurutkan dari paling lama)</h5>
-                        <p class="text-muted small">Pilih Invoice yang akan dibayar. Sistem akan melunasi Invoice dari urutan teratas (paling lama) terlebih dahulu.</p>
-                        <div id="invoice-list-container" class="border rounded p-3" style="max-height: 400px; overflow-y: auto; background-color: #f8f9fa;">
-                            <p class="text-center text-muted" id="invoice-placeholder">Silakan pilih klien untuk melihat daftar Invoice.</p>
-                            <table class="table table-sm table-hover d-none" id="invoice-table">
-                                <thead>
+                            {{-- Table --}}
+                            <table class="table table-hover table-transaction align-middle mb-0 d-none" id="invoice-table">
+                                <thead class="bg-light sticky-top" style="z-index: 1;">
                                     <tr>
-                                        <th><input type="checkbox" id="check-all-invoices" class="form-check-input"></th>
+                                        <th class="ps-4" style="width: 50px;">
+                                            <input type="checkbox" id="check-all-invoices" class="form-check-input cursor-pointer" style="transform: scale(1.1);">
+                                        </th>
                                         <th>No. Invoice</th>
                                         <th>Jatuh Tempo</th>
-                                        <th class="text-end">Sisa Tagihan</th>
+                                        <th class="text-end pe-4">Sisa Tagihan</th>
                                     </tr>
                                 </thead>
                                 <tbody id="invoice-list-body">
+                                    {{-- JS will render rows here --}}
                                 </tbody>
                             </table>
                         </div>
 
-                        <div class="d-flex justify-content-between align-items-center bg-light p-3 mt-3 rounded">
-                            <h5 class="mb-0">Total Tagihan Dipilih: <span id="total-selected-display" class="fw-bold text-success">Rp 0</span></h5>
-                            <button type="submit" class="btn btn-success btn-lg">Simpan Pembayaran Piutang</button>
+                        {{-- Total Bar (Sticky Bottom) --}}
+                        <div class="bg-light p-4 border-top d-flex justify-content-between align-items-center rounded-bottom">
+                            <div>
+                                <small class="text-muted d-block text-uppercase fw-bold">Total Tagihan Dipilih</small>
+                                <h3 class="fw-bold text-dark mb-0" id="total-selected-display">Rp 0</h3>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-lg shadow-sm px-5 fw-bold">
+                                <i class="bi bi-check-lg me-2"></i> Simpan Pembayaran
+                            </button>
                         </div>
-                    </form>
+
+                    </div>
                 </div>
-            </div>
+
+            </form>
         </div>
     </div>
 </div>
@@ -149,7 +213,9 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // === BAGIAN 1: Inisialisasi Variabel ===
+    // (SCRIPT ANDA TIDAK BERUBAH - SAMA PERSIS)
+    // Saya paste ulang agar Anda mudah copy-paste satu file penuh
+    
     const clientSelect = $('#client_id');
     const invoiceTable = document.getElementById('invoice-table');
     const invoiceListBody = document.getElementById('invoice-list-body');
@@ -177,8 +243,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const defaultPaymentMethodId = "{{ $defaultPaymentMethodId }}";
     const defaultBankAccountId = "{{ $defaultBankAccountId }}";
 
-    // === BAGIAN 2: Inisialisasi Event Listener & AutoNumeric ===
-    
     function handlePaymentMethodChange() {
         if (!paymentMethodSelect) return;
         const selectedOption = paymentMethodSelect.options[paymentMethodSelect.selectedIndex];
@@ -225,8 +289,6 @@ document.addEventListener('DOMContentLoaded', function () {
         placeholder: '-- Cari Klien --'
     });
 
-    // === BAGIAN 3: Fungsi Helper ===
-
     function formatRupiah(number) {
         if (isNaN(number)) return 'Rp 0';
         return new Intl.NumberFormat('id-ID', {
@@ -264,7 +326,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 paymentMethodSelect.required = false;
                 paymentMethodSelect.disabled = true;
                 paymentMethodSelect.value = "";
-
                 bankAccountSelect.required = false;
                 bankAccountSelect.disabled = true;
                 bankAccountSelect.value = "";
@@ -274,7 +335,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 paymentMethodSelect.required = true;
                 paymentMethodSelect.disabled = false;
                 if (!paymentMethodSelect.value) paymentMethodSelect.value = defaultPaymentMethodId;
-                
                 bankAccountSelect.required = true;
                 bankAccountSelect.disabled = false;
                 if (!bankAccountSelect.value) bankAccountSelect.value = defaultBankAccountId;
@@ -324,8 +384,6 @@ document.addEventListener('DOMContentLoaded', function () {
         calculateTotalSelected();
     }
 
-    // === BAGIAN 4: Handler Utama (onChange Select Klien) ===
-
     clientSelect.on('change', async function () {
         const clientId = this.value;
 
@@ -333,7 +391,10 @@ document.addEventListener('DOMContentLoaded', function () {
         useCreditContainer.style.display = 'none';
         useCreditCheckbox.checked = false;
         currentCreditBalance = 0;
-        invoicePlaceholder.textContent = 'Memuat data...';
+        
+        invoicePlaceholder.innerHTML = '<div class="spinner-border text-primary" role="status"></div><div class="mt-2">Memuat data...</div>';
+        invoicePlaceholder.classList.remove('d-none');
+        
         invoiceTable.classList.add('d-none');
         invoiceListBody.innerHTML = '';
         checkAll.checked = false;
@@ -372,21 +433,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 invoices.forEach(invoice => {
                     const row = `
                         <tr>
-                            <td>
-                                <input class="form-check-input invoice-checkbox"
+                            <td class="ps-4">
+                                <input class="form-check-input invoice-checkbox cursor-pointer"
                                        type="checkbox"
                                        name="invoice_ids[]"
                                        value="${invoice.invoice_id}"
-                                       data-balance="${invoice.sisa_tagihan}">
+                                       data-balance="${invoice.sisa_tagihan}"
+                                       style="transform: scale(1.1);">
                             </td>
-                            <td>${invoice.invoice_number}</td>
+                            <td class="fw-bold text-primary">${invoice.invoice_number}</td>
                             <td>${invoice.due_date_formatted}</td>
-                            <td class="text-end">${formatRupiah(invoice.sisa_tagihan)}</td>
+                            <td class="text-end pe-4 fw-semibold">${formatRupiah(invoice.sisa_tagihan)}</td>
                         </tr>
                     `;
                     invoiceListBody.insertAdjacentHTML('beforeend', row);
                 });
-                invoicePlaceholder.textContent = '';
+                invoicePlaceholder.classList.add('d-none');
                 invoiceTable.classList.remove('d-none');
                 addInvoiceCheckboxListeners();
             }

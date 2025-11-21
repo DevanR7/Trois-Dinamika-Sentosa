@@ -1,79 +1,63 @@
-@extends("layouts.app")
+@extends('layouts.app')
 
-@section("content")
-    <div class="container-fluid">
-        <h2 class="fw-bold mb-4">Edit Tarif Pajak</h2>
-        <div class="row justify-content-center">
-            <div class="col-lg-6">
-                <div class="card shadow-sm">
-                    <div class="card-body p-4">
-                        <form
-                            action="{{ route("taxes.update", $tax->id) }}"
-                            method="POST"
-                        >
-                            @csrf
-                            @method("PUT")
-                            <div class="mb-3">
-                                <label
-                                    for="name"
-                                    class="form-label fw-semibold"
-                                >
-                                    Nama Pajak
-                                </label>
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    id="name"
-                                    name="name"
-                                    value="{{ old("name", $tax->name) }}"
-                                    required
-                                />
+@section('content')
+<div class="container-fluid py-2">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold text-dark mb-1">Edit Tarif Pajak</h3>
+            <p class="text-muted small mb-0">Perbarui tarif untuk: <span class="text-primary fw-bold">{{ $tax->name }}</span></p>
+        </div>
+        <div>
+            <a href="{{ route('taxes.index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Kembali
+            </a>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card card-transaction border-0 shadow-sm">
+                <div class="card-header bg-white p-4 border-bottom">
+                    <div class="form-section-title mb-0"><i class="bi bi-pencil-square"></i> Edit Data Tarif</div>
+                </div>
+                <div class="card-body p-4">
+                    @if ($errors->any())
+                        <div class="alert alert-danger border-0 shadow-sm rounded-3 mb-4">
+                            <ul class="mb-0 small ps-3">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+                        </div>
+                    @endif
+
+                    <form action="{{ route('taxes.update', $tax->id) }}" method="POST">
+                        @csrf
+                        @method('PUT')
+                        <div class="mb-3">
+                            <label for="name" class="form-label fw-bold small text-muted">NAMA PAJAK</label>
+                            <input type="text" class="form-control" id="name" name="name" value="{{ old('name', $tax->name) }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="rate" class="form-label fw-bold small text-muted">TARIF (%)</label>
+                            <div class="input-group">
+                                <input type="number" step="0.01" class="form-control text-end fw-bold" id="rate" name="rate" value="{{ old('rate', $tax->rate) }}" required>
+                                <span class="input-group-text">%</span>
                             </div>
-                            <div class="mb-3">
-                                <label
-                                    for="rate"
-                                    class="form-label fw-semibold"
-                                >
-                                    Tarif (%)
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    class="form-control"
-                                    id="rate"
-                                    name="rate"
-                                    value="{{ old("rate", $tax->rate) }}"
-                                    required
-                                />
-                            </div>
-                            <div class="mb-3 form-check">
-                                <input
-                                    type="checkbox"
-                                    class="form-check-input"
-                                    id="is_active"
-                                    name="is_active"
-                                    value="1"
-                                    {{ old("is_active", $tax->is_active) ? "checked" : "" }}
-                                />
-                                <label class="form-check-label" for="is_active">
-                                    Jadikan tarif ini aktif?
-                                </label>
-                            </div>
-                            <div class="d-flex justify-content-end mt-4">
-                                <a
-                                    href="{{ route("taxes.index") }}"
-                                    class="btn btn-secondary me-2"
-                                >
-                                    Batal
-                                </a>
-                                <button type="submit" class="btn btn-success">
-                                    Update
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+                        </div>
+                        <div class="mb-4 form-check">
+                            <input type="checkbox" class="form-check-input cursor-pointer" id="is_active" name="is_active" value="1" {{ old("is_active", $tax->is_active) ? "checked" : "" }} />
+                            <label class="form-check-label" for="is_active">
+                                Jadikan tarif ini aktif?
+                            </label>
+                        </div>
+                        <div class="d-flex justify-content-end mt-4 pt-3 border-top">
+                            <a href="{{ route('taxes.index') }}" class="btn btn-light border me-2">Batal</a>
+                            <button type="submit" class="btn btn-success px-4 fw-bold">
+                                <i class="bi bi-check-lg me-1"></i> Update Tarif
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
+</div>
 @endsection
