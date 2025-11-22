@@ -1,5 +1,5 @@
 {{-- ======================================================================== --}}
-{{--  1. BERANDA --}}
+{{-- 1. BERANDA --}}
 {{-- ======================================================================== --}}
 @can('view-dashboard')
 <div class="menu_title flex">
@@ -17,7 +17,7 @@
 @endcan
 
 {{-- ======================================================================== --}}
-{{--  2. MANAJEMEN PRODUK --}}
+{{-- 2. MANAJEMEN PRODUK --}}
 {{-- ======================================================================== --}}
 @can('view-products')
 <ul class="menu_item">
@@ -34,13 +34,13 @@
         <ul class="submenu">
             <li class="item">
                 <a class="link flex {{ request()->routeIs('products.*') ? 'active' : '' }}" href="{{ route('products.index') }}">
-                    <i class="material-icons">list</i> {{-- Icon List --}}
+                    <i class="material-icons">list</i>
                     <span>Daftar Produk</span>
                 </a>
             </li>
             <li class="item">
                 <a class="link flex {{ request()->routeIs('stock-opnames.*') ? 'active' : '' }}" href="{{ route('stock-opnames.index') }}">
-                    <i class="material-icons">assignment_turned_in</i> {{-- Icon Ceklis --}}
+                    <i class="material-icons">assignment_turned_in</i>
                     <span>Stock Opname</span>
                 </a>
             </li>
@@ -50,7 +50,7 @@
 @endcan
 
 {{-- ======================================================================== --}}
-{{--  3. PEMBELIAN & SUPPLIER --}}
+{{-- 3. PEMBELIAN & SUPPLIER --}}
 {{-- ======================================================================== --}}
 @if(Auth::user()->canany(['view-suppliers', 'view-purchase-orders', 'view-purchase-returns']))
 <ul class="menu_item">
@@ -72,7 +72,7 @@
             @can('view-suppliers')
             <li class="item">
                 <a class="link flex {{ request()->routeIs('suppliers.*') ? 'active' : '' }}" href="{{ route('suppliers.index') }}">
-                    <i class="material-icons">local_shipping</i> {{-- Icon Truk --}}
+                    <i class="material-icons">local_shipping</i>
                     <span>Data Supplier</span>
                 </a>
             </li>
@@ -81,7 +81,7 @@
             @can('view-purchase-orders')
             <li class="item">
                 <a class="link flex {{ request()->routeIs('purchase-orders.*') ? 'active' : '' }}" href="{{ route('purchase-orders.index') }}">
-                    <i class="material-icons">receipt</i> {{-- Icon Struk --}}
+                    <i class="material-icons">receipt</i>
                     <span>Pesanan Pembelian (PO)</span>
                 </a>
             </li>
@@ -90,7 +90,7 @@
             @can('create-purchase-adjustments')
             <li class="item">
                 <a class="link flex {{ request()->routeIs('purchase-order-adjustments.*') ? 'active' : '' }}" href="{{ route('purchase-order-adjustments.create') }}">
-                    <i class="material-icons">edit_note</i> {{-- Icon Edit --}}
+                    <i class="material-icons">edit_note</i>
                     <span>Penyesuaian PO</span>
                 </a>
             </li>
@@ -99,7 +99,7 @@
             @can('create-batch-purchase-payments')
             <li class="item">
                 <a class="link flex {{ request()->routeIs('batch-purchase-payments.*') ? 'active' : '' }}" href="{{ route('batch-purchase-payments.create') }}">
-                    <i class="material-icons">checklist</i> {{-- Icon Checklist Bulk --}}
+                    <i class="material-icons">checklist</i>
                     <span>Bayar Hutang (Bulk)</span>
                 </a>
             </li>
@@ -108,7 +108,7 @@
             @can('view-purchase-returns')
             <li class="item">
                 <a class="link flex {{ request()->routeIs("purchase-returns.*") ? "active" : "" }}" href="{{ route('purchase-returns.index') }}">
-                    <i class="material-icons">assignment_return</i> {{-- Icon Retur --}}
+                    <i class="material-icons">assignment_return</i>
                     <span>Retur Pembelian</span>
                 </a>
             </li>
@@ -119,7 +119,7 @@
 @endif
 
 {{-- ======================================================================== --}}
-{{--  4. PENJUALAN & KLIEN --}}
+{{-- 4. PENJUALAN & KLIEN --}}
 {{-- ======================================================================== --}}
 @if(Auth::user()->canany(['view-clients', 'view-sales-orders', 'review-client-orders', 'view-sales-returns']))
 <ul class="menu_item">
@@ -141,7 +141,7 @@
             @can('view-clients')
             <li class="item">
                 <a class="link flex {{ request()->routeIs('clients.*') ? 'active' : '' }}" href="{{ route('clients.index') }}">
-                    <i class="material-icons">people</i> {{-- Icon Orang --}}
+                    <i class="material-icons">people</i>
                     <span>Data Klien</span>
                 </a>
             </li>
@@ -150,7 +150,7 @@
             @can('view-sales-orders')
             <li class="item">
                 <a class="link flex {{ request()->routeIs('sales-orders.*') ? 'active' : '' }}" href="{{ route('sales-orders.index') }}">
-                    <i class="material-icons">description</i> {{-- Icon Dokumen --}}
+                    <i class="material-icons">description</i>
                     <span>Pesanan Sales</span>
                     @if(isset($pendingSalesOrderCount) && $pendingSalesOrderCount > 0)
                         <span class="badge bg-danger rounded-pill ms-auto" style="font-size: 0.7em">{{ $pendingSalesOrderCount }}</span>
@@ -162,7 +162,7 @@
             @can('review-client-orders')
             <li class="item">
                 <a class="link flex {{ request()->routeIs('client-order-reviews.*') ? 'active' : '' }}" href="{{ route('client-order-reviews.index') }}">
-                    <i class="material-icons">rate_review</i> {{-- Icon Review --}}
+                    <i class="material-icons">rate_review</i>
                     <span>Review Order Klien</span>
                 </a>
             </li>
@@ -171,7 +171,7 @@
             @can('review-order-change-requests')
             <li class="item">
                 <a class="link flex {{ request()->routeIs('order-change-requests.*') ? 'active' : '' }}" href="{{ route('order-change-requests.index') }}">
-                    <i class="material-icons">sync_problem</i> {{-- Icon Sync/Change --}}
+                    <i class="material-icons">sync_problem</i>
                     <span>Request Perubahan</span>
                 </a>
             </li>
@@ -180,7 +180,7 @@
             @can('view-sales-returns')
             <li class="item">
                 <a class="link flex {{ request()->routeIs("sales-returns.*") ? "active" : "" }}" href="{{ route('sales-returns.index') }}">
-                    <i class="material-icons">keyboard_return</i> {{-- Icon Retur --}}
+                    <i class="material-icons">keyboard_return</i>
                     <span>Retur Penjualan</span>
                 </a>
             </li>
@@ -191,7 +191,7 @@
 @endif
 
 {{-- ======================================================================== --}}
-{{--  5. KEUANGAN & INVOICE --}}
+{{-- 5. KEUANGAN & INVOICE --}}
 {{-- ======================================================================== --}}
 @if(Auth::user()->canany(['view-invoices', 'create-batch-payments', 'manage-payment-clearance']))
 <ul class="menu_item">
@@ -212,7 +212,7 @@
             @can("view-invoices")
             <li class="item">
                 <a class="link flex {{ request()->routeIs('invoices.*') ? 'active' : '' }}" href="{{ route('invoices.index') }}">
-                    <i class="material-icons">receipt_long</i> {{-- Icon Invoice Panjang --}}
+                    <i class="material-icons">receipt_long</i>
                     <span>Daftar Invoice</span>
                 </a>
             </li>
@@ -230,7 +230,7 @@
             @can("create-batch-payments")
             <li class="item">
                 <a class="link flex {{ (request()->routeIs('batch-payments.*') && !request()->routeIs('batch-payments.pending')) ? 'active' : '' }}" href="{{ route('batch-payments.create') }}">
-                    <i class="material-icons">price_check</i> {{-- Icon Cek Harga/Bayar --}}
+                    <i class="material-icons">price_check</i>
                     <span>Terima Invoice (Bulk)</span>
                 </a>
             </li>
@@ -239,7 +239,7 @@
             @can("review-batch-payments")
             <li class="item">
                 <a class="link flex {{ request()->routeIs('batch-payments.pending') ? 'active' : '' }}" href="{{ route('batch-payments.pending') }}">
-                    <i class="material-icons">verified</i> {{-- Icon Verifikasi --}}
+                    <i class="material-icons">verified</i>
                     <span>Verifikasi Pembayaran</span>
                 </a>
             </li>
@@ -248,7 +248,7 @@
             @can("manage-payment-clearance")
             <li class="item">
                 <a class="link flex {{ request()->routeIs('payment-clearance.*') ? 'active' : '' }}" href="{{ route('payment-clearance.index') }}">
-                    <i class="material-icons">hourglass_bottom</i> {{-- Icon Pending --}}
+                    <i class="material-icons">hourglass_bottom</i>
                     <span>Kliring Pembayaran</span>
                 </a>
             </li>
@@ -259,7 +259,7 @@
 @endif
 
 {{-- ======================================================================== --}}
-{{--  6. AKUNTANSI --}}
+{{-- 6. AKUNTANSI --}}
 {{-- ======================================================================== --}}
 @if(Auth::user()->canany(['view-reports', 'manage-settings', 'manage-bank-accounts']))
 <ul class="menu_item">
@@ -272,7 +272,7 @@
                               request()->routeIs('bank-reconciliations.*') ||
                               request()->routeIs('closing-book.*') ||
                               request()->routeIs('chart-of-accounts.*') ||
-                              request()->routeIs('reports.*');
+                              request()->routeIs('reports.*'); // Sudah mencakup general-ledger
     @endphp
 
     <li class="item has-submenu {{ $isActiveAccounting ? 'open' : '' }}">
@@ -336,11 +336,30 @@
             </li>
             
             @can('view-reports')
-            <li class="item">
-                <a class="link flex {{ request()->routeIs("reports.index") ? "active" : "" }}" href="{{ route("reports.index") }}">
+            {{-- Mengubah Laporan Keuangan menjadi sub-menu untuk menampung Buku Besar --}}
+            @php
+                $isActiveReports = request()->routeIs('reports.index') || request()->routeIs('reports.general-ledger');
+            @endphp
+            <li class="item has-submenu {{ $isActiveReports ? 'open' : '' }}">
+                <a class="link flex" href="#">
                     <i class="material-icons">analytics</i>
                     <span>Laporan Keuangan</span>
+                    <i class="material-icons dropdown-icon">chevron_right</i>
                 </a>
+                <ul class="submenu">
+                    <li class="item">
+                        <a class="link flex {{ request()->routeIs("reports.index") ? "active" : "" }}" href="{{ route("reports.index") }}">
+                            <i class="material-icons">summarize</i>
+                            <span>Ringkasan Laporan</span>
+                        </a>
+                    </li>
+                    <li class="item">
+                        <a class="link flex {{ request()->routeIs("reports.general-ledger") ? "active" : "" }}" href="{{ route("reports.general-ledger") }}">
+                            <i class="material-icons">book_online</i>
+                            <span>Buku Besar</span> {{-- Link yang diminta --}}
+                        </a>
+                    </li>
+                </ul>
             </li>
             @endcan
         </ul>
@@ -349,7 +368,7 @@
 @endif
 
 {{-- ======================================================================== --}}
-{{--  7. PENGATURAN --}}
+{{-- 7. PENGATURAN --}}
 {{-- ======================================================================== --}}
 @if(Auth::user()->canany(["manage-settings", "manage-payment-methods", "manage-users", "manage-roles"]))
 <ul class="menu_item">
@@ -429,7 +448,7 @@
 @endif
 
 {{-- ======================================================================== --}}
-{{--  8. UTILITIES --}}
+{{-- 8. UTILITIES --}}
 {{-- ======================================================================== --}}
 @can("manage-announcements")
 <div class="menu_title flex">
@@ -446,11 +465,11 @@
 </ul>
 @endcan
 
-@can('manage-settings') {{-- Atau gunakan permission yang lebih spesifik jika ada --}}
+@can('manage-settings')
 <ul class="menu_item">
     <li class="item">
         <a class="link flex {{ request()->routeIs("migration.*") ? "active" : "" }}" href="{{ route("migration.index") }}">
-            <i class="material-icons">cloud_upload</i> {{-- Icon Upload --}}
+            <i class="material-icons">cloud_upload</i>
             <span>Migrasi Data</span>
         </a>
     </li>

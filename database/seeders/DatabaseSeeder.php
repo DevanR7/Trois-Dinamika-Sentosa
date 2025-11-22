@@ -51,7 +51,7 @@ class DatabaseSeeder extends Seeder
             ChartOfAccountsSeeder::class,
             SettingSeeder::class,
             CompanyBankAccountSeeder::class,
-            //PurchaseOrderSeeder::class,
+            PurchaseOrderSeeder::class,
             //SalesInvoiceSeeder::class,
             // Opsional: aktifkan jika ingin generate data invoice juga
             // InvoiceItemSeeder::class,
