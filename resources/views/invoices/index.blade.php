@@ -1,177 +1,231 @@
 @extends('layouts.app')
 
+@section('title', 'Daftar Invoice Penjualan')
+
 @section('content')
-<div class="container-fluid py-4">
+<div class="max-w-7xl mx-auto">
+    
     {{-- HEADER --}}
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
-            <h3 class="fw-bold text-dark mb-0">Daftar Invoice Penjualan</h3>
-            <p class="text-muted small mb-0">Tagihan ke pelanggan</p>
+            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Invoice Penjualan</h2>
+            <p class="text-sm text-gray-500 mt-1">Tagihan ke pelanggan (Klien).</p>
         </div>
-        <a href="{{ route('invoices.create') }}" class="btn btn-primary shadow-sm">
-            <i class="bi bi-plus-lg me-2"></i> Buat Invoice Baru
+        <a href="{{ route('invoices.create') }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition flex items-center gap-2">
+            <i class="bi bi-plus-lg"></i> Buat Invoice Baru
         </a>
     </div>
 
-    {{-- ALERT --}}
+    {{-- NOTIFIKASI --}}
     @if (session('success'))
-        <div class="alert alert-success border-0 shadow-sm d-flex align-items-center mb-4">
-            <i class="bi bi-check-circle-fill fs-4 me-2"></i>
-            <div>{{ session('success') }}</div>
-            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+        <div class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-r shadow-sm flex justify-between items-center animate-fade-in-down">
+            <div class="flex items-center gap-3">
+                <i class="bi bi-check-circle-fill text-green-500 text-xl"></i>
+                <div class="text-sm text-green-700 font-medium">{{ session('success') }}</div>
+            </div>
+            <button onclick="this.parentElement.remove()" class="text-green-500 hover:text-green-700"><i class="bi bi-x text-lg"></i></button>
         </div>
     @endif
 
     {{-- FILTER CARD --}}
-    <div class="card card-transaction border-0 shadow-sm mb-4">
-        <div class="card-body p-3">
-            <form action="{{ route('invoices.index') }}" method="GET" class="row g-2 align-items-center">
-                <div class="col-md-3">
-                    <div class="input-group">
-                        <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
-                        <input type="text" name="search" class="form-control border-start-0 ps-0" placeholder="Cari No. Invoice / Klien..." value="{{ request('search') }}">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+        <form action="{{ route('invoices.index') }}" method="GET">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                
+                {{-- 1. PENCARIAN (4 Kolom) --}}
+                <div class="md:col-span-4">
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Pencarian</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="bi bi-search text-gray-400"></i>
+                        </div>
+                        <input type="text" name="search" value="{{ request('search') }}" 
+                            class="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2" 
+                            placeholder="Cari No. Invoice / Klien...">
                     </div>
                 </div>
-                <div class="col-md-2">
-                    <input type="date" name="start_date" class="form-control" value="{{ request('start_date') }}" title="Tanggal Mulai">
+
+                {{-- 2. TANGGAL MULAI (2 Kolom) --}}
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Dari Tanggal</label>
+                    <input type="date" name="start_date" value="{{ request('start_date') }}" 
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2">
                 </div>
-                <div class="col-md-2">
-                    <input type="date" name="end_date" class="form-control" value="{{ request('end_date') }}" title="Tanggal Akhir">
+
+                {{-- 3. TANGGAL AKHIR (2 Kolom) --}}
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Sampai Tanggal</label>
+                    <input type="date" name="end_date" value="{{ request('end_date') }}" 
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2">
                 </div>
-                <div class="col-md-2">
-                    <select name="status" class="form-select">
-                        <option value="">-- Status --</option>
-                        <option value="draft" @selected(request("status") == "draft")>Draft</option>
-                        <option value="unpaid" @selected(request("status") == "unpaid")>Belum Lunas</option>
-                        <option value="partially_paid" @selected(request("status") == "partially_paid")>Cicil</option>
-                        <option value="paid" @selected(request("status") == "paid")>Lunas</option>
-                        <option value="cancelled" @selected(request("status") == "cancelled")>Dibatalkan</option>
+
+                {{-- 4. STATUS (2 Kolom) --}}
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Status</label>
+                    <select name="status" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2">
+                        <option value="">-- Semua --</option>
+                        <option value="draft" @selected(request('status') == 'draft')>Draft</option>
+                        <option value="unpaid" @selected(request('status') == 'unpaid')>Belum Lunas</option>
+                        <option value="partially_paid" @selected(request('status') == 'partially_paid')>Cicil</option>
+                        <option value="paid" @selected(request('status') == 'paid')>Lunas</option>
+                        <option value="cancelled" @selected(request('status') == 'cancelled')>Dibatalkan</option>
                     </select>
                 </div>
-                <div class="col-md-3 d-flex gap-2">
-                    <button type="submit" class="btn btn-dark w-100">Filter</button>
-                    <a href="{{ route('invoices.index') }}" class="btn btn-light border w-100" title="Reset"><i class="bi bi-arrow-clockwise"></i></a>
+
+                {{-- 5. TOMBOL (2 Kolom) --}}
+                <div class="md:col-span-2 flex gap-2">
+                    <button type="submit" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white font-medium py-2 px-4 rounded-md shadow-sm transition text-sm flex items-center justify-center gap-2">
+                        <i class="bi bi-funnel-fill"></i>
+                    </button>
+                    <a href="{{ route('invoices.index') }}" class="px-3 py-2 bg-white border border-gray-300 rounded-md text-gray-500 hover:text-indigo-600 hover:border-indigo-300 transition flex items-center justify-center shadow-sm" title="Reset">
+                        <i class="bi bi-arrow-clockwise text-lg"></i>
+                    </a>
                 </div>
-            </form>
-        </div>
+            </div>
+        </form>
     </div>
 
-    {{-- CARD LIST VIEW --}}
-    <div class="d-flex flex-column gap-3">
+    {{-- LIST CARD --}}
+    <div class="flex flex-col gap-4">
         @forelse ($invoices as $invoice)
             @php
                 $sisaPiutang = $invoice->remaining_balance;
-                $borderClass = 'border-warning'; // Default unpaid
-                if($invoice->status == 'paid') $borderClass = 'border-success';
-                elseif($invoice->status == 'cancelled') $borderClass = 'border-secondary';
-                elseif($invoice->status == 'draft') $borderClass = 'border-secondary';
-                elseif(optional($invoice->due_date)->isPast() && $invoice->status != 'paid') $borderClass = 'border-danger';
+                $borderColor = 'border-l-gray-400';
+                if($invoice->status == 'paid') $borderColor = 'border-l-green-500';
+                elseif($invoice->status == 'cancelled') $borderColor = 'border-l-red-500';
+                elseif($invoice->status == 'draft') $borderColor = 'border-l-gray-500';
+                elseif(optional($invoice->due_date)->isPast() && $invoice->status != 'paid') $borderColor = 'border-l-red-500'; // Overdue
+                elseif($invoice->status == 'unpaid' || $invoice->status == 'partially_paid') $borderColor = 'border-l-yellow-500';
             @endphp
 
-            <div class="card card-transaction shadow-sm border-0 border-start border-5 {{ $borderClass }}">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden border-l-4 {{ $borderColor }} hover:shadow-md transition-shadow">
                 
-                {{-- HEADER KARTU --}}
-                <div class="card-header bg-white p-3 cursor-pointer" data-bs-toggle="collapse" data-bs-target="#collapse-{{ $invoice->invoice_id }}" aria-expanded="false">
-                    <div class="row align-items-center">
-                        {{-- Kolom 1: No Invoice & Klien --}}
-                        <div class="col-md-4 mb-2 mb-md-0">
-                            <div class="d-flex align-items-center">
-                                <div class="me-3 bg-light rounded-circle d-flex align-items-center justify-content-center" style="width:45px; height:45px;">
-                                    <i class="bi bi-receipt text-primary fs-5"></i>
-                                </div>
-                                <div>
-                                    <h6 class="fw-bold text-dark mb-0">{{ $invoice->invoice_number }}</h6>
-                                    <span class="fw-semibold text-secondary small">{{ $invoice->client->client_name ?? 'N/A' }}</span>
-                                </div>
+                {{-- HEADER CARD --}}
+                <div class="p-5 cursor-pointer hover:bg-gray-50 transition-colors" onclick="toggleAccordion('collapse-{{ $invoice->invoice_id }}')">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                        
+                        {{-- Info Utama --}}
+                        <div class="flex items-center gap-4 lg:w-1/3">
+                            <div class="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0 border border-indigo-100">
+                                <i class="bi bi-receipt text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-bold text-gray-900 mb-0.5">{{ $invoice->invoice_number }}</h3>
+                                <p class="text-sm font-medium text-indigo-600">{{ $invoice->client->client_name ?? 'Klien Dihapus' }}</p>
                             </div>
                         </div>
 
-                        {{-- Kolom 2: Tanggal & Total --}}
-                        <div class="col-md-4 col-6 mb-2 mb-md-0">
-                            <div class="row">
-                                <div class="col-6">
-                                    <small class="text-muted d-block" style="font-size: 0.7rem;">TANGGAL INVOICE</small>
-                                    <span class="text-dark fw-medium">{{ optional($invoice->order_date)->format('d M Y') }}</span>
-                                </div>
-                                <div class="col-6">
-                                    <small class="text-muted d-block" style="font-size: 0.7rem;">TOTAL TAGIHAN</small>
-                                    <span class="fw-bold text-dark">Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span>
-                                </div>
+                        {{-- Tanggal & Total --}}
+                        <div class="flex gap-8 lg:w-1/3">
+                            <div>
+                                <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Tanggal</span>
+                                <span class="text-sm font-medium text-gray-900">{{ optional($invoice->order_date)->format('d M Y') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Total Tagihan</span>
+                                <span class="text-sm font-bold text-gray-900">Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span>
                             </div>
                         </div>
 
-                        {{-- Kolom 3: Status & Sisa --}}
-                        <div class="col-md-4 text-md-end d-flex justify-content-between justify-content-md-end align-items-center gap-3">
-                            <div class="text-end">
-                                @if($invoice->status == 'paid') <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3">Lunas</span>
-                                @elseif($invoice->status == 'partially_paid') <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 rounded-pill px-3">Cicil</span>
-                                @elseif($invoice->status == 'cancelled') <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-3">Batal</span>
-                                @elseif($invoice->status == 'draft') <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-3">Draft</span>
-                                @else 
-                                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-3">
-                                        {{ optional($invoice->due_date)->isPast() ? 'Jatuh Tempo' : 'Belum Lunas' }}
-                                    </span>
-                                @endif
-                                
-                                @if($sisaPiutang > 0 && $invoice->status != 'cancelled')
-                                    <div class="small text-danger fw-bold mt-1">Sisa: Rp {{ number_format($sisaPiutang, 0, ',', '.') }}</div>
-                                @endif
-                            </div>
-                            <i class="bi bi-chevron-down text-muted transition-icon"></i>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- DETAIL KARTU (COLLAPSE) --}}
-                <div class="collapse" id="collapse-{{ $invoice->invoice_id }}">
-                    <div class="card-body bg-light bg-opacity-25 border-top p-3">
-                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-                            <div class="d-flex gap-4 text-muted small">
-                                <div><strong>Jatuh Tempo:</strong> {{ optional($invoice->due_date)->format('d M Y') }}</div>
-                                <div><strong>Sales:</strong> {{ $invoice->sales->full_name ?? '-' }}</div>
-                            </div>
-
-                            <div class="btn-group">
-                                <a href="{{ route('invoices.show', $invoice->invoice_id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i> Detail</a>
-                                
-                                @if(!in_array($invoice->status, ['paid', 'cancelled']))
-                                    <a href="{{ route('invoices.edit', $invoice->invoice_id) }}" class="btn btn-sm btn-outline-warning text-dark"><i class="bi bi-pencil"></i> Edit</a>
+                        {{-- Status & Icon --}}
+                        <div class="flex items-center justify-between lg:justify-end gap-4 lg:w-1/3">
+                            <div class="text-right">
+                                @php
+                                    $statusStyles = [
+                                        'paid' => 'bg-green-100 text-green-800 border-green-200',
+                                        'partially_paid' => 'bg-blue-100 text-blue-800 border-blue-200',
+                                        'unpaid' => 'bg-yellow-100 text-yellow-800 border-yellow-200',
+                                        'draft' => 'bg-gray-100 text-gray-600 border-gray-200',
+                                        'cancelled' => 'bg-red-100 text-red-800 border-red-200',
+                                    ];
                                     
-                                    @if($invoice->status != 'draft')
-                                    <form class="cancel-form d-inline" action="{{ route('invoices.cancel', $invoice->invoice_id) }}" method="POST">
-                                        @csrf
-                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i> Batal</button>
-                                    </form>
-                                    @endif
-                                @endif
+                                    $labelStatus = [
+                                        'paid' => 'Lunas',
+                                        'partially_paid' => 'Cicil',
+                                        'unpaid' => 'Belum Lunas',
+                                        'draft' => 'Draft',
+                                        'cancelled' => 'Batal',
+                                    ];
 
-                                @if($invoice->status == 'draft')
-                                    <form class="confirm-form d-inline" action="{{ route('invoices.confirm', $invoice->invoice_id) }}" method="POST">
-                                        @csrf
-                                        <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-circle"></i> Konfirmasi</button>
-                                    </form>
+                                    // Cek Overdue
+                                    if(optional($invoice->due_date)->isPast() && $invoice->status != 'paid' && $invoice->status != 'cancelled' && $invoice->status != 'draft') {
+                                        $statusClass = 'bg-red-100 text-red-800 border-red-200';
+                                        $statusText = 'Jatuh Tempo';
+                                    } else {
+                                        $statusClass = $statusStyles[$invoice->status] ?? 'bg-gray-100 text-gray-600';
+                                        $statusText = $labelStatus[$invoice->status] ?? Str::title($invoice->status);
+                                    }
+                                @endphp
+                                <span class="px-3 py-1 rounded-full text-xs font-bold border uppercase {{ $statusClass }}">
+                                    {{ $statusText }}
+                                </span>
+
+                                @if($sisaPiutang > 0 && $invoice->status != 'cancelled' && $invoice->status != 'draft')
+                                    <div class="text-[10px] text-red-500 font-bold mt-1">Sisa: Rp {{ number_format($sisaPiutang, 0, ',', '.') }}</div>
                                 @endif
                             </div>
+                            
+                            <i class="bi bi-chevron-down text-gray-400 transition-transform duration-200" id="icon-collapse-{{ $invoice->invoice_id }}"></i>
                         </div>
                     </div>
                 </div>
+
+                {{-- COLLAPSE BODY --}}
+                <div id="collapse-{{ $invoice->invoice_id }}" class="hidden bg-gray-50 border-t border-gray-100">
+                    <div class="p-5 flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <div class="text-sm text-gray-600 flex gap-4">
+                            <div><strong>Jatuh Tempo:</strong> {{ optional($invoice->due_date)->format('d M Y') }}</div>
+                            <div><strong>Sales:</strong> {{ $invoice->sales->full_name ?? '-' }}</div>
+                        </div>
+                        
+                        <div class="flex gap-2">
+                            <a href="{{ route('invoices.show', $invoice->invoice_id) }}" class="px-3 py-1.5 bg-white border border-indigo-200 text-indigo-700 font-medium rounded-lg hover:bg-indigo-50 transition text-sm shadow-sm flex items-center gap-1">
+                                <i class="bi bi-eye"></i> Detail
+                            </a>
+
+                            @if(!in_array($invoice->status, ['paid', 'cancelled']))
+                                <a href="{{ route('invoices.edit', $invoice->invoice_id) }}" class="px-3 py-1.5 bg-white border border-yellow-200 text-yellow-700 font-medium rounded-lg hover:bg-yellow-50 transition text-sm shadow-sm flex items-center gap-1">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+
+                                @if($invoice->status != 'draft')
+                                    <form action="{{ route('invoices.cancel', $invoice->invoice_id) }}" method="POST" class="cancel-form inline-block">
+                                        @csrf
+                                        <button type="submit" class="px-3 py-1.5 bg-white border border-red-200 text-red-600 font-medium rounded-lg hover:bg-red-50 transition text-sm shadow-sm flex items-center gap-1">
+                                            <i class="bi bi-x-circle"></i> Batal
+                                        </button>
+                                    </form>
+                                @endif
+                            @endif
+
+                            @if($invoice->status == 'draft')
+                                <form action="{{ route('invoices.confirm', $invoice->invoice_id) }}" method="POST" class="confirm-form inline-block">
+                                    @csrf
+                                    <button type="submit" class="px-3 py-1.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition text-sm shadow-sm flex items-center gap-1">
+                                        <i class="bi bi-check-circle"></i> Konfirmasi
+                                    </button>
+                                </form>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
             </div>
         @empty
-            {{-- EMPTY STATE --}}
-            <div class="text-center py-5 my-3 bg-white rounded shadow-sm border border-dashed">
-                <div class="mb-3">
-                    <i class="bi bi-receipt-cutoff text-muted" style="font-size: 3rem; opacity: 0.5;"></i>
+            <div class="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
+                <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="bi bi-receipt-cutoff text-3xl text-gray-400"></i>
                 </div>
-                <h5 class="fw-bold text-dark">Belum ada Invoice</h5>
-                <p class="text-muted mb-4">Data tagihan belum tersedia.</p>
-                <a href="{{ route('invoices.create') }}" class="btn btn-primary btn-sm">
-                    <i class="bi bi-plus-lg me-1"></i> Buat Invoice Baru
+                <h3 class="text-lg font-medium text-gray-900">Tidak ada invoice</h3>
+                <p class="text-gray-500 text-sm mt-1">Belum ada data tagihan yang sesuai filter.</p>
+                <a href="{{ route('invoices.create') }}" class="inline-flex items-center mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition">
+                    <i class="bi bi-plus-lg mr-2"></i> Buat Invoice Baru
                 </a>
             </div>
         @endforelse
     </div>
 
-    <div class="mt-4 d-flex justify-content-center">
+    <div class="mt-6">
         {{ $invoices->appends(request()->query())->links() }}
     </div>
 </div>
@@ -180,36 +234,35 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Script Konfirmasi
+    // Helper Toggle Accordion
+    window.toggleAccordion = function(id) {
+        const el = document.getElementById(id);
+        const icon = document.getElementById('icon-' + id);
+        if(el.classList.contains('hidden')) {
+            el.classList.remove('hidden');
+            if(icon) icon.classList.add('rotate-180');
+        } else {
+            el.classList.add('hidden');
+            if(icon) icon.classList.remove('rotate-180');
+        }
+    }
+
+    // Script Konfirmasi (SweetAlert)
     function confirmAction(selector, title, text, btnText, btnColor) {
         document.querySelectorAll(selector).forEach(form => {
             form.addEventListener('submit', function(event) {
                 event.preventDefault();
                 Swal.fire({
                     title: title, text: text, icon: 'warning',
-                    showCancelButton: true, confirmButtonColor: btnColor, cancelButtonColor: '#6c757d',
+                    showCancelButton: true, confirmButtonColor: btnColor, cancelButtonColor: '#6b7280',
                     confirmButtonText: btnText, cancelButtonText: 'Batal'
                 }).then((result) => { if (result.isConfirmed) event.target.submit(); });
             });
         });
     }
-    confirmAction('.cancel-form', 'Batalkan Invoice?', 'Status akan berubah menjadi Cancelled.', 'Ya, Batalkan!', '#d33');
-    confirmAction('.confirm-form', 'Konfirmasi Invoice?', 'Stok akan dikurangi dan invoice menjadi Unpaid.', 'Ya, Konfirmasi!', '#198754');
-
-    // Rotasi Icon
-    const collapses = document.querySelectorAll('.collapse');
-    collapses.forEach(el => {
-        el.addEventListener('show.bs.collapse', function () {
-            const parent = this.closest('.card');
-            const icon = parent.querySelector('.bi-chevron-down');
-            if(icon) icon.style.transform = 'rotate(180deg)';
-        });
-        el.addEventListener('hide.bs.collapse', function () {
-            const parent = this.closest('.card');
-            const icon = parent.querySelector('.bi-chevron-down');
-            if(icon) icon.style.transform = 'rotate(0deg)';
-        });
-    });
+    
+    confirmAction('.cancel-form', 'Batalkan Invoice?', 'Status akan berubah menjadi Cancelled.', '#ef4444', 'Ya, Batalkan!');
+    confirmAction('.confirm-form', 'Konfirmasi Invoice?', 'Stok akan dikurangi dan invoice menjadi Unpaid.', '#10b981', 'Ya, Konfirmasi!');
 });
 </script>
 @endpush

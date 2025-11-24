@@ -1,106 +1,110 @@
 @extends('layouts.app')
 
-@section('styles')
-{{-- Select2 untuk pencarian Akun --}}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
-@endsection
+@section('title', 'Tambah Akun Bank Baru')
 
 @section('content')
-<div class="container py-4">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-dark text-white">
-                    <h2 class="fw-bold mb-0 fs-4">Tambah Akun Bank Baru</h2>
-                </div>
-                <div class="card-body">
-                    <form action="{{ route('company-bank-accounts.store') }}" method="POST" id="bank-form">
-                        @csrf
-                        <div class="row g-3">
-                            {{-- Nama Bank --}}
-                            <div class="col-md-6 mb-3">
-                                <label for="bank_name" class="form-label">Nama Bank <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control @error('bank_name') is-invalid @enderror" id="bank_name" name="bank_name" value="{{ old('bank_name') }}" placeholder="Misal: BCA, Mandiri, Kas Tunai" required>
-                                @error('bank_name')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            {{-- Atas Nama --}}
-                            <div class="col-md-6 mb-3">
-                                <label for="account_name" class="form-label">Atas Nama <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control @error('account_name') is-invalid @enderror" id="account_name" name="account_name" value="{{ old('account_name') }}" placeholder="Misal: PT. Usaha Jaya" required>
-                                @error('account_name')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            {{-- No. Rekening --}}
-                            <div class="col-md-6 mb-3">
-                                <label for="account_number" class="form-label">Nomor Rekening</label>
-                                <input type="text" class="form-control @error('account_number') is-invalid @enderror" id="account_number" name="account_number" value="{{ old('account_number') }}" placeholder="(Opsional)">
-                                @error('account_number')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-                            
-                            {{-- Hubungkan ke COA --}}
-                            <div class="col-md-6 mb-3">
-                                <label for="chart_of_account_id" class="form-label">Hubungkan ke Akun (COA) <span class="text-danger">*</span></label>
-                                <select class="form-select select2 @error('chart_of_account_id') is-invalid @enderror" id="chart_of_account_id" name="chart_of_account_id" required>
-                                    <option value="" disabled selected></option>
-                                    @foreach ($assetAccounts as $asset)
-                                        <option value="{{ $asset->account_id }}" {{ old('chart_of_account_id') == $asset->account_id ? 'selected' : '' }}>
-                                            {{ $asset->account_number }} - {{ $asset->account_name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <div class="form-text small text-muted">Pilih akun Kas/Bank dari Chart of Accounts.</div>
-                                @error('chart_of_account_id')
-                                    <div class="text-danger small mt-1">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            <div class="col-12 mb-3">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" role="switch" id="is_active" name="is_active" value="1" {{ old('is_active', true) ? 'checked' : '' }}>
-                                    <label class="form-check-label" for="is_active">Aktifkan Akun Ini</label>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="d-flex justify-content-end mt-4">
-                            <a href="{{ route('company-bank-accounts.index') }}" class="btn btn-outline-secondary me-2">Batal</a>
-                            <button type="submit" class="btn btn-dark">
-                                <i class="bi bi-save-fill"></i> Simpan Akun
-                            </button>
-                        </div>
-                    </form>
-                </div>
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    
+    {{-- HEADER --}}
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+        <div>
+            <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                <a href="{{ route('company-bank-accounts.index') }}" class="hover:text-indigo-600 transition">Akun Bank</a>
+                <span>/</span>
+                <span class="text-gray-800">Baru</span>
             </div>
+            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Tambah Akun Bank</h2>
+            <p class="text-sm text-gray-500 mt-1">Daftarkan rekening bank atau kas tunai perusahaan.</p>
+        </div>
+        <div class="mt-4 sm:mt-0">
+            <a href="{{ route('company-bank-accounts.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition text-sm">
+                <i class="material-icons text-lg mr-2">arrow_back</i> Kembali
+            </a>
         </div>
     </div>
+
+    <form action="{{ route('company-bank-accounts.store') }}" method="POST" id="bank-form">
+        @csrf
+        
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
+                <i class="material-icons text-indigo-500">account_balance</i>
+                <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Form Akun Bank</h3>
+            </div>
+            
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {{-- Nama Bank --}}
+                <div>
+                    <label for="bank_name" class="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Bank <span class="text-red-500">*</span></label>
+                    <input type="text" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" id="bank_name" name="bank_name" value="{{ old('bank_name') }}" placeholder="Misal: BCA, Mandiri, Kas Tunai" required>
+                    @error('bank_name') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+
+                {{-- Atas Nama --}}
+                <div>
+                    <label for="account_name" class="block text-xs font-bold text-gray-500 uppercase mb-1">Atas Nama <span class="text-red-500">*</span></label>
+                    <input type="text" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" id="account_name" name="account_name" value="{{ old('account_name') }}" placeholder="Misal: PT. Usaha Jaya" required>
+                    @error('account_name') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+
+                {{-- No Rekening --}}
+                <div>
+                    <label for="account_number" class="block text-xs font-bold text-gray-500 uppercase mb-1">Nomor Rekening</label>
+                    <input type="text" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono" id="account_number" name="account_number" value="{{ old('account_number') }}" placeholder="(Opsional)">
+                    @error('account_number') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+
+                {{-- Hubungkan ke COA --}}
+                <div>
+                    <label for="chart_of_account_id" class="block text-xs font-bold text-gray-500 uppercase mb-1">Hubungkan ke Akun (COA) <span class="text-red-500">*</span></label>
+                    <select class="select2 form-select block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" id="chart_of_account_id" name="chart_of_account_id" required>
+                        <option value="" disabled selected></option>
+                        @foreach ($assetAccounts as $asset)
+                            <option value="{{ $asset->account_id }}" @selected(old('chart_of_account_id') == $asset->account_id)>
+                                {{ $asset->account_number }} - {{ $asset->account_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500">Pilih akun Kas/Bank dari Chart of Accounts untuk penjurnalan otomatis.</p>
+                    @error('chart_of_account_id') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+
+                {{-- Switch Active --}}
+                <div class="md:col-span-2 pt-2">
+                    <div class="flex items-start">
+                        <div class="flex items-center h-5">
+                            <input id="is_active" name="is_active" type="checkbox" value="1" checked class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded cursor-pointer">
+                        </div>
+                        <div class="ml-3 text-sm">
+                            <label for="is_active" class="font-medium text-gray-700 cursor-pointer">Status Aktif</label>
+                            <p class="text-gray-500 text-xs">Akun aktif dapat dipilih dalam transaksi pembayaran.</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                <a href="{{ route('company-bank-accounts.index') }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 shadow-sm transition">
+                    Batal
+                </a>
+                <button type="submit" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-lg font-bold text-sm text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-md transition">
+                    <i class="material-icons text-lg mr-2">save</i> Simpan Akun
+                </button>
+            </div>
+        </div>
+    </form>
 </div>
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     $(document).ready(function() {
-        // Init Select2
         $('.select2').select2({
             theme: 'bootstrap-5',
             placeholder: '-- Pilih Akun Aset --',
             width: '100%'
-        });
-
-        // Validasi Submit
-        $('#bank-form').on('submit', function(e) {
-            if(!this.checkValidity()) {
-                // Biarkan HTML5 validation bekerja
-            }
         });
     });
 </script>

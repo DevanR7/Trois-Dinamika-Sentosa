@@ -1,8 +1,16 @@
 @extends('layouts.app')
 
+@section('title', 'Pembayaran Batch (Hutang)')
+
 @push('styles')
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<style>
+    .form-select-lg-custom {
+        height: 48px;
+        font-size: 1rem;
+        border-color: #e5e7eb;
+        border-radius: 0.5rem;
+    }
+</style>
 @endpush
 
 @php
@@ -11,200 +19,251 @@
 @endphp
 
 @section('content')
-<div class="container-fluid py-2">
+<div class="max-w-6xl mx-auto py-6">
     
-    {{-- HEADER HALAMAN --}}
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    {{-- HEADER --}}
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-            <h3 class="fw-bold text-dark mb-1">Pembayaran Hutang (Batch)</h3>
-            <p class="text-muted mb-0 small">Catat pembayaran untuk beberapa PO sekaligus ke satu supplier.</p>
+            <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                <a href="{{ route('purchase-orders.index') }}" class="hover:text-indigo-600 transition">Pembelian</a>
+                <span>/</span>
+                <span class="text-gray-800">Batch Payment</span>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Pembayaran Hutang (Batch)</h2>
+            <p class="text-sm text-gray-500 mt-1">Catat pembayaran untuk beberapa PO sekaligus ke satu supplier.</p>
         </div>
-        <div>
-            <a href="{{ route('purchase-orders.index') }}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left me-1"></i> Kembali ke List PO
-            </a>
-        </div>
+        <a href="{{ route('purchase-orders.index') }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition shadow-sm">
+            Kembali
+        </a>
     </div>
 
-    <div class="row justify-content-center">
-        <div class="col-lg-10">
-            
-            @if ($errors->any() || session('error'))
-                <div class="alert alert-danger border-0 shadow-sm rounded-3 mb-4">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
-                        <ul class="mb-0 small ps-3">
-                            @foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach
-                            @if (session('error'))<li>{{ session('error') }}</li>@endif
-                        </ul>
-                    </div>
+    {{-- ==================================================================== --}}
+    {{-- ✅ NOTIFIKASI SUKSES & ERROR (ADDED) --}}
+    {{-- ==================================================================== --}}
+    @if (session('success'))
+        <div class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-r shadow-sm flex justify-between items-center animate-fade-in-down">
+            <div class="flex items-center">
+                <i class="bi bi-check-circle-fill text-green-500 text-xl mr-3"></i>
+                <div>
+                    <h3 class="text-sm font-bold text-green-800">Berhasil!</h3>
+                    <p class="text-sm text-green-700 font-medium">{{ session('success') }}</p>
                 </div>
-            @endif
+            </div>
+            <button type="button" class="text-green-500 hover:text-green-700 transition" onclick="this.parentElement.remove()">
+                <i class="bi bi-x text-lg"></i>
+            </button>
+        </div>
+    @endif
 
-            <form action="{{ route('batch-purchase-payments.store') }}" method="POST" id="batch-payment-form" enctype="multipart/form-data">
-                @csrf
+    @if ($errors->any() || session('error'))
+        <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r shadow-sm animate-fade-in-down">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="bi bi-exclamation-triangle-fill text-red-400 text-xl"></i>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-bold text-red-800">Terdapat kesalahan:</h3>
+                    <ul class="mt-1 list-disc list-inside text-sm text-red-700">
+                        @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
+                        @if (session('error')) <li>{{ session('error') }}</li> @endif
+                    </ul>
+                </div>
+            </div>
+        </div>
+    @endif
+    {{-- ==================================================================== --}}
 
+
+    <form action="{{ route('batch-purchase-payments.store') }}" method="POST" id="batch-payment-form" enctype="multipart/form-data">
+        @csrf
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+            {{-- KOLOM KIRI: SUPPLIER & PEMBAYARAN (Span 8) --}}
+            <div class="lg:col-span-8 space-y-8">
+                
                 {{-- 1. PILIH SUPPLIER --}}
-                <div class="card card-transaction border-0 shadow-sm mb-4">
-                    <div class="card-header bg-white p-4 border-bottom">
-                        <div class="form-section-title mb-0"><i class="bi bi-people"></i> 1. Pilih Supplier</div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+                        <div class="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold">1</div>
+                        <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Pilih Supplier</h3>
                     </div>
-                    <div class="card-body p-4">
-                        <div class="row align-items-center">
-                            <div class="col-md-6">
-                                <label for="supplier_id" class="form-label fw-bold small text-muted">NAMA SUPPLIER</label>
-                                <select name="supplier_id" id="supplier_id" class="form-select" required>
-                                    <option value="" disabled selected>-- Cari Supplier --</option>
-                                    @foreach ($suppliers as $supplier)
-                                        <option value="{{ $supplier->supplier_id }}">{{ $supplier->supplier_name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-6 mt-3 mt-md-0">
-                                {{-- Info Saldo Deposit (Hidden by default) --}}
-                                <div id="supplier-debit-info" class="alert alert-info border-0 bg-info bg-opacity-10 d-none mb-0">
-                                    <div class="d-flex align-items-center">
-                                        <div class="me-3 text-info">
-                                            <i class="bi bi-wallet2 fs-2"></i>
-                                        </div>
-                                        <div>
-                                            <span class="d-block text-muted small">Saldo Deposit Tersedia</span>
-                                            <strong class="fs-5 text-dark" id="supplier-debit-balance">Rp 0</strong>
-                                            <div class="small text-muted fst-italic border-top border-info border-opacity-25 mt-1 pt-1">
-                                                Pending / Tertahan: <span id="supplier-pending-balance">Rp 0</span>
-                                            </div>
-                                        </div>
-                                    </div>
+                    <div class="p-6">
+                        <label for="supplier_id" class="block text-xs font-bold text-gray-500 uppercase mb-2">Cari Supplier</label>
+                        <select name="supplier_id" id="supplier_id" class="w-full" required>
+                            <option value="" disabled selected>-- Cari Supplier --</option>
+                            @foreach ($suppliers as $supplier)
+                                <option value="{{ $supplier->supplier_id }}">{{ $supplier->supplier_name }}</option>
+                            @endforeach
+                        </select>
+
+                        {{-- Info Saldo Deposit (Hidden by default) --}}
+                        <div id="supplier-debit-info" class="hidden mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2 bg-blue-100 rounded-full text-blue-600">
+                                    <i class="bi bi-wallet2 text-xl"></i>
                                 </div>
+                                <div>
+                                    <span class="block text-xs text-blue-600 font-bold uppercase">Saldo Deposit</span>
+                                    <span class="text-lg font-bold text-gray-900" id="supplier-debit-balance">Rp 0</span>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="block text-[10px] text-gray-400 uppercase">Pending</span>
+                                <span class="text-sm font-medium text-gray-600" id="supplier-pending-balance">Rp 0</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {{-- 2. DETAIL PEMBAYARAN --}}
-                <div class="card card-transaction border-0 shadow-sm mb-4">
-                    <div class="card-header bg-white p-4 border-bottom">
-                        <div class="form-section-title mb-0"><i class="bi bi-credit-card"></i> 2. Detail Pembayaran</div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+                        <div class="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold">2</div>
+                        <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Detail Pembayaran</h3>
                     </div>
-                    <div class="card-body p-4">
+                    <div class="p-6 space-y-6">
                         
                         {{-- Switch Deposit --}}
-                        <div class="mb-4 p-3 bg-light rounded border" id="use-debit-container" style="display: none;">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input cursor-pointer" type="checkbox" role="switch" id="use_debit_balance" name="use_debit_balance" value="1" style="transform: scale(1.2);">
-                                <label class="form-check-label fw-bold ms-2 pt-1 cursor-pointer" for="use_debit_balance">
-                                    Gunakan Saldo Deposit untuk pembayaran ini?
-                                </label>
-                            </div>
+                        <div id="use-debit-container" class="hidden p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center gap-3">
+                            <input type="checkbox" role="switch" id="use_debit_balance" name="use_debit_balance" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-5 w-5 cursor-pointer">
+                            <label for="use_debit_balance" class="text-sm font-medium text-gray-700 cursor-pointer select-none">
+                                Gunakan Saldo Deposit untuk pembayaran ini?
+                            </label>
                         </div>
 
-                        <div class="row g-4">
-                            {{-- Baris 1 --}}
-                            <div class="col-md-6">
-                                <label for="total_amount_formatted" class="form-label fw-bold small text-muted">TOTAL DANA KELUAR (NON-DEPOSIT)</label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-white text-muted">Rp</span>
-                                    <input type="text" class="form-control fw-bold fs-5 text-primary" id="total_amount_formatted" placeholder="0">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {{-- Total Bayar --}}
+                            <div>
+                                <label for="total_amount_formatted" class="block text-xs font-bold text-gray-500 uppercase mb-1">Total Bayar (Non-Deposit)</label>
+                                <div class="relative rounded-md shadow-sm">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <span class="text-gray-500 sm:text-sm">Rp</span>
+                                    </div>
+                                    <input type="text" id="total_amount_formatted" class="block w-full pl-10 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 text-lg font-bold text-indigo-600" placeholder="0">
                                 </div>
                                 <input type="hidden" name="total_amount" id="total_amount" value="0">
                             </div>
-                            <div class="col-md-6">
-                                <label for="payment_date" class="form-label fw-bold small text-muted">TANGGAL BAYAR</label>
-                                <input type="date" class="form-control" name="payment_date" value="{{ now()->format('Y-m-d') }}" required>
+
+                            {{-- Tanggal --}}
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Tanggal Bayar</label>
+                                <input type="date" name="payment_date" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" value="{{ now()->format('Y-m-d') }}" required>
                             </div>
 
-                            {{-- Baris 2 --}}
-                            <div class="col-md-6">
-                                <label for="payment_method_id" class="form-label fw-bold small text-muted">METODE BAYAR</label>
-                                <select name="payment_method_id" id="payment_method_id" class="form-select">
+                            {{-- Metode Bayar --}}
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Metode Bayar</label>
+                                <select name="payment_method_id" id="payment_method_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
                                     <option value="">-- Pilih Metode --</option>
                                     @foreach ($paymentMethods as $method)
-                                        <option value="{{ $method->payment_method_id }}" data-config="{{ $method->required_fields_config }}">
-                                            {{ $method->name }}
-                                        </option>
+                                        <option value="{{ $method->payment_method_id }}" data-config="{{ $method->required_fields_config }}">{{ $method->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
-                            <div class="col-md-6">
-                                <label for="company_bank_account_id_batch_purchase" class="form-label fw-bold small text-muted">SUMBER DANA (AKUN KAS/BANK)</label>
-                                <select name="company_bank_account_id" id="company_bank_account_id_batch_purchase" class="form-select">
+
+                            {{-- Akun Kas/Bank --}}
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Sumber Dana</label>
+                                <select name="company_bank_account_id" id="company_bank_account_id_batch_purchase" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
                                     <option value="">-- Pilih Akun --</option>
                                     @foreach($companyBankAccounts as $account)
-                                        <option value="{{ $account->company_bank_account_id }}">
-                                            {{ $account->bank_name }} - {{ $account->account_number ?? $account->account_name }}
-                                        </option>
+                                        <option value="{{ $account->company_bank_account_id }}">{{ $account->bank_name }} - {{ $account->account_number ?? $account->account_name }}</option>
                                     @endforeach
                                 </select>
                             </div>
+                        </div>
 
-                            {{-- Baris 3 (Conditional) --}}
-                            <div class="col-md-6" id="payment-reference-group-batch-purchase" style="display: none;">
-                                <label for="reference_number_batch_purchase" class="form-label fw-bold small text-muted">NOMOR REFERENSI</label>
-                                <input type="text" class="form-control" name="reference_number" id="reference_number_batch_purchase" placeholder="No. Cek / Giro / Transfer">
+                        {{-- Conditional Fields --}}
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div id="payment-reference-group-batch-purchase" style="display: none;">
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nomor Referensi</label>
+                                <input type="text" name="reference_number" id="reference_number_batch_purchase" class="w-full rounded-md border-gray-300 shadow-sm text-sm" placeholder="No. Cek / Giro">
                             </div>
-                            <div class="col-md-6" id="payment-proof-group-batch-purchase" style="display: none;">
-                                <label for="proof_of_payment_batch_purchase" class="form-label fw-bold small text-muted">BUKTI TRANSFER</label>
-                                <input type="file" class="form-control" name="proof_of_payment" id="proof_of_payment_batch_purchase" accept="image/jpeg,image/png,image/jpg">
+                            <div id="payment-proof-group-batch-purchase" style="display: none;">
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Bukti Transfer</label>
+                                <input type="file" name="proof_of_payment" id="proof_of_payment_batch_purchase" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
                             </div>
+                        </div>
 
-                            <div class="col-12">
-                                <label for="notes" class="form-label fw-bold small text-muted">CATATAN (OPSIONAL)</label>
-                                <textarea name="notes" class="form-control" rows="2" placeholder="Tambahkan keterangan pembayaran..."></textarea>
-                            </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Catatan (Opsional)</label>
+                            <textarea name="notes" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" rows="2" placeholder="Tambahkan keterangan..."></textarea>
                         </div>
                     </div>
                 </div>
 
-                {{-- 3. ALOKASI PO --}}
-                <div class="card card-transaction border-0 shadow-sm mb-5">
-                    <div class="card-header bg-white p-4 border-bottom">
-                        <div class="form-section-title mb-0"><i class="bi bi-list-check"></i> 3. Alokasi ke Purchase Order</div>
-                        <p class="text-muted small mt-1 mb-0">Sistem akan melunasi PO secara berurutan mulai dari yang paling lama jatuh temponya.</p>
+            </div>
+
+            {{-- KOLOM KANAN: ALOKASI PO (Span 4) --}}
+            <div class="lg:col-span-4 space-y-6">
+                
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-full sticky top-6">
+                    <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+                        <div class="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold">3</div>
+                        <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Pilih Tagihan (PO)</h3>
                     </div>
-                    <div class="card-body p-0">
+                    
+                    {{-- List PO Container --}}
+                    <div class="flex-1 p-0 overflow-y-auto custom-scrollbar" style="max-height: 500px;">
                         
-                        <div id="po-list-container" class="p-0" style="max-height: 500px; overflow-y: auto;">
-                            {{-- Placeholder State --}}
-                            <div id="po-placeholder" class="text-center py-5 text-muted">
-                                <i class="bi bi-search fs-1 d-block mb-2 opacity-25"></i>
-                                Silakan pilih supplier di atas untuk memuat tagihan.
-                            </div>
-
-                            {{-- Table --}}
-                            <table class="table table-hover table-transaction align-middle mb-0 d-none" id="po-table">
-                                <thead class="bg-light sticky-top" style="z-index: 1;">
-                                    <tr>
-                                        <th class="ps-4" style="width: 50px;">
-                                            <input type="checkbox" id="check-all-pos" class="form-check-input cursor-pointer" style="transform: scale(1.1);">
-                                        </th>
-                                        <th>No. Purchase Order</th>
-                                        <th>Jatuh Tempo</th>
-                                        <th class="text-end pe-4">Sisa Tagihan</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="po-list-body">
-                                    {{-- JS will render rows here --}}
-                                </tbody>
-                            </table>
+                        {{-- Placeholder --}}
+                        <div id="po-placeholder" class="flex flex-col items-center justify-center py-10 text-gray-400">
+                            <i class="bi bi-receipt text-4xl mb-2 opacity-30"></i>
+                            <p class="text-sm">Pilih supplier terlebih dahulu.</p>
                         </div>
 
-                        {{-- Total Bar (Sticky Bottom) --}}
-                        <div class="bg-light p-4 border-top d-flex justify-content-between align-items-center rounded-bottom">
-                            <div>
-                                <small class="text-muted d-block text-uppercase fw-bold">Total Tagihan Dipilih</small>
-                                <h3 class="fw-bold text-dark mb-0" id="total-selected-display">Rp 0</h3>
+                        {{-- Table PO --}}
+                        <table class="w-full text-left border-collapse hidden" id="po-table">
+                            <thead class="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                                <tr>
+                                    <th class="px-4 py-3 text-center w-10">
+                                        <input type="checkbox" id="check-all-pos" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                                    </th>
+                                    <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">No. PO</th>
+                                    <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase text-right">Sisa Tagihan</th>
+                                </tr>
+                            </thead>
+                            <tbody id="po-list-body" class="divide-y divide-gray-100">
+                                {{-- JS akan mengisi baris ini --}}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {{-- Footer Summary --}}
+                    <div class="p-6 border-t border-gray-200 bg-gray-50">
+                        
+                        {{-- Rincian Hitungan --}}
+                        <div class="space-y-2 mb-4 text-sm">
+                            <div class="flex justify-between text-gray-600">
+                                <span>Total Tagihan Dipilih:</span>
+                                <span class="font-semibold text-gray-900" id="summary-total-bill">Rp 0</span>
                             </div>
-                            <button type="submit" class="btn btn-primary btn-lg shadow-sm px-5 fw-bold">
-                                <i class="bi bi-check-lg me-2"></i> Simpan Pembayaran
-                            </button>
+                            
+                            {{-- Baris Deposit (Hidden by default) --}}
+                            <div id="summary-deposit-row" class="flex justify-between text-green-600 hidden">
+                                <span>Potong Deposit:</span>
+                                <span id="summary-deposit-amount">- Rp 0</span>
+                            </div>
                         </div>
 
+                        <div class="border-t border-gray-200 my-3"></div>
+
+                        <div class="flex justify-between items-end mb-4">
+                            <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Transfer/Kas</span>
+                            <span class="text-2xl font-bold text-indigo-600" id="total-selected-display">Rp 0</span>
+                        </div>
+                        
+                        <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition flex justify-center items-center gap-2">
+                            <i class="bi bi-check-circle"></i> Simpan Pembayaran
+                        </button>
                     </div>
                 </div>
 
-            </form>
+            </div>
+
         </div>
-    </div>
+    </form>
 </div>
 @endsection
 
@@ -214,9 +273,6 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // (SCRIPT ANDA TIDAK BERUBAH - SAMA PERSIS)
-    // Saya paste ulang agar Anda mudah copy-paste satu file penuh
-    
     const supplierSelect = $('#supplier_id');
     const poTable = document.getElementById('po-table');
     const poListBody = document.getElementById('po-list-body');
@@ -240,44 +296,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const proofInput = document.getElementById('proof_of_payment_batch_purchase');
     
     let currentDebitBalance = 0;
-    
     const defaultPaymentMethodId = "{{ $defaultPaymentMethodId }}";
     const defaultBankAccountId = "{{ $defaultBankAccountId }}";
 
-    function handlePaymentMethodChange() {
-        if (!paymentMethodSelect) return;
-        const selectedOption = paymentMethodSelect.options[paymentMethodSelect.selectedIndex];
-        const config = (selectedOption && !paymentMethodSelect.disabled) ? selectedOption.dataset.config : 'none';
-
-        referenceGroup.style.display = 'none';
-        referenceInput.required = false;
-        proofGroup.style.display = 'none';
-        proofInput.required = false;
-
-        if (config === 'proof_only') {
-            proofGroup.style.display = 'block';
-            proofInput.required = true;
-        } else if (config === 'reference_only') {
-            referenceGroup.style.display = 'block';
-            referenceInput.required = true;
-        } else if (config === 'proof_and_reference') {
-            proofGroup.style.display = 'block';
-            proofInput.required = true;
-            referenceGroup.style.display = 'block';
-            referenceInput.required = true;
-        }
-    }
-    
-    if (paymentMethodSelect) {
-        paymentMethodSelect.addEventListener('change', handlePaymentMethodChange);
-    }
-    
+    // 1. AutoNumeric
     const autoNumericInstance = new AutoNumeric(amountFormattedInput, {
-        digitGroupSeparator: '.',
-        decimalCharacter: ',',
-        decimalCharacterAlternative: '.',
-        decimalPlaces: 0,
-        minimumValue: 0
+        digitGroupSeparator: '.', decimalCharacter: ',', decimalPlaces: 0, minimumValue: 0
     });
 
     amountFormattedInput.addEventListener('autoNumeric:rawValueModified', (e) => {
@@ -285,21 +309,33 @@ document.addEventListener('DOMContentLoaded', function () {
         toggleRequiredFields();
     });
 
-    supplierSelect.select2({
-        theme: 'bootstrap-5',
-        placeholder: '-- Cari Supplier --'
-    });
+    // 2. Select2 Supplier
+    supplierSelect.select2({ theme: 'bootstrap-5', placeholder: '-- Cari Supplier --', width: '100%' });
 
+    // 3. Toggle Payment Fields
+    function handlePaymentMethodChange() {
+        if (!paymentMethodSelect) return;
+        const selectedOption = paymentMethodSelect.options[paymentMethodSelect.selectedIndex];
+        const config = (selectedOption && !paymentMethodSelect.disabled) ? selectedOption.dataset.config : 'none';
+
+        referenceGroup.style.display = 'none'; referenceInput.required = false;
+        proofGroup.style.display = 'none'; proofInput.required = false;
+
+        if (config === 'proof_only') { proofGroup.style.display = 'block'; proofInput.required = true; }
+        else if (config === 'reference_only') { referenceGroup.style.display = 'block'; referenceInput.required = true; }
+        else if (config === 'proof_and_reference') {
+            proofGroup.style.display = 'block'; proofInput.required = true;
+            referenceGroup.style.display = 'block'; referenceInput.required = true;
+        }
+    }
+    if (paymentMethodSelect) paymentMethodSelect.addEventListener('change', handlePaymentMethodChange);
+
+    // 4. Helper Format Rupiah
     function formatRupiah(number) {
-        if (isNaN(number)) return 'Rp 0';
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency', 
-            currency: 'IDR', 
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 2
-        }).format(number);
+        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(number);
     }
 
+    // 5. Calculate Total Selected
     function calculateTotalSelected() {
         let total = 0;
         document.querySelectorAll('.po-checkbox:checked').forEach(checkbox => {
@@ -309,74 +345,92 @@ document.addEventListener('DOMContentLoaded', function () {
         toggleRequiredFields();
     }
 
+    // 6. Toggle Required Fields based on Debit
     function toggleRequiredFields() {
-        const selectedPOBalanceString = totalSelectedDisplay.textContent || 'Rp 0';
-        const selectedPOBalance = parseFloat(selectedPOBalanceString.replace(/[^0-9,-]+/g,"").replace(",", ".")) || 0;
+        // 1. Ambil Total Tagihan dari Checkbox yang dipilih
+        let totalBill = 0;
+        document.querySelectorAll('.po-checkbox:checked').forEach(checkbox => {
+            totalBill += parseFloat(checkbox.dataset.balance || 0);
+        });
 
         const useDebitIsChecked = useDebitCheckbox.checked;
-        const inputAmountValue = parseFloat(amountHiddenInput.value || 0);
-        const debitIsSufficient = currentDebitBalance >= selectedPOBalance && selectedPOBalance > 0;
+        let depositUsed = 0;
+        let cashToPay = totalBill;
 
-        if (useDebitIsChecked) {
-            if (debitIsSufficient) {
-                if (!amountFormattedInput.disabled) {
-                     autoNumericInstance.set(0);
-                }
-                amountFormattedInput.required = false;
-                amountFormattedInput.disabled = true;
-                paymentMethodSelect.required = false;
-                paymentMethodSelect.disabled = true;
-                paymentMethodSelect.value = "";
-                bankAccountSelect.required = false;
-                bankAccountSelect.disabled = true;
-                bankAccountSelect.value = "";
+        // 2. Hitung Logika Deposit
+        if (useDebitIsChecked && currentDebitBalance > 0) {
+            if (currentDebitBalance >= totalBill) {
+                // Deposit cukup untuk bayar semua
+                depositUsed = totalBill;
+                cashToPay = 0;
             } else {
-                amountFormattedInput.required = true;
-                amountFormattedInput.disabled = false;
-                paymentMethodSelect.required = true;
-                paymentMethodSelect.disabled = false;
-                if (!paymentMethodSelect.value) paymentMethodSelect.value = defaultPaymentMethodId;
-                bankAccountSelect.required = true;
-                bankAccountSelect.disabled = false;
-                if (!bankAccountSelect.value) bankAccountSelect.value = defaultBankAccountId;
-            }
-        } else {
-            amountFormattedInput.required = true;
-            amountFormattedInput.disabled = false;
-            
-            const isAmountPositive = inputAmountValue > 0;
-            
-            paymentMethodSelect.required = isAmountPositive;
-            paymentMethodSelect.disabled = false;
-            bankAccountSelect.required = isAmountPositive;
-            bankAccountSelect.disabled = false;
-            
-            if (isAmountPositive) {
-                if (!paymentMethodSelect.value) paymentMethodSelect.value = defaultPaymentMethodId;
-                if (!bankAccountSelect.value) bankAccountSelect.value = defaultBankAccountId;
-            } else {
-                 paymentMethodSelect.value = "";
-                 bankAccountSelect.value = "";
+                // Deposit tidak cukup, sisanya bayar cash
+                depositUsed = currentDebitBalance;
+                cashToPay = totalBill - currentDebitBalance;
             }
         }
+
+        // 3. Update Tampilan Summary
+        document.getElementById('summary-total-bill').textContent = formatRupiah(totalBill);
         
+        const depositRow = document.getElementById('summary-deposit-row');
+        const depositSpan = document.getElementById('summary-deposit-amount');
+        const netDisplay = document.getElementById('total-selected-display');
+
+        if (depositUsed > 0) {
+            depositRow.classList.remove('hidden');
+            depositSpan.textContent = '- ' + formatRupiah(depositUsed);
+        } else {
+            depositRow.classList.add('hidden');
+        }
+
+        netDisplay.textContent = formatRupiah(cashToPay);
+
+        // 4. Update Input Form (AutoNumeric & Disabled State)
+        // Set nilai input cash sesuai perhitungan sisa
+        if (amountFormattedInput) {
+            autoNumericInstance.set(cashToPay);
+        }
+
+        // Logic Disable/Enable Input berdasarkan apakah sisa bayar 0 atau tidak
+        if (cashToPay <= 0) {
+            // Lunas pakai deposit semua
+            amountFormattedInput.disabled = true;
+            
+            paymentMethodSelect.disabled = true;
+            paymentMethodSelect.value = "";
+            paymentMethodSelect.required = false;
+            
+            bankAccountSelect.disabled = true;
+            bankAccountSelect.value = "";
+            bankAccountSelect.required = false;
+        } else {
+            // Masih ada sisa yang harus dibayar cash
+            amountFormattedInput.disabled = false;
+            
+            paymentMethodSelect.disabled = false;
+            paymentMethodSelect.required = true;
+            if (!paymentMethodSelect.value) paymentMethodSelect.value = defaultPaymentMethodId;
+
+            bankAccountSelect.disabled = false;
+            bankAccountSelect.required = true;
+            if (!bankAccountSelect.value) bankAccountSelect.value = defaultBankAccountId;
+        }
+
+        // Trigger perubahan method agar field bukti/referensi menyesuaikan
         handlePaymentMethodChange();
     }
 
-    if(useDebitCheckbox) {
-        useDebitCheckbox.addEventListener('change', toggleRequiredFields);
-    }
+    if(useDebitCheckbox) useDebitCheckbox.addEventListener('change', toggleRequiredFields);
 
+    // 7. Checkbox Logic
     checkAll.addEventListener('change', function () {
-        document.querySelectorAll('.po-checkbox').forEach(checkbox => {
-            checkbox.checked = this.checked;
-        });
+        document.querySelectorAll('.po-checkbox').forEach(cb => cb.checked = this.checked);
         calculateTotalSelected();
     });
 
     function addPOCheckboxListeners() {
         document.querySelectorAll('.po-checkbox').forEach(cb => {
-            cb.removeEventListener('change', handlePOCheckboxChange);
             cb.addEventListener('change', handlePOCheckboxChange);
         });
     }
@@ -385,28 +439,24 @@ document.addEventListener('DOMContentLoaded', function () {
         calculateTotalSelected();
     }
 
+    // 8. Fetch PO Data
     supplierSelect.on('change', async function () {
         const supplierId = this.value;
 
-        debitInfoDiv.classList.add('d-none');
+        // Reset UI
+        debitInfoDiv.classList.add('hidden'); 
         useDebitContainer.style.display = 'none';
         useDebitCheckbox.checked = false;
         currentDebitBalance = 0;
         
-        poPlaceholder.innerHTML = '<div class="spinner-border text-primary" role="status"></div><div class="mt-2">Memuat data...</div>';
-        poPlaceholder.classList.remove('d-none');
-        
-        poTable.classList.add('d-none');
+        poPlaceholder.innerHTML = '<div class="flex flex-col items-center"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div><span class="text-sm text-gray-500">Memuat data...</span></div>';
+        poPlaceholder.classList.remove('hidden');
+        poTable.classList.add('hidden');
         poListBody.innerHTML = '';
         checkAll.checked = false;
         autoNumericInstance.set(0);
 
-        if (!supplierId) {
-            poPlaceholder.textContent = 'Silakan pilih supplier untuk melihat daftar PO.';
-            calculateTotalSelected();
-            toggleRequiredFields();
-            return;
-        }
+        if (!supplierId) return;
 
         try {
             const supplierResponse = await fetch(`/api/suppliers/${supplierId}/details`);
@@ -418,11 +468,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
             debitBalanceSpan.textContent = formatRupiah(currentDebitBalance);
             pendingBalanceSpan.textContent = formatRupiah(pendingBalance);
-            debitInfoDiv.classList.remove('d-none');
+            debitInfoDiv.classList.remove('hidden');
+            debitInfoDiv.classList.add('block'); // Ensure visible
 
-            if (currentDebitBalance > 0) {
-                useDebitContainer.style.display = 'block';
-            }
+            if (currentDebitBalance > 0) useDebitContainer.style.display = 'flex';
 
             const poResponse = await fetch(`/api/suppliers/${supplierId}/unpaid-purchase-orders`);
             if (!poResponse.ok) throw new Error('Gagal mengambil data PO');
@@ -433,34 +482,31 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 pos.forEach(po => {
                     const row = `
-                        <tr>
-                            <td class="ps-4">
-                                <input class="form-check-input po-checkbox cursor-pointer"
-                                       type="checkbox"
-                                       name="po_ids[]"
-                                       value="${po.po_id}"
-                                       data-balance="${po.sisa_tagihan}"
-                                       style="transform: scale(1.1);">
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-4 py-3 text-center">
+                                <input class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer po-checkbox"
+                                       type="checkbox" name="po_ids[]" value="${po.po_id}" data-balance="${po.sisa_tagihan}">
                             </td>
-                            <td class="fw-bold text-primary">${po.po_number}</td>
-                            <td>${po.due_date_formatted}</td>
-                            <td class="text-end pe-4 fw-semibold">${formatRupiah(po.sisa_tagihan)}</td>
+                            <td class="px-4 py-3">
+                                <span class="block text-sm font-bold text-indigo-600">${po.po_number}</span>
+                                <span class="text-xs text-gray-500">Due: ${po.due_date_formatted}</span>
+                            </td>
+                            <td class="px-4 py-3 text-right text-sm font-medium text-gray-900">
+                                ${formatRupiah(po.sisa_tagihan)}
+                            </td>
                         </tr>
                     `;
                     poListBody.insertAdjacentHTML('beforeend', row);
                 });
-                poPlaceholder.classList.add('d-none');
-                poTable.classList.remove('d-none');
+                poPlaceholder.classList.add('hidden');
+                poTable.classList.remove('hidden');
                 addPOCheckboxListeners();
             }
 
         } catch (error) {
-            poPlaceholder.textContent = 'Gagal memuat data. Silakan coba lagi.';
-            console.error('Error fetching data:', error);
-            debitInfoDiv.classList.add('d-none');
-            useDebitContainer.style.display = 'none';
+            poPlaceholder.textContent = 'Gagal memuat data.';
+            console.error(error);
         }
-
         calculateTotalSelected();
         toggleRequiredFields();
     });

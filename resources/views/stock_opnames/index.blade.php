@@ -1,105 +1,119 @@
 @extends('layouts.app')
 
+@section('title', 'Riwayat Stock Opname')
+
 @section('content')
-<div class="container-fluid py-4">
+<div class="max-w-7xl mx-auto">
     
     {{-- HEADER --}}
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
-            <h3 class="fw-bold text-dark mb-0">Riwayat Stock Opname</h3>
-            <p class="text-muted small mb-0">Audit dan penyesuaian stok gudang</p>
+            <h2 class="text-2xl font-bold text-gray-900">Riwayat Stock Opname</h2>
+            <p class="text-sm text-gray-500 mt-1">Audit dan penyesuaian stok gudang.</p>
         </div>
         
-        <div class="d-flex gap-2">
-            <a href="{{ route('stock-opnames.worksheet') }}" class="btn btn-light border shadow-sm text-dark">
-                <i class="bi bi-printer me-1"></i> Cetak Worksheet
+        <div class="flex gap-3">
+            <a href="{{ route('stock-opnames.worksheet') }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 shadow-sm transition">
+                <i class="bi bi-printer mr-2"></i> Cetak Worksheet
             </a>
-            <a href="{{ route('stock-opnames.create') }}" class="btn btn-primary shadow-sm">
-                <i class="bi bi-plus-lg me-1"></i> Mulai Opname Baru
+            <a href="{{ route('stock-opnames.create') }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm transition">
+                <i class="bi bi-plus-lg mr-2"></i> Mulai Opname
             </a>
         </div>
     </div>
 
+    {{-- FLASH MESSAGE --}}
     @if(session('success'))
-    <div class="alert alert-success border-0 shadow-sm d-flex align-items-center mb-4">
-        <i class="bi bi-check-circle-fill fs-4 me-2"></i>
-        <div>{{ session('success') }}</div>
-        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+    <div class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-r shadow-sm flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <i class="bi bi-check-circle-fill text-green-500 text-xl"></i>
+            <span class="text-sm text-green-700 font-medium">{{ session('success') }}</span>
+        </div>
+        <button onclick="this.parentElement.remove()" class="text-green-500 hover:text-green-700"><i class="bi bi-x text-lg"></i></button>
     </div>
     @endif
 
-    {{-- CARD LIST --}}
-    <div class="card card-transaction border-0 shadow-sm">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover table-transaction align-middle mb-0">
-                    <thead class="bg-light">
-                        <tr>
-                            <th class="ps-4">No. Opname</th>
-                            <th>Tanggal</th>
-                            <th>Petugas</th>
-                            <th>Catatan</th>
-                            <th class="text-end">Nilai Penyesuaian</th>
-                            <th class="text-center">Status</th>
-                            <th class="text-center pe-4">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($opnames as $opname)
-                        <tr>
-                            <td class="ps-4 fw-bold text-primary">{{ $opname->opname_number }}</td>
-                            <td>{{ $opname->opname_date->format('d M Y') }}</td>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <div class="bg-light rounded-circle d-flex justify-content-center align-items-center me-2" style="width: 30px; height: 30px;">
-                                        <i class="bi bi-person text-muted small"></i>
-                                    </div>
-                                    {{ $opname->user->full_name ?? 'System' }}
+    {{-- TABLE CARD --}}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">No. Opname</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tanggal</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Petugas</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Catatan</th>
+                        <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Nilai Penyesuaian</th>
+                        <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    @forelse($opnames as $opname)
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="text-sm font-bold text-indigo-600 font-mono">{{ $opname->opname_number }}</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                            {{ $opname->opname_date->format('d M Y') }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 mr-2 border border-gray-200">
+                                    <i class="bi bi-person-fill text-xs"></i>
                                 </div>
-                            </td>
-                            <td class="text-muted small">{{ Str::limit($opname->notes, 40) ?: '-' }}</td>
-                            
-                            <td class="text-end fw-bold {{ $opname->total_adjustment_value < 0 ? 'text-danger' : ($opname->total_adjustment_value > 0 ? 'text-success' : 'text-muted') }}">
+                                <span class="text-sm text-gray-700">{{ $opname->user->full_name ?? 'System' }}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 italic">
+                            {{ Str::limit($opname->notes, 30) ?: '-' }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right">
+                            <span class="text-sm font-bold {{ $opname->total_adjustment_value < 0 ? 'text-red-600' : ($opname->total_adjustment_value > 0 ? 'text-green-600' : 'text-gray-500') }}">
                                 {{ $opname->total_adjustment_value < 0 ? '-' : '+' }} Rp {{ number_format(abs($opname->total_adjustment_value), 0, ',', '.') }}
-                            </td>
-                            
-                            <td class="text-center">
-                                @if($opname->status == 'completed')
-                                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3">Selesai</span>
-                                @else
-                                    <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-3">{{ $opname->status }}</span>
-                                @endif
-                            </td>
-                            
-                            <td class="text-center pe-4">
-                                <a href="{{ route('stock-opnames.show', $opname->opname_id) }}" class="btn btn-sm btn-light border text-primary shadow-sm" title="Detail">
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center">
+                            @if($opname->status == 'completed')
+                                <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">Selesai</span>
+                            @else
+                                <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">{{ ucfirst($opname->status) }}</span>
+                            @endif
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                            <div class="flex justify-center gap-2">
+                                <a href="{{ route('stock-opnames.show', $opname->opname_id) }}" class="p-1.5 bg-white border border-gray-300 rounded-md text-indigo-600 hover:bg-indigo-50 transition shadow-sm" title="Detail">
                                     <i class="bi bi-eye"></i>
                                 </a>
-                                
-                                <form action="{{ route('stock-opnames.destroy', $opname->opname_id) }}" method="POST" class="d-inline form-delete-opname">
+                                <form action="{{ route('stock-opnames.destroy', $opname->opname_id) }}" method="POST" class="form-delete-opname inline-block">
                                     @csrf @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-light border text-danger shadow-sm ms-1" title="Hapus">
+                                    <button type="submit" class="p-1.5 bg-white border border-gray-300 rounded-md text-red-600 hover:bg-red-50 transition shadow-sm" title="Hapus">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
-                            </td>
-                        </tr>
-                        @empty
-                        <tr>
-                            <td colspan="7" class="text-center py-5 text-muted">
-                                <i class="bi bi-clipboard-x fs-1 d-block mb-2 opacity-25"></i>
-                                Belum ada riwayat Stock Opname.
-                            </td>
-                        </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+                            </div>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                            <div class="flex flex-col items-center justify-center">
+                                <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                                    <i class="bi bi-clipboard-x text-2xl text-gray-400"></i>
+                                </div>
+                                <p class="text-sm">Belum ada riwayat Stock Opname.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
-    </div>
-    
-    <div class="mt-4 d-flex justify-content-center">
-        {{ $opnames->links() }}
+        
+        {{-- Pagination --}}
+        <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            {{ $opnames->links() }}
+        </div>
     </div>
 </div>
 @endsection
@@ -113,17 +127,15 @@ document.addEventListener('DOMContentLoaded', function() {
             event.preventDefault();
             Swal.fire({
                 title: 'Batalkan Opname?',
-                text: "Stok akan dikembalikan dan jurnal dihapus!",
+                text: "Stok akan dikembalikan dan jurnal dihapus! Data tidak bisa dikembalikan.",
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#6c757d',
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#6b7280',
                 confirmButtonText: 'Ya, Hapus!',
                 cancelButtonText: 'Batal'
             }).then((result) => {
-                if (result.isConfirmed) {
-                    form.submit();
-                }
+                if (result.isConfirmed) form.submit();
             });
         });
     });

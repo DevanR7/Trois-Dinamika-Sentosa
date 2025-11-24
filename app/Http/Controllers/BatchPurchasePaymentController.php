@@ -325,7 +325,8 @@ class BatchPurchasePaymentController extends Controller
             DB::commit();
 
             $message = 'Batch pembayaran berhasil. ' . implode('. ', $alokasiLog);
-            return redirect()->route('purchase-orders.index')->with('success', $message);
+            return redirect()->route('batch-purchase-payments.create')
+            ->with('success', 'Pembayaran Batch Berhasil Disimpan. ' . count($alokasiLog) . ' alokasi diproses.');
 
         } catch (\Exception $e) {
             DB::rollBack();

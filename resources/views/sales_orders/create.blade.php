@@ -1,123 +1,139 @@
 @extends('layouts.app')
 
+@section('title', 'Buat Pesanan Penjualan')
+
 @section('content')
-<div class="container-fluid py-2">
+<div class="max-w-6xl mx-auto">
     
     {{-- HEADER --}}
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
-            <h3 class="fw-bold text-dark mb-1">Buat Pesanan Penjualan</h3>
-            <p class="text-muted mb-0 small">Input pesanan baru dari pelanggan.</p>
+            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Buat Pesanan Penjualan</h2>
+            <p class="text-sm text-gray-500 mt-1">Input pesanan baru dari pelanggan.</p>
         </div>
-        <div>
-            <a href="{{ route('sales-orders.index') }}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left me-1"></i> Kembali
-            </a>
-        </div>
+        <a href="{{ route('sales-orders.index') }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition shadow-sm">
+            Kembali
+        </a>
     </div>
 
-    <div class="row justify-content-center">
-        <div class="col-lg-10">
-            
-            @if ($errors->any())
-                <div class="alert alert-danger border-0 shadow-sm rounded-3 mb-4">
-                    <ul class="mb-0 small ps-3">
-                        @foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach
+    {{-- ALERT ERROR --}}
+    @if ($errors->any() || session('error'))
+        <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r shadow-sm">
+            <div class="flex">
+                <div class="flex-shrink-0"><i class="bi bi-exclamation-triangle-fill text-red-400 text-xl"></i></div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-bold text-red-800">Terdapat kesalahan input:</h3>
+                    <ul class="mt-1 list-disc list-inside text-sm text-red-700">
+                        @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
+                        @if(session('error')) <li>{{ session('error') }}</li> @endif
                     </ul>
                 </div>
-            @endif
-            @if (session('error'))
-                <div class="alert alert-danger border-0 shadow-sm rounded-3 mb-4">
-                    {{ session('error') }}
-                </div>
-            @endif
+            </div>
+        </div>
+    @endif
 
-            <form action="{{ route('sales-orders.store') }}" method="POST">
-                @csrf
+    <form action="{{ route('sales-orders.store') }}" method="POST">
+        @csrf
+        
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {{-- KOLOM KIRI: INFO & ITEM (Span 8) --}}
+            <div class="lg:col-span-8 space-y-6">
                 
-                <div class="card card-transaction border-0 shadow-sm">
-                    <div class="card-header bg-white p-4 border-bottom">
-                        <div class="form-section-title mb-0"><i class="bi bi-cart-plus"></i> Form Pesanan</div>
+                {{-- CARD 1: INFO PESANAN --}}
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+                        <i class="bi bi-info-circle text-indigo-500"></i>
+                        <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Informasi Pesanan</h3>
+                    </div>
+                    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="md:col-span-2">
+                            <label for="client_id" class="block text-xs font-bold text-gray-700 uppercase mb-1">Pelanggan (Klien)</label>
+                            <select name="client_id" id="client_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" required>
+                                <option value="" disabled selected>-- Pilih Klien --</option>
+                                @foreach ($clients as $client)
+                                    <option value="{{ $client->client_id }}">{{ $client->client_name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label for="order_date" class="block text-xs font-bold text-gray-700 uppercase mb-1">Tanggal Pesanan</label>
+                            <input type="date" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" id="order_date" name="order_date" value="{{ now()->format('Y-m-d') }}" required>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- CARD 2: RINCIAN ITEM --}}
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                        <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                            <i class="bi bi-cart text-indigo-500"></i> Rincian Item
+                        </h3>
+                        <button type="button" id="add-product-btn" class="inline-flex items-center px-3 py-1.5 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-md hover:bg-indigo-100 border border-indigo-200 transition">
+                            <i class="bi bi-plus-lg mr-1"></i> Tambah Item
+                        </button>
                     </div>
                     
-                    <div class="card-body p-4">
-                        
-                        {{-- 1. INFO KLIEN --}}
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-6">
-                                <label for="client_id" class="form-label fw-bold small text-muted">PELANGGAN (KLIEN)</label>
-                                <select name="client_id" id="client_id" class="form-select" required>
-                                    <option value="" disabled selected>-- Pilih Klien --</option>
-                                    @foreach ($clients as $client)
-                                        <option value="{{ $client->client_id }}">{{ $client->client_name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="order_date" class="form-label fw-bold small text-muted">TANGGAL PESANAN</label>
-                                <input type="date" class="form-control" id="order_date" name="order_date" value="{{ now()->format('Y-m-d') }}" required>
-                            </div>
-                        </div>
-
-                        <hr class="border-dashed">
-
-                        {{-- 2. ITEM PESANAN --}}
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="fw-bold text-dark mb-0">Rincian Item</h6>
-                            <button type="button" id="add-product-btn" class="btn btn-primary btn-sm rounded-pill px-3">
-                                <i class="bi bi-plus-lg me-1"></i> Tambah Item
-                            </button>
-                        </div>
-
-                        <div class="table-responsive mb-3">
-                            <table class="table table-hover table-transaction align-middle mb-0">
-                                <thead class="bg-light">
-                                    <tr>
-                                        <th style="width: 40%;">Produk</th>
-                                        <th style="width: 15%;">Kuantitas</th>
-                                        <th style="width: 20%;">Harga Satuan</th>
-                                        <th class="text-end" style="width: 20%;">Subtotal</th>
-                                        <th class="text-center" style="width: 5%;"></th>
-                                    </tr>
-                                </thead>
-                                <tbody id="product-items"></tbody>
-                            </table>
-                        </div>
-
-                        {{-- 3. TOTAL & CATATAN --}}
-                        <div class="row mt-4">
-                            <div class="col-md-7">
-                                <label for="notes" class="form-label fw-bold small text-muted">CATATAN / INSTRUKSI</label>
-                                <textarea class="form-control bg-light" name="notes" id="notes" rows="3" placeholder="Contoh: Kirim sebelum jam 5 sore...">{{ old('notes') }}</textarea>
-                            </div>
-                            <div class="col-md-5">
-                                <div class="card bg-light border-0 p-3">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <span class="fw-bold text-secondary">TOTAL PESANAN</span>
-                                        <span class="fw-bold fs-4 text-primary" id="grand-total">Rp 0</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- ACTIONS --}}
-                        <div class="d-flex justify-content-end mt-4 pt-3 border-top">
-                            <a href="{{ route('sales-orders.index') }}" class="btn btn-light border me-2">Batal</a>
-                            <button type="submit" class="btn btn-primary px-4 fw-bold">Simpan Pesanan</button>
-                        </div>
-
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase w-5/12">Produk</th>
+                                    <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase text-center w-2/12">Qty</th>
+                                    <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase text-right w-2/12">Harga (@)</th>
+                                    <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase text-right w-2/12">Subtotal</th>
+                                    <th class="px-4 py-3 w-10"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="product-items" class="divide-y divide-gray-100 bg-white">
+                                {{-- JS Inject Rows --}}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="p-6 border-t border-gray-100 bg-yellow-50/30">
+                        <label for="notes" class="block text-xs font-bold text-gray-700 uppercase mb-2">Catatan / Instruksi</label>
+                        <textarea class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm bg-white" name="notes" id="notes" rows="2" placeholder="Contoh: Kirim sebelum jam 5 sore...">{{ old('notes') }}</textarea>
                     </div>
                 </div>
-            </form>
+            </div>
+
+            {{-- KOLOM KANAN: TOTAL & AKSI (Span 4) --}}
+            <div class="lg:col-span-4 space-y-6">
+                
+                {{-- CARD SUMMARY --}}
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sticky top-6">
+                    <h3 class="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
+                        <i class="bi bi-calculator text-indigo-500"></i> Ringkasan
+                    </h3>
+
+                    <div class="space-y-3 text-sm text-gray-600 mb-6">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium">TOTAL PESANAN</span>
+                            <span class="text-xl font-bold text-indigo-600" id="grand-total">Rp 0</span>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-3">
+                        <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition flex justify-center items-center gap-2">
+                            <i class="bi bi-check-circle"></i> Simpan Pesanan
+                        </button>
+                        <a href="{{ route('sales-orders.index') }}" class="w-full py-3 bg-white border border-gray-300 text-gray-700 text-sm font-bold rounded-lg hover:bg-gray-50 transition text-center shadow-sm">
+                            Batal
+                        </a>
+                    </div>
+                </div>
+
+            </div>
         </div>
-    </div>
+    </form>
 </div>
 
 {{-- TEMPLATE ROW --}}
 <template id="product-row-template">
-    <tr>
-        <td>
-           <select class="form-select form-select-sm product-select" required>
+    <tr class="hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
+        <td class="p-3 align-top">
+           <select class="product-select table-input w-full text-sm" required>
                 <option></option>
                 @foreach ($products as $product)
                     <option value="{{ $product->product_id }}" data-price="{{ $product->selling_price ?? 0 }}">
@@ -126,32 +142,35 @@
                 @endforeach
             </select>
         </td>
-        <td>
-            <input type="number" class="form-control form-control-sm quantity text-center" value="1" min="1" required>
+        <td class="p-3 align-top">
+            <input type="number" class="table-input quantity text-center w-full font-bold text-gray-700 border border-gray-300 rounded-md h-9" value="1" min="1" required>
         </td>
-        <td>
-            <div class="input-group input-group-sm">
-                <span class="input-group-text border-0 bg-transparent px-1 text-muted">Rp</span>
-                <input type="text" class="form-control border-0 bg-transparent px-0 price-display" readonly>
+        <td class="p-3 align-top">
+            <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 text-xs">Rp</span>
+                <input type="text" class="price-display block w-full pl-8 pr-2 py-1.5 border border-gray-300 rounded-md text-right text-sm bg-gray-50 text-gray-600 cursor-not-allowed" readonly>
             </div>
             <input type="hidden" class="price-raw">
         </td>
-        <td class="text-end fw-bold text-dark"><span class="subtotal">Rp 0</span></td>
-        <td class="text-center">
-            <button type="button" class="btn btn-link text-danger btn-sm remove-product-btn p-0"><i class="bi bi-trash"></i></button>
+        <td class="p-3 align-top text-right font-bold text-gray-900 text-sm align-middle">
+            <span class="subtotal">Rp 0</span>
+        </td>
+        <td class="p-3 align-top text-center align-middle">
+            <button type="button" class="text-gray-400 hover:text-red-500 hover:bg-red-50 rounded p-1 transition remove-product-btn">
+                <i class="bi bi-trash"></i>
+            </button>
         </td>
     </tr>
 </template>
 @endsection
 
 @push('scripts')
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        $('#client_id').select2({
-            theme: 'bootstrap-5',
-            placeholder: '-- Pilih Klien --',
-            width: '100%'
-        });
+        $('#client_id').select2({ theme: 'bootstrap-5', placeholder: '-- Cari Klien --', width: '100%' });
 
         const productItemsContainer = document.getElementById('product-items');
         const productRowTemplate = document.getElementById('product-row-template');
@@ -175,9 +194,7 @@
         }
 
         function addProductRow() {
-            const newRowFragment = productRowTemplate.content.cloneNode(true);
-            const newRow = newRowFragment.querySelector('tr');
-            
+            const newRow = productRowTemplate.content.cloneNode(true).querySelector('tr');
             const productSelect = newRow.querySelector('.product-select');
             const quantityInput = newRow.querySelector('.quantity');
             const priceDisplay = newRow.querySelector('.price-display');
@@ -186,7 +203,7 @@
 
             productSelect.name = `products[${productIndex}][product_id]`;
             quantityInput.name = `products[${productIndex}][quantity]`;
-            priceRaw.name = `products[${productIndex}][price]`; 
+            priceRaw.name = `products[${productIndex}][price]`;
 
             productItemsContainer.appendChild(newRow);
 
@@ -200,7 +217,7 @@
             select2.on('select2:select', function(e) {
                 const selectedOption = e.params.data.element;
                 const price = selectedOption.getAttribute('data-price') || 0;
-                priceDisplay.value = formatRupiah(price).replace('Rp', '').trim();
+                priceDisplay.value = new Intl.NumberFormat('id-ID').format(price);
                 priceRaw.value = price;
                 calculateTotals();
             });
@@ -216,7 +233,7 @@
         }
 
         addProductBtn.addEventListener('click', addProductRow);
-        addProductRow(); 
+        addProductRow(); // Init 1 row
     });
 </script>
 @endpush

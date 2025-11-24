@@ -1,583 +1,417 @@
 @extends('layouts.app')
 
+@section('title', 'Laporan Keuangan')
+
 @section('content')
-<div class="container-fluid py-4">
-    <h2 class="fw-bold mb-4">Laporan Keuangan (Berbasis Jurnal Umum)</h2>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
     
-    {{-- FORM FILTER --}}
-    <div class="card shadow-sm mb-4">
-        <div class="card-body">
-            <form action="{{ route('reports.index') }}" method="GET" class="row g-3 align-items-center">
-                <div class="col-md-5">
-                    <label for="start_date" class="form-label">Dari Tanggal</label>
-                    <input type="date" name="start_date" id="start_date" class="form-control" value="{{ $startDate }}">
+    {{-- HEADER & FILTER --}}
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Laporan Keuangan</h2>
+            <p class="text-sm text-gray-500 mt-1">Berbasis Jurnal Umum (Double Entry Accounting)</p>
+        </div>
+        
+        {{-- Filter Form --}}
+        <div class="w-full md:w-auto">
+            <form action="{{ route('reports.index') }}" method="GET" class="flex flex-col md:flex-row items-end gap-3">
+                <div>
+                    <label for="start_date" class="block text-xs font-bold text-gray-500 uppercase mb-1">Dari Tanggal</label>
+                    <input type="date" name="start_date" id="start_date" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" value="{{ $startDate }}">
                 </div>
-                <div class="col-md-5">
-                    <label for="end_date" class="form-label">Sampai Tanggal</label>
-                    <input type="date" name="end_date" id="end_date" class="form-control" value="{{ $endDate }}">
+                <div>
+                    <label for="end_date" class="block text-xs font-bold text-gray-500 uppercase mb-1">Sampai Tanggal</label>
+                    <input type="date" name="end_date" id="end_date" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" value="{{ $endDate }}">
                 </div>
-                <div class="col-md-2 align-self-end">
-                    <button type="submit" class="btn btn-dark w-100"><i class="bi bi-funnel-fill"></i> Tampilkan</button>
-                </div>
+                <button type="submit" class="w-full md:w-auto inline-flex justify-center items-center px-4 py-2 bg-gray-800 border border-transparent rounded-lg font-medium text-sm text-white hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition h-[38px]">
+                    <i class="material-icons text-lg mr-2">filter_alt</i> Tampilkan
+                </button>
             </form>
         </div>
-        <div class="card-footer bg-light">
-            <small class="text-muted">
-                <strong>Laba Rugi:</strong> Berdasarkan Jurnal Umum pada rentang tanggal yang dipilih.<br>
-                <strong>Neraca:</strong> Merupakan "foto" Jurnal Umum pada <strong>Tanggal Akhir</strong> yang dipilih.
-            </small>
+    </div>
+
+    {{-- INFO CARD --}}
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+        <i class="material-icons text-blue-500 mt-0.5">info</i>
+        <div class="text-sm text-blue-800">
+            <p class="font-bold mb-1">Tentang Laporan:</p>
+            <ul class="list-disc list-inside space-y-1 ml-1 text-xs">
+                <li><strong>Laba Rugi:</strong> Menampilkan performa (Pendapatan vs Beban) selama rentang tanggal yang dipilih.</li>
+                <li><strong>Neraca:</strong> Menampilkan posisi keuangan (Aset, Kewajiban, Modal) per tanggal akhir periode.</li>
+            </ul>
         </div>
     </div>
 
     {{-- =================================== --}}
     {{-- LAPORAN NERACA (BALANCE SHEET) --}}
     {{-- =================================== --}}
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-semibold">Laporan Neraca (Balance Sheet)</h5>
-            <span>Per Tanggal: {{ $endDateCarbon->isoFormat('D MMMM Y') }}</span>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-indigo-600 flex justify-between items-center text-white">
+            <h5 class="font-bold text-lg flex items-center gap-2">
+                <i class="material-icons">account_balance</i> Laporan Neraca (Balance Sheet)
+            </h5>
+            <span class="text-xs bg-indigo-700 px-3 py-1 rounded-full">Per: {{ $endDateCarbon->isoFormat('D MMMM Y') }}</span>
         </div>
-        <div class="card-body p-0">
-            <div class="row g-0">
-                
-                {{-- SISI ASET --}}
-                <div class="col-lg-6 border-end">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th class="fw-bold fs-5 p-3" colspan="2">ASET</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{-- Loop Dinamis Akun Aset --}}
-                                @forelse ($neraca_aset as $account)
-                                <tr>
-                                    <td class="ps-4">{{ $account->account_name }}</td>
-                                    <td class="text-end pe-3">Rp {{ number_format($account->balance, 0, ',', '.') }}</td>
-                                </tr>
-                                @empty
-                                <tr>
-                                    <td class="ps-4 text-muted" colspan="2">Tidak ada data Aset.</td>
-                                </tr>
-                                @endforelse
-                            </tbody>
-                            <tfoot class="table-primary">
-                                <tr>
-                                    <td class="fw-bold fs-5 p-3">TOTAL ASET</td>
-                                    <td class="text-end fw-bold fs-5 p-3">Rp {{ number_format($totalAset, 0, ',', '.') }}</td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                </div>
-
-                {{-- SISI LIABILITAS & EKUITAS --}}
-                <div class="col-lg-6">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th class="fw-bold fs-5 p-3" colspan="2">LIABILITAS & EKUITAS</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td class="fw-semibold ps-3" colspan="2">Liabilitas</td>
-                                </tr>
-                                {{-- Loop Dinamis Akun Liabilitas --}}
-                                @forelse ($neraca_liabilitas as $account)
-                                <tr>
-                                    <td class="ps-4">{{ $account->account_name }}</td>
-                                    <td class="text-end pe-3">Rp {{ number_format($account->balance, 0, ',', '.') }}</td>
-                                </tr>
-                                @empty
-                                <tr>
-                                    <td class="ps-4 text-muted" colspan="2">Tidak ada data Liabilitas.</td>
-                                </tr>
-                                @endforelse
-                                <tr class="table-secondary">
-                                    <td class="fw-bold ps-3">TOTAL LIABILITAS</td>
-                                    <td class="text-end fw-bold pe-3">Rp {{ number_format($totalLiabilitas, 0, ',', '.') }}</td>
-                                </tr>
-                                
-                                <tr>
-                                    <td class="fw-semibold ps-3 mt-2" colspan="2">Ekuitas (Modal)</td>
-                                </tr>
-                                {{-- Loop Dinamis Akun Ekuitas (Modal Setor, Prive, dll) --}}
-                                @forelse ($neraca_ekuitas_non_pl as $account)
-                                <tr>
-                                    <td class="ps-4">{{ $account->account_name }}</td>
-                                    <td class="text-end pe-3">Rp {{ number_format($account->balance, 0, ',', '.') }}</td>
-                                </tr>
-                                @empty
-                                <tr>
-                                    <td class="ps-4 text-muted" colspan="2">Tidak ada data Ekuitas.</td>
-                                </tr>
-                                @endforelse
-                                
-                                {{-- Laba Rugi Akumulasi (Dihitung terpisah) --}}
-                                <tr>
-                                    <td class="ps-4">Laba/Rugi Akumulasi</td>
-                                    <td class="text-end pe-3 {{ $ekuitas_labaRugiAkumulasi < 0 ? 'text-danger' : '' }}">
-                                        @if($ekuitas_labaRugiAkumulasi < 0)
-                                            (Rp {{ number_format(abs($ekuitas_labaRugiAkumulasi), 0, ',', '.') }})
-                                        @else
-                                            Rp {{ number_format($ekuitas_labaRugiAkumulasi, 0, ',', '.') }}
-                                        @endif
-                                    </td>
-                                </tr>
-                                <tr class="table-secondary">
-                                    <td class="fw-bold ps-3">TOTAL EKUITAS</td>
-                                    <td class="text-end fw-bold pe-3">Rp {{ number_format($totalEkuitas, 0, ',', '.') }}</td>
-                                </tr>
-                            </tbody>
-                            <tfoot class="table-primary">
-                                <tr>
-                                    <td class="fw-bold fs-5 p-3">TOTAL LIABILITAS & EKUITAS</td>
-                                    <td class="text-end fw-bold fs-5 p-3">Rp {{ number_format($totalLiabilitasDanEkuitas, 0, ',', '.') }}</td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                </div>
-            </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-gray-200">
             
-            {{-- Pengecekan Keseimbangan --}}
-            @php
-                $selisih = $totalAset - $totalLiabilitasDanEkuitas;
-            @endphp
-            @if(round($selisih, 2) != 0)
-                <div class="card-footer bg-danger text-white text-center fw-bold">
-                    TIDAK SEIMBANG! (Selisih: Rp {{ number_format($selisih, 2, ',', '.') }}) - Cek kembali Jurnal Umum.
+            {{-- SISI ASET --}}
+            <div class="p-0">
+                <div class="bg-gray-50 px-6 py-3 border-b border-gray-200 font-bold text-gray-700 uppercase tracking-wider text-sm">
+                    ASET (Harta)
                 </div>
-            @else
-                <div class="card-footer bg-success text-white text-center fw-bold">
-                    SEIMBANG (BALANCE)
+                <table class="min-w-full divide-y divide-gray-100">
+                    <tbody class="bg-white divide-y divide-gray-50">
+                        @forelse ($neraca_aset as $account)
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-3 text-sm text-gray-700">{{ $account->account_name }}</td>
+                            <td class="px-6 py-3 text-sm text-right font-mono text-gray-900">Rp {{ number_format($account->balance, 0, ',', '.') }}</td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="2" class="px-6 py-4 text-center text-gray-400 text-sm italic">Tidak ada data Aset.</td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                    <tfoot class="bg-indigo-50">
+                        <tr>
+                            <td class="px-6 py-3 text-sm font-bold text-indigo-900 uppercase">Total Aset</td>
+                            <td class="px-6 py-3 text-sm font-bold text-right text-indigo-900 font-mono">Rp {{ number_format($totalAset, 0, ',', '.') }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            {{-- SISI LIABILITAS & EKUITAS --}}
+            <div class="p-0">
+                <div class="bg-gray-50 px-6 py-3 border-b border-gray-200 font-bold text-gray-700 uppercase tracking-wider text-sm">
+                    LIABILITAS & EKUITAS
                 </div>
-            @endif
+                <table class="min-w-full divide-y divide-gray-100">
+                    <tbody class="bg-white divide-y divide-gray-50">
+                        {{-- Liabilitas --}}
+                        <tr>
+                            <td colspan="2" class="px-6 py-2 text-xs font-bold text-gray-500 bg-gray-50 uppercase tracking-wider">Kewajiban (Hutang)</td>
+                        </tr>
+                        @forelse ($neraca_liabilitas as $account)
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-2 text-sm text-gray-700 pl-8">{{ $account->account_name }}</td>
+                            <td class="px-6 py-2 text-sm text-right font-mono text-gray-900">Rp {{ number_format($account->balance, 0, ',', '.') }}</td>
+                        </tr>
+                        @empty
+                        <tr><td colspan="2" class="px-6 py-2 text-center text-gray-400 text-xs italic">Nihil.</td></tr>
+                        @endforelse
+                        <tr class="bg-gray-50/50">
+                            <td class="px-6 py-2 text-xs font-bold text-gray-600 pl-8">Total Liabilitas</td>
+                            <td class="px-6 py-2 text-xs font-bold text-right text-gray-800 font-mono">Rp {{ number_format($totalLiabilitas, 0, ',', '.') }}</td>
+                        </tr>
+
+                        {{-- Ekuitas --}}
+                        <tr>
+                            <td colspan="2" class="px-6 py-2 text-xs font-bold text-gray-500 bg-gray-50 uppercase tracking-wider mt-2">Ekuitas (Modal)</td>
+                        </tr>
+                        @forelse ($neraca_ekuitas_non_pl as $account)
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-2 text-sm text-gray-700 pl-8">{{ $account->account_name }}</td>
+                            <td class="px-6 py-2 text-sm text-right font-mono text-gray-900">Rp {{ number_format($account->balance, 0, ',', '.') }}</td>
+                        </tr>
+                        @empty
+                        <tr><td colspan="2" class="px-6 py-2 text-center text-gray-400 text-xs italic">Nihil.</td></tr>
+                        @endforelse
+                        
+                        {{-- Laba Rugi Akumulasi --}}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-2 text-sm text-gray-700 pl-8">Laba/Rugi Periode Berjalan</td>
+                            <td class="px-6 py-2 text-sm text-right font-mono font-bold {{ $ekuitas_labaRugiAkumulasi < 0 ? 'text-red-600' : 'text-green-600' }}">
+                                @if($ekuitas_labaRugiAkumulasi < 0)
+                                    (Rp {{ number_format(abs($ekuitas_labaRugiAkumulasi), 0, ',', '.') }})
+                                @else
+                                    Rp {{ number_format($ekuitas_labaRugiAkumulasi, 0, ',', '.') }}
+                                @endif
+                            </td>
+                        </tr>
+
+                        <tr class="bg-gray-50/50">
+                            <td class="px-6 py-2 text-xs font-bold text-gray-600 pl-8">Total Ekuitas</td>
+                            <td class="px-6 py-2 text-xs font-bold text-right text-gray-800 font-mono">Rp {{ number_format($totalEkuitas, 0, ',', '.') }}</td>
+                        </tr>
+                    </tbody>
+                    <tfoot class="bg-indigo-50">
+                        <tr>
+                            <td class="px-6 py-3 text-sm font-bold text-indigo-900 uppercase">Total Pasiva</td>
+                            <td class="px-6 py-3 text-sm font-bold text-right text-indigo-900 font-mono">Rp {{ number_format($totalLiabilitasDanEkuitas, 0, ',', '.') }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
         </div>
+
+        {{-- Balance Check --}}
+        @php $selisih = $totalAset - $totalLiabilitasDanEkuitas; @endphp
+        @if(round($selisih, 2) != 0)
+            <div class="bg-red-600 text-white text-center py-2 font-bold text-sm">
+                <i class="material-icons text-sm mr-1 align-middle">warning</i>
+                TIDAK SEIMBANG! Selisih: Rp {{ number_format($selisih, 2, ',', '.') }}
+            </div>
+        @else
+            <div class="bg-green-600 text-white text-center py-2 font-bold text-sm">
+                <i class="material-icons text-sm mr-1 align-middle">check_circle</i>
+                SEIMBANG (BALANCE)
+            </div>
+        @endif
     </div>
 
     {{-- =================================== --}}
     {{-- LAPORAN LABA RUGI --}}
     {{-- =================================== --}}
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-semibold">Laporan Laba Rugi</h5>
-            <span>{{ \Carbon\Carbon::parse($startDate)->isoFormat('D MMM Y') }} s/d {{ \Carbon\Carbon::parse($endDate)->isoFormat('D MMM Y') }}</span>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-800 flex justify-between items-center text-white">
+            <h5 class="font-bold text-lg flex items-center gap-2">
+                <i class="material-icons">trending_up</i> Laporan Laba Rugi
+            </h5>
+            <span class="text-xs bg-gray-700 px-3 py-1 rounded-full">
+                {{ \Carbon\Carbon::parse($startDate)->isoFormat('D MMM') }} - {{ \Carbon\Carbon::parse($endDate)->isoFormat('D MMM Y') }}
+            </span>
         </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-sm table-striped mb-0">
-                    <tbody>
-                        <tr>
-                            <td class="fw-semibold" style="width: 60%;" colspan="2">A. Pendapatan</td>
-                        </tr>
-                        {{-- Loop Dinamis Akun Pendapatan --}}
-                        @forelse ($labaRugi_pendapatan as $account)
-                        <tr>
-                            <td class="ps-4" style="width: 60%;">{{ $account->account_name }}</td>
-                            <td class="text-end" style="width: 40%;">Rp {{ number_format($account->total_credit - $account->total_debit, 0, ',', '.') }}</td>
-                        </tr>
-                        @empty
-                        <tr>
-                            <td class="ps-4 text-muted" colspan="2">Tidak ada data Pendapatan.</td>
-                        </tr>
-                        @endforelse
-                        <tr class="table-light">
-                            <td class="fw-bold ps-4">Total Pendapatan</td>
-                            <td class="text-end fw-bold">Rp {{ number_format($totalPendapatan, 0, ',', '.') }}</td>
-                        </tr>
+        
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-100">
+                <tbody class="divide-y divide-gray-50">
+                    
+                    {{-- A. PENDAPATAN --}}
+                    <tr class="bg-gray-50">
+                        <td colspan="2" class="px-6 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">A. Pendapatan (Revenue)</td>
+                    </tr>
+                    @forelse ($labaRugi_pendapatan as $account)
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-2 text-sm text-gray-700 pl-10">{{ $account->account_name }}</td>
+                        <td class="px-6 py-2 text-sm text-right text-gray-900 font-mono">Rp {{ number_format($account->total_credit - $account->total_debit, 0, ',', '.') }}</td>
+                    </tr>
+                    @empty
+                    <tr><td colspan="2" class="px-6 py-2 text-center text-gray-400 text-xs italic">Nihil.</td></tr>
+                    @endforelse
+                    <tr class="bg-blue-50/50 border-t border-blue-100">
+                        <td class="px-6 py-2 text-sm font-bold text-gray-800 pl-10">Total Pendapatan</td>
+                        <td class="px-6 py-2 text-sm font-bold text-right text-blue-700 font-mono">Rp {{ number_format($totalPendapatan, 0, ',', '.') }}</td>
+                    </tr>
 
-                        <tr>
-                            <td class="fw-semibold" colspan="2">B. Harga Pokok Penjualan (HPP)</td>
-                        </tr>
-                        {{-- Loop Dinamis Akun HPP --}}
-                        @forelse ($labaRugi_hpp as $account)
-                        <tr>
-                            <td class="ps-4">{{ $account->account_name }}</td>
-                            <td class="text-end text-danger">(Rp {{ number_format($account->total_debit - $account->total_credit, 0, ',', '.') }})</td>
-                        </tr>
-                        @empty
-                        <tr>
-                            <td class="ps-4 text-muted" colspan="2">Tidak ada data HPP.</td>
-                        </tr>
-                        @endforelse
-                        <tr class="table-light">
-                            <td class="fw-bold ps-4">Total HPP</td>
-                            <td class="text-end fw-bold text-danger">(Rp {{ number_format($totalHPP, 0, ',', '.') }})</td>
-                        </tr>
+                    {{-- B. HPP --}}
+                    <tr class="bg-gray-50">
+                        <td colspan="2" class="px-6 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider mt-4">B. Harga Pokok Penjualan (COGS)</td>
+                    </tr>
+                    @forelse ($labaRugi_hpp as $account)
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-2 text-sm text-gray-700 pl-10">{{ $account->account_name }}</td>
+                        <td class="px-6 py-2 text-sm text-right text-red-600 font-mono">(Rp {{ number_format($account->total_debit - $account->total_credit, 0, ',', '.') }})</td>
+                    </tr>
+                    @empty
+                    <tr><td colspan="2" class="px-6 py-2 text-center text-gray-400 text-xs italic">Nihil.</td></tr>
+                    @endforelse
+                    <tr class="bg-red-50/50 border-t border-red-100">
+                        <td class="px-6 py-2 text-sm font-bold text-gray-800 pl-10">Total HPP</td>
+                        <td class="px-6 py-2 text-sm font-bold text-right text-red-600 font-mono">(Rp {{ number_format($totalHPP, 0, ',', '.') }})</td>
+                    </tr>
 
-                        <tr class="table-info">
-                            <td class="fw-bold">LABA KOTOR (Gross Profit)</td>
-                            <td class="text-end fw-bold fs-5">Rp {{ number_format($labaKotor, 0, ',', '.') }}</td>
-                        </tr>
-                         
-                        <tr>
-                            <td class="fw-semibold ps-3" colspan="2">C. Beban Operasional</td>
-                        </tr>
-                        {{-- Loop Dinamis Akun Beban --}}
-                        @forelse ($labaRugi_beban as $account)
-                        <tr>
-                            <td class="ps-4">{{ $account->account_name }}</td>
-                            <td class="text-end text-danger">(Rp {{ number_format($account->total_debit - $account->total_credit, 0, ',', '.') }})</td>
-                        </tr>
-                        @empty
-                        <tr>
-                            <td class="ps-4 text-muted" colspan="2">Tidak ada data Beban.</td>
-                        </tr>
-                        @endforelse
-                        <tr class="table-light">
-                            <td class="fw-bold ps-4">Total Beban Operasional</td>
-                            <td class="text-end fw-bold text-danger">(Rp {{ number_format($totalBeban, 0, ',', '.') }})</td>
-                        </tr>
+                    {{-- LABA KOTOR --}}
+                    <tr class="bg-gray-100 border-y border-gray-200">
+                        <td class="px-6 py-3 text-sm font-bold text-gray-900 uppercase tracking-wide">Laba Kotor (Gross Profit)</td>
+                        <td class="px-6 py-3 text-base font-bold text-right text-gray-900 font-mono">Rp {{ number_format($labaKotor, 0, ',', '.') }}</td>
+                    </tr>
+
+                    {{-- C. BEBAN --}}
+                    <tr class="bg-gray-50">
+                        <td colspan="2" class="px-6 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider mt-4">C. Beban Operasional</td>
+                    </tr>
+                    @forelse ($labaRugi_beban as $account)
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-2 text-sm text-gray-700 pl-10">{{ $account->account_name }}</td>
+                        <td class="px-6 py-2 text-sm text-right text-red-600 font-mono">(Rp {{ number_format($account->total_debit - $account->total_credit, 0, ',', '.') }})</td>
+                    </tr>
+                    @empty
+                    <tr><td colspan="2" class="px-6 py-2 text-center text-gray-400 text-xs italic">Nihil.</td></tr>
+                    @endforelse
+                    <tr class="bg-red-50/50 border-t border-red-100">
+                        <td class="px-6 py-2 text-sm font-bold text-gray-800 pl-10">Total Beban</td>
+                        <td class="px-6 py-2 text-sm font-bold text-right text-red-600 font-mono">(Rp {{ number_format($totalBeban, 0, ',', '.') }})</td>
+                    </tr>
+                </tbody>
+                <tfoot class="bg-gray-800 text-white">
+                    <tr>
+                        <td class="px-6 py-4 text-base font-bold uppercase tracking-wide">Laba Bersih (Net Profit)</td>
+                        <td class="px-6 py-4 text-xl font-bold text-right font-mono {{ $labaBersih < 0 ? 'text-red-300' : 'text-green-300' }}">
+                            @if($labaBersih < 0)
+                                (Rp {{ number_format(abs($labaBersih), 0, ',', '.') }})
+                            @else
+                                Rp {{ number_format($labaBersih, 0, ',', '.') }}
+                            @endif
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    {{-- =================================== --}}
+    {{-- LAPORAN ARUS KAS --}}
+    {{-- =================================== --}}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {{-- ARUS KAS --}}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-full">
+            <div class="px-6 py-4 border-b border-gray-200 bg-green-600 flex justify-between items-center text-white">
+                <h5 class="font-bold text-sm flex items-center gap-2 uppercase tracking-wider">
+                    <i class="material-icons text-base">payments</i> Arus Kas (Indirect)
+                </h5>
+            </div>
+            <div class="p-0 flex-grow overflow-auto custom-scrollbar">
+                <table class="min-w-full divide-y divide-gray-100">
+                    <tbody class="divide-y divide-gray-50 bg-white">
                         
-                        <tr class="table-dark">
-                            <td class="fw-bold fs-5">LABA BERSIH (Net Profit)</td>
-                            <td class="text-end fw-bold fs-5">
-                                @if($labaBersih < 0)
-                                    (Rp {{ number_format(abs($labaBersih), 0, ',', '.') }})
-                                @else
-                                    Rp {{ number_format($labaBersih, 0, ',', '.') }}
-                                @endif
+                        {{-- 1. OPERASI --}}
+                        <tr class="bg-gray-50"><td colspan="2" class="px-6 py-2 text-xs font-bold text-gray-500 uppercase">1. Aktivitas Operasi</td></tr>
+                        <tr>
+                            <td class="px-6 py-2 text-sm text-gray-800 pl-8">Laba Bersih</td>
+                            <td class="px-6 py-2 text-sm text-right font-bold">Rp {{ number_format($cf_operating_net_income, 0, ',', '.') }}</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-1 text-xs text-gray-500 pl-10 italic">+ Penyusutan</td>
+                            <td class="px-6 py-1 text-xs text-right text-gray-500">Rp {{ number_format($cf_operating_depreciation, 0, ',', '.') }}</td>
+                        </tr>
+                        {{-- Perubahan Modal Kerja --}}
+                        @foreach([
+                            ['Piutang Usaha', $cf_change_ar],
+                            ['Persediaan', $cf_change_inventory],
+                            ['Hutang Dagang', $cf_change_ap],
+                            ['Deposit Klien', $cf_change_client_deposit],
+                            ['Deposit Supplier', $cf_change_supplier_deposit]
+                        ] as $item)
+                        <tr>
+                            <td class="px-6 py-1 text-xs text-gray-600 pl-10">Perubahan {{ $item[0] }}</td>
+                            <td class="px-6 py-1 text-xs text-right font-mono {{ $item[1] < 0 ? 'text-red-500' : 'text-gray-600' }}">
+                                Rp {{ number_format($item[1], 0, ',', '.') }}
                             </td>
                         </tr>
+                        @endforeach
+                        <tr class="bg-green-50 border-t border-green-100">
+                            <td class="px-6 py-2 text-xs font-bold text-green-800 pl-8">Kas Bersih Operasi</td>
+                            <td class="px-6 py-2 text-xs font-bold text-right text-green-800">Rp {{ number_format($total_cash_from_operations, 0, ',', '.') }}</td>
+                        </tr>
+
+                        {{-- 2. INVESTASI --}}
+                        <tr class="bg-gray-50"><td colspan="2" class="px-6 py-2 text-xs font-bold text-gray-500 uppercase">2. Aktivitas Investasi</td></tr>
+                        <tr>
+                            <td class="px-6 py-2 text-sm text-gray-800 pl-8">Pembelian Aset</td>
+                            <td class="px-6 py-2 text-sm text-right text-red-600 font-mono">(Rp {{ number_format($cf_investing_purchase_asset, 0, ',', '.') }})</td>
+                        </tr>
+                        <tr class="bg-yellow-50 border-t border-yellow-100">
+                            <td class="px-6 py-2 text-xs font-bold text-yellow-800 pl-8">Kas Bersih Investasi</td>
+                            <td class="px-6 py-2 text-xs font-bold text-right text-yellow-800">Rp {{ number_format($total_cash_from_investing, 0, ',', '.') }}</td>
+                        </tr>
+
+                        {{-- 3. PENDANAAN --}}
+                        <tr class="bg-gray-50"><td colspan="2" class="px-6 py-2 text-xs font-bold text-gray-500 uppercase">3. Aktivitas Pendanaan</td></tr>
+                        <tr>
+                            <td class="px-6 py-2 text-sm text-gray-800 pl-8">Modal Masuk & Pinjaman</td>
+                            <td class="px-6 py-2 text-sm text-right font-mono">Rp {{ number_format($cf_financing_capital_in + $cf_financing_loan_in, 0, ',', '.') }}</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-2 text-sm text-gray-800 pl-8">Prive & Bayar Pinjaman</td>
+                            <td class="px-6 py-2 text-sm text-right text-red-600 font-mono">(Rp {{ number_format($cf_financing_drawing + $cf_financing_loan_pay, 0, ',', '.') }})</td>
+                        </tr>
+                        <tr class="bg-blue-50 border-t border-blue-100">
+                            <td class="px-6 py-2 text-xs font-bold text-blue-800 pl-8">Kas Bersih Pendanaan</td>
+                            <td class="px-6 py-2 text-xs font-bold text-right text-blue-800">Rp {{ number_format($total_cash_from_financing, 0, ',', '.') }}</td>
+                        </tr>
                     </tbody>
+                    <tfoot class="bg-gray-800 text-white border-t-4 border-white">
+                        <tr>
+                            <td class="px-6 py-3 text-sm font-bold">Kenaikan Bersih Kas</td>
+                            <td class="px-6 py-3 text-sm font-bold text-right font-mono">Rp {{ number_format($net_increase_cash, 0, ',', '.') }}</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-2 text-xs font-medium text-gray-400">Saldo Awal</td>
+                            <td class="px-6 py-2 text-xs font-medium text-right text-gray-400 font-mono">Rp {{ number_format($cash_beginning, 0, ',', '.') }}</td>
+                        </tr>
+                        <tr class="bg-gray-700">
+                            <td class="px-6 py-3 text-sm font-bold text-green-400">SALDO AKHIR</td>
+                            <td class="px-6 py-3 text-sm font-bold text-right text-green-400 font-mono">Rp {{ number_format($cash_ending, 0, ',', '.') }}</td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
         </div>
-    </div>
-    
-    {{-- =================================== --}}
-    {{-- LAPORAN PENDUKUNG (Sub-Ledger & Arus Kas) --}}
-    {{-- =================================== --}}
-    <h3 class="fw-bold mb-3 mt-5">Laporan Pendukung</h3>
-    <div class="row g-4">
-        
-        {{-- LAPORAN ARUS KAS (METODE TIDAK LANGSUNG) -- BARU DITAMBAHKAN --}}
-        <div class="col-lg-12">
-            <div class="card shadow-sm h-100">
-                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-semibold">Laporan Arus Kas (Metode Tidak Langsung)</h5>
-                    <span class="badge bg-light text-success">Periode: {{ \Carbon\Carbon::parse($startDate)->format('d M') }} - {{ \Carbon\Carbon::parse($endDate)->format('d M Y') }}</span>
+
+        {{-- SUB LEDGERS (PIUTANG & HUTANG) --}}
+        <div class="space-y-6 flex flex-col h-full">
+            
+            {{-- Piutang --}}
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1">
+                <div class="px-6 py-3 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                    <h5 class="font-bold text-sm text-gray-700 uppercase tracking-wider">Rincian Piutang (AR)</h5>
                 </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0">
-                            <tbody>
-                                {{-- 1. AKTIVITAS OPERASI --}}
-                                <tr class="table-light fw-bold"><td colspan="2">1. Arus Kas dari Aktivitas Operasi</td></tr>
-                                <tr>
-                                    <td class="ps-4">Laba Bersih</td>
-                                    <td class="text-end fw-bold">Rp {{ number_format($cf_operating_net_income, 0, ',', '.') }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-4 text-muted fst-italic">Penyesuaian untuk item non-kas:</td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-5">+ Penyusutan Aset Tetap</td>
-                                    <td class="text-end">Rp {{ number_format($cf_operating_depreciation, 0, ',', '.') }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-4 text-muted fst-italic">Perubahan Modal Kerja:</td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-5">Penurunan (Kenaikan) Piutang Usaha</td>
-                                    <td class="text-end {{ $cf_change_ar < 0 ? 'text-danger' : '' }}">Rp {{ number_format($cf_change_ar, 0, ',', '.') }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-5">Penurunan (Kenaikan) Persediaan</td>
-                                    <td class="text-end {{ $cf_change_inventory < 0 ? 'text-danger' : '' }}">Rp {{ number_format($cf_change_inventory, 0, ',', '.') }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-5">Penurunan (Kenaikan) Deposit ke Supplier</td>
-                                    <td class="text-end {{ $cf_change_supplier_deposit < 0 ? 'text-danger' : '' }}">Rp {{ number_format($cf_change_supplier_deposit, 0, ',', '.') }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-5">Kenaikan (Penurunan) Hutang Dagang</td>
-                                    <td class="text-end {{ $cf_change_ap < 0 ? 'text-danger' : '' }}">Rp {{ number_format($cf_change_ap, 0, ',', '.') }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-5">Kenaikan (Penurunan) Deposit dari Klien</td>
-                                    <td class="text-end {{ $cf_change_client_deposit < 0 ? 'text-danger' : '' }}">Rp {{ number_format($cf_change_client_deposit, 0, ',', '.') }}</td>
-                                </tr>
-                                <tr class="table-success border-top border-success">
-                                    <td class="fw-bold ps-4">Kas Bersih dari Aktivitas Operasi</td>
-                                    <td class="text-end fw-bold">Rp {{ number_format($total_cash_from_operations, 0, ',', '.') }}</td>
-                                </tr>
-
-                                {{-- 2. AKTIVITAS INVESTASI --}}
-                                <tr class="table-light fw-bold"><td colspan="2" class="pt-3">2. Arus Kas dari Aktivitas Investasi</td></tr>
-                                <tr>
-                                    <td class="ps-4">Pembelian Aset Tetap</td>
-                                    <td class="text-end text-danger">(Rp {{ number_format($cf_investing_purchase_asset, 0, ',', '.') }})</td>
-                                </tr>
-                                <tr class="table-warning border-top border-warning">
-                                    <td class="fw-bold ps-4">Kas Bersih untuk Aktivitas Investasi</td>
-                                    <td class="text-end fw-bold">Rp {{ number_format($total_cash_from_investing, 0, ',', '.') }}</td>
-                                </tr>
-
-                                {{-- 3. AKTIVITAS PENDANAAN --}}
-                                <tr class="table-light fw-bold"><td colspan="2" class="pt-3">3. Arus Kas dari Aktivitas Pendanaan</td></tr>
-                                <tr>
-                                    <td class="ps-4">Setoran Modal</td>
-                                    <td class="text-end">Rp {{ number_format($cf_financing_capital_in, 0, ',', '.') }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-4">Penarikan Modal (Prive)</td>
-                                    <td class="text-end text-danger">(Rp {{ number_format($cf_financing_drawing, 0, ',', '.') }})</td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-4">Penerimaan Pinjaman</td>
-                                    <td class="text-end">Rp {{ number_format($cf_financing_loan_in, 0, ',', '.') }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-4">Pelunasan Pokok Pinjaman</td>
-                                    <td class="text-end text-danger">(Rp {{ number_format($cf_financing_loan_pay, 0, ',', '.') }})</td>
-                                </tr>
-                                <tr class="table-info border-top border-info">
-                                    <td class="fw-bold ps-4">Kas Bersih dari Aktivitas Pendanaan</td>
-                                    <td class="text-end fw-bold">Rp {{ number_format($total_cash_from_financing, 0, ',', '.') }}</td>
-                                </tr>
-
-                                {{-- RINGKASAN --}}
-                                <tr class="table-dark border-top border-dark mt-3">
-                                    <td class="fw-bold ps-3 py-3">Kenaikan (Penurunan) Bersih Kas</td>
-                                    <td class="text-end fw-bold py-3">Rp {{ number_format($net_increase_cash, 0, ',', '.') }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-3">Saldo Kas Awal Periode</td>
-                                    <td class="text-end">Rp {{ number_format($cash_beginning, 0, ',', '.') }}</td>
-                                </tr>
-                                <tr class="table-secondary fw-bold fs-5">
-                                    <td class="ps-3">Saldo Kas Akhir Periode</td>
-                                    <td class="text-end text-primary">Rp {{ number_format($cash_ending, 0, ',', '.') }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="overflow-auto custom-scrollbar max-h-[300px]">
+                    <table class="min-w-full divide-y divide-gray-100">
+                        <thead class="bg-gray-50 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Klien</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Inv</th>
+                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500">Sisa</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50">
+                            @forelse ($laporanPiutang as $inv)
+                            <tr>
+                                <td class="px-4 py-2 text-xs text-gray-700">{{ $inv->client->client_name }}</td>
+                                <td class="px-4 py-2 text-xs text-indigo-600"><a href="{{ route('invoices.show', $inv->invoice_id) }}">{{ $inv->invoice_number }}</a></td>
+                                <td class="px-4 py-2 text-xs text-right font-bold">Rp {{ number_format($inv->remaining_balance, 0, ',', '.') }}</td>
+                            </tr>
+                            @empty
+                            <tr><td colspan="3" class="px-4 py-8 text-center text-xs text-gray-400 italic">Nihil</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
-            </div>
-        </div>
-
-        {{-- ARUS KAS SEDERHANA (Basis Kas) --}}
-        <div class="col-lg-12">
-            <div class="card shadow-sm h-100">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-semibold">Laporan Arus Kas (Sederhana - Basis Kas)</h5>
-                    @php
-                        $arusKasBersih = $totalPemasukan - $totalPengeluaran;
-                    @endphp
-                    <span class="fw-bold fs-5 {{ $arusKasBersih >= 0 ? 'text-success' : 'text-danger' }}">
-                         @if($arusKasBersih < 0)
-                            (Rp {{ number_format(abs($arusKasBersih), 0, ',', '.') }})
-                        @else
-                            Rp {{ number_format($arusKasBersih, 0, ',', '.') }}
-                        @endif
-                    </span>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped">
-                            <thead class="table-light">
-                                <tr>
-                                    <th colspan="3" class="fw-semibold">Kas Masuk (Pemasukan)</th>
-                                </tr>
-                                <tr><th>Tanggal</th><th>Keterangan</th><th class="text-end">Jumlah</th></tr>
-                            </thead>
-                            <tbody>
-                                @forelse ($pemasukan_invoice as $item)
-                                <tr>
-                                    <td>{{ optional($item->payment_date)->format('d/m/Y') }}</td>
-                                    <td>Pembayaran Invoice <a href="{{ route('invoices.show', $item->invoice_id) }}">{{ $item->salesInvoice->invoice_number ?? 'N/A' }}</a></td>
-                                    <td class="text-end">Rp {{ number_format($item->amount, 0, ',', '.') }}</td>
-                                </tr>
-                                @empty
-                                {{-- Kosong --}}
-                                @endforelse
-                                @forelse ($pemasukan_modal as $item)
-                                <tr>
-                                    <td>{{ optional($item->transaction_date)->format('d/m/Y') }}</td>
-                                    <td>Setoran Modal: {{ $item->description }}</td>
-                                    <td class="text-end">Rp {{ number_format($item->amount, 0, ',', '.') }}</td>
-                                </tr>
-                                @empty
-                                {{-- Kosong --}}
-                                @endforelse
-                                @if($pemasukan_invoice->isEmpty() && $pemasukan_modal->isEmpty())
-                                <tr><td colspan="3" class="text-center text-muted">Tidak ada kas masuk.</td></tr>
-                                @endif
-                                <tr class="table-light">
-                                    <td colspan="2" class="text-end fw-bold">Total Pemasukan</td>
-                                    <td class="text-end fw-bold text-success">Rp {{ number_format($totalPemasukan, 0, ',', '.') }}</td>
-                                </tr>
-                            </tbody>
-                            <thead class="table-light">
-                                <tr>
-                                    <th colspan="3" class="fw-semibold mt-3">Kas Keluar (Pengeluaran)</th>
-                                </tr>
-                                 <tr><th>Tanggal</th><th>Keterangan</th><th class="text-end">Jumlah</th></tr>
-                            </thead>
-                             <tbody>
-                                @forelse ($pengeluaran_po as $item)
-                                <tr>
-                                    <td>{{ optional($item->payment_date)->format('d/m/Y') }}</td>
-                                    <td>Pembayaran PO <a href="{{ route('purchase-orders.show', $item->po_id) }}">{{ $item->purchaseOrder->po_number ?? 'N/A' }}</a></td>
-                                    <td class="text-end">Rp {{ number_format($item->amount, 0, ',', '.') }}</td>
-                                </tr>
-                                @empty
-                                {{-- Kosong --}}
-                                @endforelse
-                                
-                                @foreach ($pengeluaran_beban as $item)
-                                 <tr>
-                                    <td>{{ optional($item->expense_date)->format('d/m/Y') }}</td>
-                                    <td>Beban: {{ $item->expenseAccount->account_name ?? $item->category }} ({{ $item->description }})</td>
-                                    <td class="text-end">Rp {{ number_format($item->amount, 0, ',', '.') }}</td>
-                                </tr>
-                                @endforeach
-                                
-                                @forelse ($pengeluaran_pinjaman as $item)
-                                 <tr>
-                                    <td>{{ optional($item->payment_date)->format('d/m/Y') }}</td>
-                                    <td>Pembayaran Cicilan <a href="{{ route('loans.show', $item->loan_id) }}">{{ $item->loan->lender_name ?? 'N/A' }}</a></td>
-                                    <td class="text-end">Rp {{ number_format($item->total_paid, 0, ',', '.') }}</td>
-                                </tr>
-                                @empty
-                                {{-- Kosong --}}
-                                @endforelse
-
-                                @forelse ($pengeluaran_aset as $item)
-                                 <tr>
-                                    <td>{{ optional($item->purchase_date)->format('d/m/Y') }}</td>
-                                    <td>Pembelian Aset: {{ $item->asset_name }}</td>
-                                    <td class="text-end">Rp {{ number_format($item->purchase_cost, 0, ',', '.') }}</td>
-                                </tr>
-                                @empty
-                                {{-- Kosong --}}
-                                @endforelse
-
-                                @forelse ($pengeluaran_modal as $item)
-                                 <tr>
-                                    <td>{{ optional($item->transaction_date)->format('d/m/Y') }}</td>
-                                    <td>Penarikan Modal: {{ $item->description }}</td>
-                                    <td class="text-end">Rp {{ number_format($item->amount, 0, ',', '.') }}</td>
-                                </tr>
-                                @empty
-                                {{-- Kosong --}}
-                                @endforelse
-
-                                @if($totalPengeluaran == 0)
-                                <tr><td colspan="3" class="text-center text-muted">Tidak ada kas keluar.</td></tr>
-                                @endif
-                                
-                                <tr class="table-light">
-                                    <td colspan="2" class="text-end fw-bold">Total Pengeluaran</td>
-                                    <td class="text-end fw-bold text-danger">(Rp {{ number_format($totalPengeluaran, 0, ',', '.') }})</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {{-- RINCIAN PIUTANG (Sub-Ledger) --}}
-        <div class="col-lg-6">
-            <div class="card shadow-sm h-100">
-                <div class="card-header">
-                    <h5 class="mb-0 fw-semibold">Rincian Piutang Usaha (Sub-Ledger)</h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Klien</th>
-                                    <th>Invoice</th>
-                                    <th>Jatuh Tempo</th>
-                                    <th class="text-end">Sisa Tagihan</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse ($laporanPiutang as $invoice)
-                                    <tr>
-                                        <td>{{ $invoice->client->client_name ?? 'N/A' }}</td>
-                                        <td>
-                                            <a href="{{ route('invoices.show', $invoice->invoice_id) }}">
-                                                {{ $invoice->invoice_number }}
-                                            </a>
-                                        </td>
-                                        <td>{{ $invoice->due_date->format('d/m/Y') }}</td>
-                                        <td class="text-end fw-semibold">
-                                            Rp {{ number_format($invoice->remaining_balance, 0, ',', '.') }}
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="4" class="text-center text-muted">Tidak ada piutang jatuh tempo.</td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="card-footer fw-bold d-flex justify-content-between">
-                    <span>Total Piutang (Sub-Ledger)</span>
+                <div class="px-4 py-2 bg-gray-50 border-t border-gray-200 flex justify-between items-center text-xs font-bold text-gray-700">
+                    <span>Total Piutang</span>
                     <span>Rp {{ number_format($totalPiutang_SL, 0, ',', '.') }}</span>
                 </div>
             </div>
-        </div>
 
-        {{-- RINCIAN UTANG (Sub-Ledger) --}}
-        <div class="col-lg-6">
-            <div class="card shadow-sm h-100">
-                <div class="card-header">
-                    <h5 class="mb-0 fw-semibold">Rincian Utang Usaha (Sub-Ledger)</h5>
+            {{-- Utang --}}
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1">
+                <div class="px-6 py-3 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                    <h5 class="font-bold text-sm text-gray-700 uppercase tracking-wider">Rincian Hutang (AP)</h5>
                 </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Supplier</th>
-                                    <th>No. PO</th>
-                                    <th>Jatuh Tempo</th>
-                                    <th class="text-end">Sisa Hutang</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse ($laporanUtang as $po)
-                                    <tr>
-                                        <td>{{ $po->supplier->supplier_name ?? 'N/A' }}</td>
-                                        <td>
-                                            <a href="{{ route('purchase-orders.show', $po->po_id) }}">
-                                                {{ $po->po_number }}
-                                            </a>
-                                        </td>
-                                        <td>{{ $po->due_date ? $po->due_date->format('d/m/Y') : '-' }}</td>
-                                        <td class="text-end fw-semibold">
-                                            Rp {{ number_format($po->remaining_balance, 0, ',', '.') }}
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="4" class="text-center text-muted">Tidak ada utang jatuh tempo.</td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="overflow-auto custom-scrollbar max-h-[300px]">
+                    <table class="min-w-full divide-y divide-gray-100">
+                        <thead class="bg-gray-50 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Supplier</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">PO</th>
+                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500">Sisa</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50">
+                            @forelse ($laporanUtang as $po)
+                            <tr>
+                                <td class="px-4 py-2 text-xs text-gray-700">{{ $po->supplier->supplier_name }}</td>
+                                <td class="px-4 py-2 text-xs text-indigo-600"><a href="{{ route('purchase-orders.show', $po->po_id) }}">{{ $po->po_number }}</a></td>
+                                <td class="px-4 py-2 text-xs text-right font-bold">Rp {{ number_format($po->remaining_balance, 0, ',', '.') }}</td>
+                            </tr>
+                            @empty
+                            <tr><td colspan="3" class="px-4 py-8 text-center text-xs text-gray-400 italic">Nihil</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
-                <div class="card-footer fw-bold d-flex justify-content-between">
-                    <span>Total Utang (Sub-Ledger)</span>
+                <div class="px-4 py-2 bg-gray-50 border-t border-gray-200 flex justify-between items-center text-xs font-bold text-gray-700">
+                    <span>Total Hutang</span>
                     <span>Rp {{ number_format($totalUtang_SL, 0, ',', '.') }}</span>
                 </div>
             </div>
+
         </div>
     </div>
+
 </div>
 @endsection

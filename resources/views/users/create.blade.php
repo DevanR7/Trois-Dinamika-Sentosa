@@ -1,51 +1,61 @@
 @extends('layouts.app')
 
+@section('title', 'Tambah User Baru')
+
 @section('content')
-<div class="container-fluid py-2">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    
+    {{-- HEADER --}}
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <div>
-            <h3 class="fw-bold text-dark mb-1">Tambah User Baru</h3>
-            <p class="text-muted mb-0 small">Tambahkan staf atau admin baru.</p>
+            <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                <a href="{{ route('users.index') }}" class="hover:text-indigo-600 transition">Users</a>
+                <span>/</span>
+                <span class="text-gray-800">Baru</span>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Tambah User Baru</h2>
+            <p class="text-sm text-gray-500 mt-1">Tambahkan staf atau admin baru ke dalam sistem.</p>
         </div>
-        <div>
-            <a href="{{ route('users.index') }}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left me-1"></i> Kembali
+        <div class="mt-4 sm:mt-0">
+            <a href="{{ route('users.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition text-sm">
+                <i class="material-icons text-lg mr-2">arrow_back</i> Kembali
             </a>
         </div>
     </div>
 
-    <div class="row justify-content-center">
-        <div class="col-lg-10">
-            <form action="{{ route('users.store') }}" method="POST">
-                @csrf
-                
-                <div class="card card-transaction border-0 shadow-sm">
-                    <div class="card-header bg-white p-4 border-bottom">
-                        <div class="form-section-title mb-0"><i class="bi bi-person-plus"></i> Form Data User</div>
-                    </div>
-                    
-                    <div class="card-body p-4">
-                        @include('users._form')
+    <form action="{{ route('users.store') }}" method="POST">
+        @csrf
+        
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
+                <i class="material-icons text-indigo-500">person_add</i>
+                <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Form Data User</h3>
+            </div>
+            
+            <div class="p-6">
+                @include('users._form')
+            </div>
 
-                        <div class="d-flex justify-content-end mt-4 pt-3 border-top">
-                            <a href="{{ route('users.index') }}" class="btn btn-light border me-2">Batal</a>
-                            <button type="submit" class="btn btn-primary px-4 fw-bold">Simpan User</button>
-                        </div>
-                    </div>
-                </div>
-            </form>
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                <a href="{{ route('users.index') }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 shadow-sm transition">
+                    Batal
+                </a>
+                <button type="submit" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-lg font-bold text-sm text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-md transition">
+                    <i class="material-icons text-lg mr-2">save</i> Simpan User
+                </button>
+            </div>
         </div>
-    </div>
+    </form>
 </div>
 @endsection
 
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Init Select2 untuk Role
+    // Init Select2 (Theme sudah ada di app.css global)
     $('#role').select2({ theme: 'bootstrap-5', placeholder: 'Pilih Role...', width: '100%' });
 
-    // --- LOGIKA UNTUK HIDE/UNHIDE PASSWORD ---
+    // Toggle Password Visibility
     function setupPasswordToggle(inputId, toggleId) {
         const passwordInput = document.getElementById(inputId);
         const toggleButton = document.getElementById(toggleId);
@@ -55,38 +65,40 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleButton.addEventListener('click', function() {
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordInput.setAttribute('type', type);
-            eyeIcon.classList.toggle('bi-eye-slash');
-            eyeIcon.classList.toggle('bi-eye');
+            eyeIcon.innerText = type === 'password' ? 'visibility_off' : 'visibility';
         });
     }
     setupPasswordToggle('password', 'toggle-password');
     setupPasswordToggle('password_confirmation', 'toggle-password-confirmation');
 
-    // --- LOGIKA UNTUK VALIDASI KONFIRMASI PASSWORD ---
+    // Validate Password Match
     const passwordInput = document.getElementById('password');
     const passwordConfirmationInput = document.getElementById('password_confirmation');
     const passwordError = document.getElementById('password-match-error');
+    
     if (passwordInput && passwordConfirmationInput && passwordError) {
         function validatePasswordMatch() {
             if (passwordInput.value !== passwordConfirmationInput.value && passwordConfirmationInput.value.length > 0) {
-                passwordError.classList.remove('d-none');
+                passwordError.classList.remove('hidden');
             } else {
-                passwordError.classList.add('d-none');
+                passwordError.classList.add('hidden');
             }
         }
         passwordInput.addEventListener('input', validatePasswordMatch);
         passwordConfirmationInput.addEventListener('input', validatePasswordMatch);
     }
     
-    // --- LOGIKA UNTUK MENAMPILKAN KODE SALES (SAMA DENGAN EDIT) ---
-    const roleSelect = document.getElementById('role');
+    // Toggle Sales Code
+    const roleSelect = $('#role'); // Gunakan jQuery karena Select2
     const salesCodeContainer = document.getElementById('sales-code-container');
-    if (roleSelect && salesCodeContainer) {
+    
+    if (roleSelect.length && salesCodeContainer) {
         function toggleSalesCode() {
-            salesCodeContainer.style.display = (roleSelect.value === 'sales') ? 'block' : 'none';
+            const val = roleSelect.val();
+            salesCodeContainer.style.display = (val === 'sales') ? 'block' : 'none';
         }
-        toggleSalesCode();
-        roleSelect.addEventListener('change', toggleSalesCode);
+        toggleSalesCode(); // Run on load
+        roleSelect.on('change', toggleSalesCode);
     }
 });
 </script>

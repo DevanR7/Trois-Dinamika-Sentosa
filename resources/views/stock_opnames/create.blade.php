@@ -1,117 +1,125 @@
 @extends('layouts.app')
 
+@section('title', 'Stock Opname Baru')
+
 @section('content')
-<div class="container-fluid py-2">
+<div class="max-w-6xl mx-auto">
     
-    {{-- HEADER HALAMAN --}}
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    {{-- HEADER --}}
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
-            <h3 class="fw-bold text-dark mb-1">Stock Opname Baru</h3>
-            <p class="text-muted mb-0 small">Lakukan penyesuaian stok fisik gudang dengan sistem.</p>
+            <h2 class="text-2xl font-bold text-gray-900">Stock Opname Baru</h2>
+            <p class="text-sm text-gray-500 mt-1">Lakukan penyesuaian stok fisik gudang dengan sistem.</p>
         </div>
-        <div>
-            <a href="{{ route('stock-opnames.index') }}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left me-1"></i> Kembali
-            </a>
-        </div>
+        <a href="{{ route('stock-opnames.index') }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition shadow-sm">
+            Kembali
+        </a>
     </div>
 
-    <div class="row justify-content-center">
-        <div class="col-lg-12">
+    @if ($errors->any())
+        <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r shadow-sm">
+            <ul class="list-disc list-inside text-sm text-red-700">
+                @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <form action="{{ route('stock-opnames.store') }}" method="POST" id="opname-form">
+        @csrf
+        
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             
-            @if ($errors->any())
-                <div class="alert alert-danger border-0 shadow-sm rounded-3 mb-4">
-                    <ul class="mb-0 small">
-                        @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
-                    </ul>
-                </div>
-            @endif
-
-            <form action="{{ route('stock-opnames.store') }}" method="POST" id="opname-form">
-                @csrf
+            {{-- CARD HEADER --}}
+            <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                    <i class="bi bi-clipboard-check text-indigo-500"></i> Form Input Opname
+                </h3>
+                <span class="px-3 py-1 bg-white border border-gray-200 rounded text-xs font-medium text-gray-500 shadow-sm">
+                    {{ now()->format('d M Y') }}
+                </span>
+            </div>
+            
+            <div class="p-6">
                 
-                <div class="card card-transaction border-0 shadow-sm">
-                    <div class="card-header bg-white p-4 border-bottom d-flex justify-content-between align-items-center">
-                        <div class="form-section-title mb-0"><i class="bi bi-clipboard-check"></i> Form Input Opname</div>
-                        <span class="badge bg-light text-dark border">{{ now()->format('d M Y') }}</span>
+                {{-- FORM INPUT UTAMA --}}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Tanggal Opname</label>
+                        <input type="date" name="opname_date" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" value="{{ old('opname_date', now()->format('Y-m-d')) }}" required>
                     </div>
-                    
-                    <div class="card-body p-4">
-                        
-                        {{-- INFO & HEADER INPUT --}}
-                        <div class="row mb-4 g-3">
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold small text-muted">TANGGAL OPNAME</label>
-                                <input type="date" name="opname_date" class="form-control" value="{{ old('opname_date', now()->format('Y-m-d')) }}" required>
-                            </div>
-                            <div class="col-md-8">
-                                <label class="form-label fw-bold small text-muted">CATATAN / KETERANGAN</label>
-                                <input type="text" name="notes" class="form-control" placeholder="Contoh: Opname rutin bulan ini..." value="{{ old('notes') }}">
-                            </div>
-                        </div>
-
-                        {{-- SEARCH BAR --}}
-                        <div class="d-flex justify-content-between align-items-center mb-3 bg-light p-3 rounded border border-dashed">
-                            <div class="d-flex align-items-center text-primary">
-                                <i class="bi bi-info-circle me-2 fs-5"></i>
-                                <span class="small fw-bold">Isi kolom "Fisik" dengan jumlah riil di gudang.</span>
-                            </div>
-                            <div class="input-group" style="max-width: 350px;">
-                                <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
-                                <input type="text" id="product-search" class="form-control border-start-0 ps-0" placeholder="Cari nama produk...">
-                            </div>
-                        </div>
-
-                        {{-- TABEL INPUT --}}
-                        <div class="table-responsive border rounded mb-4" style="max-height: 600px; overflow-y: auto;">
-                            <table class="table table-hover table-transaction align-middle mb-0" id="opname-table">
-                                <thead class="bg-white sticky-top" style="z-index: 10;">
-                                    <tr>
-                                        <th style="width: 40%;" class="ps-4">Produk</th>
-                                        <th style="width: 15%;" class="text-center bg-light">System</th>
-                                        <th style="width: 25%;" class="text-center bg-primary bg-opacity-10 text-primary border-bottom border-primary">Fisik (Input)</th>
-                                        <th style="width: 20%;" class="text-center">Selisih</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($products as $index => $product)
-                                    <tr class="product-row">
-                                        <td class="ps-4">
-                                            <div class="fw-bold text-dark product-name">{{ $product->product_name }}</div>
-                                            <small class="text-muted">{{ $product->product_code }}</small>
-                                            <input type="hidden" name="products[{{ $index }}][product_id]" value="{{ $product->product_id }}">
-                                        </td>
-                                        <td class="text-center bg-light">
-                                            <input type="text" class="form-control-plaintext text-center fw-bold text-muted system-qty" value="{{ $product->stock_quantity }}" readonly>
-                                        </td>
-                                        <td class="bg-primary bg-opacity-10 p-2">
-                                            <input type="number" 
-                                                   name="products[{{ $index }}][physical_qty]" 
-                                                   class="form-control text-center fw-bold fs-5 border-primary physical-qty-input" 
-                                                   value="{{ $product->stock_quantity }}" 
-                                                   min="0" required>
-                                        </td>
-                                        <td class="text-center">
-                                            <span class="badge bg-secondary bg-opacity-25 text-secondary border fs-6 difference-badge" style="min-width: 60px;">0</span>
-                                        </td>
-                                    </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="d-flex justify-content-end pt-3 border-top">
-                            <a href="{{ route('stock-opnames.index') }}" class="btn btn-light border me-2">Batal</a>
-                            <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm">
-                                <i class="bi bi-check-circle me-2"></i> Simpan Hasil Opname
-                            </button>
-                        </div>
-
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Catatan / Keterangan</label>
+                        <input type="text" name="notes" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" placeholder="Contoh: Opname rutin bulan ini..." value="{{ old('notes') }}">
                     </div>
                 </div>
-            </form>
+
+                {{-- SEARCH BAR & INFO --}}
+                <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-4 bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                    <div class="flex items-center gap-3 text-indigo-700">
+                        <i class="bi bi-info-circle-fill text-xl"></i>
+                        <span class="text-sm font-medium">Isi kolom <span class="font-bold">"Fisik"</span> dengan jumlah riil di gudang.</span>
+                    </div>
+                    <div class="relative w-full md:w-72">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="bi bi-search text-gray-400"></i>
+                        </div>
+                        <input type="text" id="product-search" class="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" placeholder="Cari nama produk...">
+                    </div>
+                </div>
+
+                {{-- TABEL INPUT (SCROLLABLE) --}}
+                <div class="border border-gray-200 rounded-lg overflow-hidden">
+                    <div class="overflow-y-auto max-h-[500px] custom-scrollbar">
+                        <table class="min-w-full divide-y divide-gray-200" id="opname-table">
+                            <thead class="bg-gray-50 sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-5/12">Produk</th>
+                                    <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-2/12 bg-gray-100">System</th>
+                                    <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-indigo-700 uppercase tracking-wider w-3/12 bg-indigo-50 border-b border-indigo-100">Fisik (Input)</th>
+                                    <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-2/12">Selisih</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                @foreach($products as $index => $product)
+                                <tr class="product-row hover:bg-gray-50 transition-colors">
+                                    <td class="px-6 py-3">
+                                        <div class="text-sm font-bold text-gray-900 product-name">{{ $product->product_name }}</div>
+                                        <div class="text-xs text-gray-500 font-mono mt-0.5">{{ $product->product_code }}</div>
+                                        <input type="hidden" name="products[{{ $index }}][product_id]" value="{{ $product->product_id }}">
+                                    </td>
+                                    <td class="px-6 py-3 text-center bg-gray-50">
+                                        <input type="text" class="w-full bg-transparent text-center text-sm font-medium text-gray-500 border-0 focus:ring-0 p-0 system-qty cursor-default" value="{{ $product->stock_quantity }}" readonly tabindex="-1">
+                                    </td>
+                                    <td class="px-6 py-3 bg-indigo-50/30 p-2">
+                                        <input type="number" 
+                                               name="products[{{ $index }}][physical_qty]" 
+                                               class="w-full text-center font-bold text-gray-900 border border-indigo-200 rounded-md focus:border-indigo-500 focus:ring-indigo-500 physical-qty-input py-1.5" 
+                                               value="{{ $product->stock_quantity }}" 
+                                               min="0" required>
+                                    </td>
+                                    <td class="px-6 py-3 text-center">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 difference-badge border border-gray-200 min-w-[40px] justify-center">0</span>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {{-- FOOTER ACTIONS --}}
+                <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
+                    <a href="{{ route('stock-opnames.index') }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition">
+                        Batal
+                    </a>
+                    <button type="submit" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition flex items-center">
+                        <i class="bi bi-check-circle mr-2"></i> Simpan Hasil Opname
+                    </button>
+                </div>
+
+            </div>
         </div>
-    </div>
+    </form>
 </div>
 @endsection
 
@@ -119,7 +127,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     
-    // 1. Logic Pencarian Produk
+    // 1. Filter Pencarian
     const searchInput = document.getElementById('product-search');
     const tableRows = document.querySelectorAll('.product-row');
 
@@ -127,15 +135,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const term = e.target.value.toLowerCase();
         tableRows.forEach(row => {
             const name = row.querySelector('.product-name').textContent.toLowerCase();
-            if (name.includes(term)) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
+            if (name.includes(term)) row.style.display = '';
+            else row.style.display = 'none';
         });
     });
 
-    // 2. Logic Kalkulasi Selisih Real-time
+    // 2. Kalkulasi Selisih
     const inputs = document.querySelectorAll('.physical-qty-input');
 
     function updateDifference(row) {
@@ -147,7 +152,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (isNaN(physicalQty)) {
             badge.textContent = '-';
-            badge.className = 'badge bg-secondary bg-opacity-25 text-secondary border fs-6 difference-badge';
+            badge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200 min-w-[40px] justify-center difference-badge';
             return;
         }
 
@@ -155,28 +160,25 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (diff > 0) {
             badge.textContent = '+' + diff;
-            badge.className = 'badge bg-success bg-opacity-10 text-success border border-success fs-6 difference-badge'; 
+            badge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200 min-w-[40px] justify-center difference-badge'; 
         } else if (diff < 0) {
             badge.textContent = diff;
-            badge.className = 'badge bg-danger bg-opacity-10 text-danger border border-danger fs-6 difference-badge'; 
+            badge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200 min-w-[40px] justify-center difference-badge'; 
         } else {
             badge.textContent = '0';
-            badge.className = 'badge bg-secondary bg-opacity-25 text-secondary border fs-6 difference-badge'; 
+            badge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200 min-w-[40px] justify-center difference-badge'; 
         }
     }
 
     inputs.forEach(input => {
-        input.addEventListener('input', function() {
-            updateDifference(this.closest('tr'));
-        });
-        updateDifference(input.closest('tr'));
+        input.addEventListener('input', function() { updateDifference(this.closest('tr')); });
+        updateDifference(input.closest('tr')); // Init load
     });
 
-    // 3. SweetAlert Konfirmasi Submit
+    // 3. Konfirmasi Submit
     const form = document.getElementById('opname-form');
     form.addEventListener('submit', function(e) {
         e.preventDefault();
-
         let changedItems = 0;
         inputs.forEach(input => {
             const row = input.closest('tr');
@@ -187,20 +189,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
         Swal.fire({
             title: 'Simpan Stock Opname?',
-            text: `Anda akan menyesuaikan stok untuk ${changedItems} barang yang memiliki selisih.`,
-            icon: 'warning',
+            text: `Anda akan menyesuaikan stok untuk ${changedItems} barang yang selisih.`,
+            icon: 'question',
             showCancelButton: true,
-            confirmButtonColor: '#0d6efd',
-            cancelButtonColor: '#6c757d',
+            confirmButtonColor: '#4f46e5', // Indigo
+            cancelButtonColor: '#6b7280',
             confirmButtonText: 'Ya, Simpan!',
             cancelButtonText: 'Batal'
         }).then((result) => {
-            if (result.isConfirmed) {
-                form.submit();
-            }
+            if (result.isConfirmed) form.submit();
         });
     });
-
 });
 </script>
 @endpush

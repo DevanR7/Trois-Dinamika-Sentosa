@@ -1,144 +1,169 @@
 @extends('layouts.app')
 
+@section('title', 'Transaksi Modal')
+
 @section('content')
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold mb-0">Transaksi Modal</h2>
-        <a href="{{ route('equity-transactions.create') }}" class="btn btn-dark shadow-sm">
-            <i class="bi bi-plus-lg"></i> Catat Transaksi
-        </a>
-    </div>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     
-    {{-- FORM FILTER --}}
-    <div class="card shadow-sm mb-4 border-0">
-        <div class="card-body bg-light rounded">
-            <form action="{{ route('equity-transactions.index') }}" method="GET">
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-4">
-                        <label for="start_date" class="form-label fw-bold small text-muted">Dari Tanggal</label>
-                        <input type="date" name="start_date" id="start_date" class="form-control" value="{{ request('start_date') }}">
-                    </div>
-                    <div class="col-md-4">
-                        <label for="end_date" class="form-label fw-bold small text-muted">Sampai Tanggal</label>
-                        <input type="date" name="end_date" id="end_date" class="form-control" value="{{ request('end_date') }}">
-                    </div>
-                    <div class="col-md-2">
-                         <label for="type" class="form-label fw-bold small text-muted">Tipe Transaksi</label>
-                        <select name="type" id="type" class="form-select">
-                            <option value="">Semua Tipe</option>
-                            <option value="investment" {{ request('type') == 'investment' ? 'selected' : '' }}>Setoran Modal</option>
-                            <option value="drawing" {{ request('type') == 'drawing' ? 'selected' : '' }}>Penarikan Modal</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-funnel-fill"></i> Filter</button>
-                    </div>
-                </div>
-            </form>
+    {{-- HEADER --}}
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+        <div>
+            <h3 class="text-2xl font-bold text-gray-900 tracking-tight">Transaksi Modal & Prive</h3>
+            <p class="text-sm text-gray-500 mt-1">Daftar riwayat setoran modal dan penarikan prive.</p>
+        </div>
+        <div class="mt-4 sm:mt-0">
+            <a href="{{ route('equity-transactions.create') }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-lg font-bold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition">
+                <i class="material-icons text-base mr-2">add</i> Catat Transaksi
+            </a>
         </div>
     </div>
 
-    {{-- DAFTAR TRANSAKSI --}}
-    <div class="card shadow-sm border-0">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-dark">
-                        <tr>
-                            <th class="ps-4 py-3">Tanggal</th>
-                            <th class="py-3">Akun Transaksi</th> 
-                            <th class="py-3">Deskripsi</th>
-                            <th class="text-end py-3">Jumlah</th>
-                            <th class="py-3">Dicatat Oleh</th>
-                            <th class="text-center py-3">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($transactions as $transaction)
-                        <tr>
-                            <td class="ps-4">{{ $transaction->transaction_date->format('d/m/Y') }}</td>
-                            
-                            <td>
+    {{-- FILTER FORM --}}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+        <form action="{{ route('equity-transactions.index') }}" method="GET">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                <div class="md:col-span-3">
+                    <label for="start_date" class="block text-xs font-bold text-gray-500 uppercase mb-1">Dari Tanggal</label>
+                    <input type="date" name="start_date" id="start_date" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" value="{{ request('start_date') }}">
+                </div>
+                
+                <div class="md:col-span-3">
+                    <label for="end_date" class="block text-xs font-bold text-gray-500 uppercase mb-1">Sampai Tanggal</label>
+                    <input type="date" name="end_date" id="end_date" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" value="{{ request('end_date') }}">
+                </div>
+
+                <div class="md:col-span-4">
+                    <label for="type" class="block text-xs font-bold text-gray-500 uppercase mb-1">Tipe Transaksi</label>
+                    <select name="type" id="type" class="form-select block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        <option value="">Semua Tipe</option>
+                        <option value="investment" @selected(request('type') == 'investment')>Setoran Modal</option>
+                        <option value="drawing" @selected(request('type') == 'drawing')>Penarikan Modal</option>
+                    </select>
+                </div>
+
+                <div class="md:col-span-2">
+                    <button type="submit" class="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition">
+                        <i class="material-icons text-sm mr-2">filter_alt</i> Filter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {{-- TABEL --}}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Tanggal</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Akun Transaksi</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/3">Deskripsi</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Jumlah</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Oleh</th>
+                        <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    @forelse ($transactions as $transaction)
+                        <tr class="hover:bg-gray-50 transition-colors group">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ $transaction->transaction_date->format('d/m/Y') }}
+                            </td>
+                            <td class="px-6 py-4 text-sm">
                                 @if ($transaction->type == 'investment')
                                     {{-- Setoran: Kas (Debit), Modal (Kredit) --}}
-                                    <span class="fw-bold text-success">{{ $transaction->cashBankAccount->account_name ?? 'N/A' }}</span>
-                                    <i class="bi bi-arrow-left text-muted mx-1"></i>
-                                    <span class="text-muted">{{ $transaction->equityAccount->account_name ?? 'N/A' }}</span>
-                                    <span class="badge bg-success ms-2">Setoran</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-medium text-gray-900">{{ $transaction->cashBankAccount->account_name ?? 'N/A' }}</span>
+                                        <i class="material-icons text-gray-400 text-sm">arrow_back</i>
+                                        <span class="text-gray-500">{{ $transaction->equityAccount->account_name ?? 'N/A' }}</span>
+                                    </div>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 mt-1">
+                                        Setoran Modal
+                                    </span>
                                 @else
                                     {{-- Penarikan: Prive (Debit), Kas (Kredit) --}}
-                                    <span class="fw-bold text-danger">{{ $transaction->equityAccount->account_name ?? 'N/A' }}</span>
-                                    <i class="bi bi-arrow-left text-muted mx-1"></i>
-                                    <span class="text-muted">{{ $transaction->cashBankAccount->account_name ?? 'N/A' }}</span>
-                                    <span class="badge bg-danger ms-2">Penarikan</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-medium text-gray-900">{{ $transaction->equityAccount->account_name ?? 'N/A' }}</span>
+                                        <i class="material-icons text-gray-400 text-sm">arrow_back</i>
+                                        <span class="text-gray-500">{{ $transaction->cashBankAccount->account_name ?? 'N/A' }}</span>
+                                    </div>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 mt-1">
+                                        Penarikan Prive
+                                    </span>
                                 @endif
                             </td>
-
-                            <td>{{ Str::limit($transaction->description, 40) }}</td>
-                            <td class="text-end fw-bold font-monospace">
+                            <td class="px-6 py-4 text-sm text-gray-600">
+                                <span class="line-clamp-2" title="{{ $transaction->description }}">
+                                    {{ $transaction->description }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-900 font-mono">
                                 Rp {{ number_format($transaction->amount, 0, ',', '.') }}
                             </td>
-                            <td><small>{{ $transaction->user->name ?? 'N/A' }}</small></td>
-                            <td class="text-center">
-                                <div class="btn-group" role="group">
-                                    <a href="{{ route('equity-transactions.edit', $transaction) }}" class="btn btn-sm btn-outline-primary" title="Edit">
-                                        <i class="bi bi-pencil-square"></i>
+                            <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+                                {{ $transaction->user->name ?? 'N/A' }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                                <div class="flex justify-center gap-2">
+                                    <a href="{{ route('equity-transactions.edit', $transaction) }}" class="p-1.5 bg-white text-yellow-600 rounded-lg hover:bg-yellow-50 transition border border-gray-200 shadow-sm hover:border-yellow-200" title="Edit">
+                                        <i class="material-icons text-lg leading-none">edit</i>
                                     </a>
                                     
                                     <form action="{{ route('equity-transactions.destroy', $transaction) }}" method="POST" 
                                           class="d-inline form-delete-transaction" 
                                           data-transaction-label="{{ ($transaction->type == 'investment' ? 'Setoran' : 'Penarikan') . ' Rp ' . number_format($transaction->amount, 0, ',', '.') }}">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
-                                            <i class="bi bi-trash-fill"></i>
+                                        @csrf @method('DELETE')
+                                        <button type="submit" class="p-1.5 bg-white text-red-600 rounded-lg hover:bg-red-50 transition border border-gray-200 shadow-sm hover:border-red-200" title="Hapus">
+                                            <i class="material-icons text-lg leading-none">delete</i>
                                         </button>
                                     </form>
                                 </div>
                             </td>
                         </tr>
-                        @empty
+                    @empty
                         <tr>
-                            <td colspan="6" class="text-center py-5 text-muted">
-                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                                Belum ada data transaksi modal.
+                            <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                                <div class="flex flex-col items-center justify-center">
+                                    <i class="material-icons text-4xl text-gray-300 mb-3">account_balance</i>
+                                    <p class="text-base font-medium">Belum ada data</p>
+                                    <p class="text-sm mt-1">Silakan catat transaksi modal baru.</p>
+                                </div>
                             </td>
                         </tr>
-                        @endforelse
-                    </tbody>
-                    
-                    {{-- RINGKASAN TOTAL --}}
-                    <tfoot class="bg-light">
-                        <tr>
-                            <td colspan="3" class="text-end fw-bold py-2 text-muted small text-uppercase">Total Setoran</td>
-                            <td class="text-end fw-bold text-success py-2">Rp {{ number_format($totalInvestment, 0, ',', '.') }}</td>
-                            <td colspan="2"></td>
-                        </tr>
-                        <tr>
-                            <td colspan="3" class="text-end fw-bold py-2 text-muted small text-uppercase">Total Penarikan</td>
-                            <td class="text-end fw-bold text-danger py-2">(Rp {{ number_format($totalDrawing, 0, ',', '.') }})</td>
-                            <td colspan="2"></td>
-                        </tr>
-                         <tr class="table-secondary border-top border-dark">
-                            <td colspan="3" class="text-end fw-bold fs-5 py-3">Perubahan Modal Bersih</td>
-                            <td class="text-end fw-bold fs-5 py-3 {{ $netModal >= 0 ? 'text-success' : 'text-danger' }}">
-                                @if($netModal < 0)
-                                    (Rp {{ number_format(abs($netModal), 0, ',', '.') }})
-                                @else
-                                    Rp {{ number_format($netModal, 0, ',', '.') }}
-                                @endif
-                            </td>
-                            <td colspan="2"></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-            @if($transactions->hasPages())
-                <div class="card-footer bg-white">
-                    {{ $transactions->links() }}
-                </div>
-            @endif
+                    @endforelse
+                </tbody>
+                <tfoot class="bg-gray-50 border-t border-gray-200">
+                    <tr>
+                        <td colspan="3" class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Total Setoran</td>
+                        <td class="px-6 py-3 text-right text-sm font-bold text-green-600">Rp {{ number_format($totalInvestment, 0, ',', '.') }}</td>
+                        <td colspan="2"></td>
+                    </tr>
+                    <tr>
+                        <td colspan="3" class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Total Penarikan</td>
+                        <td class="px-6 py-3 text-right text-sm font-bold text-red-600">(Rp {{ number_format($totalDrawing, 0, ',', '.') }})</td>
+                        <td colspan="2"></td>
+                    </tr>
+                    <tr class="bg-gray-100 border-t border-gray-300">
+                        <td colspan="3" class="px-6 py-3 text-right text-sm font-bold text-gray-900 uppercase">Perubahan Modal Bersih</td>
+                        <td class="px-6 py-3 text-right text-base font-bold {{ $netModal >= 0 ? 'text-green-700' : 'text-red-700' }}">
+                            @if($netModal < 0)
+                                (Rp {{ number_format(abs($netModal), 0, ',', '.') }})
+                            @else
+                                Rp {{ number_format($netModal, 0, ',', '.') }}
+                            @endif
+                        </td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
         </div>
+
+        @if($transactions->hasPages())
+            <div class="px-6 py-4 border-t border-gray-200">
+                {{ $transactions->links() }}
+            </div>
+        @endif
     </div>
 </div>
 @endsection
@@ -147,8 +172,7 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    
-    // 1. Konfirmasi Delete
+    // Konfirmasi Delete
     const deleteForms = document.querySelectorAll('.form-delete-transaction');
     deleteForms.forEach(form => {
         form.addEventListener('submit', function (event) {
@@ -157,14 +181,13 @@ document.addEventListener('DOMContentLoaded', function() {
             
             Swal.fire({
                 title: 'Hapus Transaksi?',
-                html: `Anda akan menghapus:<br><b>${txLabel}</b><br><br><small class="text-danger">Tindakan ini juga akan membalik jurnal akuntansi terkait.</small>`,
+                html: `Anda akan menghapus:<br><b>${txLabel}</b><br><br><span class="text-red-500 text-xs">Tindakan ini juga akan membalik jurnal akuntansi terkait.</span>`,
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonColor: '#dc3545',
-                cancelButtonColor: '#6c757d',
+                confirmButtonColor: '#dc2626',
+                cancelButtonColor: '#6b7280',
                 confirmButtonText: 'Ya, Hapus!',
-                cancelButtonText: 'Batal',
-                reverseButtons: true
+                cancelButtonText: 'Batal'
             }).then((result) => {
                 if (result.isConfirmed) {
                     event.target.submit();
@@ -173,23 +196,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // 2. Notifikasi Flash Message
+    // Notifikasi
     @if(session('success'))
-        Swal.fire({
-            icon: 'success',
-            title: 'Berhasil!',
-            text: "{{ session('success') }}",
-            timer: 3000,
-            showConfirmButton: false
-        });
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Berhasil!', text: "{{ session('success') }}", timer: 3000, showConfirmButton: false });
     @endif
-
     @if(session('error'))
-        Swal.fire({
-            icon: 'error',
-            title: 'Gagal!',
-            text: "{{ session('error') }}",
-        });
+        Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Gagal!', text: "{{ session('error') }}" });
     @endif
 });
 </script>

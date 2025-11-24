@@ -1,131 +1,149 @@
 @extends('layouts.app') 
 
+@section('title', 'Manajemen User')
+
 @section('content')
-<div class="container-fluid py-2">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    
+    {{-- HEADER --}}
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <div>
-            <h3 class="fw-bold text-dark mb-1">Manajemen User</h3>
-            <p class="text-muted small mb-0">Kelola staf, admin, dan hak akses.</p>
+            <h3 class="text-2xl font-bold text-gray-900 tracking-tight">Manajemen User</h3>
+            <p class="text-sm text-gray-500 mt-1">Kelola staf, admin, dan hak akses sistem.</p>
         </div>
-        <div>
+        <div class="mt-4 sm:mt-0 flex gap-2">
             @if(request('status') === 'deleted')
-                <a href="{{ route('users.index') }}" class="btn btn-outline-secondary shadow-sm btn-sm me-2">
-                    <i class="bi bi-arrow-left me-1"></i>Kembali
+                <a href="{{ route('users.index') }}" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-xs font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
+                    <i class="material-icons text-sm mr-1">arrow_back</i> Kembali
                 </a>
             @else
-                <a href="{{ route('users.index', ['status' => 'deleted']) }}" class="btn btn-outline-secondary shadow-sm btn-sm me-2">
-                    <i class="bi bi-archive me-1"></i>Lihat Arsip
+                <a href="{{ route('users.index', ['status' => 'deleted']) }}" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-xs font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
+                    <i class="material-icons text-sm mr-1">archive</i> Lihat Arsip
                 </a>
                 @can('manage-users')
-                <a href="{{ route('users.create') }}" class="btn btn-primary shadow-sm btn-sm">
-                    <i class="bi bi-person-plus me-1"></i>Tambah User
+                <a href="{{ route('users.create') }}" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-xs font-bold rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
+                    <i class="material-icons text-sm mr-1">person_add</i> Tambah User
                 </a>
                 @endcan
             @endif
         </div>
     </div>
     
-    {{-- ACCORDION VIEW --}}
-    <div class="accordion shadow-sm" id="usersAccordion">
-        
+    {{-- USER GRID --}}
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         @forelse ($users as $user)
-        <div class="accordion-item">
-            <h2 class="accordion-header" id="heading-{{ $user->user_id }}">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
-                        data-bs-target="#collapse-{{ $user->user_id }}" aria-expanded="false" 
-                        aria-controls="collapse-{{ $user->user_id }}">
-                    
-                    <div class="d-flex justify-content-between w-100 align-items-center pe-5">
-                        
-                        {{-- Kiri: Nama & Username --}}
-                        <div class="d-flex flex-column text-start">
-                            <strong class="fs-5 text-dark">{{ $user->full_name }}</strong>
-                            <span class="text-muted small">{{ $user->username }}</span>
-                        </div>
-                        
-                        {{-- Kanan: Role & Status --}}
-                        <div class="text-end">
-                            <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill me-2">
-                                {{ $user->getRoleNames()->first() ?? 'N/A' }}
-                            </span>
-
-                            @if($user->trashed())
-                                <span class="badge bg-danger rounded-pill">Diarsipkan</span>
-                            @elseif($user->is_approved)
-                                <span class="badge bg-success rounded-pill">Aktif</span>
-                            @else
-                                <span class="badge bg-warning text-dark rounded-pill">Pending</span>
-                            @endif
-                        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-200 flex flex-col">
+            
+            {{-- Card Header --}}
+            <div class="p-5 border-b border-gray-100 flex items-start justify-between">
+                <div class="flex items-center gap-3">
+                    {{-- Avatar Placeholder --}}
+                    <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg">
+                        {{ substr($user->full_name, 0, 1) }}
                     </div>
-                </button>
-            </h2>
-
-            {{-- TAMPILAN TERBUKA (EXPANDED) --}}
-            <div id="collapse-{{ $user->user_id }}" class="accordion-collapse collapse" 
-                 aria-labelledby="heading-{{ $user->user_id }}" data-bs-parent="#usersAccordion">
-                <div class="accordion-body bg-light bg-opacity-25">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <p class="mb-1"><strong>Email:</strong> {{ $user->email ?? '-' }}</p>
-                            <p class="mb-1"><strong>NIK:</strong> {{ $user->nik ?? '-' }}</p>
-                            <p class="mb-1"><strong>Telepon:</strong> {{ $user->phone_number ?? '-' }}</p>
-                        </div>
-                        <div class="col-md-6">
-                            <p class="mb-1"><strong>Kode Sales:</strong> <span class="badge bg-secondary">{{ $user->sales_code ?? '-' }}</span></p>
-                            <p class="mb-1"><strong>Alamat:</strong> {{ $user->address ?? '-' }}</p>
-                        </div>
-                    </div>
-                    
-                    <hr class="my-3">
-                    
-                    {{-- Tombol Aksi --}}
-                    <strong>Tindakan:</strong>
-                    <div class="d-flex justify-content-start flex-wrap gap-2 mt-2">
-                        @if($user->trashed())
-                            @can('manage-users')
-                            <form action="{{ route('users.restore', $user->user_id) }}" method="POST" class="form-restore d-inline">
-                                @csrf @method('PATCH')
-                                <button type="submit" class="btn btn-sm btn-success" data-name="{{ $user->full_name }}"><i class="bi bi-arrow-counterclockwise me-1"></i> Pulihkan</button>
-                            </form>
-                            @endcan
-                        @else
-                            @can('manage-users')
-                                {{-- Tombol Setujui --}}
-                                @if(!$user->is_approved && !$user->hasRole(['admin', 'superadmin']))
-                                <form action="{{ route('users.approve', $user->user_id) }}" method="POST" class="form-approve d-inline">
-                                    @csrf @method('PATCH')
-                                    <button type="submit" class="btn btn-sm btn-success" title="Setujui User" data-name="{{ $user->full_name }}"><i class="bi bi-check-circle me-1"></i> Setujui</button>
-                                </form>
-                                @endif
-                                
-                                {{-- Tombol Edit --}}
-                                <a href="{{ route('users.edit', $user->user_id) }}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil-square me-1"></i> Edit</a>
-                                
-                                {{-- Tombol Hapus/Arsipkan (User tidak boleh menghapus dirinya sendiri) --}}
-                                @if(Auth::id() !== $user->user_id)
-                                <form action="{{ route('users.destroy', $user->user_id) }}" method="POST" class="form-delete d-inline">
-                                    @csrf @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Arsipkan" data-name="{{ $user->full_name }}"><i class="bi bi-archive me-1"></i> Arsipkan</button>
-                                </form>
-                                @endif
-                            @endcan
-                        @endif
+                    <div>
+                        <h4 class="text-base font-bold text-gray-900 leading-tight">{{ $user->full_name }}</h4>
+                        <span class="text-xs text-gray-500 block">{{ $user->username }}</span>
                     </div>
                 </div>
+                {{-- Badge Role --}}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100 capitalize">
+                    {{ $user->getRoleNames()->first() ?? 'N/A' }}
+                </span>
+            </div>
+
+            {{-- Card Body --}}
+            <div class="p-5 flex-grow text-sm text-gray-600 space-y-2">
+                <div class="flex items-center gap-2">
+                    <i class="material-icons text-base text-gray-400">email</i>
+                    <span class="truncate">{{ $user->email }}</span>
+                </div>
+                @if($user->phone_number)
+                <div class="flex items-center gap-2">
+                    <i class="material-icons text-base text-gray-400">phone</i>
+                    <span>{{ $user->phone_number }}</span>
+                </div>
+                @endif
+                @if($user->sales_code)
+                <div class="flex items-center gap-2">
+                    <i class="material-icons text-base text-gray-400">badge</i>
+                    <span>Sales: <span class="font-mono font-bold text-gray-800">{{ $user->sales_code }}</span></span>
+                </div>
+                @endif
+                
+                {{-- Status Badge --}}
+                <div class="pt-2">
+                    @if($user->trashed())
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                            <i class="material-icons text-[10px] mr-1">archive</i> Diarsipkan
+                        </span>
+                    @elseif($user->is_approved)
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                            <i class="material-icons text-[10px] mr-1">check_circle</i> Aktif
+                        </span>
+                    @else
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                            <i class="material-icons text-[10px] mr-1">hourglass_empty</i> Pending
+                        </span>
+                    @endif
+                </div>
+            </div>
+
+            {{-- Card Footer (Actions) --}}
+            <div class="bg-gray-50 px-5 py-3 border-t border-gray-100 flex justify-end gap-2">
+                @if($user->trashed())
+                    @can('manage-users')
+                    <form action="{{ route('users.restore', $user->user_id) }}" method="POST" class="form-restore">
+                        @csrf @method('PATCH')
+                        <button type="submit" class="inline-flex items-center px-2 py-1 bg-white border border-green-300 rounded text-xs font-medium text-green-700 hover:bg-green-50 transition" data-name="{{ $user->full_name }}">
+                            <i class="material-icons text-sm mr-1">restore</i> Pulihkan
+                        </button>
+                    </form>
+                    @endcan
+                @else
+                    @can('manage-users')
+                        {{-- Approve --}}
+                        @if(!$user->is_approved && !$user->hasRole(['admin', 'superadmin']))
+                        <form action="{{ route('users.approve', $user->user_id) }}" method="POST" class="form-approve">
+                            @csrf @method('PATCH')
+                            <button type="submit" class="inline-flex items-center px-2 py-1 bg-green-600 border border-transparent rounded text-xs font-medium text-white hover:bg-green-700 transition" title="Setujui" data-name="{{ $user->full_name }}">
+                                <i class="material-icons text-sm">check</i>
+                            </button>
+                        </form>
+                        @endif
+                        
+                        {{-- Edit --}}
+                        <a href="{{ route('users.edit', $user->user_id) }}" class="inline-flex items-center px-2 py-1 bg-white border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-gray-50 transition" title="Edit">
+                            <i class="material-icons text-sm">edit</i>
+                        </a>
+                        
+                        {{-- Delete --}}
+                        @if(Auth::id() !== $user->user_id)
+                        <form action="{{ route('users.destroy', $user->user_id) }}" method="POST" class="form-delete">
+                            @csrf @method('DELETE')
+                            <button type="submit" class="inline-flex items-center px-2 py-1 bg-white border border-red-200 rounded text-xs font-medium text-red-600 hover:bg-red-50 transition" title="Arsipkan" data-name="{{ $user->full_name }}">
+                                <i class="material-icons text-sm">archive</i>
+                            </button>
+                        </form>
+                        @endif
+                    @endcan
+                @endif
             </div>
         </div>
         @empty
-        {{-- Tampilan jika tidak ada user --}}
-        <div class="alert alert-info text-center py-5 my-3">
-            <i class="bi bi-people fs-1 d-block mb-2 opacity-50"></i>
-            Tidak ada data user.
+        <div class="col-span-full">
+            <div class="flex flex-col items-center justify-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-300 text-center">
+                <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-3">
+                    <i class="material-icons text-4xl text-gray-400">people_outline</i>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900">Tidak Ada Data User</h3>
+                <p class="text-gray-500 max-w-sm mt-1">Belum ada user yang terdaftar atau sesuai filter.</p>
+            </div>
         </div>
         @endforelse
-
     </div>
     
-    <div class="mt-4 d-flex justify-content-center">
+    <div class="mt-6">
         {{ $users->appends(request()->query())->links() }}
     </div>
 </div>

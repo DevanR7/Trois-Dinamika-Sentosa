@@ -1,133 +1,147 @@
 @extends('layouts.app')
 
+@section('title', 'Detail Pinjaman')
+
 @section('content')
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold mb-0 text-dark">Detail Pinjaman</h2>
-        <a href="{{ route('loans.index') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Kembali
-        </a>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    
+    {{-- HEADER --}}
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+        <div>
+            <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                <a href="{{ route('loans.index') }}" class="hover:text-indigo-600 transition">Pinjaman</a>
+                <span>/</span>
+                <span class="text-gray-800">Detail</span>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Detail Pinjaman</h2>
+        </div>
+        <div class="mt-4 sm:mt-0">
+            <a href="{{ route('loans.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition text-sm">
+                <i class="material-icons text-lg mr-2">arrow_back</i> Kembali
+            </a>
+        </div>
     </div>
 
     {{-- INFO UTAMA --}}
-    <div class="card shadow-sm mb-4 border-0">
-        <div class="card-body p-4">
-            <div class="row align-items-center">
-                <div class="col-md-8">
-                    <h3 class="fw-bold text-primary mb-1">{{ $loan->lender_name }}</h3>
-                    <p class="text-muted mb-3">{{ $loan->description ?? 'Tidak ada deskripsi' }}</p>
-                    
-                    <div class="d-flex gap-4 mb-3">
-                        <div>
-                            <small class="text-uppercase fw-bold text-secondary d-block">Tanggal Pinjam</small>
-                            <span class="fs-5">{{ $loan->loan_date->format('d M Y') }}</span>
-                        </div>
-                        <div>
-                            <small class="text-uppercase fw-bold text-secondary d-block">Status</small>
-                            @if ($loan->status == 'active')
-                                <span class="badge bg-warning text-dark fs-6 mt-1">Aktif / Belum Lunas</span>
-                            @else
-                                <span class="badge bg-success fs-6 mt-1">Lunas</span>
-                            @endif
-                        </div>
-                    </div>
-                </div>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+        <div class="p-6 flex flex-col md:flex-row gap-8 items-center">
+            
+            <div class="flex-1 w-full">
+                <h3 class="text-2xl font-bold text-indigo-600 mb-1">{{ $loan->lender_name }}</h3>
+                <p class="text-gray-500 mb-4 text-sm">{{ $loan->description ?? 'Tidak ada deskripsi' }}</p>
                 
-                <div class="col-md-4 border-start">
-                    <div class="ps-md-3">
-                        <small class="text-uppercase fw-bold text-secondary">Sisa Pokok Pinjaman</small>
-                        <h2 class="fw-bold text-danger mb-0">Rp {{ number_format($loan->remaining_balance, 0, ',', '.') }}</h2>
-                        <div class="progress mt-2" style="height: 6px;">
-                            @php
-                                $percentPaid = ($loan->principal_amount > 0) 
-                                    ? (($loan->principal_amount - $loan->remaining_balance) / $loan->principal_amount) * 100 
-                                    : 0;
-                            @endphp
-                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ $percentPaid }}%"></div>
-                        </div>
-                        <small class="text-muted">Terbayar: {{ round($percentPaid) }}%</small>
+                <div class="flex gap-8">
+                    <div>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Tanggal Pinjam</p>
+                        <p class="text-lg font-medium text-gray-900">{{ $loan->loan_date->format('d M Y') }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Status</p>
+                        @if ($loan->status == 'active')
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 mt-1 border border-yellow-200">
+                                Belum Lunas
+                            </span>
+                        @else
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-1 border border-green-200">
+                                Lunas
+                            </span>
+                        @endif
                     </div>
                 </div>
             </div>
 
-            <div class="row mt-4 pt-3 border-top bg-light rounded py-3 mx-0">
-                <div class="col-md-3">
-                    <small class="d-block text-muted">Total Pinjaman Awal</small>
-                    <strong>Rp {{ number_format($loan->principal_amount, 0, ',', '.') }}</strong>
+            <div class="w-full md:w-1/3 bg-gray-50 p-5 rounded-xl border border-gray-200">
+                <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Sisa Pokok Pinjaman</p>
+                <h2 class="text-3xl font-bold text-red-600 mb-2">Rp {{ number_format($loan->remaining_balance, 0, ',', '.') }}</h2>
+                
+                @php
+                    $percentPaid = ($loan->principal_amount > 0) 
+                        ? (($loan->principal_amount - $loan->remaining_balance) / $loan->principal_amount) * 100 
+                        : 0;
+                @endphp
+                <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+                    <div class="bg-green-500 h-2.5 rounded-full transition-all duration-500" style="width: {{ $percentPaid }}%"></div>
                 </div>
-                <div class="col-md-3">
-                    <small class="d-block text-muted">Total Pokok Dibayar</small>
-                    <strong class="text-success">Rp {{ number_format($loan->payments->sum('principal_paid'), 0, ',', '.') }}</strong>
-                </div>
-                <div class="col-md-3">
-                    <small class="d-block text-muted">Total Bunga Dibayar</small>
-                    <strong class="text-warning text-dark">Rp {{ number_format($loan->payments->sum('interest_paid'), 0, ',', '.') }}</strong>
-                </div>
-                <div class="col-md-3">
-                    <small class="d-block text-muted">Akun Akuntansi</small>
-                    <div class="small">{{ $loan->loanAccount->account_name ?? '-' }} (Utang)</div>
-                    <div class="small">{{ $loan->cashBankAccount->account_name ?? '-' }} (Kas Masuk)</div>
-                </div>
+                <p class="text-xs text-gray-500 text-right">Terbayar: {{ round($percentPaid) }}%</p>
+            </div>
+        </div>
+        
+        <div class="bg-gray-50 border-t border-gray-100 p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+                <p class="text-xs text-gray-500 uppercase">Total Pinjaman Awal</p>
+                <p class="font-bold text-gray-900">Rp {{ number_format($loan->principal_amount, 0, ',', '.') }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-500 uppercase">Total Pokok Dibayar</p>
+                <p class="font-bold text-green-600">Rp {{ number_format($loan->payments->sum('principal_paid'), 0, ',', '.') }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-500 uppercase">Total Bunga Dibayar</p>
+                <p class="font-bold text-yellow-600">Rp {{ number_format($loan->payments->sum('interest_paid'), 0, ',', '.') }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-500 uppercase">Akun Akuntansi</p>
+                <p class="text-xs text-gray-700 font-medium truncate" title="{{ $loan->loanAccount->account_name }}">{{ $loan->loanAccount->account_name }} (Utang)</p>
+                <p class="text-xs text-gray-700 font-medium truncate" title="{{ $loan->cashBankAccount->account_name }}">{{ $loan->cashBankAccount->account_name }} (Kas)</p>
             </div>
         </div>
     </div>
 
     {{-- RIWAYAT PEMBAYARAN --}}
-    <div class="card shadow-sm border-0">
-        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-bold"><i class="bi bi-clock-history me-2"></i> Riwayat Pembayaran Cicilan</h5>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+            <h5 class="font-bold text-gray-800 text-sm uppercase tracking-wider flex items-center gap-2">
+                <i class="material-icons text-gray-400">history</i> Riwayat Cicilan
+            </h5>
             
             @if($loan->status == 'active')
-                <a href="{{ route('loans.payments.create', $loan) }}" class="btn btn-success">
-                    <i class="bi bi-plus-lg"></i> Bayar Cicilan
+                <a href="{{ route('loans.payments.create', $loan) }}" class="inline-flex items-center px-3 py-1.5 bg-green-600 border border-transparent rounded-lg font-bold text-xs text-white uppercase tracking-widest hover:bg-green-700 transition">
+                    <i class="material-icons text-sm mr-1">add</i> Bayar Cicilan
                 </a>
             @endif
         </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="ps-4">Tanggal</th>
-                            <th>Keterangan</th>
-                            <th class="text-end">Pokok</th>
-                            <th class="text-end">Bunga</th>
-                            <th class="text-end">Total Bayar</th>
-                            <th>Via Akun</th>
-                            <th>Admin</th>
-                            <th class="text-center">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($loan->payments as $payment)
-                        <tr>
-                            <td class="ps-4">{{ $payment->payment_date->format('d/m/y') }}</td>
-                            <td>{{ Str::limit($payment->notes, 30) ?? '-' }}</td>
-                            <td class="text-end">Rp {{ number_format($payment->principal_paid, 0, ',', '.') }}</td>
-                            <td class="text-end text-muted">Rp {{ number_format($payment->interest_paid, 0, ',', '.') }}</td>
-                            <td class="text-end fw-bold text-success">Rp {{ number_format($payment->total_paid, 0, ',', '.') }}</td>
-                            <td>{{ $payment->cashBankAccount->account_name ?? '-' }}</td>
-                            <td><small>{{ $payment->user->name ?? 'System' }}</small></td>
-                            <td class="text-center">
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tanggal</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Keterangan</th>
+                        <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Pokok</th>
+                        <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Bunga</th>
+                        <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Total Bayar</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Via Akun</th>
+                        <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    @forelse ($loan->payments as $payment)
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $payment->payment_date->format('d/m/y') }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-600 truncate max-w-xs">{{ $payment->notes ?? '-' }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-mono text-gray-900">Rp {{ number_format($payment->principal_paid, 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-mono text-gray-500">Rp {{ number_format($payment->interest_paid, 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-mono font-bold text-green-600">Rp {{ number_format($payment->total_paid, 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-500">{{ $payment->cashBankAccount->account_name ?? '-' }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
                                 <form action="{{ route('loans.payments.destroy', [$loan, $payment]) }}" method="POST" 
                                       class="d-inline form-delete-payment"
                                       data-payment-label="Pembayaran tgl {{ $payment->payment_date->format('d/m/Y') }} sebesar Rp {{ number_format($payment->total_paid, 0, ',', '.') }}">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Batalkan Pembayaran">
-                                        <i class="bi bi-x-circle"></i>
+                                    <button type="submit" class="p-1 text-red-400 hover:text-red-600 transition rounded-full hover:bg-red-50" title="Batalkan">
+                                        <i class="material-icons text-lg">cancel</i>
                                     </button>
                                 </form>
                             </td>
                         </tr>
-                        @empty
+                    @empty
                         <tr>
-                            <td colspan="8" class="text-center py-5 text-muted">Belum ada riwayat pembayaran cicilan.</td>
+                            <td colspan="7" class="px-6 py-12 text-center text-gray-500 text-sm">Belum ada riwayat pembayaran cicilan.</td>
                         </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -136,30 +150,30 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const deleteForms = document.querySelectorAll('.form-delete-payment');
-    deleteForms.forEach(form => {
-        form.addEventListener('submit', function (event) {
-            event.preventDefault(); 
-            const label = event.target.dataset.paymentLabel;
-            
-            Swal.fire({
-                title: 'Batalkan Pembayaran?',
-                html: `Anda akan membatalkan:<br><b>${label}</b><br><br><small class="text-danger">Sisa pokok pinjaman akan dikembalikan dan jurnal dibalik.</small>`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#dc3545',
-                confirmButtonText: 'Ya, Batalkan!',
-                cancelButtonText: 'Tidak'
-            }).then((result) => {
-                if (result.isConfirmed) event.target.submit();
+    document.addEventListener('DOMContentLoaded', function() {
+        const deleteForms = document.querySelectorAll('.form-delete-payment');
+        deleteForms.forEach(form => {
+            form.addEventListener('submit', function (event) {
+                event.preventDefault(); 
+                const label = event.target.dataset.paymentLabel;
+                
+                Swal.fire({
+                    title: 'Batalkan Pembayaran?',
+                    html: `Anda akan membatalkan:<br><b>${label}</b><br><br><span class="text-red-600 font-bold text-xs">Sisa pokok pinjaman akan dikembalikan dan jurnal dibalik.</span>`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#dc2626',
+                    cancelButtonColor: '#6b7280',
+                    confirmButtonText: 'Ya, Batalkan!',
+                    cancelButtonText: 'Tidak'
+                }).then((result) => {
+                    if (result.isConfirmed) event.target.submit();
+                });
             });
         });
-    });
 
-    // Notifikasi Flash
-    @if(session('success')) Swal.fire('Berhasil!', "{{ session('success') }}", 'success'); @endif
-    @if(session('error')) Swal.fire('Gagal!', "{{ session('error') }}", 'error'); @endif
-});
+        @if(session('success')) Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Berhasil!', text: "{{ session('success') }}", timer: 3000, showConfirmButton: false }); @endif
+        @if(session('error')) Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Gagal!', text: "{{ session('error') }}" }); @endif
+    });
 </script>
 @endpush

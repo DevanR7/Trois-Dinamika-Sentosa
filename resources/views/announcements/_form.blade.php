@@ -1,75 +1,98 @@
-{{-- resources/views/announcements/_form.blade.php --}}
-
 @if ($errors->any())
-    <div class="alert alert-danger"><ul class="mb-0">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
+    <div class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+        <i class="material-icons text-red-500 text-lg mt-0.5">error</i>
+        <div>
+            <h3 class="text-sm font-bold text-red-800">Terdapat kesalahan input</h3>
+            <ul class="mt-1 list-disc list-inside text-sm text-red-700">
+                @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
+            </ul>
+        </div>
+    </div>
 @endif
 
-<div class="row g-3">
-    <div class="col-12">
-        <label for="title" class="form-label fw-semibold">Judul (Opsional)</label>
-        <input type="text" class="form-control" id="title" name="title" value="{{ old('title', $announcement->title ?? '') }}">
+<div class="space-y-6">
+    
+    {{-- Judul --}}
+    <div>
+        <label for="title" class="block text-xs font-bold text-gray-500 uppercase mb-1">Judul (Opsional)</label>
+        <input type="text" name="title" id="title" value="{{ old('title', $announcement->title ?? '') }}" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Contoh: Pemberitahuan Libur Lebaran">
     </div>
 
-    <div class="col-12">
-        <label for="content" class="form-label fw-semibold">Isi Pengumuman <span class="text-danger">*</span></label>
-        <textarea class="form-control" id="content" name="content" rows="5" required>{{ old('content', $announcement->content ?? '') }}</textarea>
+    {{-- Konten --}}
+    <div>
+        <label for="content" class="block text-xs font-bold text-gray-500 uppercase mb-1">Isi Pengumuman <span class="text-red-500">*</span></label>
+        <textarea name="content" id="content" rows="5" class="form-textarea block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required placeholder="Tulis isi pengumuman di sini...">{{ old('content', $announcement->content ?? '') }}</textarea>
     </div>
 
-    <div class="col-md-6">
-        <label for="type" class="form-label fw-semibold">Tipe <span class="text-danger">*</span></label>
-        <select class="form-select" id="type" name="type" required>
+    {{-- Tipe --}}
+    <div>
+        <label for="type" class="block text-xs font-bold text-gray-500 uppercase mb-1">Tipe Pengumuman <span class="text-red-500">*</span></label>
+        <select name="type" id="type" class="form-select block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>
             <option value="broadcast" @selected(old('type', $announcement->type ?? 'broadcast') == 'broadcast')>Broadcast (Semua Klien)</option>
             <option value="targeted" @selected(old('type', $announcement->type ?? '') == 'targeted')>Targeted (Klien Tertentu)</option>
         </select>
     </div>
 
-    {{-- Container untuk pilihan klien, awalnya tersembunyi --}}
-    <div class="col-12" id="client-selection-container" style="display: {{ old('type', $announcement->type ?? 'broadcast') == 'targeted' ? 'block' : 'none' }};">
-        <label for="client_ids" class="form-label fw-semibold">Pilih Klien Target <span id="client-required-indicator" class="text-danger" style="display: none;">*</span></label>
-        {{-- Gunakan select2 untuk pilihan multiple --}}
-        <select class="form-select select2" id="client_ids" name="client_ids[]" multiple="multiple" style="width: 100%;">
+    {{-- Pilihan Klien (Conditional) --}}
+    <div id="client-selection-container" style="display: {{ old('type', $announcement->type ?? 'broadcast') == 'targeted' ? 'block' : 'none' }};">
+        <label for="client_ids" class="block text-xs font-bold text-gray-500 uppercase mb-1">Pilih Klien Target <span id="client-required-indicator" class="text-red-500 hidden">*</span></label>
+        <select class="select2 form-select block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" id="client_ids" name="client_ids[]" multiple="multiple">
             @foreach ($clients as $client)
                 <option value="{{ $client->client_id }}" 
-                    {{-- Cek old input atau data dari edit --}}
                     @selected(in_array($client->client_id, old('client_ids', $selectedClientIds ?? [])))> 
-                    {{ $client->client_name }} ({{ $client->email ?? 'Email Kosong' }})
+                    {{ $client->client_name }} ({{ $client->email ?? '-' }})
                 </option>
             @endforeach
         </select>
-        @error('client_ids') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
-        @error('client_ids.*') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+        <p class="mt-1 text-xs text-gray-500">Pilih satu atau lebih klien yang akan menerima pengumuman ini.</p>
+        @error('client_ids') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
     </div>
 
-    <div class="col-12">
-        <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" role="switch" id="is_active" name="is_active" value="1" 
-                   @checked(old('is_active', $announcement->is_active ?? false))>
-            <label class="form-check-label" for="is_active">Aktifkan Pengumuman ini?</label>
+    {{-- Status Switch --}}
+    <div class="pt-2 border-t border-gray-100">
+        <div class="flex items-start">
+            <div class="flex items-center h-5">
+                <input id="is_active" name="is_active" type="checkbox" value="1" @checked(old('is_active', $announcement->is_active ?? false)) class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded cursor-pointer">
+            </div>
+            <div class="ml-3 text-sm">
+                <label for="is_active" class="font-medium text-gray-700 cursor-pointer">Publikasikan Sekarang?</label>
+                <p class="text-gray-500 text-xs">Jika dicentang, pengumuman akan langsung tampil di portal klien.</p>
+            </div>
         </div>
-        <small class="text-muted">Jika dicentang, pengumuman akan langsung tampil di portal klien.</small>
     </div>
+
 </div>
 
 @push('styles')
-    {{-- CSS untuk Select2 --}}
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+    <style>
+        /* Style Select2 agar mirip input Tailwind */
+        .select2-container--bootstrap-5 .select2-selection {
+            border-color: #d1d5db !important;
+            border-radius: 0.5rem;
+            padding: 0.3rem 0.5rem;
+        }
+        .select2-container--bootstrap-5.select2-container--focus .select2-selection {
+            border-color: #6366f1 !important;
+            box-shadow: 0 0 0 1px #6366f1 !important;
+        }
+    </style>
 @endpush
 
 @push('scripts')
-    {{-- JS untuk Select2 & logic form --}}
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> {{-- Select2 butuh jQuery --}}
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         $(document).ready(function() {
             // Inisialisasi Select2
             $('.select2').select2({
                 theme: 'bootstrap-5',
-                placeholder: 'Pilih satu atau lebih klien...',
-                allowClear: true
+                placeholder: 'Pilih klien...',
+                allowClear: true,
+                width: '100%'
             });
 
-            // Tampilkan/sembunyikan pilihan klien berdasarkan tipe
+            // Logic Tipe Pengumuman
             const typeSelect = $('#type');
             const clientContainer = $('#client-selection-container');
             const clientRequiredIndicator = $('#client-required-indicator');
@@ -78,19 +101,14 @@
             function toggleClientSelection() {
                 if (typeSelect.val() === 'targeted') {
                     clientContainer.slideDown();
-                    clientRequiredIndicator.show();
-                    // Optional: tambahkan atribut required ke select2
-                    // clientSelect.prop('required', true); 
+                    clientRequiredIndicator.removeClass('hidden');
                 } else {
                     clientContainer.slideUp();
-                    clientRequiredIndicator.hide();
-                    // Hapus pilihan & required jika broadcast
+                    clientRequiredIndicator.addClass('hidden');
                     clientSelect.val(null).trigger('change'); 
-                    // clientSelect.prop('required', false);
                 }
             }
 
-            // Panggil saat halaman load & saat tipe berubah
             toggleClientSelection();
             typeSelect.on('change', toggleClientSelection);
         });

@@ -305,7 +305,8 @@ class PurchaseReturnController extends Controller
             }
 
             DB::commit();
-            return redirect()->route('purchase-returns.index')->with('success', 'Retur pembelian berhasil disimpan dan dijurnal.');
+            return redirect()->route('purchase-returns.index')
+                ->with('success', 'Retur pembelian berhasil disimpan. Nomor: ' . $purchaseReturn->return_number);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Gagal menyimpan retur pembelian: ' . $e->getMessage());

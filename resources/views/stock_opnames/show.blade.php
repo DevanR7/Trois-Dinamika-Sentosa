@@ -1,61 +1,73 @@
 @extends('layouts.app')
 
+@section('title', 'Detail Opname')
+
 @section('content')
-<div class="container-fluid py-2">
+<div class="max-w-7xl mx-auto">
     
-    {{-- Header --}}
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    {{-- HEADER --}}
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
-            <h3 class="fw-bold text-dark mb-1">Detail Opname</h3>
-            <p class="text-muted mb-0 small">Nomor Dokumen: <span class="text-primary fw-bold">{{ $stockOpname->opname_number }}</span></p>
+            <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                <a href="{{ route('stock-opnames.index') }}" class="hover:text-indigo-600 transition">Opname</a>
+                <span>/</span>
+                <span class="text-gray-800">Detail</span>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">
+                No. Dokumen: <span class="text-indigo-600">{{ $stockOpname->opname_number }}</span>
+            </h2>
         </div>
         
-        <div class="d-flex gap-2">
+        <div class="flex gap-3">
             <form action="{{ route('stock-opnames.destroy', $stockOpname->opname_id) }}" method="POST" class="form-delete-opname-detail">
                 @csrf @method('DELETE')
-                <button type="submit" class="btn btn-danger btn-sm shadow-sm">
-                    <i class="bi bi-trash me-1"></i> Batalkan Opname
+                <button type="submit" class="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-100 transition">
+                    <i class="bi bi-trash mr-1"></i> Batalkan Opname
                 </button>
             </form>
 
-            <a href="{{ route('stock-opnames.index') }}" class="btn btn-outline-secondary btn-sm shadow-sm">
-                <i class="bi bi-arrow-left me-1"></i> Kembali
+            <a href="{{ route('stock-opnames.index') }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition shadow-sm">
+                Kembali
             </a>
         </div>
     </div>
 
-    <div class="row g-4">
-        {{-- Info Card --}}
-        <div class="col-md-4">
-            <div class="card card-transaction border-0 shadow-sm h-100">
-                <div class="card-header bg-white p-3 border-bottom">
-                    <div class="form-section-title mb-0"><i class="bi bi-info-circle"></i> Informasi Umum</div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {{-- KOLOM KIRI: INFO UMUM --}}
+        <div class="lg:col-span-1 space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-5 py-3 border-b border-gray-100 bg-gray-50">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                        <i class="bi bi-info-circle text-indigo-500"></i> Informasi Umum
+                    </h3>
                 </div>
-                <div class="card-body p-4">
-                    <dl class="row mb-0">
-                        <dt class="col-sm-4 small text-muted text-uppercase">Tanggal</dt>
-                        <dd class="col-sm-8 fw-medium">{{ $stockOpname->opname_date->format('d F Y') }}</dd>
-
-                        <dt class="col-sm-4 small text-muted text-uppercase">Petugas</dt>
-                        <dd class="col-sm-8">{{ $stockOpname->user->full_name ?? 'System' }}</dd>
-
-                        <dt class="col-sm-4 small text-muted text-uppercase">Status</dt>
-                        <dd class="col-sm-8"><span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">Selesai</span></dd>
-
-                        <dt class="col-sm-12 small text-muted text-uppercase mt-2">Catatan</dt>
-                        <dd class="col-sm-12 bg-light p-3 rounded border border-light fst-italic small text-muted mb-0">
+                <div class="p-5 space-y-4">
+                    <div>
+                        <span class="block text-xs font-medium text-gray-500 uppercase">Tanggal</span>
+                        <span class="text-sm font-semibold text-gray-900">{{ $stockOpname->opname_date->format('d F Y') }}</span>
+                    </div>
+                    <div>
+                        <span class="block text-xs font-medium text-gray-500 uppercase">Petugas</span>
+                        <span class="text-sm font-semibold text-gray-900">{{ $stockOpname->user->full_name ?? 'System' }}</span>
+                    </div>
+                    <div>
+                        <span class="block text-xs font-medium text-gray-500 uppercase">Status</span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200 mt-1">Selesai</span>
+                    </div>
+                    <div>
+                        <span class="block text-xs font-medium text-gray-500 uppercase mb-1">Catatan</span>
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm text-gray-600 italic">
                             {{ $stockOpname->notes ?: 'Tidak ada catatan.' }}
-                        </dd>
-                    </dl>
-
-                    <hr class="border-dashed my-4">
-
-                    <div class="text-center">
-                        <small class="text-muted d-block mb-1 text-uppercase fw-bold">Total Nilai Penyesuaian</small>
-                        <h2 class="fw-bold {{ $stockOpname->total_adjustment_value < 0 ? 'text-danger' : ($stockOpname->total_adjustment_value > 0 ? 'text-success' : 'text-muted') }}">
+                        </div>
+                    </div>
+                    
+                    <div class="border-t border-dashed border-gray-200 pt-4 mt-2 text-center">
+                        <span class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Total Nilai Penyesuaian</span>
+                        <div class="text-2xl font-bold {{ $stockOpname->total_adjustment_value < 0 ? 'text-red-600' : ($stockOpname->total_adjustment_value > 0 ? 'text-green-600' : 'text-gray-400') }}">
                             {{ $stockOpname->total_adjustment_value < 0 ? '-' : '+' }} Rp {{ number_format(abs($stockOpname->total_adjustment_value), 0, ',', '.') }}
-                        </h2>
-                        <span class="badge rounded-pill {{ $stockOpname->total_adjustment_value < 0 ? 'bg-danger' : 'bg-success' }} bg-opacity-10 {{ $stockOpname->total_adjustment_value < 0 ? 'text-danger' : 'text-success' }}">
+                        </div>
+                        <span class="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase border {{ $stockOpname->total_adjustment_value < 0 ? 'bg-red-50 text-red-600 border-red-100' : ($stockOpname->total_adjustment_value > 0 ? 'bg-green-50 text-green-600 border-green-100' : 'bg-gray-50 text-gray-500 border-gray-200') }}">
                             @if($stockOpname->total_adjustment_value < 0) Selisih Kurang (Rugi)
                             @elseif($stockOpname->total_adjustment_value > 0) Selisih Lebih (Untung)
                             @else Sesuai (Balance)
@@ -66,53 +78,59 @@
             </div>
         </div>
 
-        {{-- Items Table --}}
-        <div class="col-md-8">
-            <div class="card card-transaction border-0 shadow-sm h-100">
-                <div class="card-header bg-white p-3 border-bottom">
-                    <div class="form-section-title mb-0"><i class="bi bi-list-check"></i> Rincian Barang</div>
+        {{-- KOLOM KANAN: RINCIAN BARANG --}}
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-full flex flex-col">
+                <div class="px-5 py-3 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                        <i class="bi bi-list-check text-indigo-500"></i> Rincian Barang
+                    </h3>
+                    <span class="text-xs text-gray-400 font-medium">{{ $stockOpname->items->count() }} Item</span>
                 </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive" style="max-height: 600px;">
-                        <table class="table table-hover table-transaction align-middle mb-0">
-                            <thead class="bg-light sticky-top">
-                                <tr>
-                                    <th class="ps-4">Produk</th>
-                                    <th class="text-center">System</th>
-                                    <th class="text-center">Fisik</th>
-                                    <th class="text-center">Selisih</th>
-                                    <th class="text-end pe-4">Nilai (Rp)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($stockOpname->items as $item)
-                                <tr class="{{ $item->difference != 0 ? ($item->difference < 0 ? 'bg-danger bg-opacity-10' : 'bg-success bg-opacity-10') : '' }}">
-                                    <td class="ps-4">
-                                        <div class="fw-bold text-dark">{{ $item->product->product_name }}</div>
-                                        <small class="text-muted">HPP: Rp {{ number_format($item->cost_per_unit, 0, ',', '.') }}</small>
-                                    </td>
-                                    <td class="text-center text-muted">{{ $item->system_qty }}</td>
-                                    <td class="text-center fw-bold text-dark">{{ $item->physical_qty }}</td>
-                                    <td class="text-center fw-bold">
-                                        @if($item->difference > 0) <span class="text-success">+{{ $item->difference }}</span>
-                                        @elseif($item->difference < 0) <span class="text-danger">{{ $item->difference }}</span>
-                                        @else <span class="text-muted">0</span>
-                                        @endif
-                                    </td>
-                                    <td class="text-end pe-4 fw-medium">
-                                        @if($item->adjustment_value != 0)
-                                            <span class="{{ $item->adjustment_value < 0 ? 'text-danger' : 'text-success' }}">
-                                                {{ $item->adjustment_value < 0 ? '-' : '+' }} Rp {{ number_format(abs($item->adjustment_value), 0, ',', '.') }}
-                                            </span>
-                                        @else
-                                            -
-                                        @endif
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+                
+                <div class="flex-1 overflow-y-auto custom-scrollbar max-h-[600px]">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Produk</th>
+                                <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">System</th>
+                                <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Fisik</th>
+                                <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Selisih</th>
+                                <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Nilai (Rp)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @foreach($stockOpname->items as $item)
+                            <tr class="hover:bg-gray-50 transition-colors {{ $item->difference != 0 ? ($item->difference < 0 ? 'bg-red-50/30' : 'bg-green-50/30') : '' }}">
+                                <td class="px-6 py-3">
+                                    <div class="text-sm font-medium text-gray-900">{{ $item->product->product_name }}</div>
+                                    <div class="text-xs text-gray-500">HPP: Rp {{ number_format($item->cost_per_unit, 0, ',', '.') }}</div>
+                                </td>
+                                <td class="px-6 py-3 text-center text-sm text-gray-500">
+                                    {{ $item->system_qty }}
+                                </td>
+                                <td class="px-6 py-3 text-center text-sm font-bold text-gray-800">
+                                    {{ $item->physical_qty }}
+                                </td>
+                                <td class="px-6 py-3 text-center text-sm font-bold">
+                                    @if($item->difference > 0) <span class="text-green-600">+{{ $item->difference }}</span>
+                                    @elseif($item->difference < 0) <span class="text-red-600">{{ $item->difference }}</span>
+                                    @else <span class="text-gray-400">0</span>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-3 text-right text-sm font-medium">
+                                    @if($item->adjustment_value != 0)
+                                        <span class="{{ $item->adjustment_value < 0 ? 'text-red-600' : 'text-green-600' }}">
+                                            {{ $item->adjustment_value < 0 ? '-' : '+' }} Rp {{ number_format(abs($item->adjustment_value), 0, ',', '.') }}
+                                        </span>
+                                    @else
+                                        <span class="text-gray-300">-</span>
+                                    @endif
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -129,17 +147,15 @@ document.addEventListener('DOMContentLoaded', function() {
             event.preventDefault();
             Swal.fire({
                 title: 'Batalkan Opname?',
-                text: "Stok akan dikembalikan dan jurnal dihapus!",
+                text: "Stok akan dikembalikan dan jurnal dihapus! Aksi ini tidak dapat dibatalkan.",
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Ya, Hapus!',
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Ya, Batalkan!',
                 cancelButtonText: 'Batal'
             }).then((result) => {
-                if (result.isConfirmed) {
-                    deleteForm.submit();
-                }
+                if (result.isConfirmed) deleteForm.submit();
             });
         });
     }

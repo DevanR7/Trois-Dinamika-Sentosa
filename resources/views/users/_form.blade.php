@@ -1,96 +1,106 @@
 @if ($errors->any())
-    <div class="alert alert-danger border-0 shadow-sm rounded-3 mb-4">
-        <ul class="mb-0 small ps-3">
-            @foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach
-        </ul>
+    <div class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+        <i class="material-icons text-red-500 text-lg mt-0.5">error</i>
+        <div>
+            <h3 class="text-sm font-bold text-red-800">Terdapat kesalahan input</h3>
+            <ul class="mt-1 list-disc list-inside text-sm text-red-700">
+                @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
+            </ul>
+        </div>
     </div>
 @endif
 
-<h6 class="fw-bold text-dark mb-3">Informasi Login & Peran</h6>
-<div class="row g-4">
-    {{-- Info Utama --}}
-    <div class="col-md-6">
-        <label for="full_name" class="form-label fw-semibold small text-muted">NAMA LENGKAP <span class="text-danger">*</span></label>
-        <input type="text" class="form-control" id="full_name" name="full_name" value="{{ old('full_name', $user->full_name ?? '') }}" required>
-    </div>
-    <div class="col-md-6">
-        <label for="role" class="form-label fw-semibold small text-muted">PERAN (ROLE) <span class="text-danger">*</span></label>
-        <select class="form-select" id="role" name="role" required>
-            <option value="" disabled selected>Pilih Role...</option>
-            @foreach ($roles as $role)
-            <option 
-                value="{{ $role->name }}" 
-                @if(isset($user)) 
-                    @selected($user->hasRole($role->name)) 
-                @endif
-            >
-                {{ Str::title($role->name) }}
-            </option>
-            @endforeach
-        </select>
-    </div>
-    <div class="col-md-6">
-        <label for="username" class="form-label fw-semibold small text-muted">USERNAME <span class="text-danger">*</span></label>
-        <input type="text" class="form-control" id="username" name="username" value="{{ old('username', $user->username ?? '') }}" required>
-    </div>
-    <div class="col-md-6">
-        <label for="email" class="form-label fw-semibold small text-muted">EMAIL <span class="text-danger">*</span></label>
-        <input type="email" class="form-control" id="email" name="email" value="{{ old('email', $user->email ?? '') }}" required>
-    </div>
-    
-    {{-- Kode Sales (Conditional) --}}
-    <div class="col-md-6" id="sales-code-container" style="display: none;">
-        <label for="sales_code" class="form-label fw-semibold small text-muted">KODE SALES (Contoh: KV)</label>
-        <input type="text" class="form-control" id="sales_code" name="sales_code" value="{{ old('sales_code', $user->sales_code ?? '') }}">
+{{-- SECTION 1: INFORMASI LOGIN --}}
+<div class="mb-6">
+    <h6 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2">Informasi Login & Peran</h6>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <div>
+            <label for="full_name" class="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Lengkap <span class="text-red-500">*</span></label>
+            <input type="text" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" id="full_name" name="full_name" value="{{ old('full_name', $user->full_name ?? '') }}" required>
+        </div>
+
+        <div>
+            <label for="role" class="block text-xs font-bold text-gray-500 uppercase mb-1">Peran (Role) <span class="text-red-500">*</span></label>
+            <select class="form-select block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" id="role" name="role" required>
+                <option value="" disabled selected>Pilih Role...</option>
+                @foreach ($roles as $role)
+                    <option value="{{ $role->name }}" 
+                        @if(isset($user)) @selected($user->hasRole($role->name)) @endif>
+                        {{ Str::title($role->name) }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+
+        <div>
+            <label for="username" class="block text-xs font-bold text-gray-500 uppercase mb-1">Username <span class="text-red-500">*</span></label>
+            <input type="text" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" id="username" name="username" value="{{ old('username', $user->username ?? '') }}" required>
+        </div>
+
+        <div>
+            <label for="email" class="block text-xs font-bold text-gray-500 uppercase mb-1">Email <span class="text-red-500">*</span></label>
+            <input type="email" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" id="email" name="email" value="{{ old('email', $user->email ?? '') }}" required>
+        </div>
+
+        {{-- Kode Sales (Conditional) --}}
+        <div id="sales-code-container" style="display: none;">
+            <label for="sales_code" class="block text-xs font-bold text-gray-500 uppercase mb-1">Kode Sales</label>
+            <input type="text" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" id="sales_code" name="sales_code" value="{{ old('sales_code', $user->sales_code ?? '') }}" placeholder="Contoh: KV">
+        </div>
     </div>
 </div>
 
-<hr class="border-dashed my-4">
+{{-- SECTION 2: INFORMASI TAMBAHAN --}}
+<div class="mb-6">
+    <h6 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2">Informasi Tambahan</h6>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+            <label for="nik" class="block text-xs font-bold text-gray-500 uppercase mb-1">NIK (Opsional)</label>
+            <input type="text" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" id="nik" name="nik" value="{{ old('nik', $user->nik ?? '') }}">
+        </div>
+        
+        <div>
+            <label for="phone_number" class="block text-xs font-bold text-gray-500 uppercase mb-1">No. Telepon (Opsional)</label>
+            <input type="text" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" id="phone_number" name="phone_number" value="{{ old('phone_number', $user->phone_number ?? '') }}">
+        </div>
 
-<h6 class="fw-bold text-dark mb-3">Informasi Tambahan</h6>
-<div class="row g-4">
-    <div class="col-md-6">
-        <label for="nik" class="form-label fw-semibold small text-muted">NIK (OPSIONAL)</label>
-        <input type="text" class="form-control @error('nik') is-invalid @enderror" id="nik" name="nik" value="{{ old('nik', $user->nik ?? '') }}">
-        @error('nik') <div class="invalid-feedback">{{ $message }}</div> @enderror
-    </div>
-    <div class="col-md-6">
-        <label for="phone_number" class="form-label fw-semibold small text-muted">NO. TELEPON (OPSIONAL)</label>
-        <input type="text" class="form-control @error('phone_number') is-invalid @enderror" id="phone_number" name="phone_number" value="{{ old('phone_number', $user->phone_number ?? '') }}">
-        @error('phone_number') <div class="invalid-feedback">{{ $message }}</div> @enderror
-    </div>
-    <div class="col-12">
-        <label for="address" class="form-label fw-semibold small text-muted">ALAMAT (OPSIONAL)</label>
-        <textarea class="form-control @error('address') is-invalid @enderror" id="address" name="address" rows="2">{{ old('address', $user->address ?? '') }}</textarea>
-        @error('address') <div class="invalid-feedback">{{ $message }}</div> @enderror
+        <div class="md:col-span-2">
+            <label for="address" class="block text-xs font-bold text-gray-500 uppercase mb-1">Alamat (Opsional)</label>
+            <textarea class="form-textarea block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" id="address" name="address" rows="2">{{ old('address', $user->address ?? '') }}</textarea>
+        </div>
     </div>
 </div>
 
-<hr class="border-dashed my-4">
-
-<h6 class="fw-bold text-dark mb-3">Keamanan</h6>
-<div class="row g-4">
-    {{-- Kolom Password --}}
-    <div class="col-md-6">
-        <label for="password" class="form-label fw-semibold small text-muted">PASSWORD @if(!isset($user))<span class="text-danger">*</span>@endif</label>
-        <div class="input-group">
-            <input type="password" class="form-control" id="password" name="password" {{ isset($user) ? '' : 'required' }}>
-            <button class="btn btn-outline-secondary" type="button" id="toggle-password">
-                <i class="bi bi-eye-slash"></i>
-            </button>
+{{-- SECTION 3: KEAMANAN --}}
+<div>
+    <h6 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2">Keamanan</h6>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        {{-- Password --}}
+        <div>
+            <label for="password" class="block text-xs font-bold text-gray-500 uppercase mb-1">Password @if(!isset($user))<span class="text-red-500">*</span>@endif</label>
+            <div class="relative rounded-md shadow-sm">
+                <input type="password" id="password" name="password" class="form-input block w-full rounded-lg border-gray-300 pr-10 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" {{ isset($user) ? '' : 'required' }}>
+                <button type="button" id="toggle-password" class="absolute inset-y-0 right-0 px-3 flex items-center cursor-pointer text-gray-400 hover:text-gray-600">
+                    <i class="material-icons text-lg">visibility_off</i>
+                </button>
+            </div>
+            @if(isset($user))<p class="mt-1 text-xs text-gray-500">Kosongkan jika tidak ingin mengubah password.</p>@endif
         </div>
-        @if(isset($user))<small class="text-muted">Kosongkan jika tidak ingin mengubah password.</small>@endif
-    </div>
 
-    {{-- Kolom Konfirmasi Password --}}
-    <div class="col-md-6">
-        <label for="password_confirmation" class="form-label fw-semibold small text-muted">KONFIRMASI PASSWORD @if(!isset($user))<span class="text-danger">*</span>@endif</label>
-        <div class="input-group">
-            <input type="password" class="form-control" id="password_confirmation" name="password_confirmation" {{ isset($user) ? '' : 'required' }}>
-            <button class="btn btn-outline-secondary" type="button" id="toggle-password-confirmation">
-                <i class="bi bi-eye-slash"></i>
-            </button>
+        {{-- Konfirmasi Password --}}
+        <div>
+            <label for="password_confirmation" class="block text-xs font-bold text-gray-500 uppercase mb-1">Konfirmasi Password @if(!isset($user))<span class="text-red-500">*</span>@endif</label>
+            <div class="relative rounded-md shadow-sm">
+                <input type="password" id="password_confirmation" name="password_confirmation" class="form-input block w-full rounded-lg border-gray-300 pr-10 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" {{ isset($user) ? '' : 'required' }}>
+                <button type="button" id="toggle-password-confirmation" class="absolute inset-y-0 right-0 px-3 flex items-center cursor-pointer text-gray-400 hover:text-gray-600">
+                    <i class="material-icons text-lg">visibility_off</i>
+                </button>
+            </div>
+            <p id="password-match-error" class="mt-1 text-xs text-red-600 hidden flex items-center gap-1">
+                <i class="material-icons text-xs">error</i> Password tidak cocok.
+            </p>
         </div>
-        <div id="password-match-error" class="text-danger small mt-1 d-none"><i class="bi bi-exclamation-circle"></i> Password tidak cocok.</div>
     </div>
 </div>

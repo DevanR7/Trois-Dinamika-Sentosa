@@ -1,73 +1,60 @@
-<nav class="sidebar locked">
-    <div class="logo_items flex">
-        <span class="nav_image">
-            <img src="{{ asset('images/TDS-favicon.png') }}" alt="logo_img" />
-        </span>
-        <span class="logo_name">Internal</span>
-
-        <i class="bx bx-lock-alt" id="lock-icon" title="Kunci/Buka Sidebar"></i>
-        <i class="bx bx-x" id="sidebar-close"></i>
+<nav class="sidebar close" id="mainSidebar">
+    {{-- A. LOGO & BRANDING --}}
+    <div class="logo_items">
+        <div class="nav_image">
+            <img src="{{ asset('images/TDS-favicon.png') }}" alt="logo" class="w-5 h-5 object-contain brightness-0 invert" /> 
+        </div>
+        <div class="logo_text flex flex-col overflow-hidden transition-opacity duration-200">
+            <span class="logo_name text-lg font-bold text-white tracking-tight leading-tight whitespace-nowrap">Internal</span>
+            <span class="text-[10px] text-gray-500 font-medium uppercase tracking-wider leading-none whitespace-nowrap">System</span>
+        </div>
+        
+        {{-- Default Icon: Penuh (Checked) artinya TIDAK TERKUNCI --}}
+        <i class="material-icons text-gray-500 hover:text-indigo-400 cursor-pointer text-[20px] ml-auto transition-all duration-200 mr-2 select-none" 
+           id="lock-icon" 
+           title="Kunci Sidebar">radio_button_checked</i>
+        
+        <i class="material-icons cursor-pointer text-gray-400 ml-auto text-2xl lg:hidden hover:text-white transition select-none" id="sidebar-close">close</i>
     </div>
 
+    {{-- B. MENU ITEMS --}}
     <div class="menu_container" id="sidebarScrollContainer">
         <div class="menu_items">
             @include("layouts.partials.sidebar-links")
         </div>
     </div>
 
-    <div class="sidebar_profile flex">
-        <span class="nav_image">
-            <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()->full_name) }}&background=4f46e5&color=fff" alt="profil" />
-        </span>
-        <div class="data_text">
-            <span class="name">{{ Auth::user()->full_name }}</span>
-            <span class="email">{{ Auth::user()->email }}</span>
+    {{-- C. PROFILE SECTION --}}
+    <div class="sidebar_profile relative">
+        <div id="profile-menu" class="hidden absolute bottom-full left-0 w-full bg-gray-800 border-b border-gray-700 mb-1 transition-all duration-200 z-50 shadow-lg rounded-t-lg">
+            <div class="px-4 py-3 border-b border-gray-700 bg-gray-900/30">
+                <p class="text-sm text-white font-medium truncate">{{ Auth::user()->full_name ?? 'User Name' }}</p>
+                <p class="text-xs text-gray-400 truncate">{{ Auth::user()->email ?? 'user@example.com' }}</p>
+            </div>
+            <a href="{{ route('profile.edit') }}" class="block px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-3">
+                <i class="material-icons text-[20px]">manage_accounts</i>
+                <span>Edit Profil</span>
+            </a>
+            <form action="{{ route('logout') }}" method="POST">
+                @csrf
+                <button type="submit" class="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-gray-700 hover:text-red-300 transition flex items-center gap-3">
+                    <i class="material-icons text-[20px]">logout</i>
+                    <span>Keluar</span>
+                </button>
+            </form>
         </div>
 
-        <div class="dropdown ms-auto dropup">
-            <a href="#" class="text-white"
-               data-bs-toggle="dropdown"
-               aria-expanded="false"
-               data-bs-placement="top-end">
-                <i class='bx bx-dots-vertical-rounded fs-5'></i>
-            </a>
-            <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
-                <li>
-                    <a class="dropdown-item" href="{{ route("profile.edit") }}">
-                        <i class="bi bi-person-circle me-2"></i> Profil
-                    </a>
-                </li>
-                <li><hr class="dropdown-divider" /></li>
-                <li>
-                    <form method="POST" action="{{ route("logout") }}">
-                        @csrf
-                        <a class="dropdown-item text-danger" href="{{ route("logout") }}"
-                           onclick="event.preventDefault(); this.closest('form').submit();">
-                            <i class="bi bi-box-arrow-right me-2"></i> Logout
-                        </a>
-                    </form>
-                </li>
-            </ul>
+        <div class="profile_trigger" id="profile-trigger-btn">
+            <div class="avatar-wrapper">
+                <img src="https://ui-avatars.com/api/?name={{ Auth::user()->full_name ?? 'Admin' }}&background=3730a3&color=fff" class="w-full h-full object-cover" alt="profile" />
+            </div>
+            <div class="profile_text flex flex-col overflow-hidden transition-opacity duration-200">
+                <span class="text-sm font-semibold text-white truncate w-[130px]">{{ Auth::user()->full_name ?? 'Administrator' }}</span>
+                <span class="text-[10px] text-gray-500 truncate w-[130px]">Klik untuk opsi</span>
+            </div>
+            <i class="material-icons text-gray-500 text-[18px] ml-auto profile_text transition-transform duration-200 rotate-0 mr-2" id="profile-chevron">expand_less</i>
         </div>
     </div>
 </nav>
 
-{{-- === SCRIPT UNTUK SIMPAN & PULIHKAN POSISI SCROLL SIDEBAR === --}}
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const sidebarContainer = document.querySelector('#sidebarScrollContainer');
-
-    if (sidebarContainer) {
-        // === Pulihkan posisi scroll terakhir ===
-        const savedScroll = localStorage.getItem('sidebarScroll');
-        if (savedScroll) {
-            sidebarContainer.scrollTop = parseInt(savedScroll);
-        }
-
-        // === Simpan posisi scroll setiap kali user scroll ===
-        sidebarContainer.addEventListener('scroll', () => {
-            localStorage.setItem('sidebarScroll', sidebarContainer.scrollTop);
-        });
-    }
-});
-</script>
+{{-- PENTING: JANGAN ADA SCRIPT DISINI. SCRIPT PINDAH KE APP.BLADE.PHP --}}

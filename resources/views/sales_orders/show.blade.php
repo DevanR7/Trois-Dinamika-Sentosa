@@ -1,170 +1,225 @@
 @extends('layouts.app')
 
+@section('title', 'Detail Pesanan Penjualan')
+
 @section('content')
-<div class="container-fluid py-2">
-    {{-- HEADER HALAMAN --}}
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <div>
-            <h3 class="fw-bold text-dark mb-1">Detail Pesanan: <span class="text-primary">{{ $order->order_number }}</span></h3>
-            <p class="text-muted mb-0 small">Tanggal Pesan: {{ $order->order_date->format('d F Y') }}</p>
-        </div>
+<div class="max-w-6xl mx-auto">
     
-        <div class="d-flex flex-wrap justify-content-end gap-2">
-            <a href="{{ route('sales-orders.index') }}" class="btn btn-outline-secondary btn-sm shadow-sm">
-                <i class="bi bi-arrow-left me-1"></i> Kembali
+    {{-- HEADER --}}
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <div>
+            <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                <a href="{{ route('sales-orders.index') }}" class="hover:text-indigo-600 transition">Pesanan</a>
+                <span>/</span>
+                <span class="text-gray-800">Detail</span>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">
+                No. Pesanan: <span class="text-indigo-600">{{ $order->order_number }}</span>
+            </h2>
+        </div>
+        
+        <div class="flex gap-3">
+            <a href="{{ route('sales-orders.index') }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition shadow-sm">
+                Kembali
             </a>
 
+            {{-- Tombol Invoice --}}
             @can('create', App\Models\SalesInvoice::class)
                 @if($order->status !== 'invoiced' && $order->status !== 'rejected')
-                    <a href="{{ route('invoices.createFromOrder', $order) }}" class="btn btn-primary btn-sm shadow-sm">
-                        <i class="bi bi-receipt-cutoff me-1"></i> Buat Invoice
+                    <a href="{{ route('invoices.createFromOrder', $order) }}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition shadow-md flex items-center gap-2">
+                        <i class="bi bi-receipt-cutoff"></i> Buat Invoice
                     </a>
                 @endif
             @endcan
             
+            {{-- Dropdown Opsi --}}
             @if (!in_array($order->status, ['invoiced', 'rejected']))
-                @can("update", $order)
-                    <a href="{{ route('sales-orders.edit', $order->order_id) }}" class="btn btn-warning btn-sm shadow-sm text-dark">
-                        <i class="bi bi-pencil-square me-1"></i> Edit
-                    </a>
-                @endcan
-                @can("delete", $order)
-                    <form class="delete-form d-inline" action="{{ route('sales-orders.destroy', $order->order_id) }}" method="POST">
-                        @csrf @method('DELETE')
-                        <button type="submit" class="btn btn-danger btn-sm shadow-sm">
-                            <i class="bi bi-trash me-1"></i> Hapus
-                        </button>
-                    </form>
-                @endcan
+            <div class="relative">
+                <button onclick="toggleDropdown('opsi-dropdown-so')" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition shadow-sm flex items-center gap-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <i class="bi bi-gear"></i> Opsi <i class="bi bi-chevron-down text-xs"></i>
+                </button>
+                
+                {{-- Dropdown Content --}}
+                <div id="opsi-dropdown-so" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50 origin-top-right">
+                    <div class="py-1">
+                        @can("update", $order)
+                            <a href="{{ route('sales-orders.edit', $order->order_id) }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-indigo-600">
+                                <i class="bi bi-pencil-square mr-2"></i> Edit Pesanan
+                            </a>
+                        @endcan
+
+                        @can("delete", $order)
+                            <form action="{{ route('sales-orders.destroy', $order->order_id) }}" method="POST" class="delete-form block w-full border-t border-gray-100">
+                                @csrf @method('DELETE')
+                                <button type="submit" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium">
+                                    <i class="bi bi-trash mr-2"></i> Hapus Pesanan
+                                </button>
+                            </form>
+                        @endcan
+                    </div>
+                </div>
+            </div>
             @endif
         </div>
     </div>
 
-    <div class="row g-4">
-        {{-- KOLOM KIRI: Detail & Item --}}
-        <div class="col-lg-8">
-            <div class="card card-transaction border-0 shadow-sm h-100">
-                <div class="card-header bg-white p-3 border-bottom d-flex justify-content-between align-items-center">
-                    <div class="form-section-title mb-0"><i class="bi bi-info-circle"></i> Informasi Pesanan</div>
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {{-- KOLOM KIRI --}}
+        <div class="lg:col-span-8 space-y-6">
+            
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                        <i class="bi bi-info-circle text-indigo-500"></i> Informasi Pesanan
+                    </h3>
                     
                     {{-- Status Badge --}}
                     @if($order->status == 'invoiced')
-                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">Invoiced</span>
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">Invoiced</span>
                     @elseif($order->status == 'rejected')
-                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25">Ditolak</span>
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">Ditolak</span>
                     @else
-                        <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25">{{ Str::title($order->status) }}</span>
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-800 border border-gray-200">{{ Str::title($order->status) }}</span>
                     @endif
+                </div>
+
+                <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0 border border-indigo-100">
+                            <i class="bi bi-building text-xl"></i>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Klien</label>
+                            <h4 class="text-base font-bold text-gray-900">{{ $order->client->client_name }}</h4>
+                            <p class="text-xs text-gray-500 mt-0.5">{{ $order->client->address ?? 'Alamat tidak tersedia' }}</p>
+                            <p class="text-xs text-gray-500">{{ $order->client->phone_number ?? '-' }}</p>
+                        </div>
+                    </div>
+                    <div class="space-y-3 border-l border-gray-100 pl-0 md:pl-6">
+                        <div class="flex justify-between">
+                            <span class="text-xs font-medium text-gray-500 uppercase">Tanggal Pesan</span>
+                            <span class="text-sm font-semibold text-gray-900">{{ $order->order_date->format('d F Y') }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-xs font-medium text-gray-500 uppercase">Sales Person</span>
+                            <span class="text-sm font-semibold text-gray-900">{{ $order->sales->full_name ?? 'N/A' }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Rincian Item</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                                <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase w-1/2">Produk</th>
+                                <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-center">Qty</th>
+                                <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">Harga (@)</th>
+                                <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach($order->items as $item)
+                            <tr class="hover:bg-gray-50 transition">
+                                <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $item->product->product_name ?? 'Produk Dihapus' }}</td>
+                                <td class="px-6 py-4 text-center">
+                                    <span class="px-2 py-1 bg-gray-100 rounded text-xs font-bold text-gray-700 border border-gray-200">
+                                        {{ $item->quantity }} {{ $item->product->unit->name ?? '' }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-right text-sm text-gray-600">Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}</td>
+                                <td class="px-6 py-4 text-right text-sm font-bold text-gray-900">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                @if($order->notes)
+                <div class="p-4 bg-yellow-50 border-t border-yellow-100 text-sm text-yellow-800 italic">
+                    <i class="bi bi-sticky mr-1"></i> Catatan: {{ $order->notes }}
+                </div>
+                @endif
+            </div>
+
+        </div>
+
+        {{-- KOLOM KANAN --}}
+        <div class="lg:col-span-4">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sticky top-6">
+                <h3 class="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
+                    <i class="bi bi-calculator text-indigo-500"></i> Ringkasan
+                </h3>
+                
+                <div class="flex justify-between mb-3 text-sm text-gray-600">
+                    <span>Jumlah Item</span>
+                    <span class="font-medium">{{ $order->items->count() }}</span>
+                </div>
+                <div class="flex justify-between mb-4 text-sm text-gray-600">
+                    <span>Total Kuantitas</span>
+                    <span class="font-medium">{{ $order->items->sum('quantity') }}</span>
+                </div>
+
+                <div class="border-t border-dashed border-gray-200 my-4"></div>
+
+                <div class="flex justify-between items-center">
+                    <span class="text-sm font-bold text-gray-900 uppercase">TOTAL TAGIHAN</span>
+                    <span class="text-xl font-bold text-indigo-600">Rp {{ number_format($order->total_amount, 0, ',', '.') }}</span>
                 </div>
                 
-                <div class="card-body p-4">
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <h6 class="fw-bold text-secondary small text-uppercase">Klien</h6>
-                            <h5 class="fw-bold text-dark mb-1">{{ $order->client->client_name }}</h5>
-                            <p class="text-muted small mb-0">{{ $order->client->address ?? 'Alamat tidak tersedia' }}</p>
-                            <p class="text-muted small">{{ $order->client->phone_number ?? '-' }}</p>
-                        </div>
-                        <div class="col-md-6 text-md-end">
-                            <h6 class="fw-bold text-secondary small text-uppercase">Sales Person</h6>
-                            <p class="mb-1 fw-medium">{{ $order->sales->full_name ?? 'N/A' }}</p>
-                            <p class="text-muted small mb-0">{{ $order->sales->sales_code ?? '' }}</p>
-                        </div>
-                    </div>
-                    
-                    <h5 class="fw-semibold mt-4 mb-3" style="font-size: 0.9rem;">Rincian Item</h5>
-                    <div class="table-responsive">
-                        <table class="table table-hover table-transaction align-middle mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th class="ps-4">Produk</th>
-                                    <th class="text-center">Qty</th>
-                                    <th class="text-end">Harga (@)</th>
-                                    <th class="text-end pe-4">Subtotal</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse($order->items as $item)
-                                <tr>
-                                    <td class="ps-4 fw-medium">{{ $item->product->product_name ?? 'Produk Dihapus' }}</td>
-                                    <td class="text-center">
-                                        <span class="badge bg-light text-dark border">{{ $item->quantity }} {{ $item->product->unit->name ?? '' }}</span>
-                                    </td>
-                                    <td class="text-end text-muted small">Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}</td>
-                                    <td class="text-end pe-4 fw-bold">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
-                                </tr>
-                                @empty
-                                <tr><td colspan="4" class="text-center py-3 text-muted">Tidak ada item.</td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-
-                    @if($order->notes)
-                    <div class="mt-4 p-3 bg-light rounded border border-light">
-                        <h6 class="fw-semibold text-secondary small mb-1"><i class="bi bi-sticky"></i> Catatan:</h6>
-                        <p class="text-muted mb-0 fst-italic small">{{ $order->notes }}</p>
-                    </div>
-                    @endif
+                <div class="mt-6 text-center text-xs text-gray-400">
+                    Dibuat pada {{ $order->created_at->format('d M Y H:i') }}
                 </div>
             </div>
         </div>
 
-        {{-- KOLOM KANAN: Summary --}}
-        <div class="col-lg-4">
-            <div class="card card-transaction border-0 shadow-sm">
-                <div class="card-header bg-white p-3 border-bottom">
-                    <div class="form-section-title mb-0"><i class="bi bi-calculator"></i> Ringkasan</div>
-                </div>
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted small">Jumlah Item</span>
-                        <span class="fw-medium">{{ $order->items->count() }}</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted small">Total Kuantitas</span>
-                        <span class="fw-medium">{{ $order->items->sum('quantity') }}</span>
-                    </div>
-                    
-                    <hr class="border-dashed my-3">
-                    
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="fw-bold text-dark">TOTAL TAGIHAN</span>
-                        <span class="fs-4 fw-bold text-primary">Rp {{ number_format($order->total_amount, 0, ',', '.') }}</span>
-                    </div>
-                </div>
-                <div class="card-footer bg-light p-3 text-center border-top-0">
-                    <small class="text-muted">Dibuat pada {{ $order->created_at->format('d M Y H:i') }}</small>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 @endsection
 
 @push('scripts')
 <script>
+function toggleDropdown(id) {
+        const el = document.getElementById(id);
+        if (el.classList.contains('hidden')) {
+            el.classList.remove('hidden');
+        } else {
+            el.classList.add('hidden');
+        }
+    }
+
+    // Menutup dropdown saat klik di luar area
+    window.addEventListener('click', function(e) {
+        const btn = document.querySelector('button[onclick="toggleDropdown(\'opsi-dropdown-so\')"]');
+        const dropdown = document.getElementById('opsi-dropdown-so');
+        
+        if (btn && dropdown && !btn.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.classList.add('hidden');
+        }
+    });
+    
 document.addEventListener('DOMContentLoaded', function() {
-    const deleteForm = document.querySelector('.delete-form');
-    if (deleteForm) {
-        deleteForm.addEventListener('submit', function(event) {
-            event.preventDefault(); 
+    const deleteForms = document.querySelectorAll('.delete-form');
+    deleteForms.forEach(form => {
+        form.addEventListener('submit', function(event) {
+            event.preventDefault();
             Swal.fire({
                 title: 'Hapus Pesanan?',
                 text: "Data yang dihapus tidak bisa dikembalikan.",
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Ya, Hapus!',
-                cancelButtonText: 'Batal'
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Ya, Hapus!'
             }).then((result) => {
-                if (result.isConfirmed) {
-                    deleteForm.submit();
-                }
+                if (result.isConfirmed) form.submit();
             });
         });
-    }
+    });
 });
 </script>
 @endpush

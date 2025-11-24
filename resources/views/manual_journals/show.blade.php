@@ -1,107 +1,100 @@
 @extends('layouts.app')
 
+@section('title', 'Detail Jurnal Umum')
+
 @section('content')
-<div class="container py-4">
-    <div class="row justify-content-center">
-        <div class="col-md-10">
-            <div class="card shadow border-0">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                    <div>
-                        <h4 class="fw-bold mb-0 text-dark">Detail Jurnal</h4>
-                        <span class="badge bg-dark">{{ $manualJournal->journal_number }}</span>
-                    </div>
-                    <a href="{{ route('manual-journals.index') }}" class="btn btn-outline-secondary btn-sm">
-                        <i class="bi bi-arrow-left"></i> Kembali ke Daftar
-                    </a>
-                </div>
-                <div class="card-body">
-                    {{-- Info Utama --}}
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <table class="table table-borderless table-sm">
-                                <tr>
-                                    <td class="text-muted" style="width: 130px;">Tanggal</td>
-                                    <td class="fw-bold">: {{ $manualJournal->entry_date->format('d F Y') }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="text-muted">Dibuat Oleh</td>
-                                    <td class="fw-bold">: {{ $manualJournal->user->name ?? 'Sistem' }}</td>
-                                </tr>
-                            </table>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="alert alert-light border">
-                                <small class="text-muted d-block">Deskripsi / Memo:</small>
-                                <span class="fw-semibold text-dark">{{ $manualJournal->description }}</span>
-                            </div>
-                        </div>
-                    </div>
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    
+    {{-- HEADER --}}
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+        <div>
+            <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                <a href="{{ route('manual-journals.index') }}" class="hover:text-indigo-600 transition">Jurnal Umum</a>
+                <span>/</span>
+                <span class="text-gray-800">Detail</span>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Detail Jurnal</h2>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded text-sm font-mono bg-gray-100 text-gray-800 border border-gray-200 mt-1">
+                {{ $manualJournal->journal_number }}
+            </span>
+        </div>
+        <div class="mt-4 sm:mt-0">
+            <a href="{{ route('manual-journals.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition text-sm">
+                <i class="material-icons text-lg mr-2">arrow_back</i> Kembali
+            </a>
+        </div>
+    </div>
 
-                    <h5 class="fw-bold mb-3">Rincian Akun</h5>
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-striped align-middle">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>Kode Akun</th>
-                                    <th>Nama Akun</th>
-                                    <th>Deskripsi Baris</th>
-                                    <th class="text-end">Debit</th>
-                                    <th class="text-end">Kredit</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($manualJournal->entries as $entry)
-                                <tr>
-                                    <td>{{ $entry->account->account_number ?? '-' }}</td>
-                                    <td>{{ $entry->account->account_name ?? '-' }}</td>
-                                    <td class="text-muted small">{{ $entry->description ?? '-' }}</td>
-                                    <td class="text-end font-monospace text-primary">
-                                        {{ $entry->debit > 0 ? 'Rp '.number_format($entry->debit, 0, ',', '.') : '-' }}
-                                    </td>
-                                    <td class="text-end font-monospace text-danger">
-                                        {{ $entry->credit > 0 ? 'Rp '.number_format($entry->credit, 0, ',', '.') : '-' }}
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                            <tfoot class="bg-light fw-bold">
-                                <tr>
-                                    <td colspan="3" class="text-end">TOTAL</td>
-                                    <td class="text-end font-monospace fs-6 text-primary">
-                                        Rp {{ number_format($manualJournal->total_debit, 0, ',', '.') }}
-                                    </td>
-                                    <td class="text-end font-monospace fs-6 text-danger">
-                                        Rp {{ number_format($manualJournal->total_credit, 0, ',', '.') }}
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-
-                    <div class="mt-4 d-flex gap-2">
-                        <a href="{{ route('manual-journals.edit', $manualJournal) }}" class="btn btn-warning">
-                            <i class="bi bi-pencil-square"></i> Edit Jurnal
-                        </a>
-                    </div>
+    {{-- INFO UTAMA --}}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+        <div class="p-6 border-b border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <p class="text-xs font-bold text-gray-500 uppercase mb-1">Tanggal Transaksi</p>
+                <p class="text-gray-900 font-medium">{{ $manualJournal->entry_date->format('d F Y') }}</p>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-gray-500 uppercase mb-1">Dibuat Oleh</p>
+                <p class="text-gray-900 font-medium">{{ $manualJournal->user->name ?? 'Sistem' }}</p>
+            </div>
+            <div class="md:col-span-2">
+                <p class="text-xs font-bold text-gray-500 uppercase mb-1">Deskripsi / Memo</p>
+                <div class="bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm text-gray-700 italic">
+                    "{{ $manualJournal->description }}"
                 </div>
             </div>
+        </div>
+
+        {{-- TABEL RINCIAN --}}
+        <div class="border-t border-gray-200">
+            <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
+                <h5 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Rincian Akun</h5>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase w-24">Kode</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Nama Akun</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase w-1/3">Deskripsi Baris</th>
+                            <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase w-32">Debit</th>
+                            <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase w-32">Kredit</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @foreach ($manualJournal->entries as $entry)
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="px-6 py-3 text-sm font-mono text-gray-600">{{ $entry->account->account_number ?? '-' }}</td>
+                            <td class="px-6 py-3 text-sm font-medium text-gray-900">{{ $entry->account->account_name ?? '-' }}</td>
+                            <td class="px-6 py-3 text-xs text-gray-500">{{ $entry->description ?? '-' }}</td>
+                            <td class="px-6 py-3 text-sm text-right font-mono {{ $entry->debit > 0 ? 'text-indigo-600 font-bold' : 'text-gray-400' }}">
+                                {{ $entry->debit > 0 ? 'Rp '.number_format($entry->debit, 0, ',', '.') : '-' }}
+                            </td>
+                            <td class="px-6 py-3 text-sm text-right font-mono {{ $entry->credit > 0 ? 'text-red-600 font-bold' : 'text-gray-400' }}">
+                                {{ $entry->credit > 0 ? 'Rp '.number_format($entry->credit, 0, ',', '.') : '-' }}
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                    <tfoot class="bg-gray-100 font-bold text-sm">
+                        <tr>
+                            <td colspan="3" class="px-6 py-3 text-right text-gray-600 uppercase text-xs">TOTAL</td>
+                            <td class="px-6 py-3 text-right text-indigo-700 font-mono border-t border-gray-300">
+                                Rp {{ number_format($manualJournal->total_debit, 0, ',', '.') }}
+                            </td>
+                            <td class="px-6 py-3 text-right text-red-700 font-mono border-t border-gray-300">
+                                Rp {{ number_format($manualJournal->total_credit, 0, ',', '.') }}
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        
+        <div class="p-6 bg-gray-50 border-t border-gray-200 flex justify-end">
+            <a href="{{ route('manual-journals.edit', $manualJournal) }}" class="inline-flex items-center px-4 py-2 bg-yellow-500 border border-transparent rounded-lg font-bold text-sm text-white hover:bg-yellow-600 focus:outline-none shadow-sm transition">
+                <i class="material-icons text-lg mr-2">edit</i> Edit Jurnal
+            </a>
         </div>
     </div>
 </div>
 @endsection
-
-@push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-    // Cek Flash Message Success (Misal setelah update lalu redirect ke show)
-    @if(session('success'))
-        Swal.fire({
-            icon: 'success',
-            title: 'Sukses',
-            text: "{{ session('success') }}",
-            timer: 3000,
-            showConfirmButton: false
-        });
-    @endif
-</script>
-@endpush

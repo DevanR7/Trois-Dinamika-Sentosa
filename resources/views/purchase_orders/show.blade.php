@@ -1,10 +1,9 @@
 @extends('layouts.app')
 
 {{-- ==================================================================== --}}
-{{-- ✅ BLOK PHP GLOBAL --}}
+{{-- ✅ BLOK PHP GLOBAL (LOGIC HITUNGAN) --}}
 {{-- ==================================================================== --}}
 @php
-    // 1. Ringkasan Keuangan
     $sisaUtang = $purchaseOrder->remaining_balance;
     $adjustments = $purchaseOrder->adjustments;
     $totalCreditNotesPO = $adjustments->where('type', 'credit_note')->sum('amount');
@@ -13,465 +12,544 @@
         ->where('return_handling_type', 'store_as_deposit')
         ->sum('total_amount');
 
-    // 2. Modal Pembayaran
     $sisaTagihanPO = $sisaUtang; 
     $saldoDepositSupplier = $purchaseOrder->supplier->balance ?? 0;
 @endphp
 
+@section('title', 'Detail Pesanan')
+
 @section('content')
-<div class="container-fluid py-2">
+<div class="max-w-7xl mx-auto">
     
+    {{-- ==================================================================== --}}
     {{-- HEADER HALAMAN --}}
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    {{-- ==================================================================== --}}
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
-            <h3 class="fw-bold text-dark mb-1">Detail Pesanan: {{ $purchaseOrder->po_number }}</h3>
-            <p class="text-muted mb-0 small">
-                Tanggal Transaksi: {{ optional($purchaseOrder->order_date)->format('d F Y') }}
-            </p>
+            <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                <a href="{{ route('purchase-orders.index') }}" class="hover:text-indigo-600 transition">Pesanan</a>
+                <span>/</span>
+                <span class="text-gray-800">Detail</span>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
+                <span class="font-mono">{{ $purchaseOrder->po_number }}</span>
+                
+                {{-- Status Badge --}}
+                @if($purchaseOrder->status == 'completed') 
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200 uppercase">Diterima</span>
+                @elseif($purchaseOrder->status == 'cancelled') 
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200 uppercase">Dibatalkan</span>
+                @elseif($purchaseOrder->status == 'draft')
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-800 border border-gray-200 uppercase">Draft</span>
+                @else 
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800 border border-yellow-200 uppercase">{{ Str::title($purchaseOrder->status) }}</span>
+                @endif
+            </h2>
         </div>
         
-        <div class="d-flex flex-wrap justify-content-end gap-2">
-            <a href="{{ route('purchase-orders.index') }}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left me-1"></i> Kembali
+        <div class="flex flex-wrap gap-3">
+            <a href="{{ route('purchase-orders.index') }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition shadow-sm">
+                Kembali
             </a>
 
-            {{-- TOMBOL TERIMA BARANG --}}
-            @can('receive', $purchaseOrder)
-                @if(in_array($purchaseOrder->status, ['draft', 'ordered']))
-                    <form id="receive-goods-form" action="{{ route('purchase-orders.receive', $purchaseOrder->po_id) }}" method="POST" class="d-inline">
-                        @csrf
-                        <button type="submit" class="btn btn-primary btn-sm">
-                            <i class="bi bi-box-seam me-1"></i> Terima Barang
-                        </button>
-                    </form>
-                @endif
-            @endcan
-
-            {{-- TOMBOL CATAT PEMBAYARAN --}}
-            @can('pay', $purchaseOrder)
-                @if($sisaUtang > 0.01 && $purchaseOrder->payment_status != 'paid')
-                    @php
-                        $barangBelumDiterima = in_array($purchaseOrder->status, ['draft', 'ordered']);
-                        $btnClass = $barangBelumDiterima ? 'btn-warning text-dark' : 'btn-success';
-                        $btnText  = $barangBelumDiterima ? 'Catat DP (Uang Muka)' : 'Catat Pembayaran';
-                    @endphp
-                    
-                    <button type="button" class="btn btn-sm {{ $btnClass }}" data-bs-toggle="modal" data-bs-target="#paymentModal" id="add-payment-btn">
-                        <i class="bi bi-cash-coin me-1"></i> {{ $btnText }}
-                    </button>
-                @endif
-            @endcan
-
-            {{-- DROPDOWN OPSI --}}
-            <div class="btn-group">
-                <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="bi bi-gear"></i> Opsi
+            {{-- TOMBOL OPSI (FIX: Menggunakan Click Toggle, bukan Hover) --}}
+            <div class="relative">
+                <button onclick="toggleDropdown('opsi-dropdown')" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition shadow-sm flex items-center gap-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <i class="bi bi-gear"></i> Opsi <i class="bi bi-chevron-down text-xs"></i>
                 </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    @if (in_array($purchaseOrder->status, ['draft', 'ordered']))
-                    <li>
-                        <a class="dropdown-item" href="{{ route('purchase-orders.edit', $purchaseOrder->po_id) }}">
-                            <i class="bi bi-pencil-square me-2"></i> Edit Pesanan
+                
+                {{-- Dropdown Content --}}
+                <div id="opsi-dropdown" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-50 origin-top-right">
+                    <div class="py-1">
+                        @if (in_array($purchaseOrder->status, ['draft', 'ordered']))
+                            <a href="{{ route('purchase-orders.edit', $purchaseOrder->po_id) }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-indigo-600">
+                                <i class="bi bi-pencil-square mr-2"></i> Edit Pesanan
+                            </a>
+                        @endif
+                        
+                        <a href="{{ route('purchase-order-adjustments.create') }}?purchase_order_id={{ $purchaseOrder->po_id }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-indigo-600 border-t border-gray-100">
+                            <i class="bi bi-file-earmark-diff mr-2"></i> Buat Penyesuaian
                         </a>
-                    </li>
-                    @endif
-                    
-                    <li><hr class="dropdown-divider"></li>
+                        
+                        <a href="{{ route('purchase-orders.pdf', $purchaseOrder->po_id) }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-indigo-600">
+                            <i class="bi bi-file-earmark-pdf mr-2"></i> Download PDF
+                        </a>
 
-                    <li>
-                        <a class="dropdown-item" href="{{ route('purchase-order-adjustments.create') }}?purchase_order_id={{ $purchaseOrder->po_id }}">
-                            <i class="bi bi-file-earmark-diff me-2"></i> Buat Penyesuaian PO
-                        </a>
-                    </li>
-
-                    <li>
-                        <a class="dropdown-item" href="{{ route('purchase-orders.pdf', $purchaseOrder->po_id) }}">
-                            <i class="bi bi-file-earmark-pdf me-2"></i> Download PDF
-                        </a>
-                    </li> 
-                    
-                    @can('cancel', $purchaseOrder)
-                        @if(in_array($purchaseOrder->status, ['draft', 'ordered', 'completed'])) 
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <form action="{{ route('purchase-orders.cancel', $purchaseOrder->po_id) }}" method="POST" class="form-cancel-po">
+                        @can('cancel', $purchaseOrder)
+                            @if(in_array($purchaseOrder->status, ['draft', 'ordered', 'completed']))
+                                <form action="{{ route('purchase-orders.cancel', $purchaseOrder->po_id) }}" method="POST" class="form-cancel-po border-t border-gray-100">
                                     @csrf
-                                    <button type="submit" class="dropdown-item text-danger">
-                                        <i class="bi bi-x-circle me-2"></i> Batalkan Pesanan
+                                    <button type="submit" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium">
+                                        <i class="bi bi-x-circle mr-2"></i> Batalkan Pesanan
                                     </button>
                                 </form>
-                            </li>
-                        @endif
-                    @endcan
-                </ul>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-4">
-        {{-- KOLOM KIRI --}}
-        <div class="col-lg-8 col-xl-9">
-            {{-- KARTU DETAIL UTAMA --}}
-            <div class="card card-transaction border-0 shadow-sm mb-4">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <div class="form-section-title mb-0"><i class="bi bi-info-circle"></i> Data Transaksi</div>
-                    <div class="text-end">
-                         {{-- Status Badges --}}
-                         @if($purchaseOrder->status == 'completed') <span class="badge bg-success">Barang Diterima</span>
-                         @elseif($purchaseOrder->status == 'cancelled') <span class="badge bg-danger">Dibatalkan</span>
-                         @else <span class="badge bg-warning text-dark">{{ Str::title($purchaseOrder->status) }}</span>
-                         @endif
- 
-                         @if($purchaseOrder->payment_status == 'paid') <span class="badge bg-primary">Lunas</span>
-                         @elseif($purchaseOrder->payment_status == 'partially_paid') <span class="badge bg-info text-dark">Cicil</span>
-                         @else <span class="badge bg-danger">Belum Lunas</span>
-                         @endif
-                    </div>
-                </div>
-                <div class="card-body p-4">
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <h6 class="fw-bold text-secondary small text-uppercase">Supplier</h6>
-                            <h5 class="fw-bold text-dark mb-1">{{ $purchaseOrder->supplier->supplier_name }}</h5>
-                            <p class="text-muted small mb-0">{{ $purchaseOrder->supplier->address ?? 'Alamat tidak tersedia' }}</p>
-                        </div>
-                        <div class="col-md-6 text-md-end">
-                            <h6 class="fw-bold text-secondary small text-uppercase">Informasi Lain</h6>
-                            <p class="mb-1 small"><strong>No. Faktur Supplier:</strong> 
-                                <a href="#" data-bs-toggle="modal" data-bs-target="#supplierInvoiceModal" class="text-decoration-none border-bottom border-primary border-opacity-25" title="Klik untuk input/edit">
-                                    @if($purchaseOrder->supplier_invoice_number)
-                                        <span class="fw-bold text-primary">{{ $purchaseOrder->supplier_invoice_number }}</span>
-                                    @else
-                                        <span class="text-muted fst-italic">-- Input Faktur --</span>
-                                    @endif
-                                </a>
-                            </p>
-                            @if($purchaseOrder->due_date)
-                                <p class="mb-1 small"><strong>Jatuh Tempo:</strong> {{ optional($purchaseOrder->due_date)->format('d F Y') }}</p>
                             @endif
-                            <p class="mb-0 small"><strong>Dibuat Oleh:</strong> {{ $purchaseOrder->creator->full_name ?? 'System' }}</p>
-                        </div>
-                    </div>
-                    
-                    {{-- Tabel Item --}}
-                    <h5 class="fw-semibold mb-3" style="font-size: 0.9rem;">Rincian Item</h5>
-                    <div class="table-responsive">
-                        <table class="table table-transaction table-hover align-middle mb-0">
-                            <thead>
-                                <tr>
-                                    <th class="text-center" style="width: 5%;">No</th>
-                                    <th>Produk</th>
-                                    <th class="text-center" style="width: 15%;">Qty</th>
-                                    <th class="text-end" style="width: 20%;">Harga (@)</th>
-                                    <th class="text-end" style="width: 20%;">Subtotal</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($purchaseOrder->items as $item)
-                                <tr>
-                                    <td class="text-center">{{ $loop->iteration }}</td>
-                                    <td style="white-space: normal; word-wrap: break-word; max-width: 300px;">
-                                        <div class="fw-bold text-dark">{{ $item->product->product_name ?? 'Produk Dihapus' }}</div>
-                                        @if(isset($item->discounts) && $item->discounts->isNotEmpty())
-                                        <small class="d-block text-muted" style="font-size: 0.75rem;">
-                                            <i class="bi bi-tag"></i> Disc: {{ $item->discounts->pluck('percentage')->join('%, ') }}%
-                                        </small>
-                                        @endif
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-light text-dark border">{{ $item->quantity }} {{ $item->product->unit->name ?? '' }}</span>
-                                    </td>
-                                    <td class="text-end text-muted small">
-                                        Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}
-                                    </td>
-                                    <td class="text-end fw-semibold">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            
-            {{-- TABEL KOREKSI (ADJUSTMENT) --}}
-            @if($purchaseOrder->adjustments->isNotEmpty())
-            <div class="card card-transaction border-0 shadow-sm mb-4">
-                <div class="card-header bg-white">
-                    <div class="form-section-title mb-0"><i class="bi bi-exclamation-circle"></i> Riwayat Koreksi (Adjustment)</div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-transaction align-middle mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Tanggal</th>
-                                    <th>Tipe</th>
-                                    <th class="text-end">Nilai</th>
-                                    <th>Alasan</th>
-                                    <th>User</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($purchaseOrder->adjustments as $adjustment)
-                                <tr>
-                                    <td>{{ $adjustment->adjustment_date->format('d/m/Y') }}</td>
-                                    <td>
-                                        @if($adjustment->type == 'credit_note')
-                                            <span class="badge bg-success bg-opacity-10 text-success">Nota Kredit</span>
-                                        @else
-                                            <span class="badge bg-danger bg-opacity-10 text-danger">Nota Debit</span>
-                                        @endif
-                                    </td>
-                                    <td class="text-end fw-bold">Rp {{ number_format($adjustment->amount, 0, ',', '.') }}</td>
-                                    <td class="small text-muted" style="white-space: normal; max-width: 250px;">{{ $adjustment->reason }}</td>
-                                    <td class="small">{{ $adjustment->user->full_name ?? '-' }}</td>
-                                    <td class="text-end">
-                                        <form action="{{ route('purchase-order-adjustments.destroy', $adjustment->adjustment_id) }}" method="POST" class="form-cancel-po-adjustment d-inline">
-                                            @csrf @method('DELETE')
-                                            <button type="submit" class="btn btn-link text-danger p-0" title="Hapus">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            @endif
-
-            {{-- TABEL PEMBAYARAN --}}
-            @if($purchaseOrder->payments->isNotEmpty())
-            <div class="card card-transaction border-0 shadow-sm mb-4">
-                <div class="card-header bg-white">
-                    <div class="form-section-title mb-0"><i class="bi bi-wallet2"></i> Riwayat Pembayaran</div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-transaction align-middle mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Tanggal</th>
-                                    <th>Metode</th>
-                                    <th class="text-end">Jumlah</th>
-                                    <th>Ref</th>
-                                    <th>Status</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($purchaseOrder->payments as $payment)
-                                <tr>
-                                    <td>{{ $payment->payment_date->format('d/m/Y') }}</td>
-                                    <td>{{ $payment->paymentMethod->name ?? '-' }}</td>
-                                    <td class="text-end fw-bold text-success">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
-                                    <td class="small text-muted">{{ $payment->reference_number ?? '-' }}</td>
-                                    <td>
-                                        @if($payment->status == 'completed') <i class="bi bi-check-circle-fill text-success"></i>
-                                        @elseif($payment->status == 'pending_clearance') <i class="bi bi-clock-fill text-warning"></i>
-                                        @else <span class="badge bg-secondary">{{ $payment->status }}</span>
-                                        @endif
-                                    </td>
-                                    <td class="text-end">
-                                        @php $paymentLabel = 'Pembayaran Rp ' . number_format($payment->amount, 0, ',', '.'); @endphp
-                                        <form action="{{ route('purchase-orders.payments.destroy', $payment) }}" method="POST" class="d-inline form-delete-po-payment" data-payment-label="{{ $paymentLabel }}">
-                                            @csrf @method('DELETE')
-                                            <button type="submit" class="btn btn-link text-danger p-0">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            @endif
-            
-            @if($purchaseOrder->notes)
-            <div class="p-3 bg-light rounded border border-light">
-                <h6 class="fw-semibold text-secondary small"><i class="bi bi-sticky"></i> Catatan:</h6>
-                <p class="text-muted mb-0 fst-italic">{{ $purchaseOrder->notes }}</p>
-            </div>
-            @endif
-        </div>
-
-        {{-- KOLOM KANAN (SUMMARY) --}}
-        <div class="col-lg-4 col-xl-3">
-            <div class="card card-transaction border-0 shadow-sm sticky-top" style="top: 20px; z-index: 99;">
-                <div class="card-header bg-white">
-                    <div class="form-section-title mb-0"><i class="bi bi-calculator"></i> Ringkasan Biaya</div>
-                </div>
-                <div class="card-body p-4">
-                    {{-- RINCIAN PERHITUNGAN --}}
-                    <div class="mb-4">
-                        <div class="d-flex justify-content-between mb-2 small"><span>Subtotal Barang</span><span class="fw-medium">Rp {{ number_format($purchaseOrder->subtotal ?? 0, 0, ',', '.') }}</span></div>
-                        <div class="d-flex justify-content-between mb-2 small"><span>Diskon/Fee</span><span class="text-danger">(-) Rp {{ number_format($purchaseOrder->disc_fee_amount ?? 0, 0, ',', '.') }}</span></div>
-                        <div class="d-flex justify-content-between mb-2 small"><span>Pembulatan</span><span class="text-danger">(-) Rp {{ number_format($purchaseOrder->rounding_discount_amount ?? 0, 0, ',', '.') }}</span></div>
-                        
-                        <div class="border-top border-dashed my-2"></div>
-                        
-                        <div class="d-flex justify-content-between mb-2 small text-muted"><span>DPP</span><span>Rp {{ number_format($purchaseOrder->dpp ?? 0, 0, ',', '.') }}</span></div>
-                        <div class="d-flex justify-content-between mb-2 small"><span>PPN ({{ $purchaseOrder->tax->rate ?? 0 }}%)</span><span>(+) Rp {{ number_format($purchaseOrder->ppn ?? 0, 0, ',', '.') }}</span></div>
-                        <div class="d-flex justify-content-between mb-2 small"><span>Ongkir</span><span>(+) Rp {{ number_format($purchaseOrder->shipping_amount ?? 0, 0, ',', '.') }}</span></div>
-                        
-                        <div class="border-top border-dashed my-2"></div>
-                        
-                        <div class="d-flex justify-content-between fw-bold text-dark"><span>GRAND TOTAL</span><span>Rp {{ number_format($purchaseOrder->total_amount ?? 0, 0, ',', '.') }}</span></div>
-                    </div>
-
-                    {{-- RINGKASAN KEUANGAN (UTANG/LUNAS) --}}
-                    <div class="bg-light p-3 rounded border">
-                        <h6 class="fw-bold small text-uppercase text-secondary mb-3">Status Keuangan</h6>
-                        
-                        @if($totalDebitNotesPO > 0)
-                            <div class="d-flex justify-content-between text-danger small mb-1"><span>Nota Debit</span><span>(+) {{ number_format($totalDebitNotesPO, 0, ',', '.') }}</span></div>
-                        @endif
-                        @if($totalCreditNotesPO > 0)
-                            <div class="d-flex justify-content-between text-success small mb-1"><span>Nota Kredit</span><span>(-) {{ number_format($totalCreditNotesPO, 0, ',', '.') }}</span></div>
-                        @endif
-                        @if($purchaseOrder->total_returned > 0)
-                            <div class="d-flex justify-content-between text-warning small mb-1"><span>Retur</span><span>(-) {{ number_format($purchaseOrder->total_returned, 0, ',', '.') }}</span></div>
-                        @endif
-
-                        <div class="d-flex justify-content-between text-success small mb-2"><span>Sudah Dibayar</span><span>(-) {{ number_format($purchaseOrder->amount_paid, 0, ',', '.') }}</span></div>
-                        
-                        <div class="border-top border-secondary border-opacity-25 my-2"></div>
-                        
-                        <div class="d-flex justify-content-between fw-bold {{ $sisaUtang > 0.01 ? 'text-danger' : 'text-success' }}">
-                            <span>SISA TAGIHAN</span>
-                            <span>Rp {{ number_format($sisaUtang, 0, ',', '.') }}</span>
-                        </div>
+                        @endcan
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-{{-- MODAL PEMBAYARAN --}}
-<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="paymentModalLabel">Catat Pembayaran Baru</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    {{-- ==================================================================== --}}
+    {{-- ✅ FLASH MESSAGES (FIX: Menambahkan Notifikasi Disini) --}}
+    {{-- ==================================================================== --}}
+    @if (session('success'))
+        <div class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-r shadow-sm flex justify-between items-center animate-fade-in-down">
+            <div class="flex items-center">
+                <i class="bi bi-check-circle-fill text-green-500 text-xl mr-3"></i>
+                <div class="text-sm text-green-700 font-medium">{{ session('success') }}</div>
             </div>
-            <form action="{{ route('purchase-orders.payments.store', $purchaseOrder->po_id) }}" method="POST" enctype="multipart/form-data">
-                @csrf
-                
-                <div class="modal-body">
-                    
-                    <div class="alert alert-info">
-                        <div class="d-flex justify-content-between"><span>Total Tagihan Awal:</span><span>Rp {{ number_format($purchaseOrder->total_amount, 0, ',', '.') }}</span></div>
-                        <hr class="my-1">
-                        <div class="d-flex justify-content-between small"><span>Sudah Dibayar:</span><span>(+) Rp {{ number_format($purchaseOrder->amount_paid, 0, ',', '.') }}</span></div>
-                        <hr class="my-1">
-                        <div class="d-flex justify-content-between fw-bold">
-                            <span>Sisa Utang:</span>
-                            <span id="modal-po-sisa-tagihan-display">Rp {{ number_format($sisaTagihanPO, 0, ',', '.') }}</span>
+            <button type="button" class="text-green-500 hover:text-green-700" onclick="this.parentElement.remove()">
+                <i class="bi bi-x text-lg"></i>
+            </button>
+        </div>
+    @endif
+    @if (session('error'))
+        <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r shadow-sm flex justify-between items-center animate-fade-in-down">
+            <div class="flex items-center">
+                <i class="bi bi-exclamation-triangle-fill text-red-500 text-xl mr-3"></i>
+                <div class="text-sm text-red-700 font-medium">{{ session('error') }}</div>
+            </div>
+            <button type="button" class="text-red-500 hover:text-red-700" onclick="this.parentElement.remove()">
+                <i class="bi bi-x text-lg"></i>
+            </button>
+        </div>
+    @endif
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {{-- ===================================================
+             KOLOM KIRI: DETAIL & ITEMS (Span 8)
+             =================================================== --}}
+        <div class="lg:col-span-8 space-y-6">
+            
+            {{-- CARD 1: INFO SUPPLIER & TANGGAL --}}
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                        <i class="bi bi-shop text-indigo-500"></i> Informasi Supplier
+                    </h3>
+                    <span class="text-xs text-gray-400">Dibuat oleh: {{ $purchaseOrder->creator->full_name ?? 'System' }}</span>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {{-- Supplier --}}
+                        <div class="flex items-start gap-4">
+                            <div class="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0 border border-indigo-100">
+                                <i class="bi bi-building text-xl"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-base font-bold text-gray-900">{{ $purchaseOrder->supplier->supplier_name }}</h4>
+                                <p class="text-sm text-gray-500 mt-1">{{ $purchaseOrder->supplier->address ?? 'Alamat tidak tersedia' }}</p>
+                                <div class="mt-2 text-xs text-gray-400">
+                                    <i class="bi bi-telephone mr-1"></i> {{ $purchaseOrder->supplier->phone_number ?? '-' }}
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Tanggal & Faktur --}}
+                        <div class="space-y-3 border-l border-gray-100 pl-0 md:pl-6">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs font-medium text-gray-500 uppercase">Tgl Pesan</span>
+                                <span class="text-sm font-semibold text-gray-900">{{ optional($purchaseOrder->order_date)->format('d M Y') }}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs font-medium text-gray-500 uppercase">Jatuh Tempo</span>
+                                <span class="text-sm font-semibold text-gray-900">{{ $purchaseOrder->due_date ? optional($purchaseOrder->due_date)->format('d M Y') : '-' }}</span>
+                            </div>
+                            <div class="flex justify-between items-center pt-2 border-t border-dashed border-gray-200">
+                                <span class="text-xs font-medium text-gray-500 uppercase">Faktur Supplier</span>
+                                @if($purchaseOrder->supplier_invoice_number)
+                                    <span class="text-sm font-bold text-indigo-600 cursor-pointer hover:underline" onclick="openModal('supplierInvoiceModal')">
+                                        {{ $purchaseOrder->supplier_invoice_number }} <i class="bi bi-pencil-square text-xs ml-1"></i>
+                                    </span>
+                                @else
+                                    <button type="button" class="text-xs text-indigo-600 font-medium hover:underline flex items-center gap-1" onclick="openModal('supplierInvoiceModal')">
+                                        <i class="bi bi-plus-circle"></i> Input Faktur
+                                    </button>
+                                @endif
+                            </div>
                         </div>
                     </div>
 
-                    @if($saldoDepositSupplier > 0)
-                    <div id="debit-info-container" class="alert alert-success">
-                        <div class="d-flex justify-content-between fw-bold">
-                            <span>Saldo Deposit Tersedia:</span>
-                            <span id="modal-debit-balance-display">Rp {{ number_format($saldoDepositSupplier, 0, ',', '.') }}</span>
+                    @if($purchaseOrder->notes)
+                        <div class="mt-6 p-3 bg-yellow-50 border border-yellow-100 rounded-lg text-sm text-yellow-800 italic flex gap-2">
+                            <i class="bi bi-sticky mt-0.5"></i>
+                            <div><span class="font-bold">Catatan:</span> {{ $purchaseOrder->notes }}</div>
                         </div>
-                        <div class="form-check form-switch mt-2">
-                            <input class="form-check-input" type="checkbox" role="switch" id="modal-use-debit" name="use_debit_balance" value="1">
-                            <label class="form-check-label" for="modal-use-debit">Gunakan Saldo Deposit</label>
-                        </div>
+                    @endif
+                </div>
+            </div>
+
+            {{-- CARD 2: ITEM PRODUK --}}
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Rincian Item</h3>
+                    <span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-md font-bold">{{ $purchaseOrder->items->count() }} Produk</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                                <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase w-12 text-center">No</th>
+                                <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Produk</th>
+                                <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-center">Qty</th>
+                                <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">Harga (@)</th>
+                                <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach($purchaseOrder->items as $item)
+                            <tr class="hover:bg-gray-50 transition">
+                                <td class="px-6 py-4 text-center text-sm text-gray-500">{{ $loop->iteration }}</td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm font-bold text-gray-900">{{ $item->product->product_name ?? 'Produk Dihapus' }}</div>
+                                    @if(isset($item->discounts) && $item->discounts->isNotEmpty())
+                                        <div class="text-xs text-green-600 mt-1 flex items-center gap-1">
+                                            <i class="bi bi-tag-fill"></i> Disc: {{ $item->discounts->pluck('percentage')->join('%, ') }}%
+                                        </div>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-4 text-center">
+                                    <span class="px-2.5 py-1 rounded-md bg-gray-100 text-xs font-bold text-gray-700 border border-gray-200">
+                                        {{ $item->quantity }} {{ $item->product->unit->name ?? '' }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-right text-sm text-gray-600">
+                                    Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}
+                                </td>
+                                <td class="px-6 py-4 text-right text-sm font-bold text-gray-900">
+                                    Rp {{ number_format($item->subtotal, 0, ',', '.') }}
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            {{-- CARD 3: RIWAYAT KOREKSI (Conditional) --}}
+            @if($purchaseOrder->adjustments->isNotEmpty())
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 bg-red-50">
+                    <h3 class="text-xs font-bold text-red-600 uppercase tracking-wider flex items-center gap-2">
+                        <i class="bi bi-exclamation-circle"></i> Riwayat Koreksi
+                    </h3>
+                </div>
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-white border-b border-gray-200">
+                        <tr>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Tanggal</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Tipe</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">Nilai</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Alasan</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @foreach ($purchaseOrder->adjustments as $adjustment)
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="px-6 py-3 text-sm text-gray-600">{{ $adjustment->adjustment_date->format('d/m/Y') }}</td>
+                            <td class="px-6 py-3">
+                                @if($adjustment->type == 'credit_note')
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700 border border-green-200 uppercase">Nota Kredit</span>
+                                @else
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200 uppercase">Nota Debit</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-3 text-right text-sm font-bold text-gray-900">
+                                Rp {{ number_format($adjustment->amount, 0, ',', '.') }}
+                            </td>
+                            <td class="px-6 py-3 text-xs text-gray-500 italic">{{ Str::limit($adjustment->reason, 40) }}</td>
+                            <td class="px-6 py-3 text-right">
+                                <form action="{{ route('purchase-order-adjustments.destroy', $adjustment->adjustment_id) }}" method="POST" class="form-cancel-po-adjustment inline-block">
+                                    @csrf @method('DELETE')
+                                    <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-bold uppercase tracking-wide hover:underline">
+                                        Hapus
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            @endif
+
+            {{-- CARD 4: RIWAYAT PEMBAYARAN (Conditional) --}}
+            @if($purchaseOrder->payments->isNotEmpty())
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 bg-blue-50">
+                    <h3 class="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-2">
+                        <i class="bi bi-wallet2"></i> Riwayat Pembayaran
+                    </h3>
+                </div>
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-white border-b border-gray-200">
+                        <tr>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Tanggal</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Metode</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">Jumlah</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-center">Status</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @foreach($purchaseOrder->payments as $payment)
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="px-6 py-3 text-sm text-gray-600">{{ $payment->payment_date->format('d/m/Y') }}</td>
+                            <td class="px-6 py-3 text-sm text-gray-600">{{ $payment->paymentMethod->name ?? '-' }}</td>
+                            <td class="px-6 py-3 text-right text-sm font-bold text-green-600">
+                                Rp {{ number_format($payment->amount, 0, ',', '.') }}
+                            </td>
+                            <td class="px-6 py-3 text-center">
+                                @if($payment->status == 'completed') <i class="bi bi-check-circle-fill text-green-500" title="Selesai"></i>
+                                @elseif($payment->status == 'pending_clearance') <i class="bi bi-clock-fill text-yellow-500" title="Menunggu Kliring"></i>
+                                @else <span class="text-xs text-gray-400">{{ $payment->status }}</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-3 text-right">
+                                @php $paymentLabel = 'Pembayaran Rp ' . number_format($payment->amount, 0, ',', '.'); @endphp
+                                <form action="{{ route('purchase-orders.payments.destroy', $payment) }}" method="POST" class="form-delete-po-payment inline-block" data-payment-label="{{ $paymentLabel }}">
+                                    @csrf @method('DELETE')
+                                    <button type="submit" class="text-red-500 hover:text-red-700 transition"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            @endif
+        </div>
+
+        {{-- ===================================================
+             KOLOM KANAN: RINGKASAN & AKSI (Lebar: 4/12)
+             =================================================== --}}
+        <div class="lg:col-span-4 space-y-6">
+            
+            {{-- CARD RINGKASAN BIAYA (Sticky) --}}
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sticky top-6">
+                <h3 class="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
+                    <i class="bi bi-calculator text-indigo-500"></i> Ringkasan Biaya
+                </h3>
+
+                <div class="space-y-3 text-sm text-gray-600 mb-4 border-b border-dashed border-gray-200 pb-4">
+                    <div class="flex justify-between">
+                        <span>Subtotal Barang</span>
+                        <span class="font-medium text-gray-900">Rp {{ number_format($purchaseOrder->subtotal ?? 0, 0, ',', '.') }}</span>
                     </div>
+                    @if($purchaseOrder->disc_fee_amount > 0)
+                    <div class="flex justify-between text-red-500"><span>Diskon/Fee</span><span>(-) Rp {{ number_format($purchaseOrder->disc_fee_amount ?? 0, 0, ',', '.') }}</span></div>
+                    @endif
+                    @if($purchaseOrder->rounding_discount_amount > 0)
+                    <div class="flex justify-between text-red-500"><span>Pembulatan</span><span>(-) Rp {{ number_format($purchaseOrder->rounding_discount_amount ?? 0, 0, ',', '.') }}</span></div>
                     @endif
                     
-                    <div class="mb-3">
-                        <label for="amount-formatted-po" class="form-label">Jumlah Dibayar (Non-Deposit)</label>
-                        <input type="text" class="form-control" id="amount-formatted-po" required>
-                        <input type="hidden" name="amount" id="amount-po">
-                        <div id="amount-error-po" class="text-danger small mt-1"></div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="payment_date" class="form-label">Tanggal Pembayaran</label>
-                        <input type="date" class="form-control" id="payment_date" name="payment_date" value="{{ now()->format('Y-m-d') }}" required>
-                    </div>
+                    <div class="flex justify-between text-gray-400 text-xs pt-1"><span>DPP</span><span>Rp {{ number_format($purchaseOrder->dpp ?? 0, 0, ',', '.') }}</span></div>
+                    @if($purchaseOrder->ppn > 0)
+                    <div class="flex justify-between"><span>PPN ({{ $purchaseOrder->tax->rate ?? 0 }}%)</span><span>(+) Rp {{ number_format($purchaseOrder->ppn ?? 0, 0, ',', '.') }}</span></div>
+                    @endif
+                    @if($purchaseOrder->shipping_amount > 0)
+                    <div class="flex justify-between"><span>Ongkir</span><span>(+) Rp {{ number_format($purchaseOrder->shipping_amount ?? 0, 0, ',', '.') }}</span></div>
+                    @endif
+                </div>
+
+                <div class="flex justify-between items-center mb-6">
+                    <span class="text-sm font-bold text-gray-900 uppercase">Grand Total</span>
+                    <span class="text-xl font-bold text-indigo-600">Rp {{ number_format($purchaseOrder->total_amount ?? 0, 0, ',', '.') }}</span>
+                </div>
+
+                {{-- STATUS KEUANGAN (SISA TAGIHAN) --}}
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <h4 class="text-xs font-bold text-gray-400 uppercase mb-3 tracking-wider">Status Keuangan</h4>
                     
-                    <div class="mb-3">
-                        <label for="payment_method_id_po" class="form-label">Metode Pembayaran (Non-Deposit)</label>
-                        <select class="form-select" id="payment_method_id_po" name="payment_method_id" required>
-                            <option value="">-- Pilih Metode --</option>
-                            @foreach($paymentMethods as $method)
-                                <option value="{{ $method->payment_method_id }}" data-config="{{ $method->required_fields_config }}">
-                                    {{ $method->name }}
-                                </option>
-                            @endforeach
-                        </select>
+                    @if($totalDebitNotesPO > 0)
+                        <div class="flex justify-between text-xs text-red-500 mb-1"><span>Nota Debit</span><span>(+) {{ number_format($totalDebitNotesPO, 0, ',', '.') }}</span></div>
+                    @endif
+                    @if($totalCreditNotesPO > 0)
+                        <div class="flex justify-between text-xs text-green-500 mb-1"><span>Nota Kredit</span><span>(-) {{ number_format($totalCreditNotesPO, 0, ',', '.') }}</span></div>
+                    @endif
+                    @if($purchaseOrder->total_returned > 0)
+                        <div class="flex justify-between text-xs text-yellow-600 mb-1"><span>Retur</span><span>(-) {{ number_format($purchaseOrder->total_returned, 0, ',', '.') }}</span></div>
+                    @endif
+
+                    <div class="flex justify-between text-xs text-green-600 mb-2 pb-2 border-b border-gray-200">
+                        <span>Sudah Dibayar</span>
+                        <span>(-) {{ number_format($purchaseOrder->amount_paid, 0, ',', '.') }}</span>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="company_bank_account_id_po" class="form-label">Keluar dari Akun <span class="text-danger">*</span></label>
-                        <select class="form-select" id="company_bank_account_id_po" name="company_bank_account_id" required>
-                            <option value="">-- Pilih Akun Bank/Kas --</option>
-                            @foreach($companyBankAccounts as $account)
-                                <option value="{{ $account->company_bank_account_id }}">
-                                    {{ $account->bank_name }} - {{ $account->account_number ?? $account->account_name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="mb-3" id="payment-reference-group-po" style="display: none;">
-                        <label for="reference_number_po" class="form-label">Nomor Referensi (Giro/Cek)</label>
-                        <input type="text" class="form-control" name="reference_number" id="reference_number_po">
-                    </div>
-                    <div class="mb-3" id="payment-proof-group-po" style="display: none;">
-                        <label for="proof_of_payment_po" class="form-label">Bukti Pembayaran (Foto)</label>
-                        <input type="file" class="form-control" name="proof_of_payment" id="proof_of_payment_po" accept="image/jpeg,image/png,image/jpg">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="notes" class="form-label">Catatan (Opsional)</label>
-                        <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-gray-700">SISA TAGIHAN</span>
+                        <span class="text-lg font-bold {{ $sisaUtang > 0.01 ? 'text-red-600' : 'text-green-600' }}">
+                            Rp {{ number_format($sisaUtang, 0, ',', '.') }}
+                        </span>
                     </div>
                 </div>
 
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary">Simpan Pembayaran</button>
+                {{-- TOMBOL AKSI UTAMA --}}
+                <div class="mt-6 space-y-3">
+                    {{-- Terima Barang --}}
+                    @can('receive', $purchaseOrder)
+                        @if(in_array($purchaseOrder->status, ['draft', 'ordered']))
+                            <form id="receive-goods-form" action="{{ route('purchase-orders.receive', $purchaseOrder->po_id) }}" method="POST">
+                                @csrf
+                                <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition flex justify-center items-center gap-2">
+                                    <i class="bi bi-box-seam"></i> Terima Barang
+                                </button>
+                            </form>
+                        @endif
+                    @endcan
+
+                    {{-- Bayar --}}
+                    @can('pay', $purchaseOrder)
+                        @if($sisaUtang > 0.01 && $purchaseOrder->payment_status != 'paid')
+                            @php
+                                $isDP = in_array($purchaseOrder->status, ['draft', 'ordered']);
+                                $btnColor = $isDP ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white';
+                                $btnText = $isDP ? 'Catat DP (Uang Muka)' : 'Catat Pembayaran';
+                            @endphp
+                            <button type="button" class="w-full py-2.5 {{ $btnColor }} text-sm font-bold rounded-lg shadow-md transition flex justify-center items-center gap-2" onclick="openModal('paymentModal')">
+                                <i class="bi bi-cash-coin"></i> {{ $btnText }}
+                            </button>
+                        @endif
+                    @endcan
                 </div>
-            </form>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{{-- ==================================================================== --}}
+{{-- MODAL PEMBAYARAN (TAILWIND) --}}
+{{-- ==================================================================== --}}
+<div id="paymentModal" class="relative z-[100] hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    {{-- Backdrop --}}
+    <div class="fixed inset-0 bg-gray-900 bg-opacity-50 transition-opacity backdrop-blur-sm"></div>
+    
+    {{-- Modal Content Wrapper --}}
+    <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+            <div class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+                
+                {{-- Header Modal --}}
+                <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4 border-b border-gray-100">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-bold leading-6 text-gray-900">Catat Pembayaran Baru</h3>
+                        <button type="button" class="text-gray-400 hover:text-gray-600" onclick="closeModal('paymentModal')">
+                            <i class="bi bi-x-lg text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <form action="{{ route('purchase-orders.payments.store', $purchaseOrder->po_id) }}" method="POST" enctype="multipart/form-data" id="paymentForm">
+                    @csrf
+                    <div class="px-6 py-4 space-y-4">
+                        
+                        {{-- Info Sisa --}}
+                        <div class="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm space-y-1">
+                            <div class="flex justify-between text-blue-800 font-bold">
+                                <span>Sisa Utang:</span>
+                                <span id="modal-po-sisa-tagihan-display">Rp {{ number_format($sisaTagihanPO, 0, ',', '.') }}</span>
+                            </div>
+                        </div>
+
+                        {{-- Info Deposit --}}
+                        @if($saldoDepositSupplier > 0)
+                        <div class="bg-green-50 border border-green-100 rounded-lg p-3 text-sm">
+                            <div class="flex justify-between font-bold text-green-800">
+                                <span>Saldo Deposit Tersedia:</span>
+                                <span id="modal-debit-balance-display">Rp {{ number_format($saldoDepositSupplier, 0, ',', '.') }}</span>
+                            </div>
+                            <div class="mt-2 flex items-center gap-2">
+                                <input class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" type="checkbox" id="modal-use-debit" name="use_debit_balance" value="1">
+                                <label class="text-xs font-medium text-gray-700 cursor-pointer" for="modal-use-debit">Gunakan Saldo</label>
+                            </div>
+                        </div>
+                        @endif
+
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Jumlah Bayar</label>
+                            <input type="text" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-end font-bold text-lg" id="amount-formatted-po" required>
+                            <input type="hidden" name="amount" id="amount-po">
+                            <div id="amount-error-po" class="text-red-500 text-xs mt-1"></div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Tanggal</label>
+                            <input type="date" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" name="payment_date" value="{{ now()->format('Y-m-d') }}" required>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Metode Pembayaran</label>
+                            <select class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" id="payment_method_id_po" name="payment_method_id" required>
+                                <option value="">-- Pilih Metode --</option>
+                                @foreach($paymentMethods as $method)
+                                    <option value="{{ $method->payment_method_id }}" data-config="{{ $method->required_fields_config }}">{{ $method->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Keluar dari Akun</label>
+                            <select class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" id="company_bank_account_id_po" name="company_bank_account_id" required>
+                                <option value="">-- Pilih Akun Kas/Bank --</option>
+                                @foreach($companyBankAccounts as $account)
+                                    <option value="{{ $account->company_bank_account_id }}">{{ $account->bank_name }} - {{ $account->account_number }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div id="payment-reference-group-po" style="display: none;">
+                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">No. Referensi</label>
+                            <input type="text" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" name="reference_number" id="reference_number_po">
+                        </div>
+                        <div id="payment-proof-group-po" style="display: none;">
+                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Bukti Foto</label>
+                            <input type="file" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" name="proof_of_payment" id="proof_of_payment_po">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Catatan</label>
+                            <textarea class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" name="notes" rows="2"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 border-t border-gray-100">
+                        <button type="submit" class="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto">Simpan</button>
+                        <button type="button" class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto" onclick="closeModal('paymentModal')">Batal</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>
 
-{{-- MODAL FAKTUR --}}
-<div class="modal fade" id="supplierInvoiceModal" tabindex="-1" aria-labelledby="supplierInvoiceModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="supplierInvoiceModalLabel">Input Nomor Faktur Supplier</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+{{-- MODAL FAKTUR (TAILWIND) --}}
+<div id="supplierInvoiceModal" class="relative z-[100] hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-gray-900 bg-opacity-50 transition-opacity backdrop-blur-sm"></div>
+    <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+            <div class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-sm">
+                <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                    <h3 class="text-lg font-bold leading-6 text-gray-900 mb-4">No. Faktur Supplier</h3>
+                    <form action="{{ route('purchase-orders.addSupplierInvoice', $purchaseOrder->po_id) }}" method="POST">
+                        @csrf
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nomor Faktur / Surat Jalan</label>
+                            <input type="text" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" name="supplier_invoice_number" value="{{ $purchaseOrder->supplier_invoice_number }}" required>
+                            <p class="text-xs text-gray-400 mt-1">Masukkan nomor referensi fisik dari supplier.</p>
+                        </div>
+                        <div class="mt-6 flex justify-end gap-3">
+                            <button type="button" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium" onclick="closeModal('supplierInvoiceModal')">Batal</button>
+                            <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-sm">Simpan</button>
+                        </div>
+                    </form>
+                </div>
             </div>
-            <form action="{{ route('purchase-orders.addSupplierInvoice', $purchaseOrder->po_id) }}" method="POST">
-                @csrf
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="supplier_invoice_number" class="form-label">No. Faktur dari Supplier</label>
-                        <input type="text" class="form-control" id="supplier_invoice_number" name="supplier_invoice_number" value="{{ $purchaseOrder->supplier_invoice_number }}" required>
-                        <div class="form-text">Masukkan nomor yang tertera di surat jalan atau faktur dari supplier.</div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary">Simpan</button>
-                </div>
-            </form>
         </div>
     </div>
 </div>
@@ -481,214 +559,111 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script>
+    // --- HELPER MODAL (VANILLA JS) ---
+    function openModal(modalId) {
+        document.getElementById(modalId).classList.remove('hidden');
+    }
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.add('hidden');
+    }
+    function toggleDropdown(id) {
+        const el = document.getElementById(id);
+        if (el.classList.contains('hidden')) el.classList.remove('hidden');
+        else el.classList.add('hidden');
+    }
+    
+    // Close dropdown when clicking outside
+    window.onclick = function(event) {
+        if (!event.target.matches('.relative button') && !event.target.matches('.relative button *')) {
+            const dropdowns = document.querySelectorAll('[id$="-dropdown"]');
+            dropdowns.forEach(d => d.classList.add('hidden'));
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         
-        const receiveGoodsForm = document.getElementById('receive-goods-form');
-        if (receiveGoodsForm) {
-            receiveGoodsForm.addEventListener('submit', function(event) {
-                event.preventDefault(); 
-                Swal.fire({
-                    title: 'Konfirmasi Penerimaan',
-                    text: "Apakah Anda yakin semua barang untuk pesanan ini telah diterima? Stok akan diperbarui dan jurnal akan dibuat.",
-                    icon: 'question',
-                    showCancelButton: true,
-                    confirmButtonColor: '#198754',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'Ya, Sudah Diterima!',
-                    cancelButtonText: 'Batal'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        event.target.submit();
-                    }
+        // 1. Konfirmasi Aksi (SweetAlert)
+        const confirmAction = (selector, title, text, btnColor = '#4f46e5', btnText = 'Ya, Lanjutkan') => {
+            const form = document.querySelector(selector);
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    Swal.fire({
+                        title: title, text: text, icon: 'question',
+                        showCancelButton: true, confirmButtonColor: btnColor, cancelButtonColor: '#6b7280',
+                        confirmButtonText: btnText, cancelButtonText: 'Batal'
+                    }).then((result) => { if (result.isConfirmed) e.target.submit(); });
                 });
-            });
-        }
+            }
+        };
+        
+        confirmAction('#receive-goods-form', 'Terima Barang?', 'Stok bertambah & jurnal dibuat.', '#10b981', 'Ya, Terima');
+        confirmAction('.form-cancel-po', 'Batalkan Pesanan?', 'Pesanan dibatalkan permanen.', '#ef4444', 'Ya, Batalkan');
 
-        const cancelPOForm = document.querySelector('.form-cancel-po');
-        if (cancelPOForm) {
-            cancelPOForm.addEventListener('submit', function (event) {
-                event.preventDefault(); 
+        document.querySelectorAll('.form-delete-po-payment').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
                 Swal.fire({
-                    title: 'Anda Yakin?',
-                    text: "Anda akan membatalkan Pesanan Pembelian (PO) ini. Jurnal akan dibalik jika barang sudah diterima.",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'Ya, Batalkan!',
-                    cancelButtonText: 'Batal'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        event.target.submit();
-                    }
-                });
-            });
-        }
-
-        const deletePOPaymentForms = document.querySelectorAll('.form-delete-po-payment');
-        deletePOPaymentForms.forEach(form => {
-            form.addEventListener('submit', function (event) {
-                event.preventDefault();
-                const paymentLabel = event.target.dataset.paymentLabel;
-                Swal.fire({
-                    title: 'Anda Yakin?',
-                    text: `Anda akan membatalkan pembayaran ini: "${paymentLabel}". Jurnal akan dibalik dan sisa utang dihitung ulang.`,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'Ya, Batalkan Pembayaran!',
-                    cancelButtonText: 'Batal'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        event.target.submit();
-                    }
-                });
+                    title: 'Hapus Pembayaran?', text: 'Jurnal akan dibalik.', icon: 'warning',
+                    showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Hapus'
+                }).then((result) => { if (result.isConfirmed) e.target.submit(); });
             });
         });
 
-        const addPaymentBtnPO = document.getElementById('add-payment-btn');
-        const amountFormattedInputPO = document.getElementById('amount-formatted-po');
-        const amountHiddenInputPO = document.getElementById('amount-po');
-        const amountErrorPO = document.getElementById('amount-error-po');
-        const useDebitCheckboxPO = document.getElementById('modal-use-debit');
-        
-        const paymentMethodSelectPO = document.getElementById('payment_method_id_po');
-        const bankAccountSelectPO = document.getElementById('company_bank_account_id_po');
-        const referenceGroupPO = document.getElementById('payment-reference-group-po');
-        const referenceInputPO = document.getElementById('reference_number_po');
-        const proofGroupPO = document.getElementById('payment-proof-group-po');
-        const proofInputPO = document.getElementById('proof_of_payment_po');
+        // 2. Logic Pembayaran (AutoNumeric & Deposit)
+        const amountInput = document.getElementById('amount-formatted-po');
+        const amountHidden = document.getElementById('amount-po');
+        const useDebit = document.getElementById('modal-use-debit');
+        const payMethod = document.getElementById('payment_method_id_po');
+        const bankAcc = document.getElementById('company_bank_account_id_po');
+        const errorDiv = document.getElementById('amount-error-po');
 
-        const remainingBalancePO = {{ $sisaTagihanPO ?? 0 }};
-        const currentDebitBalancePO = {{ $saldoDepositSupplier ?? 0 }};
-        
-        const defaultPaymentMethodIdPO = "{{ $paymentMethods->first()->payment_method_id ?? '' }}";
-        const defaultBankAccountIdPO = "{{ $companyBankAccounts->first()->company_bank_account_id ?? '' }}";
+        const sisaTagihan = {{ $sisaTagihanPO ?? 0 }};
+        const saldoDeposit = {{ $saldoDepositSupplier ?? 0 }};
 
-        function handlePaymentMethodChangePO() {
-            if (!paymentMethodSelectPO) return;
-            
-            const selectedOption = paymentMethodSelectPO.options[paymentMethodSelectPO.selectedIndex];
-            const config = (selectedOption && !paymentMethodSelectPO.disabled) ? selectedOption.dataset.config : 'none';
+        if (amountInput) {
+            const an = new AutoNumeric(amountInput, { decimalCharacter: ',', digitGroupSeparator: '.', decimalPlaces: 0, minimumValue: '0' });
 
-            referenceGroupPO.style.display = 'none';
-            referenceInputPO.required = false;
-            proofGroupPO.style.display = 'none';
-            proofInputPO.required = false;
+            function updateFormState() {
+                const isUsingDebit = useDebit ? useDebit.checked : false;
+                const inputVal = parseFloat(amountHidden.value || 0);
 
-            if (config === 'proof_only') {
-                proofGroupPO.style.display = 'block';
-                proofInputPO.required = true;
-            } else if (config === 'reference_only') {
-                referenceGroupPO.style.display = 'block';
-                referenceInputPO.required = true;
-            } else if (config === 'proof_and_reference') {
-                proofGroupPO.style.display = 'block';
-                proofInputPO.required = true;
-                referenceGroupPO.style.display = 'block';
-                referenceInputPO.required = true;
-            }
-        }
-
-        if (paymentMethodSelectPO) {
-            paymentMethodSelectPO.addEventListener('change', handlePaymentMethodChangePO);
-        }
-        
-        if (amountFormattedInputPO) {
-            const autoNumericInstancePO = new AutoNumeric(amountFormattedInputPO, {
-                decimalCharacter: ',',
-                digitGroupSeparator: '.',
-                decimalPlaces: 0,
-                minimumValue: '0'
-            });
-
-            function toggleRequiredFieldsPO() {
-                const useDebit = useDebitCheckboxPO ? useDebitCheckboxPO.checked : false;
-                const debitIsSufficient = currentDebitBalancePO >= remainingBalancePO && remainingBalancePO > 0;
-                const inputAmountValue = parseFloat(amountHiddenInputPO.value || 0);
-
-                if (useDebit) {
-                    if (debitIsSufficient) {
-                        autoNumericInstancePO.set(0);
-                        amountFormattedInputPO.disabled = true;
-                        amountFormattedInputPO.required = false;
-                        
-                        paymentMethodSelectPO.disabled = true;
-                        paymentMethodSelectPO.required = false;
-                        paymentMethodSelectPO.value = "";
-
-                        bankAccountSelectPO.disabled = true;
-                        bankAccountSelectPO.required = false;
-                        bankAccountSelectPO.value = "";
-                    } else {
-                        const shortfall = remainingBalancePO - currentDebitBalancePO;
-                        autoNumericInstancePO.set(shortfall);
-                        amountFormattedInputPO.disabled = false;
-                        amountFormattedInputPO.required = true;
-                        
-                        paymentMethodSelectPO.disabled = false;
-                        paymentMethodSelectPO.required = true;
-                        if (!paymentMethodSelectPO.value) paymentMethodSelectPO.value = defaultPaymentMethodIdPO;
-                        
-                        bankAccountSelectPO.disabled = false;
-                        bankAccountSelectPO.required = true;
-                        if (!bankAccountSelectPO.value) bankAccountSelectPO.value = defaultBankAccountIdPO;
-                    }  
+                if (isUsingDebit && saldoDeposit >= sisaTagihan && sisaTagihan > 0) {
+                    an.set(0); amountInput.disabled = true;
+                    payMethod.disabled = true; payMethod.required = false; payMethod.value = "";
+                    bankAcc.disabled = true; bankAcc.required = false; bankAcc.value = "";
                 } else {
-                    autoNumericInstancePO.set(remainingBalancePO);
-                    amountFormattedInputPO.disabled = false;
-                    amountFormattedInputPO.required = true;
-
-                    const isAmountPositive = inputAmountValue > 0 || remainingBalancePO > 0;
-
-                    paymentMethodSelectPO.disabled = false;
-                    paymentMethodSelectPO.required = isAmountPositive;
-                    bankAccountSelectPO.disabled = false;
-                    bankAccountSelectPO.required = isAmountPositive;
+                    if (isUsingDebit) an.set(Math.max(0, sisaTagihan - saldoDeposit));
+                    else an.set(sisaTagihan);
                     
-                    if (isAmountPositive) {
-                        if (!paymentMethodSelectPO.value) paymentMethodSelectPO.value = defaultPaymentMethodIdPO;
-                        if (!bankAccountSelectPO.value) bankAccountSelectPO.value = defaultBankAccountIdPO;
-                    }
+                    amountInput.disabled = false;
+                    payMethod.disabled = false; payMethod.required = true;
+                    bankAcc.disabled = false; bankAcc.required = true;
                 }
+            }
+
+            if (useDebit) useDebit.addEventListener('change', updateFormState);
+            
+            amountInput.addEventListener('autoNumeric:rawValueModified', e => {
+                amountHidden.value = e.detail.newRawValue;
+                const val = parseFloat(e.detail.newRawValue || 0);
+                const total = (useDebit && useDebit.checked ? saldoDeposit : 0) + val;
                 
-                handlePaymentMethodChangePO();
-            }
-
-            if (addPaymentBtnPO) {
-                addPaymentBtnPO.addEventListener('click', function() {
-                    if (useDebitCheckboxPO) {
-                        useDebitCheckboxPO.checked = true; 
-                    }
-                    toggleRequiredFieldsPO();
-                    amountErrorPO.textContent = '';
-                });
-            }
-
-            if (useDebitCheckboxPO) {
-                useDebitCheckboxPO.addEventListener('change', toggleRequiredFieldsPO);
-            }
-
-            amountFormattedInputPO.addEventListener('autoNumeric:rawValueModified', function(event) {
-                const rawValue = event.detail.newRawValue;
-                amountHiddenInputPO.value = rawValue;
-
-                const isAmountPositive = parseFloat(rawValue || 0) > 0;
-
-                if (useDebitCheckboxPO && !useDebitCheckboxPO.checked) {
-                    paymentMethodSelectPO.required = isAmountPositive;
-                    bankAccountSelectPO.required = isAmountPositive;
-                }
-
-                const totalPayment = (useDebitCheckboxPO && useDebitCheckboxPO.checked ? currentDebitBalancePO : 0) + parseFloat(rawValue || 0);
-                if (totalPayment > remainingBalancePO) {
-                    amountErrorPO.textContent = 'Info: Kelebihan bayar akan jadi saldo deposit.';
-                    amountErrorPO.classList.remove('text-danger');
-                    amountErrorPO.classList.add('text-success');
+                if (total > sisaTagihan) {
+                    errorDiv.textContent = 'Info: Kelebihan bayar masuk deposit.';
+                    errorDiv.className = 'text-green-600 text-xs mt-1';
                 } else {
-                    amountErrorPO.textContent = '';
+                    errorDiv.textContent = '';
                 }
+            });
+        }
+
+        // 3. Toggle Method Fields
+        if (payMethod) {
+            payMethod.addEventListener('change', function() {
+                const config = this.options[this.selectedIndex].dataset.config;
+                document.getElementById('payment-reference-group-po').style.display = (config === 'reference_only' || config === 'proof_and_reference') ? 'block' : 'none';
+                document.getElementById('payment-proof-group-po').style.display = (config === 'proof_only' || config === 'proof_and_reference') ? 'block' : 'none';
             });
         }
     });
