@@ -3,90 +3,79 @@
 @section('title', 'Pengaturan Pajak')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="max-w-5xl mx-auto pb-20 animate-enter">
     
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+    {{-- HEADER SECTION --}}
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-            <h3 class="text-2xl font-bold text-gray-900 tracking-tight">Pengaturan Pajak</h3>
-            <p class="text-sm text-gray-500 mt-1">Daftar semua tarif pajak yang berlaku (PPN, PPh, dll).</p>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Pengaturan Pajak</h1>
+            <p class="text-slate-500 text-sm mt-1">Daftar semua tarif pajak yang berlaku (PPN, PPh, dll).</p>
         </div>
-        <div class="mt-4 sm:mt-0">
-            <a href="{{ route('taxes.create') }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-lg font-bold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition">
-                <i class="material-icons text-base mr-2">add</i> Tambah Tarif
+        <div>
+            <a href="{{ route('taxes.create') }}" 
+               class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-md shadow-indigo-200 transition-all flex items-center gap-2">
+                <i class="material-icons text-[20px]">add</i> Tambah Tarif
             </a>
         </div>
     </div>
 
-    {{-- NOTIFIKASI --}}
-    @if (session('success'))
-        <div class="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-            <i class="material-icons text-green-500">check_circle</i>
-            <span class="text-sm text-green-800 font-medium">{{ session('success') }}</span>
-        </div>
-    @endif
-    @if (session('error'))
-        <div class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
-            <i class="material-icons text-red-500">error</i>
-            <span class="text-sm text-red-800 font-medium">{{ session('error') }}</span>
-        </div>
-    @endif
-
     {{-- TABEL --}}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
+            <table class="dashboard-table w-full">
+                <thead class="bg-slate-50 border-b border-slate-200">
                     <tr>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/2">
-                            Nama Pajak
-                        </th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                            Tarif (%)
-                        </th>
-                        <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-                            Status
-                        </th>
-                        <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-32">
-                            Aksi
-                        </th>
+                        <th class="pl-6 w-1/2">Nama Pajak</th>
+                        <th>Tarif (%)</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-center w-32 pr-6">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                <tbody class="divide-y divide-slate-100 bg-white">
                     @forelse ($taxes as $tax)
-                        <tr class="hover:bg-gray-50 transition-colors group">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
-                                {{ $tax->name }}
+                        <tr class="hover:bg-slate-50/80 transition-colors group">
+                            <td class="pl-6 py-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
+                                        <i class="material-icons text-[18px]">percent</i>
+                                    </div>
+                                    <span class="font-bold text-slate-700">{{ $tax->name }}</span>
+                                </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="text-sm font-mono font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                            <td class="py-4">
+                                <span class="text-sm font-mono font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded border border-slate-200">
                                     {{ number_format($tax->rate, 2, ',', '.') }}%
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                            <td class="py-4 text-center">
                                 @if ($tax->is_active)
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-                                        Aktif
+                                    <span class="status-badge status-completed">
+                                        <i class="material-icons text-[12px]">check_circle</i> Aktif
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
-                                        Non-Aktif
+                                    <span class="status-badge status-rejected">
+                                        <i class="material-icons text-[12px]">block</i> Non-Aktif
                                     </span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                <a href="{{ route('taxes.edit', $tax->id) }}" class="inline-flex p-1.5 bg-white text-yellow-600 rounded-lg hover:bg-yellow-50 transition border border-gray-200 shadow-sm hover:border-yellow-200" title="Edit">
-                                    <i class="material-icons text-lg leading-none">edit</i>
+                            <td class="py-4 text-center pr-6">
+                                <a href="{{ route('taxes.edit', $tax->id) }}" 
+                                   class="inline-flex items-center justify-center w-8 h-8 bg-white text-slate-500 rounded-lg border border-slate-200 shadow-sm hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all" 
+                                   title="Edit">
+                                    <i class="material-icons text-[16px]">edit</i>
                                 </a>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="px-6 py-12 text-center text-gray-500">
+                            <td colspan="4" class="py-12 text-center">
                                 <div class="flex flex-col items-center justify-center">
-                                    <i class="material-icons text-4xl text-gray-300 mb-3">percent</i>
-                                    <p class="text-base font-medium">Belum ada data</p>
-                                    <p class="text-sm mt-1">Silakan tambahkan tarif pajak baru.</p>
+                                    <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-slate-300">
+                                        <i class="material-icons text-4xl">percent</i>
+                                    </div>
+                                    <h3 class="text-lg font-medium text-slate-900">Belum ada data</h3>
+                                    <p class="text-slate-500 text-sm mt-1 max-w-xs">Silakan tambahkan tarif pajak baru.</p>
+                                    <a href="{{ route('taxes.create') }}" class="mt-4 text-indigo-600 font-bold text-sm hover:underline">Tambah Tarif</a>
                                 </div>
                             </td>
                         </tr>
@@ -97,3 +86,13 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Tampilkan Toast Success/Error (Hanya logic session, karena delete tidak ada)
+        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
+        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
+    });
+</script>
+@endpush

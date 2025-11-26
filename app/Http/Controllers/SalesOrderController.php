@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\Product;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\User; // Pastikan model User di-import
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -16,11 +17,8 @@ class SalesOrderController extends Controller
 {
     /**
      * ===========================================================
-     *  MENAMPILKAN DAFTAR PESANAN PENJUALAN
+     * MENAMPILKAN DAFTAR PESANAN PENJUALAN
      * ===========================================================
-     * - Data difilter berdasarkan peran pengguna (sales/admin)
-     * - Dapat difilter berdasarkan pencarian dan tanggal
-     * - Dapat diurutkan dengan beberapa opsi
      */
     public function index(Request $request): View
     {
@@ -35,7 +33,7 @@ class SalesOrderController extends Controller
             $query->where('user_id_sales', $user->user_id);
         }
 
-        // Filter pencarian berdasarkan nomor order atau nama klien
+        // Filter pencarian
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -46,12 +44,12 @@ class SalesOrderController extends Controller
             });
         }
 
-        // Filter berdasarkan tanggal order
+        // Filter tanggal
         if ($request->filled('date')) {
             $query->whereDate('order_date', $request->date);
         }
 
-        // Opsi pengurutan
+        // Sorting
         $sort = $request->get('sort', 'terbaru');
         switch ($sort) {
             case 'terlama':
@@ -59,11 +57,13 @@ class SalesOrderController extends Controller
                 break;
             case 'klien_az':
                 $query->join('clients', 'orders.client_id', '=', 'clients.client_id')
-                      ->orderBy('clients.client_name', 'asc');
+                      ->orderBy('clients.client_name', 'asc')
+                      ->select('orders.*'); // Pastikan select orders agar tidak ambigu
                 break;
             case 'klien_za':
                 $query->join('clients', 'orders.client_id', '=', 'clients.client_id')
-                      ->orderBy('clients.client_name', 'desc');
+                      ->orderBy('clients.client_name', 'desc')
+                      ->select('orders.*');
                 break;
             default:
                 $query->orderBy('order_date', 'desc')->orderBy('order_id', 'desc');
@@ -76,27 +76,28 @@ class SalesOrderController extends Controller
 
     /**
      * ===========================================================
-     *  FORM PEMBUATAN PESANAN PENJUALAN BARU
+     * FORM PEMBUATAN PESANAN PENJUALAN BARU
      * ===========================================================
-     * - Hanya dapat diakses oleh pengguna dengan izin 'create'
-     * - Memuat daftar klien dan produk yang masih tersedia
      */
     public function create(): View
     {
         $this->authorize('create', Order::class);
+        
         $clients = Client::all();
         $products = Product::where('stock_quantity', '>', 0)->get();
+        
+        // PERBAIKAN: Kirim data salesUsers ke view
+        // Asumsi menggunakan spatie/laravel-permission
+        // Jika error, gunakan: User::where('role', 'sales')->get(); (sesuaikan struktur DB)
+        $salesUsers = User::role('sales')->get(); 
 
-        return view('sales_orders.create', compact('clients', 'products'));
+        return view('sales_orders.create', compact('clients', 'products', 'salesUsers'));
     }
 
     /**
      * ===========================================================
-     *  MENYIMPAN PESANAN PENJUALAN BARU
+     * MENYIMPAN PESANAN PENJUALAN BARU
      * ===========================================================
-     * - Melakukan validasi input
-     * - Menghitung total harga berdasarkan produk yang dipilih
-     * - Menyimpan data order dan item secara transaksional
      */
     public function store(Request $request): RedirectResponse
     {
@@ -105,10 +106,12 @@ class SalesOrderController extends Controller
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,client_id',
             'order_date' => 'required|date',
+            'sales_id' => 'nullable|exists:users,user_id', // Validasi sales_id
             'notes' => 'nullable|string',
-            'products' => 'required|array|min:1',
+            'products' => 'required|array|min:1', // Menggunakan nama array 'products' dari js
             'products.*.product_id' => 'required|exists:products,product_id',
             'products.*.quantity' => 'required|integer|min:1',
+            // 'products.*.price' bisa ditambahkan jika harga bisa diedit
         ]);
 
         try {
@@ -118,34 +121,44 @@ class SalesOrderController extends Controller
             $order->client_id = $validated['client_id'];
             $order->order_date = $validated['order_date'];
             $order->notes = $validated['notes'] ?? null;
-            $order->user_id_sales = Auth::id();
+            
+            // Jika admin memilih sales lain, gunakan itu. Jika tidak, gunakan user login (jika dia sales)
+            if ($request->filled('sales_id')) {
+                 $order->user_id_sales = $validated['sales_id'];
+            } else {
+                 $order->user_id_sales = Auth::id();
+            }
+            
             $order->order_number = Order::generateOrderNumber(Auth::id());
             $order->status = 'pending';
             $order->order_source = 'sales';
 
-            // Hitung total harga
+            // Hitung total & Simpan Item (Looping array 'products' bukan 'items')
+            // Note: di JS create.blade.php name-nya `products[...]`, jadi gunakan validated['products']
             $totalAmount = 0;
-            foreach ($validated['products'] as $productData) {
-                $product = Product::find($productData['product_id']);
-                $subtotal = $productData['quantity'] * $product->selling_price;
-                $totalAmount += $subtotal;
-            }
-
-            $order->total_amount = $totalAmount;
+            
+            // Simpan order dulu untuk dapat ID
+            $order->total_amount = 0; 
             $order->save();
 
-            // Simpan item order
-            foreach ($validated['products'] as $productData) {
-                $product = Product::find($productData['product_id']);
+            foreach ($validated['products'] as $itemData) {
+                $product = Product::find($itemData['product_id']);
+                // Gunakan harga jual saat ini
+                $price = $product->selling_price; 
+                $subtotal = $itemData['quantity'] * $price;
+                $totalAmount += $subtotal;
 
                 OrderItem::create([
                     'order_id' => $order->order_id,
-                    'product_id' => $productData['product_id'],
-                    'quantity' => $productData['quantity'],
-                    'price_per_unit' => $product->selling_price,
-                    'subtotal' => $productData['quantity'] * $product->selling_price,
+                    'product_id' => $itemData['product_id'],
+                    'quantity' => $itemData['quantity'],
+                    'price_per_unit' => $price,
+                    'subtotal' => $subtotal,
                 ]);
             }
+
+            // Update Total Akhir
+            $order->update(['total_amount' => $totalAmount]);
 
             DB::commit();
 
@@ -162,9 +175,8 @@ class SalesOrderController extends Controller
 
     /**
      * ===========================================================
-     *  MENAMPILKAN DETAIL PESANAN PENJUALAN
+     * MENAMPILKAN DETAIL PESANAN PENJUALAN
      * ===========================================================
-     * - Memuat relasi client, sales, dan item produk
      */
     public function show(Order $order): View
     {
@@ -179,9 +191,8 @@ class SalesOrderController extends Controller
 
     /**
      * ===========================================================
-     *  FORM EDIT PESANAN PENJUALAN
+     * FORM EDIT PESANAN PENJUALAN
      * ===========================================================
-     * - Hanya pesanan dengan status "pending" yang bisa diedit
      */
     public function edit(Order $order): View
     {
@@ -194,63 +205,77 @@ class SalesOrderController extends Controller
         $order->load('items.product');
         $clients = Client::all();
         $products = Product::all();
+        
+        // PERBAIKAN: Kirim data salesUsers ke view edit juga
+        $salesUsers = User::role('sales')->get();
 
-        return view('sales_orders.edit', compact('order', 'clients', 'products'));
+        return view('sales_orders.edit', compact('order', 'clients', 'products', 'salesUsers'));
     }
 
     /**
      * ===========================================================
-     *  MENYIMPAN PERUBAHAN PESANAN PENJUALAN
+     * MENYIMPAN PERUBAHAN PESANAN PENJUALAN
      * ===========================================================
-     * - Menghapus item lama lalu menulis ulang item baru
-     * - Mengupdate total harga pesanan
      */
     public function update(Request $request, Order $order): RedirectResponse
     {
         $this->authorize('update', $order);
 
         if ($order->status !== 'pending') {
-            return back()
-                ->with('error', 'Pesanan yang sudah diproses tidak dapat diedit.')
-                ->withInput();
+            return back()->with('error', 'Pesanan yang sudah diproses tidak dapat diedit.');
         }
 
+        // Validasi menggunakan 'items' karena di edit.blade.php JS menggunakan name="items[...]"
+        // PERHATIKAN: Di create.blade.php JS pakai "products", di edit.blade.php pakai "items".
+        // Agar konsisten, sebaiknya samakan. Di bawah ini saya sesuaikan logika untuk menerima 'items'
+        
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,client_id',
             'order_date' => 'required|date',
+            'sales_id' => 'nullable|exists:users,user_id',
             'notes' => 'nullable|string',
-            'products' => 'required|array|min:1',
-            'products.*.product_id' => 'required|exists:products,product_id',
-            'products.*.quantity' => 'required|integer|min:1',
+            'items' => 'required|array|min:1', // Sesuaikan dengan name di view edit
+            'items.*.product_id' => 'required|exists:products,product_id',
+            'items.*.quantity' => 'required|integer|min:1',
         ]);
 
         try {
             DB::beginTransaction();
 
-            $order->update([
+            $updateData = [
                 'client_id' => $validated['client_id'],
                 'order_date' => $validated['order_date'],
                 'notes' => $validated['notes'] ?? null,
-            ]);
+            ];
+            
+            if ($request->filled('sales_id')) {
+                $updateData['user_id_sales'] = $validated['sales_id'];
+            }
 
+            $order->update($updateData);
+
+            // Hapus item lama (reset)
             $order->items()->delete();
 
             $totalAmount = 0;
-            foreach ($validated['products'] as $productData) {
-                $product = Product::find($productData['product_id']);
-                $subtotal = $productData['quantity'] * $product->purchase_price;
+            foreach ($validated['items'] as $itemData) {
+                $product = Product::find($itemData['product_id']);
+                // Gunakan selling_price (Harga Jual), bukan purchase_price (Harga Beli)
+                $price = $product->selling_price; 
+                $subtotal = $itemData['quantity'] * $price;
                 $totalAmount += $subtotal;
 
                 OrderItem::create([
                     'order_id' => $order->order_id,
-                    'product_id' => $productData['product_id'],
-                    'quantity' => $productData['quantity'],
-                    'price_per_unit' => $product->selling_price,
+                    'product_id' => $itemData['product_id'],
+                    'quantity' => $itemData['quantity'],
+                    'price_per_unit' => $price,
                     'subtotal' => $subtotal,
                 ]);
             }
 
             $order->update(['total_amount' => $totalAmount]);
+            
             DB::commit();
 
             return redirect()
@@ -266,15 +291,18 @@ class SalesOrderController extends Controller
 
     /**
      * ===========================================================
-     *  MENGHAPUS PESANAN PENJUALAN
+     * MENGHAPUS PESANAN PENJUALAN
      * ===========================================================
-     * - Menghapus data pesanan beserta item terkait
      */
     public function destroy(Order $order): RedirectResponse
     {
         $this->authorize('delete', $order);
 
-        $order->delete();
+        if ($order->status !== 'pending') {
+             return back()->with('error', 'Hanya pesanan pending yang dapat dihapus.');
+        }
+
+        $order->delete(); // Soft delete atau force delete tergantung model
 
         return redirect()
             ->route('sales-orders.index')

@@ -2,42 +2,41 @@
 
 @section('title', 'Tutup Buku Tahunan')
 
+@push('styles')
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+@endpush
+
 @section('content')
-<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+<div class="max-w-2xl mx-auto pb-20 animate-enter">
     
-    <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+    <div class="dashboard-card p-0 overflow-hidden shadow-2xl border-0 ring-1 ring-slate-900/5">
         
         {{-- HEADER MERAH (PERINGATAN) --}}
-        <div class="bg-gradient-to-br from-red-600 to-red-700 px-8 py-10 text-center text-white relative overflow-hidden">
-            {{-- Icon Dekorasi --}}
-            <i class="material-icons absolute -right-6 -bottom-6 text-[120px] text-white opacity-10 transform -rotate-12 pointer-events-none select-none">lock</i>
+        <div class="bg-gradient-to-br from-red-600 to-red-800 px-8 py-12 text-center text-white relative overflow-hidden">
+            <i class="material-icons absolute -right-6 -bottom-6 text-[150px] text-white opacity-10 transform -rotate-12 pointer-events-none select-none">lock</i>
             
             <div class="relative z-10">
-                <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-                    <i class="material-icons text-4xl">folder_zip</i>
+                <div class="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6 backdrop-blur-sm border border-white/20 shadow-lg">
+                    <i class="material-icons text-5xl">folder_zip</i>
                 </div>
-                <h2 class="text-3xl font-bold tracking-tight">Tutup Buku Tahunan</h2>
-                <p class="text-red-100 mt-2 text-sm">Periode Akuntansi Akhir Tahun</p>
+                <h1 class="text-3xl font-bold tracking-tight mb-2">Tutup Buku Tahunan</h1>
+                <p class="text-red-100 text-sm max-w-md mx-auto leading-relaxed opacity-90">
+                    Proses ini akan memindahkan saldo Laba/Rugi ke Ekuitas dan mengunci semua transaksi pada periode tersebut.
+                </p>
             </div>
         </div>
 
-        <div class="p-8">
+        <div class="p-8 bg-white">
             
             {{-- ALERT PERINGATAN --}}
-            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8 rounded-r-lg">
-                <div class="flex items-start">
-                    <div class="flex-shrink-0">
-                        <i class="material-icons text-yellow-400 text-xl">warning</i>
-                    </div>
-                    <div class="ml-3">
-                        <h3 class="text-sm font-bold text-yellow-800 uppercase tracking-wider">Penting!</h3>
-                        <div class="mt-1 text-sm text-yellow-700">
-                            <p>
-                                Proses ini akan memindahkan saldo Laba/Rugi berjalan ke Ekuitas (Laba Ditahan) dan mengunci transaksi pada tahun tersebut.
-                                <span class="font-bold text-red-600 block mt-1">Tindakan ini tidak dapat dibatalkan.</span>
-                            </p>
-                        </div>
-                    </div>
+            <div class="bg-amber-50 border-l-4 border-amber-500 p-5 mb-8 rounded-r-lg flex gap-4">
+                <i class="material-icons text-amber-600 text-2xl mt-0.5">warning_amber</i>
+                <div class="text-sm text-amber-800">
+                    <h3 class="font-bold uppercase tracking-wider mb-1">Perhatian Penting!</h3>
+                    <p class="leading-relaxed opacity-90">
+                        Pastikan semua jurnal penyesuaian, depresiasi, dan rekonsiliasi bank sudah selesai. 
+                        <span class="font-bold text-red-700 block mt-1">Tindakan ini tidak dapat dibatalkan.</span>
+                    </p>
                 </div>
             </div>
 
@@ -45,20 +44,13 @@
                 @csrf
                 
                 <div class="mb-8">
-                    <label for="year" class="block text-xs font-bold text-gray-500 uppercase mb-2 tracking-wider">Pilih Tahun Buku</label>
+                    <label for="year" class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wider">Pilih Tahun Buku</label>
                     
                     <div class="relative">
-                        {{-- Icon Kalender Absolut --}}
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
-                            <i class="material-icons text-gray-400 text-lg">calendar_month</i>
-                        </div>
-                        
-                        <select name="year" id="year" class="select2 form-select block w-full pl-10 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-lg shadow-sm" required>
-                            <option value="">-- Pilih Tahun --</option>
+                        <select name="year" id="year" class="form-input select2-basic w-full" required>
+                            <option value="" disabled selected>-- Pilih Tahun --</option>
                             @forelse ($availableYears as $year)
-                                @php
-                                    $isClosed = in_array($year, $closedYears);
-                                @endphp
+                                @php $isClosed = in_array($year, $closedYears); @endphp
                                 <option value="{{ $year }}" {{ $isClosed ? 'disabled' : '' }}>
                                     Tahun {{ $year }} {{ $isClosed ? '(Sudah Ditutup)' : '' }}
                                 </option>
@@ -67,126 +59,117 @@
                             @endforelse
                         </select>
                     </div>
-                    @error('year') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    @error('year') <p class="mt-1 text-xs text-red-600 flex items-center gap-1"><i class="material-icons text-[14px]">error</i> {{ $message }}</p> @enderror
                 </div>
                 
-                <button type="submit" class="w-full flex justify-center items-center py-4 px-4 border border-transparent rounded-lg shadow-md text-sm font-bold text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition transform active:scale-[0.98]" id="btn-submit-closing">
-                    <i class="material-icons mr-2 text-lg">lock</i> 
-                    TUTUP BUKU <span id="selected-year-text" class="ml-1">{{ $availableYears[0] ?? '' }}</span>
+                <button type="submit" class="w-full flex justify-center items-center h-[54px] px-4 border border-transparent rounded-xl shadow-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed" id="btn-submit-closing" disabled>
+                    <i class="material-icons mr-2 text-xl">lock_person</i> 
+                    TUTUP BUKU <span id="selected-year-text" class="ml-1 font-mono text-lg"></span>
                 </button>
 
             </form>
+
+            <div class="mt-8 pt-6 border-t border-slate-100 text-center">
+                 <a href="{{ route('dashboard') }}" class="text-sm font-medium text-slate-500 hover:text-indigo-600 transition flex items-center justify-center gap-1">
+                    <i class="material-icons text-[16px]">arrow_back</i> Kembali ke Dashboard
+                </a>
+            </div>
         </div>
     </div>
-    
-    {{-- Footer Note --}}
-    <p class="text-center text-xs text-gray-400 mt-6">
-        Pastikan semua jurnal penyesuaian sudah selesai sebelum melakukan tutup buku.
-    </p>
-
 </div>
 @endsection
 
-@push('styles')
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
-    {{-- Override Select2 Style agar mirip Tailwind Input (Tinggi & Padding) --}}
-    <style>
-        .select2-container--bootstrap-5 .select2-selection {
-            border-color: #d1d5db !important; /* gray-300 */
-            padding-top: 0.75rem !important;
-            padding-bottom: 0.75rem !important;
-            padding-left: 2.5rem !important; /* Space untuk icon kalender */
-            height: auto !important;
-            min-height: 50px !important; /* Lebih tinggi agar gagah */
-            border-radius: 0.5rem !important;
-        }
-        .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
-            padding-left: 0 !important;
-            line-height: 1.5 !important;
-            color: #111827 !important;
-            font-weight: 600 !important;
-        }
-        .select2-container--bootstrap-5 .select2-selection__arrow {
-            top: 50% !important;
-            transform: translateY(-50%) !important;
-            right: 10px !important;
-        }
-    </style>
-@endpush
-
 @push('scripts')
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 <script>
 $(document).ready(function() {
-    // Inisialisasi Select2
+    
+    // 1. Init Select2
     $('#year').select2({
-        theme: 'bootstrap-5',
         width: '100%', 
-        placeholder: 'Pilih Tahun...',
+        placeholder: '-- Pilih Tahun --',
         allowClear: false,
-        minimumResultsForSearch: -1 // Sembunyikan search box karena pilih tahun sedikit
+        minimumResultsForSearch: -1,
+        dropdownCssClass: 'select2-dropdown-clean' // Menggunakan style clean dari app.css
     });
 
-    // Update teks tombol saat pilih tahun
+    // 2. Update Button State
     $('#year').on('select2:select', function (e) {
-        $('#selected-year-text').text(e.params.data.id);
+        const val = e.params.data.id;
+        $('#selected-year-text').text(val);
+        $('#btn-submit-closing').prop('disabled', false).removeClass('disabled:opacity-50 bg-slate-400').addClass('bg-red-600 hover:bg-red-700');
     });
 
-    // SweetAlert Konfirmasi
+    // Cek initial value (jika browser auto-fill atau back button)
+    const initialVal = $('#year').val();
+    if(initialVal) {
+        $('#selected-year-text').text(initialVal);
+        $('#btn-submit-closing').prop('disabled', false);
+    }
+
+    // 3. Konfirmasi SweetAlert dengan Input
     $('#closing-book-form').on('submit', function(e) {
         e.preventDefault(); 
         const selectedYear = $('#year').val();
-        const confirmationWord = "KONFIRMASI"; 
+        const confirmationWord = "TUTUP"; 
 
         if(!selectedYear) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Pilih Tahun',
-                text: 'Silakan pilih tahun buku terlebih dahulu!',
-                confirmButtonColor: '#dc2626'
-            });
+            window.showToast('Silakan pilih tahun buku terlebih dahulu!', 'error');
             return;
         }
 
         Swal.fire({
-            title: 'Konfirmasi Tutup Buku',
+            title: 'KONFIRMASI TUTUP BUKU',
             html: `
-                <div class="text-center mb-4">
-                    <p class="text-gray-600 text-sm mb-1">Anda akan menutup buku tahun:</p>
-                    <b class="text-3xl text-red-600 font-mono">${selectedYear}</b>
+                <div class="text-center mb-6">
+                    <div class="bg-red-50 text-red-800 p-3 rounded-lg mb-4 text-sm">
+                        Anda akan menutup buku tahun <b class="font-mono text-lg">${selectedYear}</b>.
+                    </div>
+                    <p class="text-slate-500 text-xs mb-2">
+                        Untuk melanjutkan, ketik kata <b>"${confirmationWord}"</b> di bawah ini:
+                    </p>
                 </div>
-                <p class="text-xs text-gray-500 bg-gray-100 p-2 rounded border border-gray-200">
-                    Ketik <b>"${confirmationWord}"</b> di bawah untuk melanjutkan:
-                </p>
             `,
-            icon: 'warning',
             input: 'text',
-            inputAttributes: { autocapitalize: 'off', placeholder: 'Ketik KONFIRMASI...', class: 'swal2-input text-center font-bold tracking-widest' },
+            inputAttributes: { 
+                autocapitalize: 'off', 
+                placeholder: 'Ketik TUTUP...', 
+                class: 'swal2-input text-center font-bold tracking-widest uppercase !text-slate-800' 
+            },
+            icon: 'warning',
             showCancelButton: true,
-            confirmButtonText: 'Ya, Proses Tutup Buku!',
-            confirmButtonColor: '#dc2626', // Red-600
-            cancelButtonColor: '#6b7280',  // Gray-500
+            confirmButtonText: 'Ya, Proses!',
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#94a3b8', 
             cancelButtonText: 'Batal',
             reverseButtons: true,
+            customClass: {
+                popup: 'bg-white rounded-xl border border-slate-100 shadow-2xl p-6',
+                title: 'text-xl font-bold text-red-600',
+                confirmButton: 'px-6 py-2.5 rounded-lg font-bold shadow-md',
+                cancelButton: 'px-6 py-2.5 rounded-lg font-bold hover:bg-slate-100 text-slate-600'
+            },
             preConfirm: (inputValue) => {
-                if (inputValue !== confirmationWord) {
-                    Swal.showValidationMessage(`Kode salah. Ketik: ${confirmationWord}`);
+                if (inputValue.toUpperCase() !== confirmationWord) {
+                    Swal.showValidationMessage(`Kata kunci salah. Ketik: ${confirmationWord}`);
                 }
             }
         }).then((result) => {
             if (result.isConfirmed) {
+                // Loading State Button
                 const btn = document.getElementById('btn-submit-closing');
                 btn.disabled = true;
-                btn.innerHTML = '<i class="material-icons animate-spin mr-2 text-lg">sync</i> Memproses...';
+                btn.innerHTML = '<i class="material-icons animate-spin mr-2 text-lg">sync</i> MEMPROSES...';
                 btn.classList.add('opacity-75', 'cursor-not-allowed');
+                
                 e.target.submit(); 
             }
         });
     });
+
+    @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
+    @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
 });
 </script>
 @endpush

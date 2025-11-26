@@ -3,33 +3,31 @@
 @section('title', 'Buat PO Baru')
 
 @section('content')
-<div class="max-w-full mx-auto py-4 px-4 sm:px-6 lg:px-8">
+<div class="max-w-full mx-auto pb-20 animate-enter">
     
-    {{-- Indikator Auto Save --}}
-    <div id="autosave-indicator" class="fixed top-5 right-5 z-50 hidden transition-opacity duration-300">
-        <div class="flex items-center bg-green-600 text-white px-4 py-3 rounded-lg shadow-lg border border-green-500">
-            <i class="bi bi-cloud-check mr-2 text-lg"></i>
-            <span class="text-sm font-bold">Draft disimpan otomatis</span>
+    {{-- INDIKATOR AUTO SAVE --}}
+    <div id="autosave-indicator" class="fixed top-20 right-6 z-50 hidden transition-opacity duration-300">
+        <div class="flex items-center bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg border border-emerald-500 text-xs font-bold">
+            <i class="material-icons text-sm mr-2">cloud_done</i>
+            Draft disimpan otomatis
         </div>
     </div>
 
-    {{-- HEADER HALAMAN --}}
+    {{-- HEADER --}}
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-            <h3 class="text-2xl font-bold text-gray-900 tracking-tight">Buat Purchase Order Baru</h3>
-            <p class="text-gray-500 text-sm mt-1">Isi formulir di bawah untuk membuat pesanan pembelian ke supplier.</p>
+            <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Buat Purchase Order Baru</h2>
+            <p class="text-slate-500 text-sm mt-1">Buat pesanan pembelian baru ke supplier.</p>
         </div>
-        <div>
-            <a href="{{ route('purchase-orders.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 hover:text-indigo-600 transition shadow-sm text-sm font-medium">
-                <i class="bi bi-arrow-left mr-2"></i> Kembali ke List
-            </a>
-        </div>
+        <a href="{{ route('purchase-orders.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition shadow-sm text-sm font-bold">
+            <i class="material-icons text-sm mr-2">arrow_back</i> Kembali
+        </a>
     </div>
 
     {{-- ALERT ERROR --}}
     @if ($errors->any())
-        <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r shadow-sm flex items-start gap-3">
-            <i class="bi bi-exclamation-triangle-fill text-red-500 text-xl"></i>
+        <div class="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+            <i class="material-icons text-red-500 text-xl">error</i>
             <div>
                 <h3 class="text-sm font-bold text-red-800">Terdapat kesalahan input:</h3>
                 <ul class="mt-1 list-disc list-inside text-sm text-red-700">
@@ -39,155 +37,134 @@
         </div>
     @endif
 
-    {{-- FORM UTAMA --}}
+    {{-- FORM --}}
     <form action="{{ route('purchase-orders.store') }}" method="POST" id="po-form">
         @csrf
 
         <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
             
-            {{-- ===================================================
-                 KOLOM KIRI: INFO & ITEMS (Span 9)
-                 =================================================== --}}
+            {{-- KOLOM KIRI (DETAIL & ITEMS) - Span 9 --}}
             <div class="xl:col-span-9 space-y-6">
                 
-                {{-- 1. CARD INFORMASI PESANAN --}}
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-100 bg-gray-50">
-                        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                            <i class="bi bi-info-circle text-indigo-500"></i> Informasi Pesanan
+                {{-- 1. INFO PESANAN --}}
+                <div class="dashboard-card p-0 overflow-hidden">
+                    <div class="bg-slate-50/50 px-6 py-4 border-b border-slate-100">
+                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                            <i class="material-icons text-indigo-500 text-sm">info</i> Informasi Pesanan
                         </h3>
                     </div>
-                    <div class="p-6">
-                        <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
-                            {{-- Supplier --}}
-                            <div class="md:col-span-6">
-                                <label for="supplier_id" class="block text-xs font-bold text-gray-700 uppercase mb-1">Pilih Supplier <span class="text-red-500">*</span></label>
-                                <select name="supplier_id" id="supplier_id" class="w-full" required>
-                                    <option value="" disabled selected>-- Pilih Supplier --</option>
-                                    @foreach ($suppliers as $supplier)
-                                        <option value="{{ $supplier->supplier_id }}">{{ $supplier->supplier_name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            
-                            {{-- Tgl Pesanan --}}
-                            <div class="md:col-span-3">
-                                <label for="order_date" class="block text-xs font-bold text-gray-700 uppercase mb-1">Tanggal Pesanan <span class="text-red-500">*</span></label>
-                                <input type="date" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" id="order_date" name="order_date" value="{{ now()->format('Y-m-d') }}" required>
-                            </div>
-                            
-                            {{-- Jatuh Tempo --}}
-                            <div class="md:col-span-3">
-                                <label for="due_date" class="block text-xs font-bold text-gray-700 uppercase mb-1">Jatuh Tempo <span class="font-normal text-gray-400 normal-case">(Opsional)</span></label>
-                                <input type="date" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" id="due_date" name="due_date" value="{{ old('due_date') }}">
-                            </div>
+                    <div class="p-6 grid grid-cols-1 md:grid-cols-12 gap-6">
+                        <div class="md:col-span-6">
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Supplier <span class="text-red-500">*</span></label>
+                            <select name="supplier_id" id="supplier_id" class="select2-basic w-full" required>
+                                <option value="" disabled selected></option>
+                                @foreach ($suppliers as $supplier)
+                                    <option value="{{ $supplier->supplier_id }}">{{ $supplier->supplier_name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        
+                        <div class="md:col-span-3">
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Tanggal Pesan <span class="text-red-500">*</span></label>
+                            <input type="date" class="form-input" id="order_date" name="order_date" value="{{ now()->format('Y-m-d') }}" required>
+                        </div>
+                        
+                        <div class="md:col-span-3">
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Jatuh Tempo</label>
+                            <input type="date" class="form-input" id="due_date" name="due_date">
+                        </div>
 
-                            {{-- User Requester --}}
-                            <div class="md:col-span-12">
-                                <label for="requester_user_id" class="block text-xs font-bold text-gray-700 uppercase mb-1">Dipesan Oleh (User)</label>
-                                <select name="requester_user_id" id="requester_user_id" class="w-full">
-                                    <option value="">-- Pembelian Umum / Stok --</option>
-                                    @foreach ($users as $user)
-                                        <option value="{{ $user->user_id }}">{{ $user->full_name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
+                        <div class="md:col-span-12">
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Dipesan Oleh</label>
+                            <select name="requester_user_id" id="requester_user_id" class="select2-basic w-full">
+                                <option value="">-- Pembelian Umum / Stok --</option>
+                                @foreach ($users as $user)
+                                    <option value="{{ $user->user_id }}">{{ $user->full_name }}</option>
+                                @endforeach
+                            </select>
                         </div>
                     </div>
                 </div>
 
-                {{-- 2. CARD RINCIAN BARANG --}}
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-100 bg-gray-50">
-                        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                            <i class="bi bi-box-seam text-indigo-500"></i> Rincian Item
-                        </h3>
-                    </div>
-
-                    {{-- Toolbar Bulk Action --}}
-                    <div class="px-6 py-3 border-b border-gray-100 bg-white">
-                        <div class="flex flex-wrap items-center justify-between gap-3">
-                            <div class="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
-                                <span class="text-xs font-bold text-gray-500 uppercase"><i class="bi bi-check-all mr-1"></i> Bulk:</span>
-                                <button type="button" id="select-all-btn" class="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline">All</button>
-                                <span class="text-gray-300">|</span>
-                                <button type="button" id="deselect-all-btn" class="text-xs font-medium text-gray-500 hover:text-gray-800 hover:underline">None</button>
-                            </div>
-                            
+                {{-- 2. RINCIAN BARANG (Optimized) --}}
+                <div class="dashboard-card p-0 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            <i class="material-icons text-indigo-500 text-sm">inventory_2</i>
+                            <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider">Item Pesanan</h3>
+                        </div>
+                        
+                        {{-- Toolbar Bulk Action --}}
+                        <div class="flex items-center gap-2">
                             <div class="flex items-center gap-0 shadow-sm rounded-md">
-                                <span class="bg-gray-100 border border-gray-300 border-r-0 text-gray-500 text-xs px-3 py-2 rounded-l-md font-medium">Diskon Massal</span>
-                                <input id="bulk-discount-input" type="number" step="any" min="0" class="w-20 border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 text-sm py-1.5 h-[34px]" placeholder="%">
-                                <button type="button" id="apply-bulk-discount-btn" class="bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-3 py-2 h-[34px] transition border-l border-green-700">Selected</button>
-                                <button type="button" id="apply-all-discount-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2 rounded-r-md h-[34px] transition border-l border-indigo-700">All</button>
+                                <input id="bulk-discount-input" type="number" step="any" min="0" class="w-20 form-input rounded-none rounded-l-md text-xs h-8 py-1" placeholder="Disc %">
+                                <button type="button" id="apply-bulk-discount-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold px-3 h-8 uppercase tracking-wide transition">Selected</button>
+                                <button type="button" id="apply-all-discount-btn" class="bg-slate-700 hover:bg-slate-800 text-white text-[10px] font-bold px-3 h-8 rounded-r-md uppercase tracking-wide transition">All</button>
                             </div>
                         </div>
                     </div>
 
-                    {{-- TABLE ITEM --}}
                     <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead class="bg-gray-50 border-b border-gray-200">
+                        <table class="dashboard-table">
+                            <thead>
                                 <tr>
-                                    <th class="px-4 py-3 text-center w-10">
-                                        <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" id="header-row-select">
+                                    <th class="w-8 text-center">
+                                        <input type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" id="header-row-select">
                                     </th>
-                                    <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase w-[35%]">Produk</th>
-                                    <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase w-[15%]">Qty</th>
-                                    <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase w-[20%]">Harga Beli (@)</th>
-                                    <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase w-[10%]">Diskon</th>
-                                    <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase text-right w-[15%]">Subtotal</th>
-                                    <th class="px-4 py-3 text-center w-10"><i class="bi bi-gear"></i></th>
+                                    <th class="min-w-[250px] max-w-[300px]">Produk</th> 
+                                    {{-- LEBAR QTY DIBUAT W-24 (96px) --}}
+                                    <th class="w-24 text-center">Qty</th> 
+                                    {{-- HARGA DIPERLEBAR SEDIKIT --}}
+                                    <th class="w-36 text-right">Harga Beli (@)</th> 
+                                    <th class="w-24 text-center">Disc</th> 
+                                    <th class="w-32 text-right">Subtotal</th> 
+                                    <th class="w-8 text-center"><i class="material-icons text-slate-400 text-sm">settings</i></th>
                                 </tr>
                             </thead>
-                            <tbody id="product-items" class="divide-y divide-gray-100">
+                            <tbody id="product-items">
                                 {{-- JS Injects Rows Here --}}
                             </tbody>
                         </table>
                     </div>
                     
-                    {{-- Add Item Button --}}
-                    <div class="p-4 bg-gray-50 border-t border-gray-200 text-center">
-                         <button type="button" id="add-product-btn" class="inline-flex items-center px-6 py-2 bg-white border border-indigo-200 text-indigo-700 text-sm font-bold rounded-full hover:bg-indigo-50 hover:border-indigo-300 transition shadow-sm">
-                            <i class="bi bi-plus-lg mr-1"></i> Tambah Item Baru
+                    <div class="p-4 bg-slate-50 border-t border-slate-100 text-center">
+                         <button type="button" id="add-product-btn" class="inline-flex items-center px-4 py-2 bg-white border border-indigo-200 text-indigo-600 text-xs font-bold rounded-full hover:bg-indigo-50 transition shadow-sm uppercase tracking-wide">
+                            <i class="material-icons text-sm mr-1">add</i> Tambah Item
                         </button>
                     </div>
 
-                    {{-- Notes --}}
-                    <div class="p-6 border-t border-gray-100">
-                        <label for="notes" class="block text-xs font-bold text-gray-500 uppercase mb-2">Catatan / Keterangan</label>
-                        <textarea class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm bg-yellow-50/30" name="notes" id="notes" rows="2" placeholder="Contoh: Pengiriman tolong dilakukan lewat pintu gudang belakang...">{{ old('notes') }}</textarea>
+                    <div class="p-6 border-t border-slate-100">
+                        <label for="notes" class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Catatan</label>
+                        <textarea class="form-textarea bg-yellow-50/30 border-yellow-100 focus:border-yellow-400 focus:ring-yellow-200" name="notes" id="notes" rows="2" placeholder="Instruksi pengiriman, dsb...">{{ old('notes') }}</textarea>
                     </div>
                 </div>
             </div>
 
-            {{-- ===================================================
-                 KOLOM KANAN: SUMMARY (Span 3)
-                 =================================================== --}}
+            {{-- KOLOM KANAN (SUMMARY) - Span 3 --}}
             <div class="xl:col-span-3">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sticky top-6 z-30">
-                    <h3 class="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
-                        <i class="bi bi-calculator text-indigo-500"></i> Ringkasan Biaya
-                    </h3>
+                <div class="dashboard-card p-0 sticky top-6">
+                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+                        <i class="material-icons text-slate-400 text-sm">calculate</i>
+                        <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider">Kalkulasi</h3>
+                    </div>
 
-                    {{-- OPSI KALKULASI --}}
-                    <div class="space-y-4 mb-6">
+                    <div class="p-6 space-y-5">
                         
                         {{-- 1. Diskon Tambahan --}}
                         <div>
                             <div class="flex items-center justify-between mb-2">
-                                <label class="text-xs font-bold text-gray-700 cursor-pointer select-none" for="apply_disc_fee">Diskon / Fee Tambahan</label>
-                                <input type="checkbox" name="apply_disc_fee" id="apply_disc_fee" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase cursor-pointer" for="apply_disc_fee">Diskon Akhir / Fee</label>
+                                <input type="checkbox" name="apply_disc_fee" id="apply_disc_fee" value="1" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer">
                             </div>
-                            {{-- Container Hidden by default using style="display:none" for JS toggle --}}
-                            <div class="p-3 bg-gray-50 rounded-lg border border-gray-200" id="disc-fee-container" style="display: none;">
+                            <div id="disc-fee-container" style="display: none;" class="p-3 bg-slate-50 rounded-lg border border-slate-100">
                                 <div class="grid grid-cols-2 gap-2">
                                     <div>
-                                        <label class="block text-[10px] text-gray-500 mb-1">Diskon %</label>
-                                        <input type="number" step="any" min="0" class="w-full rounded border-gray-300 text-xs py-1.5 px-2 focus:border-indigo-500 focus:ring-indigo-500" name="disc_fee_percent" id="disc_fee_percent" placeholder="0">
+                                        <label class="block text-[10px] text-slate-400 mb-1">Persen (%)</label>
+                                        <input type="number" step="any" min="0" class="form-input text-xs h-8 px-2" name="disc_fee_percent" id="disc_fee_percent" placeholder="0">
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] text-gray-500 mb-1">Nominal (Rp)</label>
-                                        <input type="text" class="w-full rounded border-gray-300 text-xs py-1.5 px-2 focus:border-indigo-500 focus:ring-indigo-500" name="disc_fee_amount" id="disc_fee_amount" placeholder="0">
+                                        <label class="block text-[10px] text-slate-400 mb-1">Nominal (Rp)</label>
+                                        <input type="text" class="form-input text-xs h-8 px-2 text-right" name="disc_fee_amount" id="disc_fee_amount" placeholder="0">
                                     </div>
                                 </div>
                             </div>
@@ -196,24 +173,24 @@
                         {{-- 2. Pembulatan --}}
                         <div>
                             <div class="flex items-center justify-between mb-2">
-                                <label class="text-xs font-bold text-gray-700 cursor-pointer select-none" for="apply_rounding_discount">Diskon Pembulatan</label>
-                                <input type="checkbox" id="apply_rounding_discount" name="apply_rounding_discount" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer">
+                                <label class="text-[11px] font-bold text-slate-500 uppercase cursor-pointer" for="apply_rounding_discount">Diskon Pembulatan</label>
+                                <input type="checkbox" id="apply_rounding_discount" name="apply_rounding_discount" value="1" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer">
                             </div>
-                            <div class="relative rounded-md shadow-sm">
+                            <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <span class="text-gray-500 sm:text-xs">Rp</span>
+                                    <span class="text-slate-400 text-xs font-bold">Rp</span>
                                 </div>
-                                <input type="number" step="any" min="0" class="pl-8 block w-full rounded border-gray-300 text-xs py-1.5 focus:border-indigo-500 focus:ring-indigo-500" name="rounding_discount_amount" id="rounding_discount_amount" placeholder="0">
+                                <input type="text" class="form-input pl-8 text-right text-xs font-bold" name="rounding_discount_amount" id="rounding_discount_amount" placeholder="0">
                             </div>
                         </div>
 
-                        <div class="border-t border-dashed border-gray-200"></div>
+                        <div class="h-px bg-slate-200 border-none"></div>
 
                         {{-- 3. Pajak --}}
                         <div>
-                            <label class="block text-xs font-bold text-gray-700 mb-1">Pajak (PPN)</label>
-                            <select name="tax_id" id="tax_id" class="block w-full rounded border-gray-300 text-xs py-1.5 focus:border-indigo-500 focus:ring-indigo-500">
-                                <option value="">-- Tidak Ada Pajak --</option>
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Pajak (PPN)</label>
+                            <select name="tax_id" id="tax_id" class="form-select text-xs h-9">
+                                <option value="">-- Tanpa Pajak --</option>
                                 @foreach(\App\Models\Tax::where('is_active', true)->get() as $tax)
                                     <option value="{{ $tax->id }}" data-rate="{{ $tax->rate }}">{{ $tax->name }} ({{ $tax->rate }}%)</option>
                                 @endforeach
@@ -222,95 +199,98 @@
 
                         {{-- 4. Opsi Lanjutan --}}
                         <div>
-                            <a class="text-xs text-indigo-600 font-semibold cursor-pointer hover:underline flex items-center" data-bs-toggle="collapse" href="#advancedTaxOptions" role="button" aria-expanded="false" onclick="document.getElementById('advancedTaxOptions').classList.toggle('hidden')">
-                                <i class="bi bi-sliders mr-1"></i> Opsi Pajak Lanjutan
-                            </a>
-                            <div class="hidden mt-2 p-3 bg-gray-50 rounded border border-gray-200" id="advancedTaxOptions">
+                            <div class="flex items-center justify-between mb-2" onclick="document.getElementById('advancedTaxOptions').classList.toggle('hidden')">
+                                <label class="text-[10px] font-bold text-indigo-600 uppercase cursor-pointer flex items-center gap-1 hover:underline">
+                                    <i class="material-icons text-[12px]">tune</i> Opsi Lanjutan
+                                </label>
+                            </div>
+                            <div class="hidden p-3 bg-slate-50 rounded-lg border border-slate-100" id="advancedTaxOptions">
                                 <div class="flex items-center mb-2">
-                                    <input type="checkbox" id="use_custom_dpp_factor" name="use_custom_dpp_factor" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 mr-2">
-                                    <label class="text-xs text-gray-700" for="use_custom_dpp_factor">Override Faktor DPP</label>
+                                    <input type="checkbox" id="use_custom_dpp_factor" name="use_custom_dpp_factor" value="1" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 mr-2">
+                                    <label class="text-[11px] text-slate-600 cursor-pointer" for="use_custom_dpp_factor">Override Faktor DPP</label>
                                 </div>
-                                <input type="text" class="block w-full rounded border-gray-300 text-xs py-1.5 px-2 focus:border-indigo-500 focus:ring-indigo-500" name="custom_dpp_factor" id="custom_dpp_factor" placeholder="Contoh: 11/12">
+                                <input type="text" class="form-input text-xs h-8" name="custom_dpp_factor" id="custom_dpp_factor" placeholder="Contoh: 11/12">
                             </div>
                         </div>
 
                         {{-- 5. Ongkir --}}
                         <div>
-                            <label class="block text-xs font-bold text-gray-700 mb-1">Ongkos Kirim (Rp)</label>
-                            <input type="text" class="block w-full rounded border-gray-300 text-xs py-1.5 px-2 focus:border-indigo-500 focus:ring-indigo-500" name="shipping_amount" id="shipping_amount" value="0">
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Ongkos Kirim</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <span class="text-slate-400 text-xs font-bold">Rp</span>
+                                </div>
+                                <input type="text" class="form-input pl-8 text-right font-bold" name="shipping_amount" id="shipping_amount" value="0">
+                            </div>
                         </div>
-                    </div>
 
-                    {{-- SUMMARY BOX --}}
-                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                        <div class="flex justify-between mb-2 text-sm text-gray-600">
-                            <span>Subtotal</span>
-                            <span class="font-semibold text-gray-900" id="summary-subtotal">Rp 0</span>
+                        {{-- SUMMARY BOX --}}
+                        <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 space-y-2">
+                            <div class="flex justify-between text-xs text-slate-500">
+                                <span>Subtotal</span>
+                                <span class="font-bold text-slate-700" id="summary-subtotal">Rp 0</span>
+                            </div>
+                            <div class="flex justify-between text-xs text-red-500">
+                                <span>Diskon/Fee</span>
+                                <span id="summary-disc">- Rp 0</span>
+                            </div>
+                            <div class="flex justify-between text-xs text-red-500">
+                                <span>Pembulatan</span>
+                                <span id="summary-rounding">- Rp 0</span>
+                            </div>
+                            <div class="border-t border-slate-200 my-2"></div>
+                            <div class="flex justify-between text-[10px] text-slate-400">
+                                <span>DPP</span>
+                                <span id="summary-dpp">Rp 0</span>
+                            </div>
+                            <div class="flex justify-between text-xs text-slate-600">
+                                <span>PPN (<span id="summary-tax-rate">0</span>%)</span>
+                                <span class="font-bold" id="summary-ppn">Rp 0</span>
+                            </div>
+                            <div class="flex justify-between text-xs text-slate-600">
+                                <span>Ongkir</span>
+                                <span class="font-bold" id="summary-shipping">Rp 0</span>
+                            </div>
+                            <div class="border-t border-dashed border-slate-300 my-2 pt-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm font-bold text-slate-800">TOTAL</span>
+                                    <span class="text-lg font-bold text-indigo-600" id="summary-grand">Rp 0</span>
+                                </div>
+                            </div>
                         </div>
-                        <div class="flex justify-between mb-2 text-xs text-red-500">
-                            <span>Diskon/Fee</span>
-                            <span id="summary-disc">- Rp 0</span>
-                        </div>
-                        <div class="flex justify-between mb-2 text-xs text-red-500">
-                            <span>Pembulatan</span>
-                            <span id="summary-rounding">- Rp 0</span>
-                        </div>
-                        
-                        <div class="border-t border-gray-200 my-2"></div>
 
-                        <div class="flex justify-between mb-1 text-xs text-gray-400">
-                            <span>Taxable Base</span>
-                            <span id="summary-taxable">Rp 0</span>
+                        {{-- ACTIONS --}}
+                        <div class="grid grid-cols-1 gap-3">
+                            <button type="submit" class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition flex justify-center items-center gap-2" id="submit-btn">
+                                <i class="material-icons text-sm">save</i> Simpan Pesanan
+                            </button>
+                            <div class="flex justify-between gap-3">
+                                <a href="{{ route('purchase-orders.index') }}" class="w-full py-2.5 border border-slate-300 rounded-lg text-xs font-bold text-slate-600 hover:bg-white hover:shadow-sm text-center transition uppercase tracking-wide flex items-center justify-center">
+                                    Batal
+                                </a>
+                                <button type="button" class="w-full py-2.5 border border-red-200 bg-red-50 rounded-lg text-xs font-bold text-red-600 hover:bg-red-100 text-center transition uppercase tracking-wide flex items-center justify-center gap-1" onclick="clearDraft()">
+                                    <i class="material-icons text-sm">delete_sweep</i> Hapus Draft
+                                </button>
+                            </div>
                         </div>
-                        <div class="flex justify-between mb-1 text-xs text-gray-400 italic">
-                            <span>DPP</span>
-                            <span id="summary-dpp">Rp 0</span>
-                        </div>
-                        <div class="flex justify-between mb-1 text-sm text-gray-600">
-                            <span>PPN (<span id="summary-tax-rate">0</span>%)</span>
-                            <span class="font-semibold text-gray-900" id="summary-ppn">Rp 0</span>
-                        </div>
-                        <div class="flex justify-between mb-2 text-sm text-gray-600">
-                            <span>Ongkir</span>
-                            <span class="font-semibold text-gray-900" id="summary-shipping">Rp 0</span>
-                        </div>
-                        
-                        <div class="border-t-2 border-dashed border-gray-300 my-3"></div>
 
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm font-bold text-gray-900">GRAND TOTAL</span>
-                            <span class="text-xl font-bold text-indigo-600" id="summary-grand">Rp 0</span>
-                        </div>
-                    </div>
-
-                    {{-- ACTION BUTTONS --}}
-                    <div class="flex flex-col gap-3 mt-6">
-                        <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition" id="submit-btn">
-                            <i class="bi bi-save mr-2"></i> Simpan Pesanan
-                        </button>
-                        <a href="{{ route('purchase-orders.index') }}" class="w-full flex justify-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">Batal</a>
-                    </div>
-                    <div class="text-center mt-3">
-                        <button type="button" class="text-xs text-red-500 hover:text-red-700 underline" onclick="clearDraft()">
-                            <i class="bi bi-trash"></i> Hapus Draft
-                        </button>
                     </div>
                 </div>
             </div>
+
         </div>
     </form>
 </div>
 
-{{-- TEMPLATE ROW PRODUK (HIDDEN) --}}
+{{-- TEMPLATE ROW (Optimized) --}}
 <template id="product-row-template">
-    <tr class="hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
-        <td class="text-center align-middle pl-4 py-2">
-            <input type="checkbox" class="row-select rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer h-4 w-4">
+    <tr class="group transition-colors hover:bg-slate-50">
+        <td class="text-center align-middle p-1">
+            <input type="checkbox" class="row-select rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer h-4 w-4">
         </td>
-        <td class="align-middle p-2">
-            {{-- Class .table-input dan .product-select penting untuk JS --}}
-            <select class="product-select table-input w-full" required>
-                <option value="" data-unit="-" data-default-discounts="[]" disabled selected>-- Cari Produk --</option>
+        <td class="p-1">
+            <select class="product-select form-select text-xs w-full" required>
+                <option value="" data-unit="-" data-default-discounts="[]" disabled selected>-- Pilih --</option>
                 @foreach ($products as $product)
                     <option value="{{ $product->product_id }}"
                             data-unit="{{ $product->unit->name ?? '' }}"
@@ -321,37 +301,36 @@
                 @endforeach
             </select>
         </td>
-        <td class="align-middle p-2">
-            <div class="flex items-center rounded-md bg-white border border-gray-300 hover:border-indigo-400 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 h-8 overflow-hidden">
-                <input type="number" class="table-input quantity text-center font-bold bg-transparent border-0 focus:ring-0 p-0 h-full w-full text-sm" value="1" min="1" step="any" required>
-                <span class="bg-gray-100 text-gray-500 text-[10px] px-2 h-full flex items-center border-l border-gray-200 unit-display font-medium">-</span>
+        <td class="p-1">
+            {{-- W-16 untuk input QTY --}}
+            <div class="flex items-center border border-slate-300 rounded-md bg-white overflow-hidden h-8 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500">
+                <input type="number" class="table-input quantity w-full text-center text-sm font-bold border-none focus:ring-0 p-0 h-full" value="1" min="1" step="any" required>
+                <span class="bg-slate-100 text-slate-500 text-[10px] px-1 h-full flex items-center border-l border-slate-200 unit-display font-medium min-w-[20px] justify-center">-</span>
             </div>
         </td>
-        <td class="align-middle p-2">
-            {{-- Harga Beli --}}
-            <div class="flex items-center border-b border-gray-300 focus-within:border-indigo-500 mb-1 pb-0.5">
-                <span class="text-gray-400 text-[10px] mr-1">Rp</span>
-                <input type="text" class="table-input purchase-price-formatted text-right p-0 border-none focus:ring-0 w-full text-sm font-medium" placeholder="0">
+        <td class="p-1">
+            <div class="relative">
+                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]">Rp</span>
+                <input type="text" class="table-input purchase-price-formatted w-full form-input pl-6 text-right text-sm font-medium h-8" placeholder="0">
+                <input type="hidden" class="purchase-price-hidden" value="0">
             </div>
-            
-            {{-- Checkbox Update Master --}}
-            <div class="flex items-center justify-end gap-1">
-                <input class="update-master-price rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-3 w-3" type="checkbox" value="1">
-                <label class="text-[10px] text-gray-400 italic">Update Master</label>
+            <div class="flex items-center justify-end gap-1 mt-1">
+                <input class="update-master-price rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3 w-3 cursor-pointer" type="checkbox" value="1">
+                <label class="text-[9px] text-slate-400 italic cursor-pointer">Master</label>
             </div>
         </td>
-        <td class="align-middle p-2">
-            <div class="discount-container mb-1 space-y-1"></div>
-            <button type="button" class="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold add-discount-btn flex items-center uppercase tracking-wide bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100 transition">
-                <i class="bi bi-plus-circle mr-1"></i> Disc
+        <td class="p-1 align-top">
+            <div class="discount-container space-y-1"></div>
+            <button type="button" class="add-discount-btn text-[10px] text-indigo-600 font-bold uppercase tracking-wide mt-1 hover:underline flex items-center justify-center w-full">
+                + Disc
             </button>
         </td>
-        <td class="text-right pr-6 align-middle font-bold text-gray-900 text-sm">
+        <td class="p-1 text-right align-middle font-bold text-slate-800 text-sm">
             <span class="subtotal">Rp 0</span>
         </td>
-        <td class="text-center align-middle">
-            <button type="button" class="text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full p-2 transition remove-product-btn" title="Hapus Item">
-                <i class="bi bi-trash"></i>
+        <td class="text-center align-middle p-1">
+            <button type="button" class="remove-product-btn text-slate-300 hover:text-red-500 transition p-1 rounded-full hover:bg-red-50">
+                <i class="material-icons text-lg">delete</i>
             </button>
         </td>
     </tr>
@@ -360,7 +339,7 @@
 @endsection
 
 @push('scripts')
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 
@@ -373,7 +352,6 @@
         const productItemsContainer = document.getElementById('product-items');
         const productRowTemplate = document.getElementById('product-row-template');
         
-        // Elements
         const autosaveIndicator = document.getElementById('autosave-indicator');
         const bulkDiscountInput = document.getElementById('bulk-discount-input');
         const selectAllBtn = document.getElementById('select-all-btn');
@@ -381,11 +359,9 @@
         const applyBulkBtn = document.getElementById('apply-bulk-discount-btn');
         const applyAllBtn = document.getElementById('apply-all-discount-btn');
         
-        // Summary Elements
         const elSummarySubtotal = document.getElementById('summary-subtotal');
         const elSummaryDisc = document.getElementById('summary-disc');
         const elSummaryRounding = document.getElementById('summary-rounding');
-        const elSummaryTaxable = document.getElementById('summary-taxable');
         const elSummaryDpp = document.getElementById('summary-dpp');
         const elSummaryPpn = document.getElementById('summary-ppn');
         const elSummaryGrand = document.getElementById('summary-grand');
@@ -396,41 +372,41 @@
         const inputUseCustomDpp = document.getElementById('use_custom_dpp_factor');
         const inputCustomDppFactor = document.getElementById('custom_dpp_factor');
         
-        // Inputs for AutoNumeric formatting
         const inputDiscFeeAmount = document.getElementById('disc_fee_amount');
+        const inputRoundingAmount = document.getElementById('rounding_discount_amount');
         const inputShipping = document.getElementById('shipping_amount');
-
+        
         let productIndex = 0;
         let isRestoring = false; 
 
-        // === INITIALIZE SELECT2 ===
-        $('#supplier_id').select2({ theme: 'bootstrap-5', placeholder: '-- Pilih Supplier --', width: '100%' });
-        $('#requester_user_id').select2({ theme: 'bootstrap-5', placeholder: '-- Pembelian Umum --', allowClear: true, width: '100%' });
+        // === INITIALIZE SELECT2 & AUTONUMERIC GLOBAL ===
+        $('#supplier_id').select2({ theme: 'bootstrap-5', placeholder: '-- Pilih Supplier --', width: '100%', dropdownCssClass: 'select2-dropdown-clean' });
+        $('#requester_user_id').select2({ theme: 'bootstrap-5', placeholder: '-- Pembelian Umum --', allowClear: true, width: '100%', dropdownCssClass: 'select2-dropdown-clean' });
         
-        new AutoNumeric(inputDiscFeeAmount, { 
-            decimalCharacter: ',', digitGroupSeparator: '.', decimalPlaces: 0, minimumValue: '0', emptyInputBehavior: 'zero'
-        });
-        
-        new AutoNumeric(inputShipping, { 
-            decimalCharacter: ',', digitGroupSeparator: '.', decimalPlaces: 0, minimumValue: '0', emptyInputBehavior: 'zero'
-        });
+        const autoNumericOptions = { 
+            decimalCharacter: ',', 
+            digitGroupSeparator: '.', 
+            decimalPlaces: 0, 
+            minimumValue: '0', 
+            emptyInputBehavior: 'zero'
+        };
 
-        // === LOGIC TOGGLE MANUAL (GANTI BOOTSTRAP COLLAPSE) ===
+        new AutoNumeric(inputDiscFeeAmount, autoNumericOptions);
+        new AutoNumeric(inputRoundingAmount, autoNumericOptions);
+        new AutoNumeric(inputShipping, autoNumericOptions);
+
+        // === LOGIC TOGGLE MANUAL ===
         const discFeeCheckbox = document.getElementById('apply_disc_fee');
         const discFeeContainer = document.getElementById('disc-fee-container');
         
         discFeeCheckbox.addEventListener('change', function() {
-            if(this.checked) {
-                discFeeContainer.style.display = 'block';
-            } else {
-                discFeeContainer.style.display = 'none';
-            }
+            discFeeContainer.style.display = this.checked ? 'block' : 'none';
             calculateTotals();
             saveFormState();
         });
 
 
-        // === HELPER FUNCTIONS (SAME AS BEFORE) ===
+        // === HELPER FUNCTIONS ===
         function formatCurrency(n) {
             return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Math.round(n || 0));
         }
@@ -471,14 +447,12 @@
             return parseNumericForInput(el.value);
         }
 
-        // === CORE CALCULATION LOGIC (SAME AS BEFORE) ===
+        // === CORE CALCULATION LOGIC ===
         function calculateTotals() {
             const inputApplyDiscFee = document.getElementById('apply_disc_fee');
             const inputDiscFeePercent = document.getElementById('disc_fee_percent');
             const inputApplyRounding = document.getElementById('apply_rounding_discount');
-            const inputRoundingAmount = document.getElementById('rounding_discount_amount');
 
-            // 1. Subtotal Produk
             let subtotalBarang = 0;
             getAllRows().forEach(row => {
                 const price = parseFloat(row.querySelector('.purchase-price-hidden')?.value || 0);
@@ -495,23 +469,19 @@
                 subtotalBarang += subtotal;
             });
 
-            // 2. Diskon / Fee Header
             let discFeeAmount = 0;
             if (inputApplyDiscFee.checked) {
                 const percent = parseFloat(inputDiscFeePercent.value) || 0;
-                const fixed = getRawNumericValue('disc_fee_amount');
+                const fixed = getRawNumericValue('disc_fee_amount'); 
                 if (percent > 0) discFeeAmount = (percent / 100.0) * subtotalBarang;
                 else if (fixed > 0) discFeeAmount = fixed;
             }
 
-            // 3. Pembulatan
             const roundingAmount = inputApplyRounding.checked ? 
-                (parseFloat(inputRoundingAmount.value) || 0) : 0;
+                getRawNumericValue('rounding_discount_amount') : 0;
 
-            // 4. Taxable Base
             const taxableBase = Math.max(0, subtotalBarang - discFeeAmount - roundingAmount);
 
-            // 5. Hitung DPP & PPN
             let dpp = taxableBase; 
             let ppn = 0;
             let taxRate = getSelectedTaxRate();
@@ -530,20 +500,20 @@
                 taxRate = 0;
             }
 
-            // 6. Ongkir & Grand Total
             const shipping = getRawNumericValue('shipping_amount');
             const grandTotal = Math.round(taxableBase + ppn + shipping);
 
-            // 7. Render View
             elSummarySubtotal.textContent = formatCurrency(subtotalBarang);
             elSummaryDisc.textContent = formatCurrency(discFeeAmount);
             elSummaryRounding.textContent = formatCurrency(roundingAmount);
-            if(elSummaryTaxable) elSummaryTaxable.textContent = formatCurrency(taxableBase);
             elSummaryDpp.textContent = formatCurrency(dpp); 
             elSummaryPpn.textContent = formatCurrency(ppn);
             elSummaryShipping.textContent = formatCurrency(shipping);
             elSummaryGrand.textContent = formatCurrency(grandTotal);
             elSummaryTaxRate.textContent = taxRate;
+            
+            // Re-format nominal inputs on blur if they are not AutoNumeric (for non-table items)
+            document.getElementById('rounding_discount_amount').value = formatThousands(roundingAmount);
         }
 
         // === SAVE & LOAD LOGIC ===
@@ -562,7 +532,7 @@
                 return {
                     productId: productId, 
                     quantity: row.querySelector('.quantity').value,
-                    priceFormatted: row.querySelector('.purchase-price-formatted').value,
+                    priceFormatted: row.querySelector('.purchase-price-formatted').value, 
                     priceHidden: row.querySelector('.purchase-price-hidden').value,
                     discounts: Array.from(row.querySelectorAll('.discount-percentage')).map(d => d.value),
                     updateMaster: row.querySelector('.update-master-price').checked
@@ -581,7 +551,7 @@
                 disc_fee_amount: getRawNumericValue('disc_fee_amount'),
                 
                 apply_rounding_discount: document.getElementById('apply_rounding_discount').checked,
-                rounding_discount_amount: document.getElementById('rounding_discount_amount').value,
+                rounding_discount_amount: getRawNumericValue('rounding_discount_amount'),
                 
                 tax_id: document.getElementById('tax_id').value,
                 use_custom_dpp_factor: document.getElementById('use_custom_dpp_factor').checked,
@@ -608,36 +578,34 @@
                 
                 if(data.supplier_id) $('#supplier_id').val(data.supplier_id).trigger('change.select2');
                 if(data.requester_user_id) $('#requester_user_id').val(data.requester_user_id).trigger('change.select2');
+                
                 document.getElementById('order_date').value = data.order_date || '';
                 document.getElementById('due_date').value = data.due_date || '';
                 document.getElementById('notes').value = data.notes || '';
 
                 document.getElementById('apply_disc_fee').checked = data.apply_disc_fee;
+                document.getElementById('disc-fee-container').style.display = data.apply_disc_fee ? 'block' : 'none';
+
                 document.getElementById('disc_fee_percent').value = data.disc_fee_percent;
-                
-                if (data.disc_fee_amount) {
-                    AutoNumeric.getAutoNumericElement(inputDiscFeeAmount).set(data.disc_fee_amount);
-                }
+                AutoNumeric.getAutoNumericElement(inputDiscFeeAmount).set(data.disc_fee_amount || 0);
                 
                 document.getElementById('apply_rounding_discount').checked = data.apply_rounding_discount;
-                document.getElementById('rounding_discount_amount').value = data.rounding_discount_amount;
-                document.getElementById('tax_id').value = data.tax_id;
-                document.getElementById('use_custom_dpp_factor').checked = data.use_custom_dpp_factor;
-                document.getElementById('custom_dpp_factor').value = data.custom_dpp_factor;
-                
-                if (data.shipping_amount) {
-                    AutoNumeric.getAutoNumericElement(inputShipping).set(data.shipping_amount);
-                }
+                AutoNumeric.getAutoNumericElement(inputRoundingAmount).set(data.rounding_discount_amount || 0);
 
-                // REPLACEMENT FOR BOOTSTRAP COLLAPSE
-                if(data.apply_disc_fee) document.getElementById('disc-fee-container').style.display = 'block';
+                document.getElementById('tax_id').value = data.tax_id;
+                
+                document.getElementById('use_custom_dpp_factor').checked = data.use_custom_dpp_factor;
                 if(data.use_custom_dpp_factor) document.getElementById('advancedTaxOptions').classList.remove('hidden');
+
+                document.getElementById('custom_dpp_factor').value = data.custom_dpp_factor;
+                AutoNumeric.getAutoNumericElement(inputShipping).set(data.shipping_amount || 0);
 
                 productItemsContainer.innerHTML = ''; 
                 if (data.products && data.products.length > 0) {
                     data.products.forEach(p => {
-                        const row = addProductRow(false);
+                        const row = addProductRow(false); 
                         const select = $(row.querySelector('.product-select'));
+                        
                         select.val(p.productId).trigger('change.select2'); 
                         
                         setTimeout(() => {
@@ -645,12 +613,16 @@
                             row.querySelector('.purchase-price-formatted').value = p.priceFormatted;
                             row.querySelector('.purchase-price-hidden').value = p.priceHidden;
                             row.querySelector('.update-master-price').checked = p.updateMaster;
-
+                            
                             if(p.discounts) {
                                 p.discounts.forEach(val => createDiscountInputForRow(row, val));
                             }
+                            const selectedOption = select.find(':selected')[0];
+                            if(selectedOption) {
+                                row.querySelector('.unit-display').textContent = selectedOption.dataset.unit || '-';
+                            }
                             calculateTotals();
-                        }, 50);
+                        }, 100);
                     });
                 } else {
                     addProductRow();
@@ -673,16 +645,16 @@
             const index = row.dataset.index;
             const container = row.querySelector('.discount-container');
             const div = document.createElement('div');
-            div.className = 'flex items-center gap-1 mb-1';
+            div.className = 'flex items-center gap-1';
             div.innerHTML = `
-                <input type="number" step="any" class="discount-percentage table-input w-16 text-xs text-center border rounded bg-white shadow-sm focus:ring-1 focus:ring-indigo-500" placeholder="%" value="${value}" name="products[${index}][discounts][]">
-                <button type="button" class="remove-discount-btn text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50"><i class="bi bi-x"></i></button>
+                <input type="number" step="any" min="0" max="100" class="discount-percentage text-xs w-10 text-center border border-slate-300 rounded shadow-sm focus:ring-1 focus:ring-indigo-500 p-0.5" placeholder="%" value="${value}" name="products[${index}][discounts][]">
+                <button type="button" class="remove-discount-btn text-slate-300 hover:text-red-500 transition p-1 rounded-full hover:bg-red-50"><i class="material-icons text-sm">close</i></button>
             `;
             
-            const input = div.querySelector('.discount-percentage');
+            const input = div.querySelector('input');
             input.addEventListener('input', () => { calculateTotals(); saveFormState(); });
 
-            div.querySelector('.remove-discount-btn').onclick = () => { 
+            div.querySelector('button').onclick = () => { 
                 div.remove(); 
                 calculateTotals(); 
                 saveFormState(); 
@@ -693,40 +665,44 @@
 
         function addProductRow(shouldCalculate = true) {
             const newRow = productRowTemplate.content.cloneNode(true).querySelector('tr');
-            newRow.dataset.index = productIndex;
+            const currentIndex = productIndex;
+            newRow.dataset.index = currentIndex;
 
-            newRow.querySelector('.product-select').name = `products[${productIndex}][product_id]`;
-            newRow.querySelector('.quantity').name = `products[${productIndex}][quantity]`;
-            newRow.querySelector('.update-master-price').name = `products[${productIndex}][update_master_price]`;
+            newRow.querySelector('.product-select').name = `products[${currentIndex}][product_id]`;
+            newRow.querySelector('.quantity').name = `products[${currentIndex}][quantity]`;
+            newRow.querySelector('.update-master-price').name = `products[${currentIndex}][update_master_price]`;
 
             const priceHidden = document.createElement('input');
             priceHidden.type = 'hidden';
             priceHidden.className = 'purchase-price-hidden';
-            priceHidden.name = `products[${productIndex}][price_per_unit]`;
+            priceHidden.name = `products[${currentIndex}][price_per_unit]`;
             priceHidden.value = '0';
             newRow.querySelector('.purchase-price-formatted').parentElement.appendChild(priceHidden);
 
             productItemsContainer.appendChild(newRow);
 
             const selectElem = $(newRow.querySelector('.product-select'));
-            selectElem.select2({ placeholder: '-- Cari Produk --', theme: 'bootstrap-5', width: '100%' });
-
-            selectElem.on('select2:select', function(e) {
-                const el = e.params.data.element;
-                newRow.querySelector('.unit-display').textContent = el.dataset.unit || '-';
-                
-                const defPrice = el.dataset.defaultPrice || 0;
-                priceHidden.value = defPrice;
-                newRow.querySelector('.purchase-price-formatted').value = formatThousands(defPrice);
-
-                calculateTotals();
-                saveFormState();
+            selectElem.select2({ 
+                placeholder: '-- Pilih Produk --', 
+                theme: 'bootstrap-5', 
+                width: '100%',
+                dropdownCssClass: 'select2-dropdown-clean'
             });
 
             const qtyInput = newRow.querySelector('.quantity');
             const priceInput = newRow.querySelector('.purchase-price-formatted');
             const addDiscBtn = newRow.querySelector('.add-discount-btn');
             const delBtn = newRow.querySelector('.remove-product-btn');
+
+            selectElem.on('select2:select', function(e) {
+                const el = e.params.data.element;
+                newRow.querySelector('.unit-display').textContent = el.dataset.unit || '-';
+                const defPrice = el.dataset.defaultPrice || 0;
+                priceHidden.value = defPrice;
+                priceInput.value = formatThousands(defPrice);
+                calculateTotals();
+                saveFormState();
+            });
 
             qtyInput.addEventListener('input', () => { calculateTotals(); saveFormState(); });
             
@@ -743,15 +719,22 @@
             addDiscBtn.onclick = () => createDiscountInputForRow(newRow, '');
             
             delBtn.onclick = () => {
-                selectElem.select2('destroy');
-                newRow.remove();
-                calculateTotals();
-                saveFormState();
+                Swal.fire({
+                    title: 'Hapus Item?', text: "Baris ini akan dihapus permanen.", icon: 'warning',
+                    showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#94a3b8',
+                    confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        selectElem.select2('destroy');
+                        newRow.remove();
+                        calculateTotals();
+                        saveFormState();
+                    }
+                });
             };
 
-            const rowSelect = newRow.querySelector('.row-select');
-            rowSelect.addEventListener('change', saveFormState);
-
+            newRow.querySelector('.row-select').addEventListener('change', saveFormState);
+            
             productIndex++;
             
             if (shouldCalculate) {
@@ -764,30 +747,21 @@
 
         // === GLOBAL LISTENERS SETUP ===
         function setupGlobalListeners() {
-            const inputApplyDiscFee = document.getElementById('apply_disc_fee');
-            const inputDiscFeePercent = document.getElementById('disc_fee_percent');
-            const inputApplyRounding = document.getElementById('apply_rounding_discount');
-            const inputRoundingAmount = document.getElementById('rounding_discount_amount');
-            const inputUseCustomDpp = document.getElementById('use_custom_dpp_factor');
-            const inputCustomDppFactor = document.getElementById('custom_dpp_factor');
-            const bulkDiscountInput = document.getElementById('bulk-discount-input');
-
             const calculationInputs = [
-                inputApplyDiscFee, inputDiscFeePercent, 
-                inputApplyRounding, inputRoundingAmount, inputUseCustomDpp, 
-                inputCustomDppFactor, document.getElementById('tax_id')
+                document.getElementById('apply_disc_fee'), document.getElementById('disc_fee_percent'), 
+                document.getElementById('apply_rounding_discount'), document.getElementById('rounding_discount_amount'), 
+                document.getElementById('use_custom_dpp_factor'), document.getElementById('custom_dpp_factor'), 
+                document.getElementById('tax_id')
             ];
             
-            document.getElementById('disc_fee_amount').addEventListener('autoNumeric:rawValueModified', () => { 
-                calculateTotals(); 
-                clearTimeout(window.saveTimeout); 
-                window.saveTimeout = setTimeout(saveFormState, 500); 
-            });
-            
-            document.getElementById('shipping_amount').addEventListener('autoNumeric:rawValueModified', () => { 
-                calculateTotals(); 
-                clearTimeout(window.saveTimeout); 
-                window.saveTimeout = setTimeout(saveFormState, 500); 
+            const autoNumericInputs = [inputDiscFeeAmount, inputRoundingAmount, inputShipping];
+
+            autoNumericInputs.forEach(el => {
+                el.addEventListener('autoNumeric:rawValueModified', () => { 
+                    calculateTotals(); 
+                    clearTimeout(window.saveTimeout); 
+                    window.saveTimeout = setTimeout(saveFormState, 500); 
+                });
             });
 
             calculationInputs.forEach(el => {
@@ -807,24 +781,13 @@
 
             $('#supplier_id, #requester_user_id').on('change', saveFormState);
             
-            form.addEventListener('submit', (e) => {
-                const dppInput = document.getElementById('custom_dpp_factor');
-                if (dppInput && dppInput.value) {
-                     dppInput.value = parseFractionOrNumber(dppInput.value); 
-                }
-                
-                if (getAllRows().length === 0) { 
-                    e.preventDefault(); 
-                    Swal.fire('Perhatian', 'Harap tambahkan minimal satu produk.', 'warning');
-                    return; 
-                }
-
-                localStorage.removeItem(DRAFT_KEY);
-            });
+            // Tombol "Tambah Item Baru"
+            // *FIX* : Pastikan off('click') digunakan agar tidak ada event ganda saat load draft
+            $('#add-product-btn').off('click').on('click', addProductRow); 
             
             const applyDiscountBulk = (rows) => {
                 const v = parseFloat(bulkDiscountInput.value);
-                if (isNaN(v) || v <= 0) return Swal.fire('Info', 'Masukkan angka diskon valid (>0).', 'info');
+                if (isNaN(v) || v <= 0 || v > 100) return Swal.fire('Info', 'Masukkan angka diskon valid (0-100).', 'info');
                 
                 rows.forEach(r => {
                     createDiscountInputForRow(r, v);
@@ -866,7 +829,20 @@
                 saveFormState();
             });
             
-            $('#add-product-btn').on('click', addProductRow); 
+            form.addEventListener('submit', (e) => {
+                if (getAllRows().length === 0) { 
+                    e.preventDefault(); 
+                    Swal.fire('Perhatian', 'Harap tambahkan minimal satu produk.', 'warning');
+                    return; 
+                }
+
+                const dppInput = document.getElementById('custom_dpp_factor');
+                if (dppInput && dppInput.value) {
+                    dppInput.value = parseFractionOrNumber(dppInput.value); 
+                }
+                
+                localStorage.removeItem(DRAFT_KEY);
+            });
             
             clearDraft = function() {
                 Swal.fire({

@@ -3,81 +3,92 @@
 @section('title', 'Rekonsiliasi Bank')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="max-w-7xl mx-auto pb-20 animate-enter">
     
     {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+    <div class="flex flex-col sm:flex-row justify-between items-end gap-4 mb-8">
         <div>
-            <h3 class="text-2xl font-bold text-gray-900 tracking-tight">Rekonsiliasi Bank</h3>
-            <p class="text-sm text-gray-500 mt-1">Riwayat pencocokan saldo bank dan sistem.</p>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Rekonsiliasi Bank</h1>
+            <p class="text-slate-500 text-sm mt-1">Riwayat pencocokan saldo bank dan sistem.</p>
         </div>
-        <div class="mt-4 sm:mt-0">
-            <a href="{{ route('bank-reconciliations.create') }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-lg font-bold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition">
-                <i class="material-icons text-base mr-2">add</i> Mulai Baru
-            </a>
-        </div>
+        <a href="{{ route('bank-reconciliations.create') }}" class="h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5">
+            <i class="material-icons text-[20px] group-hover:rotate-90 transition-transform">add</i> 
+            <span>Mulai Baru</span>
+        </a>
     </div>
 
     {{-- TABEL --}}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
+            <table class="dashboard-table min-w-full">
+                <thead class="bg-slate-50 border-b border-slate-200">
                     <tr>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tgl. Statement</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Akun Bank</th>
-                        <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Saldo Bank</th>
-                        <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Saldo Sistem</th>
-                        <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Selisih</th>
-                        <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                        <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Aksi</th>
+                        <th class="pl-6">Tgl. Statement</th>
+                        <th>Akun Bank</th>
+                        <th class="text-right">Saldo Bank</th>
+                        <th class="text-right">Saldo Sistem</th>
+                        <th class="text-right">Selisih</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-center pr-6">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                <tbody class="divide-y divide-slate-100 bg-white">
                     @forelse ($reconciliations as $recon)
-                        <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                                {{ $recon->statement_date->format('d/m/Y') }}
+                        <tr class="hover:bg-slate-50/50 transition-colors group">
+                            <td class="pl-6 py-4">
+                                <div class="flex items-center gap-2 text-slate-600 text-sm">
+                                    <i class="material-icons text-slate-400 text-[16px]">event</i>
+                                    {{ $recon->statement_date->format('d M Y') }}
+                                </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-bold text-gray-900">{{ $recon->account->account_name ?? 'N/A' }}</div>
-                                <div class="text-xs text-gray-500">{{ $recon->account->account_number ?? '' }}</div>
+                            <td class="py-4">
+                                <div class="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition">{{ $recon->account->account_name ?? 'N/A' }}</div>
+                                <div class="text-xs text-slate-500 font-mono mt-0.5">{{ $recon->account->account_number ?? '' }}</div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-mono text-gray-900">
+                            <td class="py-4 text-right font-mono text-sm font-bold text-slate-800">
                                 Rp {{ number_format($recon->statement_balance, 0, ',', '.') }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-mono text-gray-500">
+                            <td class="py-4 text-right font-mono text-sm text-slate-600">
                                 Rp {{ number_format($recon->closing_balance, 0, ',', '.') }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-mono">
-                                @if($recon->difference == 0)
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-200">Balance</span>
+                            <td class="py-4 text-right text-sm font-bold font-mono">
+                                @php $diff = $recon->difference; @endphp
+                                @if($diff == 0)
+                                    <span class="text-emerald-600 flex justify-end items-center gap-1"><i class="material-icons text-[14px]">check</i> 0</span>
                                 @else
-                                    <span class="text-red-600 font-bold">Rp {{ number_format($recon->difference, 0, ',', '.') }}</span>
+                                    <span class="text-red-600">Rp {{ number_format(abs($diff), 0, ',', '.') }}</span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                            <td class="py-4 text-center">
                                 @if ($recon->status == 'reconciled')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        Selesai
+                                    <span class="status-completed flex items-center justify-center gap-1 w-fit mx-auto">
+                                        <i class="material-icons text-[12px]">lock</i> Selesai
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                        Draft
+                                    <span class="status-draft flex items-center justify-center gap-1 w-fit mx-auto">
+                                        <i class="material-icons text-[12px]">edit</i> Draft
                                     </span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                <div class="flex justify-center gap-2">
-                                    <a href="{{ route('bank-reconciliations.show', $recon) }}" class="p-1.5 bg-white text-indigo-600 rounded-lg hover:bg-indigo-50 transition border border-gray-200 shadow-sm hover:border-indigo-200" title="Buka Lembar Kerja">
-                                        <i class="material-icons text-lg leading-none">description</i>
+                            <td class="pr-6 py-4 text-center">
+                                <div class="flex justify-center gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <a href="{{ route('bank-reconciliations.show', $recon) }}" 
+                                       class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition shadow-sm" 
+                                       title="{{ $recon->status == 'draft' ? 'Lanjutkan' : 'Lihat' }}">
+                                        <i class="material-icons text-[18px]">{{ $recon->status == 'draft' ? 'play_arrow' : 'visibility' }}</i>
                                     </a>
                                     
                                     @if($recon->status == 'draft')
-                                    <form action="{{ route('bank-reconciliations.destroy', $recon) }}" method="POST" class="form-delete inline-block">
+                                    {{-- Global Delete Handler --}}
+                                    <form action="{{ route('bank-reconciliations.destroy', $recon) }}" method="POST" class="delete-form">
                                         @csrf @method('DELETE')
-                                        <button type="submit" class="p-1.5 bg-white text-red-600 rounded-lg hover:bg-red-50 transition border border-gray-200 shadow-sm hover:border-red-200" title="Hapus">
-                                            <i class="material-icons text-lg leading-none">delete</i>
+                                        <button type="submit" 
+                                                data-title="Hapus Draft?"
+                                                data-text="Progress rekonsiliasi ini akan hilang."
+                                                data-btn-text="Ya, Hapus Draft"
+                                                class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-red-600 hover:bg-red-50 hover:border-red-200 transition shadow-sm" 
+                                                title="Hapus">
+                                            <i class="material-icons text-[18px]">delete</i>
                                         </button>
                                     </form>
                                     @endif
@@ -86,10 +97,12 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-6 py-12 text-center text-gray-500">
-                                <div class="flex flex-col items-center justify-center">
-                                    <i class="material-icons text-4xl text-gray-300 mb-3">account_balance_wallet</i>
-                                    <p class="text-base font-medium">Belum ada data</p>
+                            <td colspan="7" class="px-6 py-16 text-center">
+                                <div class="flex flex-col items-center justify-center text-slate-400">
+                                    <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                                        <i class="material-icons text-4xl opacity-30">account_balance_wallet</i>
+                                    </div>
+                                    <h3 class="text-base font-bold text-slate-700">Belum ada riwayat</h3>
                                     <p class="text-sm mt-1">Silakan mulai rekonsiliasi baru.</p>
                                 </div>
                             </td>
@@ -98,9 +111,9 @@
                 </tbody>
             </table>
         </div>
-
+        
         @if($reconciliations->hasPages())
-            <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <div class="px-6 py-4 border-t border-slate-200 bg-slate-50/50">
                 {{ $reconciliations->links() }}
             </div>
         @endif
@@ -109,23 +122,10 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    document.querySelectorAll('.form-delete').forEach(form => {
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            Swal.fire({
-                title: 'Hapus Draft?',
-                text: "Progress rekonsiliasi ini akan hilang.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#dc2626',
-                cancelButtonColor: '#6b7280',
-                confirmButtonText: 'Ya, Hapus'
-            }).then((result) => {
-                if (result.isConfirmed) this.submit();
-            });
-        });
+    document.addEventListener('DOMContentLoaded', function() {
+        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
+        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
     });
 </script>
 @endpush

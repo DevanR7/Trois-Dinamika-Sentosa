@@ -1,42 +1,44 @@
 import defaultTheme from 'tailwindcss/defaultTheme';
-import forms from '@tailwindcss/forms';
 
 /** @type {import('tailwindcss').Config} */
 export default {
+    // 1. PENTING: Aktifkan mode 'class' agar tombol switch di navbar berfungsi
+    darkMode: 'class', 
+
+    // 2. Pastikan tailwind memindai semua file view dan js Anda
     content: [
         './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
         './storage/framework/views/*.php',
         './resources/views/**/*.blade.php',
-        // Tambahkan path JS/Vue jika nanti kamu pakai
-        './resources/js/**/*.vue',
         './resources/js/**/*.js',
     ],
 
     theme: {
         extend: {
+            // 3. Mengatur Font Utama ke 'Inter' (Sesuai request)
             fontFamily: {
-                // SAYA UBAH: Menyesuaikan dengan font di app.css kamu
-                sans: ['"Hedvig Letters Sans"', ...defaultTheme.fontFamily.sans],
+                sans: ['Inter', 'sans-serif', ...defaultTheme.fontFamily.sans],
             },
-            // SAYA TAMBAH: Warna custom dari app.css kamu agar bisa dipanggil via Tailwind
+            
+            // 4. Konfigurasi Warna Tambahan
             colors: {
-                sidebar: {
-                    DEFAULT: '#111827',     // var(--sidebar-bg) -> bg-sidebar
-                    hover: '#374151',       // var(--sidebar-link-hover) -> bg-sidebar-hover
-                    active: '#4f46e5',      // var(--sidebar-link-active) -> bg-sidebar-active
-                    text: '#adb5bd',        // var(--sidebar-link-text) -> text-sidebar-text
-                    'text-active': '#ffffff', 
-                    heading: '#6b7280',
-                },
-                body: {
-                    bg: '#f8f9fa',          // var(--body-bg) -> bg-body-bg
+                // Kita tambahkan warna khusus untuk background dark mode yang 'deep'
+                // Ini agar tidak terlalu hitam pekat, tapi biru malam yang elegan
+                slate: {
+                    850: '#151f32', 
                 }
+            },
+            
+            // 5. Konfigurasi Z-Index (Opsional, untuk keamanan overlay)
+            zIndex: {
+                '60': '60',
+                '70': '70',
+                '100': '100', 
             }
         },
     },
 
-    plugins: [
-        forms, 
-        // Pastikan plugin ini sudah terinstall via npm
-    ],
+    // Kita kosongkan plugins karena kita sudah membuat custom style input di app.css
+    // agar tampilan lebih bersih dan tidak bentrok dengan @tailwindcss/forms
+    plugins: [],
 };

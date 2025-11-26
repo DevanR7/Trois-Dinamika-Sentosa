@@ -3,40 +3,40 @@
 @section('title', 'Manajemen Pengumuman')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="max-w-7xl mx-auto pb-20 animate-enter">
     
     {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-            <h3 class="text-2xl font-bold text-gray-900 tracking-tight">Manajemen Pengumuman</h3>
-            <p class="text-sm text-gray-500 mt-1">Kelola informasi yang disiarkan ke klien.</p>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Manajemen Pengumuman</h1>
+            <p class="text-slate-500 text-sm mt-1">Kelola informasi yang disiarkan ke klien.</p>
         </div>
-        <div class="mt-4 sm:mt-0 flex gap-2">
+        <div class="mt-4 sm:mt-0 flex gap-2 w-full sm:w-auto">
             @if(request('status') === 'deleted')
-                <a href="{{ route('announcements.index') }}" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-xs font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
-                    <i class="material-icons text-sm mr-1">arrow_back</i> Kembali
+                <a href="{{ route('announcements.index') }}" class="flex-1 sm:flex-none h-[48px] px-6 bg-white border border-slate-300 rounded-lg text-slate-700 text-sm font-bold hover:bg-slate-50 transition-all shadow-sm flex items-center justify-center gap-2">
+                    <i class="material-icons text-[18px]">arrow_back</i> Kembali ke Aktif
                 </a>
             @else
-                <a href="{{ route('announcements.index', ['status' => 'deleted']) }}" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-xs font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
-                    <i class="material-icons text-sm mr-1">archive</i> Lihat Arsip
+                <a href="{{ route('announcements.index', ['status' => 'deleted']) }}" class="flex-1 sm:flex-none h-[48px] px-6 bg-white border border-slate-300 rounded-lg text-slate-700 text-sm font-bold hover:bg-slate-50 transition-all shadow-sm flex items-center justify-center gap-2">
+                    <i class="material-icons text-[18px]">archive</i> Lihat Arsip
                 </a>
-                <a href="{{ route('announcements.create') }}" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-xs font-bold rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
-                    <i class="material-icons text-sm mr-1">add</i> Buat Baru
+                <a href="{{ route('announcements.create') }}" class="flex-1 sm:flex-none h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-sm transition-all flex items-center justify-center gap-2">
+                    <i class="material-icons text-[20px]">add</i> Buat Baru
                 </a>
             @endif
         </div>
     </div>
 
     {{-- LIST CONTENT --}}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="dashboard-card p-0 overflow-hidden shadow-sm">
         
         @if($announcements->isEmpty())
-            <div class="flex flex-col items-center justify-center py-12 text-center">
-                <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-3">
-                    <i class="material-icons text-4xl text-gray-300">campaign</i>
+            <div class="empty-state py-12">
+                <div class="empty-state-icon">
+                    <i class="material-icons text-4xl">campaign</i>
                 </div>
-                <h3 class="text-lg font-medium text-gray-900">Tidak Ada Pengumuman</h3>
-                <p class="text-gray-500 max-w-sm mt-1">
+                <h3 class="text-lg font-medium text-slate-800">Tidak Ada Pengumuman</h3>
+                <p class="text-slate-500 max-w-sm mt-1 text-sm">
                     @if(request('status') === 'deleted')
                         Arsip pengumuman kosong.
                     @else
@@ -45,40 +45,35 @@
                 </p>
             </div>
         @else
-            <div class="divide-y divide-gray-100">
+            <div class="divide-y divide-slate-100">
                 @foreach ($announcements as $announcement)
-                <div class="p-5 hover:bg-gray-50 transition-colors group">
+                <div class="p-5 hover:bg-slate-50/50 transition-colors group">
                     <div class="flex justify-between items-start gap-4">
                         {{-- Konten Kiri --}}
                         <div class="flex-grow">
                             <div class="flex items-center gap-2 mb-1">
-                                <h4 class="text-base font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                                <h4 class="text-base font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
                                     {{ $announcement->title ?? 'Tanpa Judul' }}
                                 </h4>
                                 
+                                {{-- Status Badge --}}
                                 @if($announcement->trashed())
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                                        Diarsipkan
-                                    </span>
+                                    <span class="status-rejected flex items-center gap-1">Diarsipkan <i class="material-icons text-[12px]">archive</i></span>
                                 @elseif($announcement->is_active)
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                        Aktif
-                                    </span>
+                                    <span class="status-completed flex items-center gap-1">Aktif <i class="material-icons text-[12px]">check_circle</i></span>
                                 @else
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                                        Draft (Nonaktif)
-                                    </span>
+                                    <span class="status-draft flex items-center gap-1">Draft <i class="material-icons text-[12px]">edit_note</i></span>
                                 @endif
                             </div>
                             
-                            <p class="text-sm text-gray-600 line-clamp-2 mb-2">
+                            <p class="text-sm text-slate-600 line-clamp-2 mb-2">
                                 {{ $announcement->content }}
                             </p>
                             
-                            <div class="flex items-center gap-4 text-xs text-gray-500">
+                            <div class="flex items-center gap-4 text-xs text-slate-500">
                                 @if($announcement->type == 'broadcast')
                                     <div class="flex items-center gap-1 text-blue-600 font-medium">
-                                        <i class="material-icons text-[14px]">podcasts</i> Broadcast
+                                        <i class="material-icons text-[14px]">public</i> Broadcast
                                     </div>
                                 @else
                                     <div class="flex items-center gap-1 text-indigo-600 font-medium">
@@ -94,11 +89,11 @@
                         </div>
 
                         {{-- Tombol Aksi (Kanan) --}}
-                        <div class="flex flex-col items-end gap-2">
+                        <div class="flex flex-col items-end gap-2 flex-shrink-0">
                             @if($announcement->trashed())
                                 <form action="{{ route('announcements.restore', $announcement->id) }}" method="POST" class="form-restore w-full">
                                     @csrf @method('PATCH')
-                                    <button type="submit" class="inline-flex justify-center items-center w-full px-3 py-1.5 bg-green-50 text-green-700 hover:bg-green-100 rounded border border-green-200 text-xs font-medium transition" data-title="{{ $announcement->title ?? 'ini' }}">
+                                    <button type="submit" class="inline-flex justify-center items-center w-full px-3 py-1.5 bg-green-50 text-emerald-700 hover:bg-green-100 rounded border border-green-200 text-xs font-medium transition" data-title="{{ $announcement->title ?? 'ini' }}">
                                         <i class="material-icons text-sm mr-1">restore</i> Pulihkan
                                     </button>
                                 </form>
@@ -110,12 +105,12 @@
                                 </form>
                             @else
                                 <div class="flex gap-2">
-                                    <a href="{{ route('announcements.edit', $announcement->id) }}" class="inline-flex items-center p-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 shadow-sm transition text-xs font-medium" title="Edit">
+                                    <a href="{{ route('announcements.edit', $announcement->id) }}" class="inline-flex items-center p-2 bg-white border border-slate-200 rounded text-amber-600 hover:bg-amber-50 shadow-sm transition text-xs font-medium" title="Edit">
                                         <i class="material-icons text-sm">edit</i>
                                     </a>
                                     <form action="{{ route('announcements.destroy', $announcement->id) }}" method="POST" class="form-delete inline-block">
                                         @csrf @method('DELETE')
-                                        <button type="submit" class="inline-flex items-center p-2 bg-white border border-red-200 rounded text-red-600 hover:bg-red-50 shadow-sm transition text-xs font-medium" title="Arsipkan" data-title="{{ $announcement->title ?? 'ini' }}">
+                                        <button type="submit" class="inline-flex items-center p-2 bg-white border border-slate-200 rounded text-red-600 hover:bg-red-50 shadow-sm transition text-xs font-medium" title="Arsipkan" data-title="{{ $announcement->title ?? 'ini' }}">
                                             <i class="material-icons text-sm">archive</i>
                                         </button>
                                     </form>
@@ -136,18 +131,13 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // NOTIFIKASI
-        @if(session('success')) 
-            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: '{{ session('success') }}', showConfirmButton: false, timer: 3000, timerProgressBar: true }); 
-        @endif
-        @if(session('error')) 
-            Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: '{{ session('error') }}', showConfirmButton: false, timer: 5000, timerProgressBar: true }); 
-        @endif
+        // NOTIFIKASI TOAST (Menggunakan global showToast yang sudah kita definisikan)
+        @if(session('success')) showToast("{{ session('success') }}", 'success'); @endif
+        @if(session('error')) showToast("{{ session('error') }}", 'error'); @endif
 
-        // KONFIRMASI ACTIONS
+        // KONFIRMASI ACTIONS (Menggunakan SweetAlert)
         function confirmAction(selector, title, text, btnColor, btnText) {
             document.querySelectorAll(selector).forEach(form => {
                 form.addEventListener('submit', function(e) {
@@ -155,21 +145,28 @@
                     const itemTitle = this.querySelector('button').dataset.title;
                     Swal.fire({
                         title: title,
-                        text: text.replace(':title', itemTitle),
+                        html: text.replace(':title', `<b>${itemTitle}</b>`),
                         icon: 'warning',
                         showCancelButton: true,
                         confirmButtonColor: btnColor,
                         cancelButtonColor: '#6b7280',
                         confirmButtonText: btnText,
-                        cancelButtonText: 'Batal'
-                    }).then((result) => { if (result.isConfirmed) this.submit(); });
+                        cancelButtonText: 'Batal',
+                        customClass: {
+                            popup: 'colored-toast rounded-xl',
+                            confirmButton: 'px-6 py-2.5 rounded-lg font-bold',
+                            cancelButton: 'px-6 py-2.5 rounded-lg font-bold'
+                        }
+                    }).then((result) => { 
+                        if (result.isConfirmed) this.submit(); 
+                    });
                 });
             });
         }
 
-        confirmAction('.form-delete', 'Arsipkan Pengumuman?', 'Anda akan mengarsipkan pengumuman ":title".', '#dc2626', 'Ya, Arsipkan!');
-        confirmAction('.form-restore', 'Pulihkan Pengumuman?', 'Anda akan memulihkan pengumuman ":title".', '#16a34a', 'Ya, Pulihkan!');
-        confirmAction('.form-force-delete', 'Hapus Permanen?', 'PERINGATAN: Pengumuman ":title" akan dihapus selamanya!', '#dc2626', 'Ya, Hapus!');
+        confirmAction('.form-delete', 'Arsipkan Pengumuman?', 'Anda yakin ingin mengarsipkan pengumuman ":title".', '#dc2626', 'Ya, Arsipkan!');
+        confirmAction('.form-restore', 'Pulihkan Pengumuman?', 'Anda yakin ingin memulihkan pengumuman ":title".', '#10b981', 'Ya, Pulihkan!');
+        confirmAction('.form-force-delete', 'Hapus Permanen?', 'PERINGATAN: Pengumuman ":title" akan dihapus selamanya, TIDAK DAPAT DIKEMBALIKAN!', '#dc2626', 'Ya, Hapus Permanen!');
     });
 </script>
 @endpush

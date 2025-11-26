@@ -8,69 +8,51 @@
 
     <link rel="icon" type="image/x-icon" href="{{ asset('images/TDS-favicon.png') }}">
 
-    {{-- Fonts & CSS --}}
+    {{-- 1. FONTS --}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    {{-- Font Utama Login: Hedvig Letters Sans --}}
     <link href="https://fonts.googleapis.com/css2?family=Hedvig+Letters+Sans&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+    {{-- Icon Google --}}
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
     
-    @vite(['resources/css/login.css', 'resources/js/app.js'])
-</head>
-<body>
+    {{-- 2. VITE (Tailwind CSS & JS) --}}
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 
+    <style>
+        /* Override Font Khusus Halaman Login */
+        body {
+            font-family: 'Hedvig Letters Sans', sans-serif;
+        }
+        
+        /* Memastikan partikel berada di layer paling belakang */
+        #particles-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-600 antialiased h-screen w-full overflow-hidden relative flex items-center justify-center">
+
+    {{-- CONTAINER BACKGROUND PARTIKEL --}}
     <div id="particles-bg"></div>
 
-    <div class="login-page-wrapper">
-        <div class="login-card-container">
-            
-            <div class="login-welcome-section">
-                
-                <img src="{{ asset('images/TDS-side-text.png') }}" alt="Logo" class="login-logo">
-
-                <h2 class="welcome-title">Internal Portal</h2>
-                <p class="welcome-subtitle">
-                    Trois Dinamika Sentosa
-                </p>
-                <p class="welcome-text">
-                    Silakan masuk untuk melanjutkan ke dasbor Anda.
-                </p>
-                <div id="clock-widget" class="mt-4"></div>
-            </div>
-
-            <div class="login-form-section">
-                
-                {{-- Logo sudah dipindah kembali ke kiri --}}
-
-                @yield('content')
-            </div>
-
-        </div>
+    {{-- WRAPPER KONTEN UTAMA (Z-Index tinggi agar di atas partikel) --}}
+    <div class="relative z-10 w-full p-4 flex items-center justify-center">
+        @yield('content')
     </div>
 
-    {{-- Scripts --}}
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    @push('scripts')
-    <script>
-        function updateClock() {
-            const now = new Date();
-            const clockElement = document.getElementById('clock-widget');
-            if (clockElement) {
-                const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-                const formattedDate = now.toLocaleDateString('id-ID', dateOptions);
-                const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Jakarta' };
-                const formattedTime = now.toLocaleTimeString('id-ID', timeOptions).replace(/\./g,':');
-                clockElement.innerHTML = `<div>${formattedDate}</div><div>${formattedTime} WIB</div>`;
-            }
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
-    </script>
-    @endpush
+    {{-- SCRIPTS KHUSUS HALAMAN (Jika ada push stack) --}}
     @stack('scripts')
-
+    
+    {{-- LIBRARY PARTIKEL --}}
     <script src="https://cdn.jsdelivr.net/npm/tsparticles@2/tsparticles.bundle.min.js"></script>
     
+    {{-- KONFIGURASI PARTIKEL (Warna Slate agar selaras) --}}
     <script>
         document.addEventListener('DOMContentLoaded', (event) => {
             tsParticles.load("particles-bg", {
@@ -79,7 +61,7 @@
                     events: {
                         onHover: {
                             enable: true,
-                            mode: "repulse",
+                            mode: "repulse", // Efek menolak kursor
                         },
                         resize: true,
                     },
@@ -92,27 +74,24 @@
                 },
                 particles: {
                     color: {
-                        value: "#aaaaaa", // Warna partikel (abu-abu)
+                        value: "#94a3b8", // Warna titik (Slate-400)
                     },
                     links: {
-                        color: "#bbbbbb", // Warna garis penghubung
+                        color: "#cbd5e1", // Warna garis penghubung (Slate-300)
                         distance: 150,
                         enable: true,
                         opacity: 0.5,
                         width: 1,
                     },
-                    collisions: {
-                        enable: true,
-                    },
                     move: {
-                        direction: "none",
                         enable: true,
+                        speed: 1, // Kecepatan gerak lambat & kalem
+                        direction: "none",
+                        random: false,
+                        straight: false,
                         outModes: {
                             default: "bounce",
                         },
-                        random: false,
-                        speed: 1, // Kecepatan gerak
-                        straight: false,
                     },
                     number: {
                         density: {

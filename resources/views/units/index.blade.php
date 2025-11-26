@@ -3,74 +3,65 @@
 @section('title', 'Kelola Satuan')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="max-w-5xl mx-auto pb-20 animate-enter">
     
     {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-            <h3 class="text-2xl font-bold text-gray-900 tracking-tight">Kelola Satuan</h3>
-            <p class="text-sm text-gray-500 mt-1">Daftar satuan ukur untuk produk (Unit of Measurement).</p>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Kelola Satuan</h1>
+            <p class="text-slate-500 text-sm mt-1">Daftar satuan pengukuran (UOM) untuk produk.</p>
         </div>
-        <div class="mt-4 sm:mt-0">
-            <a href="{{ route('units.create') }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-lg font-bold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition">
-                <i class="material-icons text-base mr-2">add</i> Tambah Satuan
+        <div>
+            <a href="{{ route('units.create') }}" 
+               class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-md shadow-indigo-200 transition-all flex items-center gap-2">
+                <i class="material-icons text-[20px]">add</i> Tambah Satuan
             </a>
         </div>
     </div>
 
-    {{-- ALERT --}}
-    @if (session('success'))
-        <div class="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-            <i class="material-icons text-green-500">check_circle</i>
-            <span class="text-sm text-green-800 font-medium">{{ session('success') }}</span>
-        </div>
-    @endif
-    @if (session('error'))
-        <div class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
-            <i class="material-icons text-red-500">error</i>
-            <span class="text-sm text-red-800 font-medium">{{ session('error') }}</span>
-        </div>
-    @endif
-
     {{-- TABLE CARD --}}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
+            <table class="dashboard-table w-full">
+                <thead class="bg-slate-50 border-b border-slate-200">
                     <tr>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-16">
-                            No.
-                        </th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                            Nama Satuan
-                        </th>
-                        <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-32">
-                            Aksi
-                        </th>
+                        <th class="pl-6 w-16">No.</th>
+                        <th>Nama Satuan</th>
+                        <th class="text-center w-32 pr-6">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                <tbody class="divide-y divide-slate-100 bg-white">
                     @forelse ($units as $unit)
-                        <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="pl-6 py-4 text-slate-500 text-sm">
                                 {{ $loop->iteration + $units->firstItem() - 1 }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="text-sm font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded border border-gray-200">
-                                    {{ $unit->name }}
-                                </span>
+                            <td class="py-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                        <i class="material-icons text-[18px]">straighten</i>
+                                    </div>
+                                    <span class="font-bold text-slate-700">{{ $unit->name }}</span>
+                                </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                <div class="flex justify-center gap-2">
-                                    <a href="{{ route('units.edit', $unit->unit_id) }}" class="p-1.5 bg-white text-yellow-600 rounded-lg hover:bg-yellow-50 transition border border-gray-200 shadow-sm hover:border-yellow-200" title="Edit">
-                                        <i class="material-icons text-lg leading-none">edit</i>
+                            <td class="py-4 text-center pr-6">
+                                <div class="flex items-center justify-center gap-2">
+                                    {{-- Edit --}}
+                                    <a href="{{ route('units.edit', $unit->unit_id) }}" 
+                                       class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-200 transition-colors shadow-sm"
+                                       title="Edit">
+                                        <i class="material-icons text-[16px]">edit</i>
                                     </a>
                                     
+                                    {{-- Delete (Cukup berikan class 'delete-form') --}}
                                     <form action="{{ route('units.destroy', $unit->unit_id) }}" method="POST" class="delete-form inline-block">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="p-1.5 bg-white text-red-600 rounded-lg hover:bg-red-50 transition border border-gray-200 shadow-sm hover:border-red-200" title="Hapus">
-                                            <i class="material-icons text-lg leading-none">delete</i>
+                                        @csrf @method('DELETE')
+                                        {{-- Tambahkan data-name untuk teks konfirmasi --}}
+                                        <button type="submit" 
+                                                data-name="{{ $unit->name }}"
+                                                class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 transition-colors shadow-sm"
+                                                title="Hapus">
+                                            <i class="material-icons text-[16px]">delete</i>
                                         </button>
                                     </form>
                                 </div>
@@ -78,11 +69,14 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="3" class="px-6 py-12 text-center text-gray-500">
+                            <td colspan="3" class="py-12 text-center">
                                 <div class="flex flex-col items-center justify-center">
-                                    <i class="material-icons text-4xl text-gray-300 mb-3">straighten</i>
-                                    <p class="text-base font-medium">Belum ada data</p>
-                                    <p class="text-sm mt-1">Silakan tambahkan satuan baru.</p>
+                                    <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-slate-300">
+                                        <i class="material-icons text-4xl">straighten</i>
+                                    </div>
+                                    <h3 class="text-lg font-medium text-slate-900">Belum ada data</h3>
+                                    <p class="text-slate-500 text-sm mt-1 max-w-xs">Mulai dengan menambahkan satuan baru untuk produk Anda.</p>
+                                    <a href="{{ route('units.create') }}" class="mt-4 text-indigo-600 font-bold text-sm hover:underline">Tambah Satuan Baru</a>
                                 </div>
                             </td>
                         </tr>
@@ -99,29 +93,10 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const deleteForms = document.querySelectorAll('.delete-form');
-    deleteForms.forEach(form => {
-        form.addEventListener('submit', function(event) {
-            event.preventDefault(); 
-            Swal.fire({
-                title: 'Hapus Satuan?',
-                text: "Pastikan satuan ini tidak sedang digunakan oleh produk manapun.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#dc2626', // red-600
-                cancelButtonColor: '#6b7280', // gray-500
-                confirmButtonText: 'Ya, Hapus!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    event.target.submit();
-                }
-            });
-        });
-    });
-});
+    // Hanya logika Toast Session saja yang tersisa disini
+    // Logika Delete sudah pindah otomatis ke app.js
+    @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
+    @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
 </script>
 @endpush

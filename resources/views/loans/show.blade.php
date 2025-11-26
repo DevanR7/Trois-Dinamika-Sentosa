@@ -3,141 +3,159 @@
 @section('title', 'Detail Pinjaman')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="max-w-7xl mx-auto pb-20 animate-enter">
     
     {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-            <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <a href="{{ route('loans.index') }}" class="hover:text-indigo-600 transition">Pinjaman</a>
-                <span>/</span>
-                <span class="text-gray-800">Detail</span>
-            </div>
-            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Detail Pinjaman</h2>
+            <nav class="flex items-center gap-2 text-sm text-slate-500 mb-1">
+                <a href="{{ route('loans.index') }}" class="hover:text-indigo-600 transition-colors">Pinjaman</a>
+                <span class="mx-2 text-slate-300">/</span>
+                <span class="text-slate-800 font-semibold">Detail</span>
+            </nav>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Detail Pinjaman</h1>
         </div>
-        <div class="mt-4 sm:mt-0">
-            <a href="{{ route('loans.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition text-sm">
-                <i class="material-icons text-lg mr-2">arrow_back</i> Kembali
+        <div class="flex gap-3 w-full sm:w-auto">
+            <a href="{{ route('loans.index') }}" class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
+                <i class="material-icons text-[18px]">arrow_back</i> Kembali
             </a>
         </div>
     </div>
 
     {{-- INFO UTAMA --}}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
-        <div class="p-6 flex flex-col md:flex-row gap-8 items-center">
+    <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5 mb-8">
+        <div class="p-6 md:p-8 flex flex-col md:flex-row gap-8 items-center">
             
             <div class="flex-1 w-full">
-                <h3 class="text-2xl font-bold text-indigo-600 mb-1">{{ $loan->lender_name }}</h3>
-                <p class="text-gray-500 mb-4 text-sm">{{ $loan->description ?? 'Tidak ada deskripsi' }}</p>
+                <div class="flex items-center gap-3 mb-2">
+                    <h3 class="text-2xl font-bold text-indigo-600">{{ $loan->lender_name }}</h3>
+                    @if ($loan->status == 'active')
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-wide">Belum Lunas</span>
+                    @else
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase tracking-wide">Lunas</span>
+                    @endif
+                </div>
+                <p class="text-slate-500 mb-6 text-sm italic">{{ $loan->description ?? 'Tidak ada deskripsi' }}</p>
                 
                 <div class="flex gap-8">
                     <div>
-                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Tanggal Pinjam</p>
-                        <p class="text-lg font-medium text-gray-900">{{ $loan->loan_date->format('d M Y') }}</p>
-                    </div>
-                    <div>
-                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Status</p>
-                        @if ($loan->status == 'active')
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 mt-1 border border-yellow-200">
-                                Belum Lunas
-                            </span>
-                        @else
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-1 border border-green-200">
-                                Lunas
-                            </span>
-                        @endif
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tanggal Pinjam</p>
+                        <p class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <i class="material-icons text-slate-400 text-base">event</i> {{ $loan->loan_date->format('d M Y') }}
+                        </p>
                     </div>
                 </div>
             </div>
 
-            <div class="w-full md:w-1/3 bg-gray-50 p-5 rounded-xl border border-gray-200">
-                <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Sisa Pokok Pinjaman</p>
-                <h2 class="text-3xl font-bold text-red-600 mb-2">Rp {{ number_format($loan->remaining_balance, 0, ',', '.') }}</h2>
+            <div class="w-full md:w-1/3 bg-slate-50 p-6 rounded-xl border border-slate-100 text-center">
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Sisa Pokok Pinjaman</p>
+                <h2 class="text-3xl font-bold text-red-600 mb-4 font-mono">Rp {{ number_format($loan->remaining_balance, 0, ',', '.') }}</h2>
                 
                 @php
                     $percentPaid = ($loan->principal_amount > 0) 
                         ? (($loan->principal_amount - $loan->remaining_balance) / $loan->principal_amount) * 100 
                         : 0;
                 @endphp
-                <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
-                    <div class="bg-green-500 h-2.5 rounded-full transition-all duration-500" style="width: {{ $percentPaid }}%"></div>
+                <div class="w-full bg-slate-200 rounded-full h-2 mb-2 overflow-hidden">
+                    <div class="bg-emerald-500 h-2 rounded-full transition-all duration-1000 ease-out" style="width: {{ $percentPaid }}%"></div>
                 </div>
-                <p class="text-xs text-gray-500 text-right">Terbayar: {{ round($percentPaid) }}%</p>
+                <p class="text-[10px] text-slate-500 font-bold uppercase">Terbayar: {{ round($percentPaid) }}%</p>
             </div>
         </div>
         
-        <div class="bg-gray-50 border-t border-gray-100 p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-slate-50 border-t border-slate-100 p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-center md:text-left">
             <div>
-                <p class="text-xs text-gray-500 uppercase">Total Pinjaman Awal</p>
-                <p class="font-bold text-gray-900">Rp {{ number_format($loan->principal_amount, 0, ',', '.') }}</p>
+                <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Total Pinjaman Awal</p>
+                <p class="font-bold text-slate-900 font-mono text-lg">Rp {{ number_format($loan->principal_amount, 0, ',', '.') }}</p>
             </div>
             <div>
-                <p class="text-xs text-gray-500 uppercase">Total Pokok Dibayar</p>
-                <p class="font-bold text-green-600">Rp {{ number_format($loan->payments->sum('principal_paid'), 0, ',', '.') }}</p>
+                <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Total Pokok Dibayar</p>
+                <p class="font-bold text-emerald-600 font-mono text-lg">Rp {{ number_format($loan->payments->sum('principal_paid'), 0, ',', '.') }}</p>
             </div>
             <div>
-                <p class="text-xs text-gray-500 uppercase">Total Bunga Dibayar</p>
-                <p class="font-bold text-yellow-600">Rp {{ number_format($loan->payments->sum('interest_paid'), 0, ',', '.') }}</p>
+                <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Total Bunga Dibayar</p>
+                <p class="font-bold text-amber-600 font-mono text-lg">Rp {{ number_format($loan->payments->sum('interest_paid'), 0, ',', '.') }}</p>
             </div>
             <div>
-                <p class="text-xs text-gray-500 uppercase">Akun Akuntansi</p>
-                <p class="text-xs text-gray-700 font-medium truncate" title="{{ $loan->loanAccount->account_name }}">{{ $loan->loanAccount->account_name }} (Utang)</p>
-                <p class="text-xs text-gray-700 font-medium truncate" title="{{ $loan->cashBankAccount->account_name }}">{{ $loan->cashBankAccount->account_name }} (Kas)</p>
+                <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Akun Akuntansi</p>
+                <p class="text-xs text-slate-700 font-medium truncate" title="{{ $loan->loanAccount->account_name }}">{{ $loan->loanAccount->account_name }} (Utang)</p>
+                <p class="text-xs text-slate-700 font-medium truncate" title="{{ $loan->cashBankAccount->account_name }}">{{ $loan->cashBankAccount->account_name }} (Kas)</p>
             </div>
         </div>
     </div>
 
     {{-- RIWAYAT PEMBAYARAN --}}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-            <h5 class="font-bold text-gray-800 text-sm uppercase tracking-wider flex items-center gap-2">
-                <i class="material-icons text-gray-400">history</i> Riwayat Cicilan
+    <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
+        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+            <h5 class="font-bold text-slate-700 text-sm uppercase tracking-wider flex items-center gap-2">
+                <i class="material-icons text-indigo-600">history</i> Riwayat Cicilan
             </h5>
             
             @if($loan->status == 'active')
-                <a href="{{ route('loans.payments.create', $loan) }}" class="inline-flex items-center px-3 py-1.5 bg-green-600 border border-transparent rounded-lg font-bold text-xs text-white uppercase tracking-widest hover:bg-green-700 transition">
-                    <i class="material-icons text-sm mr-1">add</i> Bayar Cicilan
+                <a href="{{ route('loans.payments.create', $loan) }}" class="h-[36px] px-4 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-all shadow-sm flex items-center gap-1 group">
+                    <i class="material-icons text-[16px] group-hover:scale-110 transition-transform">add</i> Bayar Cicilan
                 </a>
             @endif
         </div>
 
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
+            <table class="dashboard-table min-w-full">
+                <thead class="bg-slate-50 border-b border-slate-200">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tanggal</th>
-                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Keterangan</th>
-                        <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Pokok</th>
-                        <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Bunga</th>
-                        <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Total Bayar</th>
-                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Via Akun</th>
-                        <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Aksi</th>
+                        <th class="pl-6 w-32">Tanggal</th>
+                        <th>Keterangan</th>
+                        <th class="text-right">Pokok</th>
+                        <th class="text-right">Bunga</th>
+                        <th class="text-right">Total Bayar</th>
+                        <th class="w-48">Via Akun</th>
+                        <th class="text-center w-24 pr-6">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                <tbody class="divide-y divide-slate-100 bg-white">
                     @forelse ($loan->payments as $payment)
-                        <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $payment->payment_date->format('d/m/y') }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-600 truncate max-w-xs">{{ $payment->notes ?? '-' }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-mono text-gray-900">Rp {{ number_format($payment->principal_paid, 0, ',', '.') }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-mono text-gray-500">Rp {{ number_format($payment->interest_paid, 0, ',', '.') }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-mono font-bold text-green-600">Rp {{ number_format($payment->total_paid, 0, ',', '.') }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-500">{{ $payment->cashBankAccount->account_name ?? '-' }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                        <tr class="hover:bg-slate-50/50 transition-colors">
+                            <td class="pl-6 py-4 text-sm text-slate-600 font-mono">
+                                {{ $payment->payment_date->format('d/m/Y') }}
+                            </td>
+                            <td class="py-4 text-sm text-slate-600 italic truncate max-w-xs">
+                                {{ $payment->notes ?? '-' }}
+                            </td>
+                            <td class="py-4 text-right text-sm font-mono text-slate-900">
+                                Rp {{ number_format($payment->principal_paid, 0, ',', '.') }}
+                            </td>
+                            <td class="py-4 text-right text-sm font-mono text-amber-600 font-medium">
+                                Rp {{ number_format($payment->interest_paid, 0, ',', '.') }}
+                            </td>
+                            <td class="py-4 text-right text-sm font-mono font-bold text-emerald-600">
+                                Rp {{ number_format($payment->total_paid, 0, ',', '.') }}
+                            </td>
+                            <td class="py-4 text-xs text-slate-500">
+                                {{ $payment->cashBankAccount->account_name ?? '-' }}
+                            </td>
+                            <td class="pr-6 py-4 text-center">
                                 <form action="{{ route('loans.payments.destroy', [$loan, $payment]) }}" method="POST" 
-                                      class="d-inline form-delete-payment"
-                                      data-payment-label="Pembayaran tgl {{ $payment->payment_date->format('d/m/Y') }} sebesar Rp {{ number_format($payment->total_paid, 0, ',', '.') }}">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="p-1 text-red-400 hover:text-red-600 transition rounded-full hover:bg-red-50" title="Batalkan">
-                                        <i class="material-icons text-lg">cancel</i>
+                                      class="delete-form inline-block"
+                                      data-title="Batalkan Pembayaran?"
+                                      data-text="Pembayaran sebesar <b>Rp {{ number_format($payment->total_paid, 0, ',', '.') }}</b> akan dihapus dan saldo pinjaman dikembalikan."
+                                      data-btn-text="Ya, Batalkan">
+                                    @csrf @method('DELETE')
+                                    <button type="submit" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-red-400 hover:text-red-600 hover:bg-red-50 transition shadow-sm" title="Batalkan">
+                                        <i class="material-icons text-[16px]">cancel</i>
                                     </button>
                                 </form>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-6 py-12 text-center text-gray-500 text-sm">Belum ada riwayat pembayaran cicilan.</td>
+                            <td colspan="7" class="px-6 py-12 text-center">
+                                <div class="flex flex-col items-center justify-center text-slate-400">
+                                    <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                                        <i class="material-icons text-4xl opacity-30">payments</i>
+                                    </div>
+                                    <h3 class="text-base font-bold text-slate-700">Belum ada pembayaran</h3>
+                                    <p class="text-sm mt-1">Silakan catat pembayaran cicilan pertama.</p>
+                                </div>
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -148,32 +166,10 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const deleteForms = document.querySelectorAll('.form-delete-payment');
-        deleteForms.forEach(form => {
-            form.addEventListener('submit', function (event) {
-                event.preventDefault(); 
-                const label = event.target.dataset.paymentLabel;
-                
-                Swal.fire({
-                    title: 'Batalkan Pembayaran?',
-                    html: `Anda akan membatalkan:<br><b>${label}</b><br><br><span class="text-red-600 font-bold text-xs">Sisa pokok pinjaman akan dikembalikan dan jurnal dibalik.</span>`,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#dc2626',
-                    cancelButtonColor: '#6b7280',
-                    confirmButtonText: 'Ya, Batalkan!',
-                    cancelButtonText: 'Tidak'
-                }).then((result) => {
-                    if (result.isConfirmed) event.target.submit();
-                });
-            });
-        });
-
-        @if(session('success')) Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Berhasil!', text: "{{ session('success') }}", timer: 3000, showConfirmButton: false }); @endif
-        @if(session('error')) Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Gagal!', text: "{{ session('error') }}" }); @endif
+        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
+        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
     });
 </script>
 @endpush

@@ -3,72 +3,77 @@
 @section('title', 'Edit Klien')
 
 @section('content')
-<div class="max-w-4xl mx-auto">
+<div class="max-w-5xl mx-auto pb-20 animate-enter">
     
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+    {{-- HEADER --}}
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Edit Klien</h2>
-            <p class="text-sm text-gray-500 mt-1">Perbarui informasi: <span class="font-bold text-indigo-600">{{ $client->client_name }}</span></p>
-        </div>
-        <a href="{{ route('clients.index') }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition shadow-sm">
-            Kembali
-        </a>
-    </div>
-
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
-            <i class="bi bi-pencil-square text-indigo-500"></i>
-            <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Edit Data Klien</h3>
+            <nav class="flex items-center gap-2 text-sm text-slate-500 mb-1">
+                <a href="{{ route('clients.index') }}" class="hover:text-indigo-600 transition-colors">Klien</a>
+                <span class="mx-2 text-slate-300">/</span>
+                <span class="text-slate-800 font-semibold">Edit</span>
+            </nav>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Edit Klien</h1>
         </div>
         
-        <div class="p-6">
-            <form action="{{ route('clients.update', $client->client_id) }}" method="POST">
-                @csrf @method('PUT')
-                
-                @include('clients._form')
-
-                <div class="flex justify-end gap-3 pt-6 border-t border-gray-100 mt-6">
-                    <a href="{{ route('clients.index') }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition">Batal</a>
-                    <button type="submit" class="px-6 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg shadow-md transition flex items-center">
-                        <i class="bi bi-check-lg mr-2"></i> Update Klien
+        <div class="flex gap-3 w-full sm:w-auto">
+            @if(!$client->trashed())
+                {{-- Global Delete Handler --}}
+                <form action="{{ route('clients.destroy', $client->client_id) }}" method="POST" class="form-confirm hidden sm:block">
+                    @csrf @method('DELETE')
+                    <button type="submit" 
+                            data-title="Arsipkan Klien?" 
+                            data-text="Klien <b>{{ $client->client_name }}</b> akan diarsipkan." 
+                            data-btn-text="Ya, Arsipkan" 
+                            data-btn-color="#ef4444"
+                            class="h-[48px] px-5 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-bold hover:bg-red-50 transition-all flex items-center justify-center gap-2 shadow-sm">
+                        <i class="material-icons text-[18px]">archive</i> Arsipkan
                     </button>
-                </div>
-            </form>
+                </form>
+            @endif
+            
+            <a href="{{ route('clients.index') }}" 
+               class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
+                <i class="material-icons text-[18px]">arrow_back</i> Kembali
+            </a>
         </div>
     </div>
+
+    <form action="{{ route('clients.update', $client->client_id) }}" method="POST">
+        @csrf @method('PUT')
+        
+        <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
+            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600">
+                    <i class="material-icons text-[20px]">edit_note</i>
+                </div>
+                <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Edit Informasi</h3>
+            </div>
+            
+            <div class="p-6 md:p-8 bg-white">
+                @include('clients._form')
+            </div>
+
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+                <a href="{{ route('clients.index') }}" 
+                   class="px-5 py-2.5 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all shadow-sm">
+                    Batal
+                </a>
+                <button type="submit" 
+                        class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-md shadow-indigo-200 transition-all flex items-center gap-2">
+                    <i class="material-icons text-[18px]">check_circle</i> Simpan Perubahan
+                </button>
+            </div>
+        </div>
+    </form>
 </div>
 @endsection
 
 @push('scripts')
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // (Copy JS Logic Password Toggle dari Create Blade disini jika perlu, atau buat file JS terpisah)
-    // Sama persis dengan create.blade.php
-    function setupPasswordToggle(inputId, btnId) {
-        const input = document.getElementById(inputId);
-        const btn = document.getElementById(btnId);
-        if(!input || !btn) return;
-        btn.addEventListener('click', () => {
-            const type = input.type === 'password' ? 'text' : 'password';
-            input.type = type;
-            btn.querySelector('i').classList.toggle('bi-eye');
-            btn.querySelector('i').classList.toggle('bi-eye-slash');
-        });
-    }
-    setupPasswordToggle('password', 'toggle-password');
-    setupPasswordToggle('password_confirmation', 'toggle-password-confirmation');
-
-    const p1 = document.getElementById('password');
-    const p2 = document.getElementById('password_confirmation');
-    const err = document.getElementById('password-match-error');
-    if(p1 && p2 && err) {
-        const checkMatch = () => {
-            if(p2.value && p1.value !== p2.value) err.classList.remove('hidden');
-            else err.classList.add('hidden');
-        };
-        p1.addEventListener('input', checkMatch);
-        p2.addEventListener('input', checkMatch);
-    }
-});
+    document.addEventListener('DOMContentLoaded', function() {
+        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
+        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
+    });
 </script>
 @endpush

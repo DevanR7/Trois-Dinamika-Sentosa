@@ -3,305 +3,436 @@
 @tailwind utilities;
 
 /* ==========================================================================
-   LAYER UTILITIES (ANTI-FLICKER & PRELOAD LOGIC)
+   1. LAYER UTILITIES (Animasi, Scrollbar & Helpers)
    ========================================================================== */
 @layer utilities {
-    .no-transition {
-        transition: none !important;
+    /* --- SIDEBAR HELPER --- */
+    /* Mencegah animasi sidebar saat halaman baru dimuat */
+    .sidebar.preload, .sidebar.preload ~ .main-wrapper { transition: none !important; }
+    
+    /* --- SCROLLBAR CUSTOM (Tipis & Elegan) --- */
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { 
+        @apply bg-slate-300 dark:bg-slate-600 rounded-full;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { 
+        @apply bg-slate-400 dark:bg-slate-500;
     }
 
-    /* --- 1. LOGIKA FORCED-OPEN (ANTI-GLITCH SIDEBAR) --- */
-    html.forced-open .sidebar { width: 260px !important; }
-    html.forced-open .sidebar.close { width: 260px !important; }
-    
-    html.forced-open .main-wrapper { 
-        margin-left: 260px !important; 
-        width: calc(100% - 260px) !important;
-        transition: none !important; 
-    }
-    
-    html.forced-open .sidebar.close .logo_text,
-    html.forced-open .sidebar.close .link span,
-    html.forced-open .sidebar.close .dropdown-icon,
-    html.forced-open .sidebar.close .profile_text,
-    html.forced-open .sidebar.close #sidebar-close {
-        opacity: 1 !important; 
-        visibility: visible !important; 
-        position: static !important;
-        width: auto !important;
-        pointer-events: auto !important;
-    }
-    
-    html.forced-open .sidebar.close .menu_title {
-        height: auto !important;
-        background: transparent !important;
-        margin-top: 1.5rem !important; 
-        margin-bottom: 0.5rem !important;
-        width: auto !important;
-        font-size: 10px !important;
-        padding-left: 20px !important; 
-        text-align: left !important;
-        opacity: 0.8 !important;
-    }
-    
-    html.forced-open .sidebar.close #lock-icon { display: block !important; }
+    /* --- NPROGRESS (Loading Bar Atas) --- */
+    #nprogress .bar { background: #6366f1 !important; height: 3px !important; }
+    #nprogress .peg { box-shadow: 0 0 10px #6366f1, 0 0 5px #6366f1 !important; }
 
-    /* Fix Dropdown saat Load */
-    html.forced-open .sidebar.close .submenu { display: none !important; }
-    html.forced-open .sidebar.close .has-submenu.open .submenu { display: flex !important; }
+    /* --- HELPER INPUT --- */
+    .input-currency { text-align: right; }
+    
+    /* --- PAGE ANIMATIONS --- */
+    .animate-enter {
+        animation: contentSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        opacity: 0;
+        transform-origin: top center;
+    }
 
-    /* --- 2. CUSTOM SCROLLBAR UTILITY --- */
-    /* Gunakan class ini di div manapun yg butuh scrollbar tipis */
-    .custom-scrollbar::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-track {
-        background: #f1f5f9; /* slate-100 */
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: #cbd5e1; /* slate-300 */
-        border-radius: 4px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8; /* slate-400 */
-    }
+    /* Helper untuk menyembunyikan elemen saat mode tertentu */
+    .dark .dark-hidden { display: none !important; }
+    .light-hidden { display: none !important; }
+    .dark .light-hidden { display: block !important; }
+}
+
+/* Keyframes Animasi */
+@keyframes contentSlideUp {
+    0% { opacity: 0; transform: translateY(20px) scale(0.99); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes cardPopIn {
+    0% { opacity: 0; transform: translateY(15px); }
+    100% { opacity: 1; transform: translateY(0); }
 }
 
 /* ==========================================================================
-   LAYER BASE
+   2. LAYER BASE (GLOBAL INPUTS & TYPOGRAPHY)
    ========================================================================== */
 @layer base {
-  body { @apply bg-[#f8fafc] text-gray-800 font-sans antialiased; }
-  
-  /* Reset Form Styles Standard */
-  [type='text'], [type='email'], [type='number'], [type='date'], [type='password'], select, textarea {
-    @apply border-gray-300 rounded-lg shadow-sm focus:border-indigo-600 focus:ring-indigo-600 sm:text-sm w-full;
-  }
+    body { 
+        @apply bg-[#f8fafc] text-slate-600 font-sans antialiased transition-colors duration-300;
+        /* Dark Mode Body */
+        @apply dark:bg-[#0f172a] dark:text-slate-300;
+    }
+    
+    /* Judul Halaman / Card */
+    h1, h2, h3, h4, h5, h6 {
+        @apply text-slate-800 dark:text-slate-100;
+    }
+    
+    /* --- GLOBAL INPUT STYLE (Ultra Thin & Crisp) --- */
+    [type='text'], [type='email'], [type='number'], [type='date'], [type='password'], 
+    select, textarea, .form-input, .form-textarea, .form-select {
+        @apply bg-white text-slate-700 text-sm w-full px-4 transition-all duration-200 ease-in-out placeholder:text-slate-400;
+        
+        border: 1px solid #e2e8f0 !important; /* Border Super Tipis (Slate-200) */
+        border-radius: 0.5rem !important; /* Rounded-lg */
+        box-shadow: none !important;
+        height: 48px !important; /* Tinggi Konsisten */
+        
+        /* Dark Mode Input */
+        @apply dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:placeholder:text-slate-500;
+    }
+
+    /* Hover State */
+    [type='text']:hover, [type='email']:hover, textarea:hover, select:hover, 
+    .form-input:hover, .form-select:hover {
+        border-color: #cbd5e1 !important; /* Slate-300 */
+        @apply dark:border-slate-600;
+    }
+
+    /* Focus State - Warna Utama (Indigo) */
+    [type='text']:focus, [type='email']:focus, textarea:focus, select:focus, 
+    .form-input:focus, .form-select:focus {
+        border-color: #6366f1 !important; /* Indigo-500 */
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important; /* Glow Effect Halus */
+        outline: none !important;
+    }
+
+    /* Textarea adjustments */
+    textarea.form-textarea { 
+        @apply h-auto py-3; 
+        min-height: 120px; 
+    }
+    
+    /* Labels */
+    label { 
+        @apply text-[11px] font-bold text-slate-500 mb-2 block uppercase tracking-wide ml-0.5;
+        @apply dark:text-slate-400;
+    }
 }
 
 /* ==========================================================================
-   LAYER COMPONENTS
+   3. LAYER COMPONENTS (SIDEBAR, LAYOUT, CARDS, TABLES)
    ========================================================================== */
 @layer components {
-
-    /* --- 1. SIDEBAR CONTAINER --- */
-    .sidebar {
-        @apply fixed top-0 left-0 h-full w-[260px] bg-[#0f172a] z-50 flex flex-col border-r border-gray-800 shadow-xl;
-        overflow-x: hidden;
-    }
-
-    .sidebar.sidebar-ready {
-        transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1);
-    }
     
+    /* --- SIDEBAR CONFIGURATION --- */
+    .sidebar { 
+        @apply fixed top-0 left-0 h-full w-[260px] bg-[#0f172a] z-[999] flex flex-col border-r border-slate-800 shadow-2xl transition-all duration-300 ease-in-out overflow-x-hidden; 
+        /* Di dark mode, border sidebar diperjelas sedikit */
+        @apply dark:border-r dark:border-slate-800;
+    }
     .sidebar.close { @apply w-[80px]; }
     .sidebar.locked { @apply w-[260px]; }
-
-    .sidebar .menu_container {
-        @apply flex-1 overflow-y-auto overflow-x-hidden py-2; 
-        -ms-overflow-style: none; scrollbar-width: none;
+    
+    .sidebar .menu_container { 
+        @apply flex-1 overflow-y-auto py-2 overflow-x-hidden; 
+        scrollbar-width: none; 
     }
     .sidebar .menu_container::-webkit-scrollbar { display: none; }
-
-
-    /* --- 2. LOGO SECTION --- */
-    .logo_items { 
-        @apply flex items-center pt-6 pb-4 mb-2 h-[80px] whitespace-nowrap overflow-hidden;
-        padding-left: 20px; padding-right: 10px;
-    }
-    .logo_items .nav_image {
-        @apply flex items-center justify-center flex-shrink-0 transition-all duration-300 bg-indigo-600 rounded-lg shadow-lg shadow-indigo-500/30;
-        width: 32px; height: 32px;
-    }
-    .logo_items .logo_text { @apply ml-3; }
-
-
-    /* --- 3. MENU LINKS --- */
-    .menu_title { 
-        @apply mt-6 mb-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest opacity-80 whitespace-nowrap;
-        padding-left: 20px;
-    }
-    .sidebar.sidebar-ready .menu_title { transition: all 300ms ease-in-out; }
-
-    .sidebar .link {
-        @apply flex items-center w-full text-gray-400 mb-1 transition-all duration-200 relative cursor-pointer border-l-[3px] border-transparent;
-        padding-left: 20px; padding-right: 10px; height: 48px;
-    }
-    .sidebar .link:hover { @apply bg-gray-800/50 text-white; }
     
-    .sidebar .link.active { 
-        @apply bg-gray-800 text-white;
-        border-left-color: #4f46e5;
-        padding-left: 17px;
-    }
+    .logo_items { @apply flex items-center pt-6 pb-4 mb-2 h-[80px] pl-5 pr-2.5; }
+    .logo_items .nav_image { @apply flex items-center justify-center flex-shrink-0 bg-indigo-600 rounded-lg shadow-lg w-8 h-8 text-white; }
+    .logo_items .logo_text { @apply ml-3 whitespace-nowrap text-white font-bold text-lg tracking-tight; }
     
-    .sidebar .link i {
-        @apply flex items-center justify-center text-[20px] transition-colors text-gray-500 flex-shrink-0;
-        width: 40px; height: 40px; margin-right: 0;
-    }
-    .sidebar .link:hover i { @apply text-gray-300; }
-    .sidebar .link.active i { @apply text-white; }
-
-    .sidebar .link span {
-        @apply ml-3 opacity-100 transition-opacity duration-200 whitespace-nowrap font-medium text-[13px];
-    }
-    .dropdown-icon { @apply ml-auto text-[16px] transition-transform duration-200 opacity-70 pr-2; }
-
-
-    /* --- 4. SUBMENU --- */
-    .submenu { @apply hidden flex-col bg-gray-900/50 py-1 transition-all; }
-    .has-submenu.open .submenu { @apply flex; }
+    .menu_title { @apply mt-6 mb-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest opacity-80 pl-5 whitespace-nowrap; }
     
-    .submenu .link { 
-        @apply h-9 mb-0 border-l-0 text-gray-500;
-        padding-left: 60px !important; font-size: 13px;
-    }
-    .submenu .link:hover { @apply text-white bg-transparent; }
-    .submenu .link.active {
-        @apply bg-transparent text-indigo-400 font-semibold;
-        border-left: none; padding-left: 60px !important;
-    }
-    .submenu .link i { display: none; }
-
-
-    /* --- 5. PROFILE --- */
-    .sidebar_profile { @apply relative p-0 border-t border-gray-800 mt-auto transition-all; }
-    .profile_trigger { 
-        @apply w-full flex items-center gap-0 cursor-pointer hover:bg-gray-800/50 transition-colors py-3;
-        padding-left: 20px; padding-right: 10px;
-    }
-    .profile_trigger .avatar-wrapper {
-        @apply flex items-center justify-center flex-shrink-0 rounded-full border-2 border-gray-700 overflow-hidden;
-        width: 36px; height: 36px; margin-left: 2px; 
-    }
-    .profile_text { @apply ml-3; }
-
-
-    /* --- 6. STATE CLOSE --- */
-    .sidebar.close .logo_text,
-    .sidebar.close .link span,
-    .sidebar.close .dropdown-icon,
-    .sidebar.close .profile_text,
-    .sidebar.close #sidebar-close {
-        @apply opacity-0 invisible absolute pointer-events-none w-0;
-    }
-    .sidebar.close .menu_title {
-        @apply h-[1px] bg-gray-700/50 my-4 mx-auto p-0 opacity-100 w-[40px];
-        font-size: 0; padding-left: 0;
-    }
-    .sidebar.close .submenu { @apply hidden !important; }
-    .sidebar.close #lock-icon { @apply hidden; }
-
-
-    /* --- 7. MAIN WRAPPER --- */
-    .main-wrapper {
-        @apply relative min-h-screen bg-[#f8fafc] flex flex-col;
-        margin-left: 260px; 
-        width: calc(100% - 260px);
-        transition: none; 
-    }
-    .sidebar.sidebar-ready ~ .main-wrapper {
-        transition: margin-left 300ms cubic-bezier(0.4, 0, 0.2, 1), width 300ms cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .sidebar.close ~ .main-wrapper { 
-        margin-left: 80px; width: calc(100% - 80px);
-    }
-
-    /* --- 8. HOVER EXPAND --- */
-    .sidebar.hover-expand {
-        width: 260px !important;
-        box-shadow: 4px 0 24px rgba(0,0,0,0.3);
-    }
-    .sidebar.hover-expand .logo_text,
-    .sidebar.hover-expand .link span,
-    .sidebar.hover-expand .dropdown-icon,
-    .sidebar.hover-expand .profile_text,
-    .sidebar.hover-expand #sidebar-close {
-        @apply opacity-100 visible static pointer-events-auto w-auto transition-opacity duration-200 delay-75;
-    }
-    .sidebar.hover-expand .menu_title {
-        @apply h-auto bg-transparent mt-6 mb-2 mx-0 w-auto text-[10px];
-        padding-left: 20px;
-    }
-    .sidebar.hover-expand #lock-icon { @apply block; }
-    .sidebar.close.hover-expand .submenu { display: none; }
-    .sidebar.close.hover-expand .has-submenu.open .submenu { display: flex !important; }
+    .sidebar .link { @apply flex items-center w-full text-slate-400 mb-1 relative cursor-pointer border-l-[3px] border-transparent pl-5 pr-2.5 h-12 transition-all duration-200; }
+    .sidebar .link:hover { @apply bg-slate-800/50 text-white; }
+    .sidebar .link.active { @apply bg-slate-800 text-white border-l-indigo-500 pl-[17px]; }
+    .sidebar .link i { @apply flex items-center justify-center text-[20px] text-slate-500 w-10 h-10 mr-0 transition-colors; }
+    .sidebar .link.active i { @apply text-indigo-400; }
+    .sidebar .link span { @apply ml-3 text-[13px] font-medium whitespace-nowrap transition-opacity duration-300; }
     
-    #profile-menu {
-        @apply min-w-[240px] bg-[#1e293b] border border-gray-700 shadow-2xl rounded-xl overflow-hidden;
-        bottom: 100%; left: 0; margin-bottom: 0.5rem; z-index: 9999;
+    /* Sidebar States */
+    .sidebar.close .logo_text, .sidebar.close .link span, .sidebar.close .dropdown-icon, .sidebar.close .profile_text, .sidebar.close #sidebar-close, .sidebar.close #lock-icon { 
+        @apply opacity-0 invisible absolute w-0 pointer-events-none; 
+    }
+    .sidebar.close .menu_title { @apply h-[1px] bg-slate-700/50 my-4 mx-auto p-0 opacity-100 w-[40px] text-[0] pl-0; }
+
+    .sidebar.locked .logo_text, .sidebar.locked .link span, .sidebar.locked .dropdown-icon, .sidebar.locked .profile_text, .sidebar.locked #lock-icon,
+    .sidebar.hover-expand .logo_text, .sidebar.hover-expand .link span, .sidebar.hover-expand .dropdown-icon, .sidebar.hover-expand .profile_text, .sidebar.hover-expand #lock-icon, .sidebar.hover-expand #sidebar-close {
+        @apply opacity-100 visible static w-auto pointer-events-auto delay-75;
+        display: flex !important;
+    }
+
+    .sidebar.hover-expand { width: 260px !important; box-shadow: 4px 0 24px rgba(0,0,0,0.3); }
+    .sidebar.hover-expand .menu_title { @apply h-auto bg-transparent mt-6 mb-2 w-auto text-[10px] pl-5 opacity-100 visible; }
+
+    /* Dropdown Animation */
+    .dropdown-icon { @apply ml-auto text-[16px] opacity-70 pr-2 transition-transform duration-300; }
+    .submenu { @apply flex flex-col bg-slate-900/50 overflow-hidden transition-all duration-300 ease-in-out; max-height: 0; opacity: 0; }
+    .has-submenu.open .submenu { max-height: 500px; opacity: 1; }
+    .has-submenu.open .dropdown-icon { transform: rotate(90deg); }
+    .submenu .link { @apply h-9 mb-0 border-l-0 text-slate-500 pl-[60px] text-[13px]; }
+    .submenu .link.active { @apply bg-transparent text-indigo-400 font-semibold pl-[60px]; }
+    .sidebar.close .submenu { display: none !important; }
+    .sidebar.hover-expand .submenu { display: flex !important; }
+
+    /* Sidebar Footer */
+    .sidebar_profile { @apply relative p-0 border-t border-slate-800 mt-auto; }
+    .profile_trigger { @apply w-full flex items-center gap-0 cursor-pointer hover:bg-slate-800/50 py-3 pl-5 pr-2.5; }
+    .profile_trigger .avatar-wrapper { @apply flex items-center justify-center rounded-full border-2 border-slate-700 overflow-hidden w-9 h-9 ml-[2px]; }
+    .profile_text { @apply ml-3 whitespace-nowrap text-slate-300 text-sm font-medium; }
+
+    /* Main Layout */
+    .main-wrapper { 
+        @apply relative min-h-screen flex flex-col ml-[260px] w-[calc(100%-260px)] transition-all duration-300;
+        @apply bg-[#f8fafc] dark:bg-[#0f172a]; /* Background utama berubah */
+    }
+    .sidebar.close ~ .main-wrapper { margin-left: 80px; width: calc(100% - 80px); }
+
+    /* Top Navbar */
+    nav.top-navbar {
+        @apply bg-white/90 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-40 shadow-sm transition-colors duration-300;
+        @apply dark:bg-slate-900/90 dark:border-slate-800;
+    }
+
+    /* Cards & Widgets */
+    .dashboard-card { 
+        @apply bg-white rounded-xl transition-colors duration-300;
+        border: 1px solid #f1f5f9; 
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
+        @apply dark:bg-slate-800 dark:border-slate-700;
+    }
+    .card-header { 
+        @apply flex items-center gap-3 mb-6 pb-4 border-b border-slate-100;
+        @apply dark:border-slate-700;
+    }
+    .card-title { 
+        @apply text-sm font-bold text-slate-800 uppercase tracking-wider;
+        @apply dark:text-slate-200;
+    }
+
+    .dashboard-stat-card { @apply relative overflow-hidden rounded-xl h-[160px] transition-all duration-300 ease-out cursor-default shadow-sm; }
+    .dashboard-stat-card:hover { transform: translateY(-5px) scale(1.01); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05); filter: brightness(1.02); }
+    .dashboard-stat-icon { @apply w-12 h-12 rounded-lg backdrop-blur-sm flex items-center justify-center border border-white/10 transition-transform duration-300; }
+    .dashboard-stat-card:hover .dashboard-stat-icon { transform: rotate(10deg) scale(1.1); }
+
+    .action-item { @apply flex items-center justify-between p-3 rounded-xl border transition-all duration-200 mb-2 cursor-pointer hover:shadow-md hover:-translate-y-0.5; }
+    .action-item-indigo { @apply bg-indigo-50/50 border-indigo-100 hover:bg-white hover:border-indigo-200; }
+    .action-item-blue { @apply bg-blue-50/50 border-blue-100 hover:bg-white hover:border-blue-200; }
+    .action-item-amber { @apply bg-amber-50/50 border-amber-100 hover:bg-white hover:border-amber-200; }
+    .action-count { @apply px-2.5 py-1 rounded-md text-xs font-bold border; }
+
+    /* Status Badges */
+    .status-badge { @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wide border; }
+    .status-pending { @apply bg-amber-50 text-amber-700 border-amber-200; }
+    .status-approved { @apply bg-emerald-50 text-emerald-700 border-emerald-200; }
+    .status-rejected { @apply bg-red-50 text-red-700 border-red-200; }
+    .status-completed { @apply bg-cyan-50 text-cyan-700 border-cyan-200; }
+    .status-draft { @apply bg-slate-100 text-slate-600 border-slate-200; }
+
+    /* Table Styling */
+    .dashboard-table { @apply w-full text-left border-collapse; }
+    .dashboard-table thead { 
+        @apply bg-slate-50 border-b border-slate-200;
+        @apply dark:bg-slate-800/50 dark:border-slate-700;
+    }
+    .dashboard-table th { 
+        @apply text-xs font-bold text-slate-500 uppercase tracking-wider py-3 px-4;
+        @apply dark:text-slate-400;
+        white-space: nowrap; 
+    }
+    .dashboard-table tbody tr { 
+        @apply border-b border-slate-100 hover:bg-slate-50/60 transition-colors;
+        @apply dark:border-slate-700/50 dark:hover:bg-slate-700/30;
+    }
+    .dashboard-table td { 
+        @apply py-3 px-4 text-sm text-slate-600 font-medium align-middle;
+        @apply dark:text-slate-300;
+        height: 64px; 
     }
     
-    /* ======================================================================= */
-    /* GLOBAL OVERRIDES: SELECT2 (TAILWIND STYLE)                              */
-    /* ======================================================================= */
-    
-   .select2-container--bootstrap-5 .select2-selection { 
-        @apply border-gray-300 rounded-lg shadow-sm bg-white !important;
-        padding-top: 0.55rem !important;
-        padding-bottom: 0.55rem !important;
-        min-height: 42px !important;
-        display: flex !important; 
-        align-items: center !important;
-        background-image: none !important; /* Hapus efek gradient bootstrap jika ada */
+    .dashboard-table .form-input, .dashboard-table .form-select, .dashboard-table .select2-selection--single {
+        height: 36px !important; min-height: 36px !important; font-size: 0.8rem !important; padding-top: 0 !important; padding-bottom: 0 !important;
     }
-    
-    /* 2. Focus State (Ring Indigo) */
-    .select2-container--bootstrap-5.select2-container--focus .select2-selection,
-    .select2-container--bootstrap-5.select2-container--open .select2-selection { 
-        @apply border-indigo-500 !important;
-        box-shadow: 0 0 0 1px #6366f1 !important; 
-    }
-    
-    /* 3. Dropdown Menu (Kotak Pilihan) */
-    .select2-container--bootstrap-5 .select2-dropdown { 
-        @apply border-gray-200 shadow-xl rounded-lg mt-1 overflow-hidden border !important; 
-        z-index: 9999 !important; 
-    }
-    
-    /* 4. Search Box di dalam Dropdown (FIX KOTAK PUTIH) */
-    .select2-container--bootstrap-5 .select2-dropdown .select2-search {
-        padding: 0.5rem !important;
-        background-color: #fff !important; /* Pastikan background putih */
-    }
-    .select2-container--bootstrap-5 .select2-dropdown .select2-search .select2-search__field {
-        @apply border-gray-300 rounded text-sm !important;
-        padding: 0.5rem !important;
-    }
-    .select2-container--bootstrap-5 .select2-dropdown .select2-search .select2-search__field:focus {
-        @apply border-indigo-500 !important;
-        box-shadow: 0 0 0 1px #6366f1 !important;
-    }
+    .dashboard-table .select2-container .select2-selection--single .select2-selection__rendered { line-height: 34px !important; padding-left: 8px !important; }
+    .dashboard-table .select2-container .select2-selection--single .select2-selection__arrow { height: 34px !important; right: 4px !important; }
 
-    /* 5. Item List (Pilihan) */
-    .select2-container--bootstrap-5 .select2-results__option { 
-        @apply text-sm py-2 px-3 text-gray-700 cursor-pointer transition-colors !important; 
-        margin-bottom: 0 !important; /* Reset margin bootstrap */
+    /* Responsive Mobile */
+    @media (max-width: 1023px) {
+        .sidebar { transform: translateX(-100%); width: 280px !important; }
+        .sidebar.mobile-open { transform: translateX(0) !important; box-shadow: 4px 0 24px rgba(0,0,0,0.3); }
+        .main-wrapper { margin-left: 0 !important; width: 100% !important; }
+        .sidebar.mobile-open .logo_text, .sidebar.mobile-open .link span, .sidebar.mobile-open .dropdown-icon, .sidebar.mobile-open .profile_text, .sidebar.mobile-open #sidebar-close { 
+            @apply opacity-100 visible static w-auto pointer-events-auto flex; 
+        }
+        #lock-icon { display: none !important; }
     }
+}
+
+/* ==========================================================================
+   4. SWEETALERT2 OVERRIDES (TOAST & MODAL - CLEAN THEME)
+   ========================================================================== */
+#toast-container { @apply fixed top-4 right-4 z-[10000] flex flex-col gap-2; }
+
+.colored-toast.swal2-popup { 
+    @apply flex items-center w-auto min-w-[300px] max-w-sm p-4 rounded-lg shadow-xl border !important;
+    @apply bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.colored-toast .swal2-title {
+    @apply text-sm font-semibold m-0 p-0 ml-3 text-left !important;
+    @apply text-slate-700 dark:text-slate-200;
+    font-family: 'Inter', sans-serif !important;
+}
+
+.colored-toast.swal2-icon { @apply m-0 border-none !important; }
+.colored-toast.swal2-icon.swal2-success { @apply text-emerald-500 !important; }
+.colored-toast.swal2-icon.swal2-error { @apply text-red-500 !important; }
+.colored-toast.swal2-icon.swal2-warning { @apply text-amber-500 !important; }
+.colored-toast.swal2-icon.swal2-info { @apply text-blue-500 !important; }
+
+.colored-toast.swal2-success .swal2-timer-progress-bar { @apply bg-emerald-500 !important; }
+.colored-toast.swal2-error .swal2-timer-progress-bar { @apply bg-red-500 !important; }
+
+/* Modal Konfirmasi */
+body.swal2-shown > [aria-hidden="true"] { transition: 0.1s filter; filter: blur(2px); }
+
+div:where(.swal2-container) div:where(.swal2-popup) {
+    @apply rounded-xl border shadow-2xl p-0 !important;
+    @apply bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700;
+    font-family: 'Inter', sans-serif !important;
+}
+div:where(.swal2-container) .swal2-title { 
+    @apply text-xl font-bold pt-8 !important;
+    @apply text-slate-800 dark:text-slate-100;
+}
+div:where(.swal2-container) .swal2-html-container { 
+    @apply text-sm !important;
+    @apply text-slate-600 dark:text-slate-400;
+}
+div:where(.swal2-icon) { @apply mt-6 !important; }
+div:where(.swal2-actions) { @apply mb-6 gap-2 !important; }
+
+/* Tombol Batal di Dark Mode */
+div:where(.swal2-container) .swal2-cancel {
+    @apply bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 !important;
+    @apply dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600 dark:border-slate-600;
+}
+
+
+/* ==========================================================================
+   5. SELECT2 OVERRIDES (FIXED & CLEAN ARROW)
+   ========================================================================== */
+/* Reset Focus Outline */
+.select2-container, .select2-container *:focus { outline: none !important; }
+
+/* Container Utama */
+.select2-container .select2-selection--single,
+.select2-container--bootstrap-5 .select2-selection {
+    @apply bg-white border border-slate-200 text-slate-700 rounded-lg;
+    @apply dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200;
     
-    /* 6. Item Highlight / Hover (FIX WARNA BIRU JADI INDIGO) */
-    /* Kita gunakan selector [aria-selected] agar lebih spesifik menimpa Bootstrap */
-    .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected] { 
-        @apply bg-indigo-600 text-white !important; 
-    }
+    height: 48px !important;
+    display: flex !important;
+    align-items: center !important;
+    box-shadow: none !important;
+    transition: all 0.2s ease !important;
+    background-image: none !important; /* Hapus arrow bawaan */
+}
+
+/* Hover & Focus */
+.select2-container .select2-selection--single:hover { 
+    border-color: #cbd5e1 !important; 
+    @apply dark:border-slate-600;
+}
+.select2-container--open .select2-selection--single {
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+
+/* Teks */
+.select2-container .select2-selection--single .select2-selection__rendered {
+    line-height: 48px !important;
+    padding-left: 16px !important;
+    padding-right: 40px !important;
+    @apply text-slate-700 dark:text-slate-200;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+}
+
+/* Placeholder & Clear */
+.select2-container .select2-selection--single .select2-selection__placeholder { color: #94a3b8 !important; }
+.select2-container .select2-selection--single .select2-selection__clear {
+    height: 48px !important;
+    line-height: 48px !important;
+    position: absolute !important;
+    right: 32px !important;
+    top: 0;
+    color: #ef4444 !important;
+    margin-right: 0 !important;
+    font-weight: bold !important;
+    z-index: 10;
+}
+
+/* --- CUSTOM SVG ARROW (THE FIX) --- */
+/* 1. Hapus segitiga lama */
+.select2-container .select2-selection--single .select2-selection__arrow b { display: none !important; }
+
+/* 2. Buat area arrow baru */
+.select2-container .select2-selection--single .select2-selection__arrow {
+    height: 46px !important;
+    position: absolute !important;
+    top: 1px !important;
+    right: 8px !important;
+    width: 24px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     
-    /* 7. Item Selected (Yang sudah dipilih) */
-    .select2-container--bootstrap-5 .select2-results__option[aria-selected="true"] {
-        @apply bg-indigo-50 text-indigo-700 font-semibold !important;
-    }
-    /* Pastikan item selected jika di-hover tetap terlihat jelas */
-    .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected="true"] {
-        @apply bg-indigo-600 text-white !important;
-    }
+    /* SVG Chevron */
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8' stroke-width='2'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3e%3c/svg%3e") !important;
+    background-position: center center !important;
+    background-repeat: no-repeat !important;
+    background-size: 16px 16px !important;
+    transition: transform 0.2s ease !important;
+}
+
+/* 3. Putar saat open */
+.select2-container--open .select2-selection--single .select2-selection__arrow {
+    transform: rotate(180deg) !important;
+}
+
+/* Dropdown Menu */
+.select2-dropdown {
+    @apply bg-white border border-slate-200;
+    @apply dark:bg-slate-800 dark:border-slate-700;
     
-    /* 8. Arrow Icon Correction */
-    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
-        top: 50% !important;
-        transform: translateY(-50%) !important;
-        right: 12px !important;
-        position: absolute !important;
-        width: auto !important;
-        height: auto !important;
-    }
+    border-radius: 0.5rem !important;
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+    padding: 6px !important;
+    z-index: 99999 !important;
+    margin-top: -1px !important;
+}
+.select2-search--dropdown .select2-search__field {
+    @apply bg-slate-50 border border-slate-200 text-slate-700 rounded;
+    @apply dark:bg-slate-900 dark:border-slate-600 dark:text-slate-200;
+    
+    border-radius: 6px !important;
+    padding: 8px 12px !important;
+    font-size: 0.875rem !important;
+    outline: none !important;
+}
+.select2-search--dropdown .select2-search__field:focus { border-color: #6366f1 !important; }
+
+/* Options */
+.select2-results__option {
+    @apply text-slate-600 dark:text-slate-300;
+    padding: 8px 12px !important;
+    font-size: 0.875rem !important;
+    border-radius: 6px !important;
+    margin-bottom: 2px !important;
+}
+.select2-container--default .select2-results__option--highlighted[aria-selected] {
+    @apply bg-indigo-50 text-indigo-600;
+    @apply dark:bg-indigo-900/50 dark:text-indigo-300;
+    font-weight: 500 !important;
+}
+.select2-container--default .select2-results__option[aria-selected=true] {
+    background-color: #e0e7ff !important;
+    color: #4338ca !important;
 }

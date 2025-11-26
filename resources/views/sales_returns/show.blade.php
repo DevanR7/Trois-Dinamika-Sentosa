@@ -3,123 +3,115 @@
 @section('title', 'Detail Retur Penjualan')
 
 @section('content')
-<div class="max-w-5xl mx-auto">
+<div class="max-w-6xl mx-auto pb-20 animate-enter">
     
     {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-            <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <a href="{{ route('sales-returns.index') }}" class="hover:text-indigo-600 transition">Retur Penjualan</a>
-                <span>/</span>
-                <span class="text-gray-800">Detail</span>
-            </div>
-            <h2 class="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
-                <span class="font-mono">{{ $salesReturn->return_number }}</span>
-            </h2>
+            <nav class="flex text-sm text-slate-500 mb-1">
+                <a href="{{ route('sales-returns.index') }}" class="hover:text-indigo-600 transition-colors font-medium">Retur Penjualan</a>
+                <span class="mx-2 text-slate-300">/</span>
+                <span class="text-slate-800 font-semibold">Detail</span>
+            </nav>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-3">
+                No. Retur: <span class="font-mono text-indigo-600 bg-indigo-50 px-2 rounded">{{ $salesReturn->return_number }}</span>
+            </h1>
         </div>
-        <a href="{{ route('sales-returns.index') }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition shadow-sm">
-            Kembali
+        <a href="{{ route('sales-returns.index') }}" class="h-[48px] px-6 bg-white border border-slate-300 rounded-lg text-slate-700 text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
+            <i class="material-icons text-[18px]">arrow_back</i> Kembali
         </a>
     </div>
 
-    {{-- ALERT --}}
-    @if (session('success'))
-        <div class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-r shadow-sm flex justify-between items-center">
-            <div class="flex items-center gap-3">
-                <i class="bi bi-check-circle-fill text-green-500 text-xl"></i>
-                <span class="text-sm text-green-700 font-medium">{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
-
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         {{-- KOLOM KIRI (Span 8) --}}
-        <div class="lg:col-span-8 space-y-6">
+        <div class="lg:col-span-8 space-y-8">
             
             {{-- CARD 1: INFO TRANSAKSI --}}
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                        <i class="bi bi-info-circle text-indigo-500"></i> Data Transaksi
-                    </h3>
+            <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
+                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
+                        <i class="material-icons text-[20px]">info</i>
+                    </div>
+                    <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Informasi Transaksi</h3>
                 </div>
-                <div class="p-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {{-- Klien --}}
-                        <div class="flex items-start gap-4">
-                            <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0 border border-indigo-100">
-                                <i class="bi bi-building text-lg"></i>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Klien</label>
-                                <h4 class="text-base font-bold text-gray-900">{{ $salesReturn->client->client_name }}</h4>
-                                <div class="mt-2 text-sm">
-                                    <span class="text-gray-500 mr-1">Invoice Asal:</span>
-                                    <a href="{{ route('invoices.show', $salesReturn->sales_invoice_id) }}" class="text-indigo-600 font-medium hover:underline font-mono">
-                                        {{ $salesReturn->salesInvoice->invoice_number }}
-                                    </a>
-                                </div>
+                
+                <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {{-- Klien --}}
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0 border border-indigo-100">
+                            <i class="material-icons text-xl">business</i>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1 tracking-wide">Klien</label>
+                            <h4 class="text-base font-bold text-slate-900">{{ $salesReturn->client->client_name }}</h4>
+                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                                <span class="text-xs text-slate-500">Invoice Asal:</span>
+                                <a href="{{ route('invoices.show', $salesReturn->sales_invoice_id) }}" class="text-xs font-bold text-indigo-600 hover:underline font-mono bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
+                                    {{ $salesReturn->salesInvoice->invoice_number }}
+                                </a>
                             </div>
                         </div>
+                    </div>
 
-                        {{-- Lainnya --}}
-                        <div class="space-y-3 border-l border-gray-100 pl-0 md:pl-6">
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs font-medium text-gray-500 uppercase">Tanggal Retur</span>
-                                <span class="text-sm font-semibold text-gray-900">{{ optional($salesReturn->return_date)->format('d F Y') }}</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs font-medium text-gray-500 uppercase">Diproses Oleh</span>
-                                <span class="text-sm font-semibold text-gray-900">{{ $salesReturn->user->full_name ?? 'System' }}</span>
-                            </div>
-                            <div class="flex justify-between items-center pt-2 border-t border-dashed border-gray-200">
-                                <span class="text-xs font-medium text-gray-500 uppercase">Dibuat Pada</span>
-                                <span class="text-xs text-gray-400">{{ $salesReturn->created_at->format('d/m/Y H:i') }}</span>
-                            </div>
+                    {{-- Lainnya --}}
+                    <div class="space-y-4 border-l border-slate-100 pl-0 md:pl-8">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-slate-500 uppercase">Tanggal Retur</span>
+                            <span class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <i class="material-icons text-slate-400 text-[16px]">event</i>
+                                {{ optional($salesReturn->return_date)->format('d F Y') }}
+                            </span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-slate-500 uppercase">Diproses Oleh</span>
+                            <span class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <i class="material-icons text-slate-400 text-[16px]">person</i>
+                                {{ $salesReturn->user->full_name ?? 'System' }}
+                            </span>
                         </div>
                     </div>
                 </div>
             </div>
 
             {{-- CARD 2: ITEM --}}
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-2 bg-red-50">
-                    <i class="bi bi-arrow-counterclockwise text-red-500"></i>
-                    <h3 class="text-xs font-bold text-red-600 uppercase tracking-wider">Item Dikembalikan</h3>
+            <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
+                <div class="px-6 py-4 border-b border-red-100 flex items-center gap-2 bg-red-50/50">
+                    <i class="material-icons text-red-500 text-lg">assignment_return</i>
+                    <h3 class="text-xs font-bold text-red-700 uppercase tracking-wider">Item Dikembalikan</h3>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead class="bg-white border-b border-gray-200">
+                    <table class="dashboard-table min-w-full">
+                        <thead class="bg-slate-50 border-b border-slate-200">
                             <tr>
-                                <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase w-10 text-center">#</th>
-                                <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Produk</th>
-                                <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-center">Qty</th>
-                                <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">Harga Jual (@)</th>
-                                <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">Subtotal</th>
+                                <th class="pl-6 text-center w-12">#</th>
+                                <th>Produk</th>
+                                <th class="text-center">Qty</th>
+                                <th class="text-right">Harga (@)</th>
+                                <th class="text-right pr-6">Subtotal</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100">
+                        <tbody class="divide-y divide-slate-100">
                             @forelse($salesReturn->items as $item)
-                            <tr class="hover:bg-gray-50 transition">
-                                <td class="px-6 py-4 text-center text-sm text-gray-500">{{ $loop->iteration }}</td>
-                                <td class="px-6 py-4">
-                                    <div class="text-sm font-bold text-gray-900">{{ $item->product->product_name ?? 'Produk Dihapus' }}</div>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="pl-6 py-4 text-center text-sm text-slate-500">{{ $loop->iteration }}</td>
+                                <td class="py-4">
+                                    <div class="text-sm font-bold text-slate-800">{{ $item->product->product_name ?? 'Produk Dihapus' }}</div>
                                 </td>
-                                <td class="px-6 py-4 text-center">
-                                    <span class="px-2.5 py-1 rounded-md bg-red-50 text-xs font-bold text-red-700 border border-red-100">
+                                <td class="py-4 text-center">
+                                    <span class="inline-block px-2.5 py-1 rounded-md bg-red-50 text-xs font-bold text-red-700 border border-red-100 shadow-sm">
                                         {{ $item->quantity }} {{ $item->product->unit->name ?? '' }}
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 text-right text-sm text-gray-600">
+                                <td class="py-4 text-right text-sm text-slate-600 font-mono">
                                     Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}
                                 </td>
-                                <td class="px-6 py-4 text-right text-sm font-bold text-gray-900">
+                                <td class="pr-6 py-4 text-right text-sm font-bold text-slate-900 font-mono">
                                     Rp {{ number_format($item->subtotal, 0, ',', '.') }}
                                 </td>
                             </tr>
                             @empty
-                            <tr><td colspan="5" class="text-center py-6 text-gray-500 italic">Tidak ada item.</td></tr>
+                            <tr><td colspan="5" class="text-center py-8 text-slate-500 italic">Tidak ada item.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -128,11 +120,13 @@
 
             {{-- CARD 3: ALASAN --}}
             @if($salesReturn->notes)
-            <div class="bg-yellow-50 rounded-xl border border-yellow-100 p-4 flex gap-3 items-start">
-                <i class="bi bi-sticky text-yellow-600 mt-0.5 text-lg"></i>
+            <div class="bg-amber-50 rounded-xl border border-amber-100 p-5 flex gap-4 items-start shadow-sm">
+                <div class="bg-amber-100 p-2 rounded-full text-amber-600">
+                    <i class="material-icons text-xl">sticky_note_2</i>
+                </div>
                 <div>
-                    <h4 class="text-xs font-bold text-yellow-800 uppercase mb-1">Alasan Retur</h4>
-                    <p class="text-sm text-yellow-900 italic">{{ $salesReturn->notes }}</p>
+                    <h4 class="text-xs font-bold text-amber-800 uppercase mb-1 tracking-wide">Alasan Retur</h4>
+                    <p class="text-sm text-amber-900 italic leading-relaxed">"{{ $salesReturn->notes }}"</p>
                 </div>
             </div>
             @endif
@@ -142,27 +136,36 @@
         {{-- KOLOM KANAN: SUMMARY & AKSI (Span 4) --}}
         <div class="lg:col-span-4 space-y-6">
             
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sticky top-6">
-                <h3 class="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
-                    <i class="bi bi-calculator text-indigo-500"></i> Ringkasan Nilai
+            <div class="dashboard-card p-6 shadow-xl sticky top-6 border-t-4 border-indigo-500">
+                <h3 class="card-title mb-6 border-b border-slate-100 pb-3 flex items-center gap-2">
+                    <i class="material-icons text-indigo-600">calculate</i> Ringkasan Nilai
                 </h3>
 
-                <div class="flex justify-between items-center mb-6">
-                    <span class="text-sm font-bold text-gray-500 uppercase tracking-wider">Total Retur</span>
-                    <span class="text-2xl font-bold text-red-600">Rp {{ number_format($salesReturn->total_amount, 0, ',', '.') }}</span>
+                <div class="flex flex-col items-center justify-center mb-8 bg-slate-50 p-6 rounded-xl border border-slate-100">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Total Retur</span>
+                    <span class="text-3xl font-bold text-red-600 font-mono tracking-tight">Rp {{ number_format($salesReturn->total_amount, 0, ',', '.') }}</span>
                 </div>
 
-                <div class="mt-8 border-t border-dashed border-gray-200 pt-6">
+                <div class="border-t border-dashed border-slate-200 pt-6">
+                    {{-- GLOBAL DELETE HANDLER --}}
                     <form action="{{ route('sales-returns.destroy', $salesReturn->return_id) }}" method="POST" class="delete-form">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="w-full py-2.5 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-bold hover:bg-red-50 transition shadow-sm flex items-center justify-center gap-2 group">
-                            <i class="bi bi-trash group-hover:scale-110 transition-transform"></i> Batalkan Retur
+                        <button type="submit" 
+                                data-title="Batalkan Retur?" 
+                                data-text="Stok akan dikembalikan dan nilai retur dihapus. <b>Data tidak dapat dikembalikan!</b>" 
+                                data-btn-text="Ya, Hapus Permanen"
+                                class="w-full h-[48px] bg-white border border-red-200 text-red-600 rounded-lg text-sm font-bold hover:bg-red-50 transition shadow-sm flex items-center justify-center gap-2 group">
+                            <i class="material-icons text-[20px] group-hover:scale-110 transition-transform">delete_forever</i> Batalkan Retur
                         </button>
                     </form>
-                    <p class="text-center text-[10px] text-gray-400 mt-2 px-4 leading-tight">
-                        Membatalkan retur akan mengurangi stok barang dan membatalkan penyesuaian saldo.
-                    </p>
+                    
+                    <div class="mt-4 flex items-start gap-2 text-[11px] text-slate-400 bg-slate-50 p-3 rounded border border-slate-100">
+                        <i class="material-icons text-[14px] mt-0.5">info</i>
+                        <p class="leading-tight">
+                            Membatalkan retur akan mengurangi stok barang kembali (jika stok sudah bertambah) dan membatalkan penyesuaian saldo piutang/kredit.
+                        </p>
+                    </div>
                 </div>
             </div>
 
@@ -171,30 +174,3 @@
     </div>
 </div>
 @endsection
-
-@push('scripts')
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const deleteForm = document.querySelector('.delete-form');
-    if (deleteForm) {
-        deleteForm.addEventListener('submit', function(event) {
-            event.preventDefault();
-            Swal.fire({
-                title: 'Batalkan Retur?',
-                text: "Stok akan dikembalikan seperti semula. Data ini akan dihapus permanen!",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#ef4444', // Red-500
-                cancelButtonColor: '#6b7280', // Gray-500
-                confirmButtonText: 'Ya, Hapus!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    event.target.submit();
-                }
-            });
-        });
-    }
-});
-</script>
-@endpush

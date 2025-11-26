@@ -2,93 +2,105 @@
 
 @section('title', 'Edit Akun Bank')
 
+@push('styles')
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+@endpush
+
 @section('content')
-<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="max-w-4xl mx-auto pb-20 animate-enter">
     
     {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-            <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <a href="{{ route('company-bank-accounts.index') }}" class="hover:text-indigo-600 transition">Akun Bank</a>
-                <span>/</span>
-                <span class="text-gray-800">Edit</span>
-            </div>
-            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Edit Akun Bank</h2>
-            <p class="text-sm text-gray-500 mt-1">
-                Perbarui data akun: <span class="font-bold text-indigo-600">{{ $account->bank_name }}</span>
-            </p>
+            <nav class="flex items-center gap-2 text-sm text-slate-500 mb-1">
+                <a href="{{ route('company-bank-accounts.index') }}" class="hover:text-indigo-600 transition-colors">Akun Bank</a>
+                <span class="mx-2 text-slate-300">/</span>
+                <span class="text-slate-800 font-semibold">Edit</span>
+            </nav>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Edit Akun Bank</h1>
         </div>
-        <div class="mt-4 sm:mt-0">
-            <a href="{{ route('company-bank-accounts.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition text-sm">
-                <i class="material-icons text-lg mr-2">arrow_back</i> Kembali
-            </a>
-        </div>
+        <a href="{{ route('company-bank-accounts.index') }}" 
+           class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
+            <i class="material-icons text-[18px]">arrow_back</i> Kembali
+        </a>
     </div>
+
+    @if ($errors->any())
+        <div class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div class="flex items-start gap-3">
+                <i class="material-icons text-red-600 text-xl mt-0.5">error_outline</i>
+                <ul class="mt-1 list-disc list-inside text-xs text-red-700">
+                    @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
+                </ul>
+            </div>
+        </div>
+    @endif
 
     <form action="{{ route('company-bank-accounts.update', $account) }}" method="POST">
         @csrf
         @method('PUT')
         
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
-                <i class="material-icons text-indigo-500">edit_note</i>
-                <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Edit Data Akun</h3>
+        <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
+            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+                <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                    <i class="material-icons text-[20px]">edit_note</i>
+                </div>
+                <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Edit Data Akun</h3>
             </div>
             
             <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                 
-                {{-- Nama Bank --}}
                 <div>
-                    <label for="bank_name" class="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Bank <span class="text-red-500">*</span></label>
-                    <input type="text" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" id="bank_name" name="bank_name" value="{{ old('bank_name', $account->bank_name) }}" required>
+                    <label for="bank_name" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Nama Bank <span class="text-red-500">*</span></label>
+                    <input type="text" class="form-input" id="bank_name" name="bank_name" value="{{ old('bank_name', $account->bank_name) }}" required>
+                    @error('bank_name') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
 
-                {{-- Atas Nama --}}
                 <div>
-                    <label for="account_name" class="block text-xs font-bold text-gray-500 uppercase mb-1">Atas Nama <span class="text-red-500">*</span></label>
-                    <input type="text" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" id="account_name" name="account_name" value="{{ old('account_name', $account->account_name) }}" required>
+                    <label for="account_name" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Atas Nama <span class="text-red-500">*</span></label>
+                    <input type="text" class="form-input" id="account_name" name="account_name" value="{{ old('account_name', $account->account_name) }}" required>
+                    @error('account_name') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
 
-                {{-- No Rekening --}}
                 <div>
-                    <label for="account_number" class="block text-xs font-bold text-gray-500 uppercase mb-1">Nomor Rekening</label>
-                    <input type="text" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono" id="account_number" name="account_number" value="{{ old('account_number', $account->account_number) }}">
+                    <label for="account_number" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Nomor Rekening</label>
+                    <input type="text" class="form-input font-mono" id="account_number" name="account_number" value="{{ old('account_number', $account->account_number) }}">
+                    @error('account_number') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
 
-                {{-- Hubungkan ke COA --}}
                 <div>
-                    <label for="chart_of_account_id" class="block text-xs font-bold text-gray-500 uppercase mb-1">Hubungkan ke Akun (COA) <span class="text-red-500">*</span></label>
-                    <select class="select2 form-select block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" id="chart_of_account_id" name="chart_of_account_id" required>
-                        <option value="" disabled>-- Pilih Akun Aset --</option>
+                    <label for="chart_of_account_id" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Hubungkan ke Akun (COA) <span class="text-red-500">*</span></label>
+                    <select class="form-input select2-basic" id="chart_of_account_id" name="chart_of_account_id" required>
                         @foreach ($assetAccounts as $asset)
                             <option value="{{ $asset->account_id }}" @selected(old('chart_of_account_id', $account->chart_of_account_id) == $asset->account_id)>
                                 {{ $asset->account_number }} - {{ $asset->account_name }}
                             </option>
                         @endforeach
                     </select>
+                    @error('chart_of_account_id') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
 
-                {{-- Switch Active --}}
-                <div class="md:col-span-2 pt-2">
-                    <div class="flex items-start">
-                        <div class="flex items-center h-5">
-                            <input id="is_active" name="is_active" type="checkbox" value="1" {{ old('is_active', $account->is_active) ? 'checked' : '' }} class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded cursor-pointer">
+                <div class="md:col-span-2 pt-4 border-t border-slate-100">
+                    <label class="flex items-center cursor-pointer group w-fit">
+                        <div class="relative">
+                            <input type="checkbox" id="is_active" name="is_active" value="1" {{ old('is_active', $account->is_active) ? 'checked' : '' }} class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                         </div>
-                        <div class="ml-3 text-sm">
-                            <label for="is_active" class="font-medium text-gray-700 cursor-pointer">Status Aktif</label>
-                            <p class="text-gray-500 text-xs">Akun aktif dapat dipilih dalam transaksi pembayaran.</p>
+                        <div class="ml-3">
+                            <span class="text-sm font-medium text-slate-700 group-hover:text-indigo-600 transition-colors block">Status Aktif</span>
                         </div>
-                    </div>
+                    </label>
                 </div>
-
             </div>
 
-            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-                <a href="{{ route('company-bank-accounts.index') }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 shadow-sm transition">
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <a href="{{ route('company-bank-accounts.index') }}" 
+                   class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center shadow-sm">
                     Batal
                 </a>
-                <button type="submit" class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-lg font-bold text-sm text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 shadow-md transition">
-                    <i class="material-icons text-lg mr-2">check_circle</i> Update Akun
+                <button type="submit" 
+                        class="h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5">
+                    <i class="material-icons text-[20px] group-hover:scale-110 transition-transform">check_circle</i> Update Akun
                 </button>
             </div>
         </div>
@@ -97,9 +109,12 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
     $(document).ready(function() {
-        $('.select2').select2({ theme: 'bootstrap-5', width: '100%' });
+        $('.select2-basic').select2({ placeholder: '-- Pilih Akun Aset --', allowClear: false, width: '100%', dropdownCssClass: 'select2-dropdown-clean' });
+        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
+        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
     });
 </script>
 @endpush

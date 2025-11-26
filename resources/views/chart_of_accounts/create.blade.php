@@ -2,56 +2,75 @@
 
 @section('title', 'Buat Akun COA')
 
+@push('styles')
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+@endpush
+
 @section('content')
-<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="max-w-3xl mx-auto pb-20 animate-enter">
     
     {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-            <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <a href="{{ route('chart-of-accounts.index') }}" class="hover:text-indigo-600 transition">Chart of Accounts</a>
-                <span>/</span>
-                <span class="text-gray-800">Baru</span>
-            </div>
-            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Buat Akun Baru (COA)</h2>
-            <p class="text-sm text-gray-500 mt-1">Tambahkan akun buku besar untuk pencatatan akuntansi.</p>
+            <nav class="flex items-center gap-2 text-sm text-slate-500 mb-1">
+                <a href="{{ route('chart-of-accounts.index') }}" class="hover:text-indigo-600 transition-colors">Chart of Accounts</a>
+                <span class="mx-2 text-slate-300">/</span>
+                <span class="text-slate-800 font-semibold">Baru</span>
+            </nav>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Buat Akun Baru (COA)</h1>
         </div>
-        <div class="mt-4 sm:mt-0">
-            <a href="{{ route('chart-of-accounts.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition text-sm">
-                <i class="material-icons text-lg mr-2">arrow_back</i> Kembali
-            </a>
-        </div>
+        <a href="{{ route('chart-of-accounts.index') }}" 
+           class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
+            <i class="material-icons text-[18px]">arrow_back</i> Kembali
+        </a>
     </div>
+
+    {{-- ALERT ERROR --}}
+    @if ($errors->any())
+        <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-md shadow-sm">
+            <div class="flex items-start gap-3">
+                <i class="material-icons text-red-600 text-xl mt-0.5">error_outline</i>
+                <div>
+                    <h3 class="text-sm font-bold text-red-800">Terdapat kesalahan input</h3>
+                    <ul class="mt-1 list-disc list-inside text-xs text-red-600">
+                        @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
+                    </ul>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <form action="{{ route('chart-of-accounts.store') }}" method="POST" id="coa-form">
         @csrf
         
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
-                <i class="material-icons text-indigo-500">account_tree</i>
-                <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Form Akun</h3>
+        <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
+            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+                <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                    <i class="material-icons text-[20px]">account_tree</i>
+                </div>
+                <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Form Akun</h3>
             </div>
             
             <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                 
                 {{-- Nomor Akun --}}
                 <div>
-                    <label for="account_number" class="block text-xs font-bold text-gray-500 uppercase mb-1">Nomor Akun <span class="text-red-500">*</span></label>
-                    <input type="text" name="account_number" id="account_number" value="{{ old('account_number') }}" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono" placeholder="Contoh: 1-1001" required>
+                    <label for="account_number" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Nomor Akun <span class="text-red-500">*</span></label>
+                    <input type="text" name="account_number" id="account_number" value="{{ old('account_number') }}" class="form-input font-mono text-indigo-600 font-bold" placeholder="Contoh: 1-1001" required>
                     @error('account_number') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
 
                 {{-- Nama Akun --}}
                 <div>
-                    <label for="account_name" class="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Akun <span class="text-red-500">*</span></label>
-                    <input type="text" name="account_name" id="account_name" value="{{ old('account_name') }}" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Contoh: Kas Besar" required>
+                    <label for="account_name" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Nama Akun <span class="text-red-500">*</span></label>
+                    <input type="text" name="account_name" id="account_name" value="{{ old('account_name') }}" class="form-input" placeholder="Contoh: Kas Besar" required>
                     @error('account_name') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
 
                 {{-- Tipe Akun --}}
                 <div>
-                    <label for="account_type" class="block text-xs font-bold text-gray-500 uppercase mb-1">Tipe Akun <span class="text-red-500">*</span></label>
-                    <select name="account_type" id="account_type" class="form-select block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>
+                    <label for="account_type" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Tipe Akun <span class="text-red-500">*</span></label>
+                    <select name="account_type" id="account_type" class="form-input select2-basic" required>
                         <option value="" disabled selected>-- Pilih Tipe --</option>
                         @foreach ($accountTypes as $type)
                             <option value="{{ $type }}" @selected(old('account_type') == $type)>{{ $type }}</option>
@@ -62,8 +81,8 @@
 
                 {{-- Saldo Normal --}}
                 <div>
-                    <label for="normal_balance" class="block text-xs font-bold text-gray-500 uppercase mb-1">Saldo Normal <span class="text-red-500">*</span></label>
-                    <select name="normal_balance" id="normal_balance" class="form-select block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>
+                    <label for="normal_balance" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Saldo Normal <span class="text-red-500">*</span></label>
+                    <select name="normal_balance" id="normal_balance" class="form-input select2-basic" required>
                         <option value="" disabled selected>-- Pilih Saldo --</option>
                         @foreach ($normalBalances as $balance)
                             <option value="{{ $balance }}" @selected(old('normal_balance') == $balance)>{{ $balance }}</option>
@@ -74,8 +93,8 @@
 
                 {{-- Akun Induk --}}
                 <div class="md:col-span-2">
-                    <label for="parent_account_id" class="block text-xs font-bold text-gray-500 uppercase mb-1">Akun Induk (Opsional)</label>
-                    <select name="parent_account_id" id="parent_account_id" class="form-select block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <label for="parent_account_id" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Akun Induk (Opsional)</label>
+                    <select name="parent_account_id" id="parent_account_id" class="form-input select2-basic">
                         <option value="">-- Tidak Ada Induk (Jadikan Akun Parent) --</option>
                         @foreach ($parentAccounts as $parent)
                             <option value="{{ $parent->account_id }}" @selected(old('parent_account_id') == $parent->account_id)>
@@ -83,35 +102,38 @@
                             </option>
                         @endforeach
                     </select>
-                    <p class="mt-1 text-xs text-gray-500">Pilih ini jika Anda ingin mengelompokkan akun (Sub-akun).</p>
+                    <p class="mt-1.5 text-[11px] text-slate-400 flex items-center gap-1"><i class="material-icons text-[12px]">info</i> Pilih ini jika Anda ingin mengelompokkan akun (Sub-akun).</p>
+                    @error('parent_account_id') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
 
                 {{-- Deskripsi --}}
                 <div class="md:col-span-2">
-                    <label for="description" class="block text-xs font-bold text-gray-500 uppercase mb-1">Deskripsi (Opsional)</label>
-                    <textarea name="description" id="description" rows="2" class="form-textarea block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">{{ old('description') }}</textarea>
+                    <label for="description" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Deskripsi (Opsional)</label>
+                    <textarea name="description" id="description" rows="2" class="form-textarea">{{ old('description') }}</textarea>
+                    @error('description') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
 
                 {{-- Status Switch --}}
-                <div class="md:col-span-2 pt-2 border-t border-gray-100">
-                    <div class="flex items-start">
-                        <div class="flex items-center h-5">
-                            <input id="is_active" name="is_active" type="checkbox" value="1" checked class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded cursor-pointer">
+                <div class="md:col-span-2 pt-4 border-t border-slate-100">
+                    <label class="flex items-center cursor-pointer group w-fit">
+                        <div class="relative">
+                            <input type="checkbox" id="is_active" name="is_active" value="1" checked class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                         </div>
-                        <div class="ml-3 text-sm">
-                            <label for="is_active" class="font-medium text-gray-700 cursor-pointer">Aktifkan Akun Ini</label>
-                        </div>
-                    </div>
+                        <span class="ml-3 text-sm font-medium text-slate-700 group-hover:text-indigo-600 transition-colors">Aktifkan Akun Ini</span>
+                    </label>
                 </div>
 
             </div>
 
-            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-                <a href="{{ route('chart-of-accounts.index') }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 shadow-sm transition">
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <a href="{{ route('chart-of-accounts.index') }}" 
+                   class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center shadow-sm">
                     Batal
                 </a>
-                <button type="submit" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-lg font-bold text-sm text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-md transition">
-                    <i class="material-icons text-lg mr-2">save</i> Simpan Akun
+                <button type="submit" 
+                        class="h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5">
+                    <i class="material-icons text-[20px] group-hover:scale-110 transition-transform">save</i> Simpan Akun
                 </button>
             </div>
         </div>
@@ -120,20 +142,13 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
-    document.getElementById('coa-form').addEventListener('submit', function(e) {
-        const accNum = document.getElementById('account_number').value;
-        const accName = document.getElementById('account_name').value;
-        if(!accNum || !accName) {
-            e.preventDefault();
-            Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: 'Nomor dan Nama Akun wajib diisi.',
-                confirmButtonColor: '#6366f1'
-            });
-        }
+    $(document).ready(function() {
+        $('.select2-basic').select2({ placeholder: '-- Pilih --', allowClear: true, width: '100%', dropdownCssClass: 'select2-dropdown-clean' });
+        
+        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
+        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
     });
 </script>
 @endpush

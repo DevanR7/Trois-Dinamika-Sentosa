@@ -8,36 +8,36 @@
 @endphp
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="max-w-7xl mx-auto pb-20 animate-enter">
     
-    {{-- HEADER HALAMAN --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+    {{-- HEADER --}}
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-            <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <a href="{{ route('invoices.index') }}" class="hover:text-indigo-600 transition">Invoice</a>
-                <span>/</span>
-                <span class="text-gray-800">Pembayaran Batch</span>
-            </div>
-            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Pembayaran Piutang (Batch)</h2>
-            <p class="text-sm text-gray-500 mt-1">Catat satu pembayaran untuk melunasi beberapa invoice sekaligus.</p>
+            <nav class="flex text-sm text-slate-500 mb-1">
+                <a href="{{ route('invoices.index') }}" class="hover:text-indigo-600 transition-colors">Invoice</a>
+                <span class="mx-2 text-slate-300">/</span>
+                <span class="text-slate-800 font-semibold">Batch Payment</span>
+            </nav>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Pembayaran Piutang (Batch)</h1>
+            <p class="text-slate-500 text-sm mt-1">Catat satu pembayaran untuk melunasi beberapa invoice sekaligus.</p>
         </div>
-        <div class="mt-4 sm:mt-0">
-            <a href="{{ route('invoices.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition text-sm">
-                <i class="bi bi-arrow-left mr-2"></i> Kembali ke List
-            </a>
-        </div>
+        <a href="{{ route('invoices.index') }}" class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
+            <i class="material-icons text-[18px]">arrow_back</i> Kembali ke List
+        </a>
     </div>
 
     {{-- ALERT ERROR --}}
     @if ($errors->any() || session('error'))
-        <div class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-            <i class="bi bi-exclamation-triangle-fill text-red-500 mt-0.5 text-lg"></i>
-            <div>
-                <h3 class="text-sm font-bold text-red-800">Terdapat kesalahan</h3>
-                <ul class="mt-1 list-disc list-inside text-sm text-red-700">
-                    @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
-                    @if (session('error')) <li>{{ session('error') }}</li> @endif
-                </ul>
+        <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-md shadow-sm animate-enter">
+            <div class="flex items-start gap-3">
+                <i class="material-icons text-red-600 text-xl mt-0.5">error_outline</i>
+                <div>
+                    <h3 class="text-sm font-bold text-red-800">Terdapat kesalahan</h3>
+                    <ul class="mt-1 list-disc list-inside text-xs text-red-600">
+                        @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
+                        @if (session('error')) <li>{{ session('error') }}</li> @endif
+                    </ul>
+                </div>
             </div>
         </div>
     @endif
@@ -48,40 +48,36 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             {{-- KOLOM KIRI (FORM UTAMA) --}}
-            <div class="lg:col-span-2 space-y-6">
+            <div class="lg:col-span-2 space-y-8">
                 
                 {{-- CARD 1: PILIH KLIEN --}}
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div class="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
-                        <div class="bg-indigo-100 p-1.5 rounded text-indigo-600">
-                            <i class="bi bi-person-check text-lg"></i>
+                <div class="dashboard-card p-0 overflow-hidden shadow-sm">
+                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+                        <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                            <i class="material-icons text-[20px]">person_search</i>
                         </div>
-                        <h3 class="text-base font-bold text-gray-900">1. Pilih Klien</h3>
+                        <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">1. Pilih Klien</h3>
                     </div>
                     
-                    <div class="grid grid-cols-1 gap-4">
-                        <div>
-                            <label for="client_id" class="block text-sm font-medium text-gray-700 mb-1">Nama Klien <span class="text-red-500">*</span></label>
-                            <select name="client_id" id="client_id" class="w-full" required>
-                                <option value="" disabled selected>-- Cari Klien --</option>
-                                @foreach ($clients as $client)
-                                    <option value="{{ $client->client_id }}">{{ $client->client_name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    <div class="p-6">
+                        <label for="client_id" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Nama Klien <span class="text-red-500">*</span></label>
+                        <select name="client_id" id="client_id" class="form-input select2-basic" required>
+                            <option value="" disabled selected>-- Cari Klien --</option>
+                            @foreach ($clients as $client)
+                                <option value="{{ $client->client_id }}">{{ $client->client_name }}</option>
+                            @endforeach
+                        </select>
 
                         {{-- Info Saldo Kredit (Hidden by default) --}}
-                        <div id="client-credit-info" class="bg-green-50 border border-green-200 rounded-lg p-4 hidden">
-                            <div class="flex items-start gap-3">
-                                <div class="p-2 bg-green-100 rounded-full text-green-600">
-                                    <i class="bi bi-wallet2 text-xl"></i>
+                        <div id="client-credit-info" class="mt-6 bg-emerald-50 border border-emerald-100 rounded-xl p-4 hidden">
+                            <div class="flex items-center gap-4">
+                                <div class="p-3 bg-white rounded-full text-emerald-600 shadow-sm">
+                                    <i class="material-icons text-2xl">account_balance_wallet</i>
                                 </div>
                                 <div>
-                                    <span class="block text-xs font-bold text-green-800 uppercase tracking-wide">Saldo Kredit Tersedia</span>
-                                    <strong class="text-xl text-green-900" id="client-credit-balance">Rp 0</strong>
-                                    <div class="mt-1 pt-1 border-t border-green-200 text-xs text-green-700">
-                                        Pending / Tertahan: <span id="client-pending-balance" class="font-medium">Rp 0</span>
-                                    </div>
+                                    <span class="block text-xs font-bold text-emerald-800 uppercase tracking-wide">Saldo Kredit Tersedia</span>
+                                    <strong class="text-xl text-emerald-700 font-mono" id="client-credit-balance">Rp 0</strong>
+                                    <p class="text-[10px] text-emerald-600 mt-0.5">Pending: <span id="client-pending-balance">Rp 0</span></p>
                                 </div>
                             </div>
                         </div>
@@ -89,48 +85,48 @@
                 </div>
 
                 {{-- CARD 2: DETAIL PEMBAYARAN --}}
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div class="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
-                        <div class="bg-indigo-100 p-1.5 rounded text-indigo-600">
-                            <i class="bi bi-credit-card text-lg"></i>
+                <div class="dashboard-card p-0 overflow-hidden shadow-sm">
+                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+                        <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                            <i class="material-icons text-[20px]">payments</i>
                         </div>
-                        <h3 class="text-base font-bold text-gray-900">2. Detail Pembayaran</h3>
+                        <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">2. Detail Pembayaran</h3>
                     </div>
 
-                    <div class="space-y-6">
+                    <div class="p-6 space-y-6">
                         {{-- Switch Kredit --}}
-                        <div class="bg-gray-50 rounded-lg p-3 border border-gray-200" id="use-credit-container" style="display: none;">
-                            <div class="flex items-center">
-                                <input type="checkbox" id="use_credit" name="use_credit" value="1" class="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer">
-                                <label for="use_credit" class="ml-3 block text-sm font-medium text-gray-900 cursor-pointer select-none">
-                                    Gunakan Saldo Kredit untuk pembayaran ini?
-                                </label>
-                            </div>
+                        <div class="bg-slate-50 rounded-lg p-4 border border-slate-200" id="use-credit-container" style="display: none;">
+                            <label class="flex items-center cursor-pointer select-none">
+                                <div class="relative">
+                                    <input type="checkbox" id="use_credit" name="use_credit" value="1" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                </div>
+                                <span class="ml-3 text-sm font-bold text-slate-700">Gunakan Saldo Kredit?</span>
+                            </label>
+                            <p class="text-xs text-slate-500 mt-1 ml-14">Jika aktif, pembayaran akan memotong saldo deposit klien terlebih dahulu.</p>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {{-- Total Amount --}}
-                            <div class="md:col-span-1">
-                                <label for="total_amount_formatted" class="block text-xs font-bold text-gray-500 uppercase mb-1">Total Dana Diterima (Non-Kredit)</label>
-                                <div class="relative rounded-md shadow-sm">
-                                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                        <span class="text-gray-500 sm:text-sm">Rp</span>
-                                    </div>
-                                    <input type="text" id="total_amount_formatted" class="block w-full rounded-lg border-gray-300 pl-10 focus:border-indigo-500 focus:ring-indigo-500 text-lg font-bold text-green-600 placeholder-gray-300" placeholder="0">
+                            <div>
+                                <label for="total_amount_formatted" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Total Dana Diterima (Non-Kredit)</label>
+                                <div class="relative">
+                                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">Rp</span>
+                                    <input type="text" id="total_amount_formatted" class="form-input pl-10 text-lg font-bold text-emerald-600 font-mono placeholder:text-slate-300" placeholder="0">
                                     <input type="hidden" name="total_amount" id="total_amount" value="0">
                                 </div>
                             </div>
 
                             {{-- Tanggal Bayar --}}
-                            <div class="md:col-span-1">
-                                <label for="payment_date" class="block text-xs font-bold text-gray-500 uppercase mb-1">Tanggal Bayar</label>
-                                <input type="date" name="payment_date" id="payment_date" value="{{ now()->format('Y-m-d') }}" class="block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>
+                            <div>
+                                <label for="payment_date" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Tanggal Bayar</label>
+                                <input type="date" name="payment_date" id="payment_date" value="{{ now()->format('Y-m-d') }}" class="form-input" required>
                             </div>
 
                             {{-- Metode Bayar --}}
-                            <div class="md:col-span-1">
-                                <label for="payment_method_id" class="block text-xs font-bold text-gray-500 uppercase mb-1">Metode Bayar</label>
-                                <select name="payment_method_id" id="payment_method_id" class="block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm form-select">
+                            <div>
+                                <label for="payment_method_id" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Metode Bayar</label>
+                                <select name="payment_method_id" id="payment_method_id" class="form-input select2-basic">
                                     <option value="">-- Pilih Metode --</option>
                                     @foreach ($paymentMethods as $method)
                                         <option value="{{ $method->payment_method_id }}" data-config="{{ $method->required_fields_config }}">
@@ -141,9 +137,9 @@
                             </div>
 
                             {{-- Akun Bank --}}
-                            <div class="md:col-span-1">
-                                <label for="company_bank_account_id_batch_payment" class="block text-xs font-bold text-gray-500 uppercase mb-1">Masuk ke Akun (Kas/Bank)</label>
-                                <select name="company_bank_account_id" id="company_bank_account_id_batch_payment" class="block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm form-select">
+                            <div>
+                                <label for="company_bank_account_id_batch_payment" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Masuk ke Akun (Kas/Bank)</label>
+                                <select name="company_bank_account_id" id="company_bank_account_id_batch_payment" class="form-input select2-basic">
                                     <option value="">-- Pilih Akun --</option>
                                     @foreach($companyBankAccounts as $account)
                                         <option value="{{ $account->company_bank_account_id }}">
@@ -155,19 +151,19 @@
 
                             {{-- Conditional Fields --}}
                             <div class="md:col-span-1" id="payment-reference-group-batch-payment" style="display: none;">
-                                <label for="reference_number_batch_payment" class="block text-xs font-bold text-gray-500 uppercase mb-1">Nomor Referensi</label>
-                                <input type="text" name="reference_number" id="reference_number_batch_payment" class="block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="No. Cek / Giro / Transfer">
+                                <label for="reference_number_batch_payment" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Nomor Referensi</label>
+                                <input type="text" name="reference_number" id="reference_number_batch_payment" class="form-input" placeholder="No. Cek / Giro / Transfer">
                             </div>
 
                             <div class="md:col-span-1" id="payment-proof-group-batch-payment" style="display: none;">
-                                <label for="proof_of_payment_batch_payment" class="block text-xs font-bold text-gray-500 uppercase mb-1">Bukti Transfer</label>
-                                <input type="file" name="proof_of_payment" id="proof_of_payment_batch_payment" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept="image/jpeg,image/png,image/jpg">
+                                <label for="proof_of_payment_batch_payment" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Bukti Transfer</label>
+                                <input type="file" name="proof_of_payment" id="proof_of_payment_batch_payment" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept="image/jpeg,image/png,image/jpg">
                             </div>
 
                             {{-- Notes --}}
                             <div class="md:col-span-2">
-                                <label for="notes" class="block text-xs font-bold text-gray-500 uppercase mb-1">Catatan (Opsional)</label>
-                                <textarea name="notes" id="notes" rows="2" class="block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Tambahkan keterangan pembayaran..."></textarea>
+                                <label for="notes" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Catatan (Opsional)</label>
+                                <textarea name="notes" id="notes" rows="2" class="form-textarea" placeholder="Tambahkan keterangan pembayaran..."></textarea>
                             </div>
                         </div>
                     </div>
@@ -177,50 +173,68 @@
 
             {{-- KOLOM KANAN (INVOICE ALLOCATION) --}}
             <div class="lg:col-span-1">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-[600px] sticky top-6">
-                    <div class="p-4 border-b border-gray-200 bg-gray-50 rounded-t-xl">
+                <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5 flex flex-col h-[600px] sticky top-6">
+                    
+                    {{-- Header List Invoice --}}
+                    <div class="p-4 border-b border-slate-200 bg-slate-50/80 rounded-t-xl">
                         <div class="flex items-center gap-2 mb-1">
-                            <div class="bg-indigo-100 p-1 rounded text-indigo-600">
-                                <i class="bi bi-list-check"></i>
+                            <div class="bg-indigo-100 p-1.5 rounded text-indigo-600">
+                                <i class="material-icons text-[18px]">playlist_add_check</i>
                             </div>
-                            <h3 class="text-sm font-bold text-gray-900 uppercase">3. Alokasi Invoice</h3>
+                            <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">3. Alokasi Invoice</h3>
                         </div>
-                        <p class="text-xs text-gray-500">Sistem melunasi dari invoice terlama.</p>
+                        <p class="text-[10px] text-slate-500 ml-8">Sistem melunasi dari invoice terlama.</p>
                     </div>
 
-                    {{-- List Container --}}
-                    <div class="flex-1 overflow-y-auto invoice-scroll-area relative bg-white">
+                    {{-- List Container (Tabel Invoice) --}}
+                    <div class="flex-1 overflow-y-auto custom-scrollbar relative bg-white">
                         {{-- Placeholder State --}}
-                        <div id="invoice-placeholder" class="flex flex-col items-center justify-center h-full text-gray-400 p-6 text-center">
-                            <i class="bi bi-search text-4xl mb-2 opacity-30"></i>
-                            <p class="text-sm">Silakan pilih klien untuk memuat tagihan.</p>
+                        <div id="invoice-placeholder" class="flex flex-col items-center justify-center h-full text-slate-400 p-8 text-center">
+                            <i class="material-icons text-5xl mb-3 opacity-20">search</i>
+                            <p class="text-sm font-medium">Silakan pilih klien untuk memuat tagihan.</p>
                         </div>
 
                         {{-- Table --}}
-                        <table class="min-w-full divide-y divide-gray-200 hidden" id="invoice-table">
-                            <thead class="bg-gray-50 sticky top-0 z-10">
+                        <table class="min-w-full divide-y divide-slate-100 hidden" id="invoice-table">
+                            <thead class="bg-slate-50 sticky top-0 z-10 shadow-sm">
                                 <tr>
-                                    <th scope="col" class="px-4 py-3 text-center w-10">
-                                        <input type="checkbox" id="check-all-invoices" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 cursor-pointer">
+                                    <th scope="col" class="px-4 py-3 text-center w-10 border-b border-slate-200">
+                                        <input type="checkbox" id="check-all-invoices" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
                                     </th>
-                                    <th scope="col" class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice</th>
-                                    <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Sisa</th>
+                                    <th scope="col" class="px-2 py-3 text-left text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Invoice</th>
+                                    <th scope="col" class="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Sisa</th>
                                 </tr>
                             </thead>
-                            <tbody class="bg-white divide-y divide-gray-200" id="invoice-list-body">
+                            <tbody class="bg-white divide-y divide-slate-50" id="invoice-list-body">
                                 {{-- JS will render rows here --}}
                             </tbody>
                         </table>
                     </div>
 
-                    {{-- Footer Action --}}
-                    <div class="p-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-                        <div class="flex justify-between items-end mb-4">
-                            <span class="text-xs font-bold text-gray-500 uppercase">Total Dipilih</span>
-                            <span class="text-xl font-bold text-gray-900" id="total-selected-display">Rp 0</span>
+                    {{-- Footer Action & Summary --}}
+                    <div class="p-5 border-t border-slate-200 bg-slate-50">
+                        
+                        {{-- RINGKASAN KALKULASI --}}
+                        <div class="space-y-2 mb-5 text-sm">
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-500 font-medium">Total Tagihan</span>
+                                <span class="font-bold text-slate-800" id="display-total-bill">Rp 0</span>
+                            </div>
+                            
+                            {{-- Baris Potongan Kredit (Hidden by default) --}}
+                            <div id="summary-credit-row" class="flex justify-between items-center text-emerald-600 hidden animate-enter">
+                                <span class="font-bold flex items-center gap-1"><i class="material-icons text-[14px]">account_balance_wallet</i> Potong Deposit</span>
+                                <span class="font-bold font-mono" id="display-credit-used">- Rp 0</span>
+                            </div>
+
+                            <div class="border-t border-slate-200 pt-2 mt-2 flex justify-between items-center">
+                                <span class="text-xs font-bold text-slate-500 uppercase">Harus Dibayar (Cash)</span>
+                                <span class="text-xl font-bold text-indigo-700 font-mono" id="total-selected-display">Rp 0</span>
+                            </div>
                         </div>
-                        <button type="submit" class="w-full py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 flex justify-center items-center transition">
-                            <i class="bi bi-check-lg mr-2 text-lg"></i> Simpan Pembayaran
+
+                        <button type="submit" class="w-full h-[48px] bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg shadow-md transition-all flex justify-center items-center gap-2 group hover:-translate-y-0.5">
+                            <i class="material-icons text-[20px] group-hover:scale-110 transition-transform">check_circle</i> Simpan Pembayaran
                         </button>
                     </div>
                 </div>
@@ -237,7 +251,6 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // --- VARIABEL & ELEMENT (LOGIKA SAMA PERSIS) ---
     const clientSelect = $('#client_id');
     const invoiceTable = document.getElementById('invoice-table');
     const invoiceListBody = document.getElementById('invoice-list-body');
@@ -265,7 +278,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const defaultPaymentMethodId = "{{ $defaultPaymentMethodId }}";
     const defaultBankAccountId = "{{ $defaultBankAccountId }}";
 
-    // --- LOGIC 1: PAYMENT METHOD TOGGLE ---
+    // --- INIT SELECT2 ---
+    $('.select2-basic').select2({ placeholder: '-- Pilih --', allowClear: true, width: '100%', dropdownCssClass: 'select2-dropdown-clean' });
+
+    // --- PAYMENT METHOD LOGIC ---
     function handlePaymentMethodChange() {
         if (!paymentMethodSelect) return;
         const selectedOption = paymentMethodSelect.options[paymentMethodSelect.selectedIndex];
@@ -289,16 +305,14 @@ document.addEventListener('DOMContentLoaded', function () {
             referenceInput.required = true;
         }
     }
-    
     if (paymentMethodSelect) {
         paymentMethodSelect.addEventListener('change', handlePaymentMethodChange);
     }
-    
-    // --- LOGIC 2: AUTONUMERIC ---
+
+    // --- AUTONUMERIC ---
     const autoNumericInstance = new AutoNumeric(amountFormattedInput, {
         digitGroupSeparator: '.',
         decimalCharacter: ',',
-        decimalCharacterAlternative: '.',
         decimalPlaces: 0,
         minimumValue: 0
     });
@@ -308,25 +322,12 @@ document.addEventListener('DOMContentLoaded', function () {
         toggleRequiredFields();
     });
 
-    // --- LOGIC 3: CLIENT SELECT2 ---
-    clientSelect.select2({
-        theme: 'bootstrap-5',
-        placeholder: '-- Cari Klien --',
-        width: '100%'
-    });
-
-    // --- LOGIC 4: HELPER FORMAT ---
+    // --- HELPER FORMAT ---
     function formatRupiah(number) {
-        if (isNaN(number)) return 'Rp 0';
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency', 
-            currency: 'IDR', 
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 2
-        }).format(number);
+        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
     }
 
-    // --- LOGIC 5: CALCULATE TOTAL ---
+    // --- CALCULATE TOTAL ---
     function calculateTotalSelected() {
         let total = 0;
         document.querySelectorAll('.invoice-checkbox:checked').forEach(checkbox => {
@@ -336,67 +337,81 @@ document.addEventListener('DOMContentLoaded', function () {
         toggleRequiredFields();
     }
 
-    // --- LOGIC 6: TOGGLE REQUIRED (CREDIT LOGIC) ---
+    // --- TOGGLE REQUIRED (CREDIT LOGIC) ---
     function toggleRequiredFields() {
-        const selectedInvoiceBalanceString = totalSelectedDisplay.textContent || 'Rp 0';
-        const selectedInvoiceBalance = parseFloat(selectedInvoiceBalanceString.replace(/[^0-9,-]+/g,"").replace(",", ".")) || 0;
+        // 1. Ambil Total Tagihan yang dipilih (Raw Number)
+        let totalBill = 0;
+        document.querySelectorAll('.invoice-checkbox:checked').forEach(checkbox => {
+            totalBill += parseFloat(checkbox.dataset.balance || 0);
+        });
 
+        // 2. Variabel Logika
         const useCreditIsChecked = useCreditCheckbox.checked;
-        const inputAmountValue = parseFloat(amountHiddenInput.value || 0);
-        const creditIsSufficient = currentCreditBalance >= selectedInvoiceBalance && selectedInvoiceBalance > 0;
+        let creditUsed = 0;
+        let cashToPay = totalBill;
 
-        if (useCreditIsChecked) {
-            if (creditIsSufficient) {
-                // FULL CREDIT
-                if (!amountFormattedInput.disabled) {
-                     autoNumericInstance.set(0);
-                }
-                amountFormattedInput.required = false;
-                amountFormattedInput.disabled = true;
-                // Disable Select styling via class (Optional, logic disabled attr is enough)
-                amountFormattedInput.classList.add('bg-gray-100', 'cursor-not-allowed');
+        // 3. Elemen UI Ringkasan
+        const summaryCreditRow = document.getElementById('summary-credit-row');
+        const displayTotalBill = document.getElementById('display-total-bill');
+        const displayCreditUsed = document.getElementById('display-credit-used');
+        const displayCashToPay = document.getElementById('total-selected-display'); // Total Akhir
 
-                paymentMethodSelect.required = false;
-                paymentMethodSelect.disabled = true;
-                paymentMethodSelect.value = "";
-                
-                bankAccountSelect.required = false;
-                bankAccountSelect.disabled = true;
-                bankAccountSelect.value = "";
-            } else {
-                // PARTIAL CREDIT (Not fully supported by UI flow yet, usually handled as normal payment)
-                amountFormattedInput.required = true;
-                amountFormattedInput.disabled = false;
-                amountFormattedInput.classList.remove('bg-gray-100', 'cursor-not-allowed');
+        // Update Tampilan Total Tagihan Awal
+        displayTotalBill.textContent = formatRupiah(totalBill);
 
-                paymentMethodSelect.required = true;
-                paymentMethodSelect.disabled = false;
-                if (!paymentMethodSelect.value) paymentMethodSelect.value = defaultPaymentMethodId;
-                
-                bankAccountSelect.required = true;
-                bankAccountSelect.disabled = false;
-                if (!bankAccountSelect.value) bankAccountSelect.value = defaultBankAccountId;
-            }
+        // 4. Hitung jika pakai kredit
+        if (useCreditIsChecked && currentCreditBalance > 0) {
+            // Kredit yang dipakai = Mana yang lebih kecil antara (Total Tagihan) atau (Saldo Kredit)
+            creditUsed = Math.min(totalBill, currentCreditBalance);
+            cashToPay = totalBill - creditUsed;
+
+            // Tampilkan Baris Kredit di Summary
+            summaryCreditRow.classList.remove('hidden');
+            displayCreditUsed.textContent = '- ' + formatRupiah(creditUsed);
         } else {
-            // NORMAL PAYMENT
+            // Sembunyikan Baris Kredit
+            summaryCreditRow.classList.add('hidden');
+        }
+
+        // 5. Update "Harus Dibayar"
+        displayCashToPay.textContent = formatRupiah(cashToPay);
+
+        // 6. Auto-fill Input "Total Dana Diterima" (UX Improvement)
+        // Kita set nilai input agar user tidak perlu mengetik manual sisa bayarnya
+        // Kecuali user sudah mengetik sendiri (kita bisa tambah logic cek focus jika mau, tapi overwrite lebih aman disini)
+        if (!amountFormattedInput.matches(':focus')) {
+             autoNumericInstance.set(cashToPay);
+             amountHiddenInput.value = cashToPay;
+        }
+
+        // 7. Atur State Input Form (Disabled/Required)
+        if (cashToPay <= 0) {
+            // --- LUNAS FULL DENGAN KREDIT ---
+            amountFormattedInput.required = false;
+            amountFormattedInput.disabled = true;
+            amountFormattedInput.classList.add('bg-slate-100', 'text-slate-400', 'cursor-not-allowed');
+            
+            paymentMethodSelect.required = false;
+            paymentMethodSelect.disabled = true;
+            $(paymentMethodSelect).val(null).trigger('change');
+            
+            bankAccountSelect.required = false;
+            bankAccountSelect.disabled = true;
+            $(bankAccountSelect).val(null).trigger('change');
+        } else {
+            // --- MASIH PERLU BAYAR CASH/TRANSFER ---
             amountFormattedInput.required = true;
             amountFormattedInput.disabled = false;
-            amountFormattedInput.classList.remove('bg-gray-100', 'cursor-not-allowed');
+            amountFormattedInput.classList.remove('bg-slate-100', 'text-slate-400', 'cursor-not-allowed');
             
-            const isAmountPositive = inputAmountValue > 0;
-            
-            paymentMethodSelect.required = isAmountPositive;
+            paymentMethodSelect.required = true;
             paymentMethodSelect.disabled = false;
-            bankAccountSelect.required = isAmountPositive;
-            bankAccountSelect.disabled = false;
+            // Restore default jika kosong
+            if (!$(paymentMethodSelect).val()) $(paymentMethodSelect).val(defaultPaymentMethodId).trigger('change');
             
-            if (isAmountPositive) {
-                if (!paymentMethodSelect.value) paymentMethodSelect.value = defaultPaymentMethodId;
-                if (!bankAccountSelect.value) bankAccountSelect.value = defaultBankAccountId;
-            } else {
-                 paymentMethodSelect.value = "";
-                 bankAccountSelect.value = "";
-            }
+            bankAccountSelect.required = true;
+            bankAccountSelect.disabled = false;
+            if (!$(bankAccountSelect).val()) $(bankAccountSelect).val(defaultBankAccountId).trigger('change');
         }
         
         handlePaymentMethodChange();
@@ -406,7 +421,7 @@ document.addEventListener('DOMContentLoaded', function () {
         useCreditCheckbox.addEventListener('change', toggleRequiredFields);
     }
 
-    // --- LOGIC 7: TABLE INTERACTION ---
+    // --- TABLE INTERACTION ---
     checkAll.addEventListener('change', function () {
         document.querySelectorAll('.invoice-checkbox').forEach(checkbox => {
             checkbox.checked = this.checked;
@@ -425,16 +440,21 @@ document.addEventListener('DOMContentLoaded', function () {
         calculateTotalSelected();
     }
 
-    // --- LOGIC 8: FETCH DATA ---
+    // --- FETCH DATA ---
     clientSelect.on('change', async function () {
         const clientId = this.value;
 
-        creditInfoDiv.classList.add('hidden'); // Tailwind class
+        creditInfoDiv.classList.add('hidden');
         useCreditContainer.style.display = 'none';
         useCreditCheckbox.checked = false;
         currentCreditBalance = 0;
         
-        invoicePlaceholder.innerHTML = '<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div><div class="text-sm text-gray-500">Memuat data...</div>';
+        invoicePlaceholder.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-8">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-3"></div>
+                <span class="text-sm text-slate-500 font-medium">Memuat data...</span>
+            </div>
+        `;
         invoicePlaceholder.classList.remove('hidden');
         
         invoiceTable.classList.add('hidden');
@@ -442,54 +462,56 @@ document.addEventListener('DOMContentLoaded', function () {
         checkAll.checked = false;
         autoNumericInstance.set(0);
 
-        if (!clientId) {
-            invoicePlaceholder.textContent = 'Silakan pilih klien untuk melihat daftar Invoice.';
-            calculateTotalSelected();
-            toggleRequiredFields();
-            return;
-        }
+        if (!clientId) return;
 
         try {
-            // Fetch Client Credit
-            const clientResponse = await fetch(`/api/clients/${clientId}/details`);
-            if (!clientResponse.ok) throw new Error('Gagal ambil data klien');
-            const clientData = await clientResponse.json();
-            
-            currentCreditBalance = parseFloat(clientData.balance) || 0;
-            const pendingBalance = parseFloat(clientData.pending_balance) || 0;
+            // Fetch Client Details & Invoices parallel
+            const [clientResponse, invoiceResponse] = await Promise.all([
+                fetch(`/api/clients/${clientId}/details`),
+                fetch(`/api/clients/${clientId}/unpaid-invoices`)
+            ]);
 
+            if (!clientResponse.ok || !invoiceResponse.ok) throw new Error('Gagal memuat data');
+
+            const clientData = await clientResponse.json();
+            const invoices = await invoiceResponse.json();
+            
+            // Update Credit Info
+            currentCreditBalance = parseFloat(clientData.balance) || 0;
             creditBalanceSpan.textContent = formatRupiah(currentCreditBalance);
-            pendingBalanceSpan.textContent = formatRupiah(pendingBalance);
+            pendingBalanceSpan.textContent = formatRupiah(clientData.pending_balance || 0);
             creditInfoDiv.classList.remove('hidden');
 
             if (currentCreditBalance > 0) {
                 useCreditContainer.style.display = 'block';
             }
 
-            // Fetch Invoices
-            const invoiceResponse = await fetch(`/api/clients/${clientId}/unpaid-invoices`);
-            if (!invoiceResponse.ok) throw new Error('Gagal mengambil data Invoice');
-            const invoices = await invoiceResponse.json();
-
+            // Render Invoices
             if (invoices.length === 0) {
-                invoicePlaceholder.innerHTML = '<i class="bi bi-check-circle text-4xl text-green-500 mb-2"></i><p class="text-sm text-gray-600">Semua invoice telah lunas.</p>';
+                invoicePlaceholder.innerHTML = `
+                    <div class="flex flex-col items-center text-slate-400">
+                        <i class="material-icons text-4xl mb-2 opacity-30">check_circle</i>
+                        <p class="text-sm">Semua invoice telah lunas.</p>
+                    </div>
+                `;
             } else {
                 invoices.forEach(invoice => {
-                    // Styling Row with Tailwind
                     const row = `
-                        <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="px-4 py-3 text-center">
-                                <input class="invoice-checkbox rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 cursor-pointer"
+                        <tr class="hover:bg-indigo-50/30 transition-colors group">
+                            <td class="px-4 py-3 text-center border-b border-slate-50">
+                                <input class="invoice-checkbox rounded border-slate-300 text-indigo-600 shadow-sm focus:ring-indigo-500 cursor-pointer"
                                        type="checkbox"
                                        name="invoice_ids[]"
                                        value="${invoice.invoice_id}"
                                        data-balance="${invoice.sisa_tagihan}">
                             </td>
-                            <td class="px-2 py-3 text-sm">
-                                <div class="font-bold text-indigo-600">${invoice.invoice_number}</div>
-                                <div class="text-xs text-gray-500">Due: ${invoice.due_date_formatted}</div>
+                            <td class="px-2 py-3 text-sm border-b border-slate-50">
+                                <div class="font-bold text-indigo-600 font-mono">${invoice.invoice_number}</div>
+                                <div class="text-xs text-slate-500 mt-0.5">Due: ${invoice.due_date_formatted}</div>
                             </td>
-                            <td class="px-4 py-3 text-right text-sm font-medium text-gray-900">${formatRupiah(invoice.sisa_tagihan)}</td>
+                            <td class="px-4 py-3 text-right text-sm font-medium text-slate-800 border-b border-slate-50 font-mono">
+                                ${formatRupiah(invoice.sisa_tagihan)}
+                            </td>
                         </tr>
                     `;
                     invoiceListBody.insertAdjacentHTML('beforeend', row);
@@ -500,17 +522,17 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
         } catch (error) {
-            invoicePlaceholder.textContent = 'Gagal memuat data. Silakan coba lagi.';
-            console.error('Error fetching data:', error);
-            creditInfoDiv.classList.add('hidden');
-            useCreditContainer.style.display = 'none';
+            console.error(error);
+            invoicePlaceholder.innerHTML = `<div class="text-red-500 text-sm font-bold">Gagal memuat data. Silakan coba lagi.</div>`;
         }
 
         calculateTotalSelected();
         toggleRequiredFields();
     });
 
-    toggleRequiredFields();
+    // Load Toast
+    @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
+    @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
 });
 </script>
 @endpush

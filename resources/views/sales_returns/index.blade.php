@@ -3,132 +3,131 @@
 @section('title', 'Daftar Retur Penjualan')
 
 @section('content')
-<div class="max-w-7xl mx-auto">
+<div class="max-w-7xl mx-auto pb-20 animate-enter">
     
     {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+    <div class="flex flex-col sm:flex-row justify-between items-end gap-4 mb-8">
         <div>
-            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Retur Penjualan</h2>
-            <p class="text-sm text-gray-500 mt-1">Daftar pengembalian barang dari pelanggan.</p>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Retur Penjualan</h1>
+            <p class="text-slate-500 text-sm mt-1">Daftar pengembalian barang dari pelanggan.</p>
         </div>
-        <a href="{{ route('sales-returns.create') }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition flex items-center gap-2">
-            <i class="bi bi-plus-lg"></i> Buat Retur Baru
+        <a href="{{ route('sales-returns.create') }}" class="h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5">
+            <i class="material-icons text-[20px] group-hover:rotate-90 transition-transform">add</i> 
+            <span>Buat Retur Baru</span>
         </a>
     </div>
 
     {{-- NOTIFIKASI --}}
-    @if (session('success'))
-        <div class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-r shadow-sm flex justify-between items-center animate-fade-in-down">
-            <div class="flex items-center gap-3">
-                <i class="bi bi-check-circle-fill text-green-500 text-xl"></i>
-                <div class="text-sm text-green-700 font-medium">{{ session('success') }}</div>
-            </div>
-            <button onclick="this.parentElement.remove()" class="text-green-500 hover:text-green-700"><i class="bi bi-x text-lg"></i></button>
-        </div>
-    @endif
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
+            @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
+        });
+    </script>
+    @endpush
 
     {{-- FILTER CARD --}}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+    <div class="dashboard-card p-6 mb-6">
         <form action="{{ route('sales-returns.index') }}" method="GET">
             <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                 
                 {{-- Pencarian --}}
                 <div class="md:col-span-5">
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Pencarian</label>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Pencarian</label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="bi bi-search text-gray-400"></i>
+                            <i class="material-icons text-slate-400 text-[20px]">search</i>
                         </div>
                         <input type="text" name="search" value="{{ request('search') }}" 
-                            class="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2" 
+                            class="form-input pl-10" 
                             placeholder="No. Retur / Klien / Invoice...">
                     </div>
                 </div>
 
                 {{-- Tanggal --}}
                 <div class="md:col-span-4">
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Tanggal Retur</label>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Tanggal Retur</label>
                     <input type="date" name="return_date" value="{{ request('return_date') }}" 
-                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2">
+                        class="form-input">
                 </div>
 
                 {{-- Tombol --}}
                 <div class="md:col-span-3 flex gap-2">
-                    <button type="submit" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white font-medium py-2 px-4 rounded-md shadow-sm transition text-sm flex items-center justify-center gap-2">
-                        <i class="bi bi-funnel-fill"></i> Filter
+                    <button type="submit" class="flex-1 h-[48px] bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg shadow-sm transition-all flex items-center justify-center gap-2">
+                        <i class="material-icons text-[18px]">filter_list</i> Filter
                     </button>
-                    <a href="{{ route('sales-returns.index') }}" class="px-3 py-2 bg-white border border-gray-300 rounded-md text-gray-500 hover:text-indigo-600 font-medium transition flex items-center justify-center shadow-sm" title="Reset">
-                        <i class="bi bi-arrow-clockwise text-lg"></i>
+                    <a href="{{ route('sales-returns.index') }}" class="h-[48px] w-[48px] flex items-center justify-center bg-white border border-slate-300 text-slate-500 hover:text-indigo-600 hover:border-indigo-500 font-medium rounded-lg shadow-sm transition" title="Reset">
+                        <i class="material-icons text-[20px]">refresh</i>
                     </a>
                 </div>
             </div>
         </form>
     </div>
 
-    {{-- LIST CARD --}}
-    <div class="flex flex-col gap-4">
-        @forelse ($salesReturns as $return)
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden border-l-4 border-l-red-500 hover:shadow-md transition-shadow">
-                
-                {{-- HEADER CARD --}}
-                <div class="p-5 cursor-pointer hover:bg-gray-50 transition-colors" onclick="toggleAccordion('collapse-{{ $return->return_id }}')">
-                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                        
-                        {{-- Info Utama --}}
-                        <div class="flex items-center gap-4 lg:w-1/3">
-                            <div class="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-red-500 flex-shrink-0 border border-red-100">
-                                <i class="bi bi-arrow-counterclockwise text-xl"></i>
-                            </div>
-                            <div>
-                                <h3 class="text-base font-bold text-gray-900 mb-0.5">{{ $return->return_number }}</h3>
-                                <p class="text-sm font-medium text-indigo-600">{{ $return->client->client_name ?? 'Klien Dihapus' }}</p>
-                            </div>
-                        </div>
-
-                        {{-- Invoice & Tanggal --}}
-                        <div class="flex gap-8 lg:w-1/3">
-                            <div>
-                                <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Invoice Asal</span>
-                                <span class="text-sm font-medium text-gray-900 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+    {{-- TABEL DATA --}}
+    <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
+        <div class="overflow-x-auto">
+            <table class="dashboard-table min-w-full">
+                <thead class="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                        <th class="pl-6 w-32">No. Retur</th>
+                        <th>Klien</th>
+                        <th>Invoice Asal</th>
+                        <th>Tanggal</th>
+                        <th class="text-right">Total Nilai</th>
+                        <th class="w-24 text-center pr-6">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white">
+                    @forelse ($salesReturns as $return)
+                        <tr class="hover:bg-slate-50/50 transition-colors">
+                            <td class="pl-6 py-4">
+                                <a href="{{ route('sales-returns.show', $return->return_id) }}" class="text-sm font-bold text-indigo-600 hover:text-indigo-800 hover:underline font-mono">
+                                    {{ $return->return_number }}
+                                </a>
+                            </td>
+                            <td class="py-4">
+                                <div class="text-sm font-bold text-slate-800">{{ $return->client->client_name ?? 'Klien Dihapus' }}</div>
+                            </td>
+                            <td class="py-4">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200 font-mono">
                                     {{ $return->salesInvoice->invoice_number ?? 'N/A' }}
                                 </span>
-                            </div>
-                            <div>
-                                <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Tanggal</span>
-                                <span class="text-sm font-medium text-gray-900">{{ optional($return->return_date)->format('d M Y') }}</span>
-                            </div>
-                        </div>
-
-                        {{-- Nilai & Icon --}}
-                        <div class="flex items-center justify-between lg:justify-end gap-4 lg:w-1/3">
-                            <div class="text-right">
-                                <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Nilai Retur</span>
-                                <span class="text-sm font-bold text-red-600">Rp {{ number_format($return->total_amount, 0, ',', '.') }}</span>
-                            </div>
-                            <i class="bi bi-chevron-down text-gray-400 transition-transform duration-200" id="icon-collapse-{{ $return->return_id }}"></i>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- COLLAPSE BODY --}}
-                <div id="collapse-{{ $return->return_id }}" class="hidden bg-gray-50 border-t border-gray-100">
-                    <div class="p-5 flex justify-end">
-                        <a href="{{ route('sales-returns.show', $return->return_id) }}" class="px-4 py-2 bg-white border border-indigo-200 text-indigo-700 font-medium rounded-lg hover:bg-indigo-50 hover:border-indigo-300 transition text-sm shadow-sm flex items-center gap-2">
-                            <i class="bi bi-eye"></i> Lihat Detail
-                        </a>
-                    </div>
-                </div>
-
-            </div>
-        @empty
-            <div class="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
-                <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i class="bi bi-inbox text-3xl text-gray-400"></i>
-                </div>
-                <h3 class="text-lg font-medium text-gray-900">Tidak ada data retur</h3>
-                <p class="text-gray-500 text-sm mt-1">Belum ada pengembalian barang yang tercatat.</p>
-            </div>
-        @endforelse
+                            </td>
+                            <td class="py-4 text-sm text-slate-600">
+                                <div class="flex items-center gap-2">
+                                    <i class="material-icons text-slate-400 text-[16px]">event</i>
+                                    {{ optional($return->return_date)->format('d M Y') }}
+                                </div>
+                            </td>
+                            <td class="py-4 text-right text-sm font-bold text-red-600 font-mono">
+                                Rp {{ number_format($return->total_amount, 0, ',', '.') }}
+                            </td>
+                            <td class="pr-6 py-4 text-center">
+                                <a href="{{ route('sales-returns.show', $return->return_id) }}" 
+                                   class="w-8 h-8 flex items-center justify-center mx-auto bg-white border border-slate-200 rounded-lg text-slate-500 hover:text-indigo-600 hover:border-indigo-200 transition shadow-sm" 
+                                   title="Lihat Detail">
+                                    <i class="material-icons text-[16px]">visibility</i>
+                                </a>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="6" class="px-6 py-12 text-center">
+                                <div class="flex flex-col items-center justify-center">
+                                    <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-slate-300">
+                                        <i class="material-icons text-4xl">assignment_return</i>
+                                    </div>
+                                    <h3 class="text-base font-bold text-slate-800">Belum ada data retur</h3>
+                                    <p class="text-sm text-slate-500 mt-1">Belum ada pengembalian barang yang tercatat.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <div class="mt-6">
@@ -136,19 +135,3 @@
     </div>
 </div>
 @endsection
-
-@push('scripts')
-<script>
-    function toggleAccordion(id) {
-        const el = document.getElementById(id);
-        const icon = document.getElementById('icon-' + id);
-        if(el.classList.contains('hidden')) {
-            el.classList.remove('hidden');
-            if(icon) icon.classList.add('rotate-180');
-        } else {
-            el.classList.add('hidden');
-            if(icon) icon.classList.remove('rotate-180');
-        }
-    }
-</script>
-@endpush

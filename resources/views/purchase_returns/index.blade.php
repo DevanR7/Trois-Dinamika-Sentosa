@@ -3,62 +3,62 @@
 @section('title', 'Daftar Retur Pembelian')
 
 @section('content')
-<div class="max-w-7xl mx-auto">
+<div class="max-w-7xl mx-auto pb-20 animate-enter">
 
-    {{-- HEADER HALAMAN --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+    {{-- HEADER --}}
+    <div class="flex flex-col sm:flex-row justify-between items-end gap-4 mb-8">
         <div>
-            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Retur Pembelian</h2>
-            <p class="text-sm text-gray-500 mt-1">Daftar pengembalian barang ke supplier.</p>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Retur Pembelian</h1>
+            <p class="text-slate-500 text-sm mt-1">Daftar pengembalian barang ke supplier.</p>
         </div>
-        <a href="{{ route('purchase-returns.create') }}" class="inline-flex items-center px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors duration-200">
-            <i class="bi bi-plus-lg mr-2"></i> Buat Retur Baru
+        <a href="{{ route('purchase-returns.create') }}" class="h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5">
+            <i class="material-icons text-[20px] group-hover:rotate-90 transition-transform">add</i> 
+            <span>Buat Retur Baru</span>
         </a>
     </div>
 
-    {{-- FLASH MESSAGE --}}
-    @if (session('success'))
-        <div class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-r shadow-sm flex justify-between items-center animate-fade-in-down">
-            <div class="flex items-center gap-3">
-                <i class="bi bi-check-circle-fill text-green-500 text-xl"></i>
-                <div class="text-sm text-green-700 font-medium">{{ session('success') }}</div>
-            </div>
-            <button onclick="this.parentElement.remove()" class="text-green-500 hover:text-green-700"><i class="bi bi-x text-lg"></i></button>
-        </div>
-    @endif
+    {{-- NOTIFIKASI --}}
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
+            @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
+        });
+    </script>
+    @endpush
 
-    {{-- FILTER SECTION --}}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+    {{-- FILTER CARD --}}
+    <div class="dashboard-card p-6 mb-6">
         <form action="{{ route('purchase-returns.index') }}" method="GET">
             <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                 
-                {{-- 1. PENCARIAN (5 Kolom) --}}
+                {{-- Pencarian --}}
                 <div class="md:col-span-5">
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Pencarian</label>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Pencarian</label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="bi bi-search text-gray-400"></i>
+                            <i class="material-icons text-slate-400 text-[20px]">search</i>
                         </div>
                         <input type="text" name="search" value="{{ request('search') }}" 
-                            class="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2" 
-                            placeholder="Cari No. Retur / Supplier / PO...">
+                            class="form-input pl-10" 
+                            placeholder="No. Retur / Supplier / PO...">
                     </div>
                 </div>
 
-                {{-- 2. TANGGAL (4 Kolom) --}}
+                {{-- Tanggal --}}
                 <div class="md:col-span-4">
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Tanggal Retur</label>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Tanggal Retur</label>
                     <input type="date" name="return_date" value="{{ request('return_date') }}" 
-                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2">
+                        class="form-input">
                 </div>
 
-                {{-- 3. TOMBOL (3 Kolom) --}}
+                {{-- Tombol --}}
                 <div class="md:col-span-3 flex gap-2">
-                    <button type="submit" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white font-medium py-2 px-4 rounded-md shadow-sm transition text-sm flex items-center justify-center">
-                        <i class="bi bi-funnel-fill mr-2"></i> Filter
+                    <button type="submit" class="flex-1 h-[48px] bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg shadow-sm transition-all flex items-center justify-center gap-2">
+                        <i class="material-icons text-[18px]">filter_list</i> Filter
                     </button>
-                    <a href="{{ route('purchase-returns.index') }}" class="px-3 py-2 bg-white border border-gray-300 rounded-md text-gray-500 hover:text-indigo-600 hover:border-indigo-300 transition flex items-center justify-center" title="Reset">
-                        <i class="bi bi-arrow-clockwise text-lg"></i>
+                    <a href="{{ route('purchase-returns.index') }}" class="h-[48px] w-[48px] flex items-center justify-center bg-white border border-slate-300 text-slate-500 hover:text-indigo-600 hover:border-indigo-500 font-medium rounded-lg shadow-sm transition" title="Reset">
+                        <i class="material-icons text-[20px]">refresh</i>
                     </a>
                 </div>
             </div>
@@ -66,53 +66,61 @@
     </div>
 
     {{-- TABEL DATA --}}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
         <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-                <thead class="bg-gray-50 border-b border-gray-200">
+            <table class="dashboard-table min-w-full">
+                <thead class="bg-slate-50 border-b border-slate-200">
                     <tr>
-                        <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">No. Retur</th>
-                        <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Supplier</th>
-                        <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">PO Asli</th>
-                        <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Tanggal</th>
-                        <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Total Nilai</th>
-                        <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Aksi</th>
+                        <th class="pl-6 w-32">No. Retur</th>
+                        <th>Supplier</th>
+                        <th>PO Asli</th>
+                        <th>Tanggal</th>
+                        <th class="text-right">Total Nilai</th>
+                        <th class="w-24 text-center pr-6">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
+                <tbody class="divide-y divide-slate-100 bg-white">
                     @forelse ($purchaseReturns as $return)
-                        <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <a href="{{ route('purchase-returns.show', $return->return_id) }}" class="text-sm font-bold text-indigo-600 hover:underline font-mono">
+                        <tr class="hover:bg-slate-50/50 transition-colors">
+                            <td class="pl-6 py-4">
+                                <a href="{{ route('purchase-returns.show', $return->return_id) }}" class="text-sm font-bold text-indigo-600 hover:text-indigo-800 hover:underline font-mono">
                                     {{ $return->return_number }}
                                 </a>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-medium text-gray-900">{{ $return->supplier->supplier_name ?? '-' }}</div>
+                            <td class="py-4">
+                                <div class="text-sm font-bold text-slate-800">{{ $return->supplier->supplier_name ?? '-' }}</div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <a href="{{ route('purchase-orders.show', $return->purchase_order_id) }}" class="text-xs font-medium text-gray-500 hover:text-indigo-600 bg-gray-100 px-2 py-1 rounded">
+                            <td class="py-4">
+                                <a href="{{ route('purchase-orders.show', $return->purchase_order_id) }}" class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition font-mono">
                                     {{ $return->purchaseOrder->po_number ?? '-' }}
                                 </a>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                {{ optional($return->return_date)->format('d M Y') }}
+                            <td class="py-4 text-sm text-slate-600">
+                                <div class="flex items-center gap-2">
+                                    <i class="material-icons text-slate-400 text-[16px]">event</i>
+                                    {{ optional($return->return_date)->format('d M Y') }}
+                                </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right">
-                                <span class="text-sm font-bold text-red-600">Rp {{ number_format($return->total_amount, 0, ',', '.') }}</span>
+                            <td class="py-4 text-right text-sm font-bold text-red-600 font-mono">
+                                Rp {{ number_format($return->total_amount, 0, ',', '.') }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                <a href="{{ route('purchase-returns.show', $return->return_id) }}" class="p-1.5 bg-white border border-gray-300 rounded-md text-indigo-600 hover:bg-indigo-50 transition shadow-sm inline-block" title="Detail">
-                                    <i class="bi bi-eye"></i>
+                            <td class="pr-6 py-4 text-center">
+                                <a href="{{ route('purchase-returns.show', $return->return_id) }}" 
+                                   class="w-8 h-8 flex items-center justify-center mx-auto bg-white border border-slate-200 rounded-lg text-slate-500 hover:text-indigo-600 hover:border-indigo-200 transition shadow-sm" 
+                                   title="Lihat Detail">
+                                    <i class="material-icons text-[16px]">visibility</i>
                                 </a>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-10 text-center text-gray-500">
+                            <td colspan="6" class="px-6 py-12 text-center">
                                 <div class="flex flex-col items-center justify-center">
-                                    <i class="bi bi-inbox text-4xl text-gray-300 mb-3"></i>
-                                    <p class="text-sm">Belum ada data retur pembelian.</p>
+                                    <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-slate-300">
+                                        <i class="material-icons text-4xl">assignment_return</i>
+                                    </div>
+                                    <h3 class="text-base font-bold text-slate-800">Belum ada data retur</h3>
+                                    <p class="text-sm text-slate-500 mt-1">Belum ada pengembalian barang yang tercatat.</p>
                                 </div>
                             </td>
                         </tr>
@@ -120,11 +128,10 @@
                 </tbody>
             </table>
         </div>
-        
-        {{-- PAGINATION --}}
-        <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
-            {{ $purchaseReturns->appends(request()->query())->links() }}
-        </div>
+    </div>
+
+    <div class="mt-6">
+        {{ $purchaseReturns->appends(request()->query())->links() }}
     </div>
 </div>
 @endsection

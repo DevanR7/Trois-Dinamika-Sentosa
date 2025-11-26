@@ -2,58 +2,65 @@
 
 @section('title', 'Edit Transaksi Modal')
 
+@push('styles')
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+@endpush
+
 @section('content')
-<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="max-w-3xl mx-auto pb-20 animate-enter">
     
     {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-            <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <a href="{{ route('equity-transactions.index') }}" class="hover:text-indigo-600 transition">Modal & Prive</a>
-                <span>/</span>
-                <span class="text-gray-800">Edit</span>
-            </div>
-            <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Edit Transaksi Modal</h2>
-            <p class="text-sm text-gray-500 mt-1">Perbarui data transaksi modal.</p>
+            <nav class="flex items-center gap-2 text-sm text-slate-500 mb-1">
+                <a href="{{ route('equity-transactions.index') }}" class="hover:text-indigo-600 transition-colors">Modal & Prive</a>
+                <span class="mx-2 text-slate-300">/</span>
+                <span class="text-slate-800 font-semibold">Edit</span>
+            </nav>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Edit Transaksi Modal</h1>
         </div>
-        <div class="mt-4 sm:mt-0">
-            <a href="{{ route('equity-transactions.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition text-sm">
-                <i class="material-icons text-lg mr-2">arrow_back</i> Kembali
-            </a>
-        </div>
+        <a href="{{ route('equity-transactions.index') }}" 
+           class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
+            <i class="material-icons text-[18px]">arrow_back</i> Kembali
+        </a>
     </div>
 
     <form action="{{ route('equity-transactions.update', $transaction) }}" method="POST" id="equity-form">
         @csrf
         @method('PUT')
         
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
-                <i class="material-icons text-indigo-500">edit_note</i>
-                <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Edit Data</h3>
+        <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
+            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+                <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                    <i class="material-icons text-[20px]">edit_note</i>
+                </div>
+                <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Edit Data</h3>
             </div>
             
-            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
                 
+                {{-- Tanggal --}}
                 <div>
-                    <label for="transaction_date" class="block text-xs font-bold text-gray-500 uppercase mb-1">Tanggal Transaksi <span class="text-red-500">*</span></label>
-                    <input type="date" name="transaction_date" id="transaction_date" value="{{ old('transaction_date', $transaction->transaction_date->toDateString()) }}" class="form-input block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>
+                    <label for="transaction_date" class="block text-xs font-bold text-slate-500 uppercase mb-1">Tanggal Transaksi <span class="text-red-500">*</span></label>
+                    <input type="date" name="transaction_date" id="transaction_date" value="{{ old('transaction_date', $transaction->transaction_date->toDateString()) }}" class="form-input" required>
                 </div>
 
+                {{-- Jumlah --}}
                 <div>
-                    <label for="amount_display" class="block text-xs font-bold text-gray-500 uppercase mb-1">Jumlah (Rp) <span class="text-red-500">*</span></label>
-                    <div class="relative rounded-md shadow-sm">
+                    <label for="amount_display" class="block text-xs font-bold text-slate-500 uppercase mb-1">Jumlah (Rp) <span class="text-red-500">*</span></label>
+                    <div class="relative">
                         <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                            <span class="text-gray-500 sm:text-sm">Rp</span>
+                            <span class="text-slate-400 font-bold text-sm">Rp</span>
                         </div>
-                        <input type="text" id="amount_display" class="form-input block w-full rounded-lg border-gray-300 pl-10 focus:border-indigo-500 focus:ring-indigo-500 sm:text-lg font-bold text-gray-900" required>
+                        <input type="text" id="amount_display" class="form-input pl-10 text-lg font-bold text-slate-800 font-mono" required>
                         <input type="hidden" name="amount" id="amount" value="{{ old('amount', intval($transaction->amount)) }}">
                     </div>
                 </div>
 
+                {{-- Akun Modal --}}
                 <div>
-                    <label for="equity_account_id" class="block text-xs font-bold text-gray-500 uppercase mb-1">Akun Modal <span class="text-red-500">*</span></label>
-                    <select name="equity_account_id" id="equity_account_id" class="form-select block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>
+                    <label for="equity_account_id" class="block text-xs font-bold text-slate-500 uppercase mb-1">Akun Modal <span class="text-red-500">*</span></label>
+                    <select name="equity_account_id" id="equity_account_id" class="form-input select2-basic" required>
                         <option value="" disabled>-- Pilih Akun --</option>
                         @foreach ($equityAccounts as $account)
                             <option value="{{ $account->account_id }}" @selected(old('equity_account_id', $transaction->equity_account_id) == $account->account_id)>
@@ -61,11 +68,13 @@
                             </option>
                         @endforeach
                     </select>
+                    <p class="mt-0.5 text-[11px] text-slate-400">Akun Modal untuk setoran atau Prive untuk penarikan.</p>
                 </div>
 
+                {{-- Akun Kas --}}
                 <div>
-                    <label for="cash_bank_account_id" class="block text-xs font-bold text-gray-500 uppercase mb-1">Akun Kas/Bank <span class="text-red-500">*</span></label>
-                    <select name="cash_bank_account_id" id="cash_bank_account_id" class="form-select block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>
+                    <label for="cash_bank_account_id" class="block text-xs font-bold text-slate-500 uppercase mb-1">Akun Kas/Bank <span class="text-red-500">*</span></label>
+                    <select name="cash_bank_account_id" id="cash_bank_account_id" class="form-input select2-basic" required>
                         <option value="" disabled>-- Pilih Akun Kas --</option>
                         @foreach ($cashAccounts as $account)
                             <option value="{{ $account->account_id }}" @selected(old('cash_bank_account_id', $transaction->cash_bank_account_id) == $account->account_id)>
@@ -73,21 +82,25 @@
                             </option>
                         @endforeach
                     </select>
+                    <p class="mt-0.5 text-[11px] text-slate-400">Akun Kas yang bertambah/berkurang.</p>
                 </div>
 
+                {{-- Deskripsi --}}
                 <div class="md:col-span-2">
-                    <label for="description" class="block text-xs font-bold text-gray-500 uppercase mb-1">Deskripsi <span class="text-red-500">*</span></label>
-                    <textarea name="description" id="description" rows="3" class="form-textarea block w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>{{ old('description', $transaction->description) }}</textarea>
+                    <label for="description" class="block text-xs font-bold text-slate-500 uppercase mb-1">Deskripsi <span class="text-red-500">*</span></label>
+                    <textarea name="description" id="description" rows="3" class="form-textarea" required>{{ old('description', $transaction->description) }}</textarea>
                 </div>
 
             </div>
 
-            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-                <a href="{{ route('equity-transactions.index') }}" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 shadow-sm transition">
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <a href="{{ route('equity-transactions.index') }}" 
+                   class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center shadow-sm">
                     Batal
                 </a>
-                <button type="submit" class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-lg font-bold text-sm text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 shadow-md transition">
-                    <i class="material-icons text-lg mr-2">check_circle</i> Update Transaksi
+                <button type="submit" 
+                        class="h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5">
+                    <i class="material-icons text-[20px] group-hover:scale-110 transition-transform">check_circle</i> Update Transaksi
                 </button>
             </div>
         </div>
@@ -96,14 +109,22 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // 1. Init Select2
+        $('.select2-basic').select2({ 
+            placeholder: '-- Pilih --', 
+            allowClear: false, 
+            width: '100%', 
+            dropdownCssClass: 'select2-dropdown-clean' 
+        });
+
+        // 2. Init AutoNumeric dengan nilai awal
         const amountDisplay = document.getElementById('amount_display');
         const amountInput = document.getElementById('amount');
         
-        // Init AutoNumeric
         const anElement = new AutoNumeric(amountDisplay, {
             decimalPlaces: 0,
             digitGroupSeparator: '.',
@@ -111,25 +132,24 @@
             minimumValue: '0'
         });
         
-        // Set Initial
+        // Set nilai awal
         if(amountInput.value) anElement.set(amountInput.value);
 
         amountDisplay.addEventListener('autoNumeric:rawValueModified', e => {
             amountInput.value = e.detail.newRawValue;
         });
 
-        // Validasi
+        // 3. Validasi Submit
         document.getElementById('equity-form').addEventListener('submit', function(e) {
             if(!amountInput.value || amountInput.value == 0) {
                 e.preventDefault();
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'Jumlah nominal tidak boleh kosong!',
-                    confirmButtonColor: '#6366f1'
-                });
+                window.showToast('Jumlah nominal tidak boleh kosong!', 'error');
+                amountDisplay.focus();
             }
         });
+        
+        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
+        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
     });
 </script>
 @endpush
