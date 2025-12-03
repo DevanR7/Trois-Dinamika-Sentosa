@@ -78,11 +78,15 @@ class OrderChangeRequestController extends Controller
             'client_notes' => 'nullable|string|max:1000',
 
             // Validasi untuk tipe "modify"
-            'items' => 'required_if:request_type,modify|array|min:1',
-            'items.*.product_id' => 'required_if:request_type,modify|exists:products,product_id',
-            'items.*.quantity' => 'required_if:request_type,modify|integer|min:0', // 0 = hapus
-            'items.*.action' => ['required_if:request_type,modify', Rule::in(['add', 'remove', 'update_qty'])],
-            'items.*.original_quantity' => 'nullable|integer',
+    'items' => 'required_if:request_type,modify|array|min:1',
+    'items.*.product_id' => 'required_if:request_type,modify|exists:products,product_id',
+    
+    // ✅ GANTI integer -> numeric
+    'items.*.quantity' => 'required_if:request_type,modify|numeric|min:0', 
+    'items.*.action' => ['required_if:request_type,modify', Rule::in(['add', 'remove', 'update_qty'])],
+    
+    // ✅ GANTI integer -> numeric
+    'items.*.original_quantity' => 'nullable|numeric',
         ]);
 
         try {

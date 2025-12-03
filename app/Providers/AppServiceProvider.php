@@ -16,10 +16,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // ✅ Daftarkan IDE Helper hanya jika ada dan mode lokal
-        if ($this->app->isLocal() && class_exists(\Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider::class)) {
-            $this->app->register(\Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider::class);
-        }
+        
     }
 
     public function boot(): void

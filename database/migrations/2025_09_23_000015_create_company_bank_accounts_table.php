@@ -10,11 +10,10 @@ return new class extends Migration
     {
         Schema::create('company_bank_accounts', function (Blueprint $table) {
             $table->id('company_bank_account_id');
-            $table->string('bank_name'); // Misal: "BCA", "Mandiri", "Kas Tunai"
-            $table->string('account_name'); // Misal: "PT. USAHA JAYA"
-            $table->string('account_number')->nullable(); // Misal: "1234567890" (nullable untuk kas)
+            $table->string('bank_name'); 
+            $table->string('account_name'); 
+            $table->string('account_number')->nullable(); 
 
-            // Hapus ->after(), karena tidak valid di Schema::create()
             $table->foreignId('chart_of_account_id')
                   ->nullable()
                   ->constrained('chart_of_accounts', 'account_id')

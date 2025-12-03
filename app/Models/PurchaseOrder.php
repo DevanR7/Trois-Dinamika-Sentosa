@@ -8,91 +8,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Models\User;
+use App\Models\Supplier;
+use App\Models\PurchaseOrderItem;
+use App\Models\Tax;
+use App\Models\PurchaseOrderPayment;
+use App\Models\PurchaseReturn;
+use App\Models\PurchaseOrderAdjustment;
+use App\Models\SupplierLedger;
 
-/**
- * App\Models\PurchaseOrder
- *
- * @property int $po_id
- * @property string $po_number
- * @property string|null $supplier_invoice_number
- * @property int $supplier_id
- * @property int|null $requester_user_id
- * @property int $user_id_admin
- * @property \Illuminate\Support\Carbon $order_date
- * @property \Illuminate\Support\Carbon|null $due_date
- * @property string|null $expected_delivery_date
- * @property float $total_amount
- * @property float|null $subtotal
- * @property int|null $tax_id
- * @property bool $apply_disc_fee
- * @property float|null $disc_fee_percent
- * @property float|null $disc_fee_amount
- * @property bool $apply_rounding_discount
- * @property float|null $rounding_discount_amount
- * @property bool $use_custom_dpp_factor
- * @property float|null $custom_dpp_factor
- * @property float $shipping_amount
- * @property float|null $taxable_amount
- * @property float|null $dpp
- * @property float|null $ppn
- * @property float|null $grand_total
- * @property string $amount_paid
- * @property string $total_returned
- * @property string $status
- * @property string $payment_status
- * @property string|null $notes
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\PurchaseOrderAdjustment> $adjustments
- * @property-read int|null $adjustments_count
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\PurchaseReturn> $deductingReturns
- * @property-read int|null $deducting_returns_count
- * @property-read float $remaining_balance
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\PurchaseOrderItem> $items
- * @property-read int|null $items_count
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\PurchaseOrderPayment> $payments
- * @property-read int|null $payments_count
- * @property-read \App\Models\User|null $requester
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\PurchaseReturn> $returns
- * @property-read int|null $returns_count
- * @property-read \App\Models\Supplier $supplier
- * @property-read \App\Models\Tax|null $tax
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder query()
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereAmountPaid($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereApplyDiscFee($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereApplyRoundingDiscount($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereCustomDppFactor($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereDiscFeeAmount($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereDiscFeePercent($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereDpp($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereDueDate($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereExpectedDeliveryDate($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereGrandTotal($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereNotes($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereOrderDate($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder wherePaymentStatus($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder wherePoId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder wherePoNumber($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder wherePpn($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereRequesterUserId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereRoundingDiscountAmount($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereShippingAmount($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereStatus($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereSubtotal($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereSupplierId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereSupplierInvoiceNumber($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereTaxId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereTaxableAmount($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereTotalAmount($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereTotalReturned($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereUseCustomDppFactor($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder whereUserIdAdmin($value)
- * @mixin \Eloquent
- */
 class PurchaseOrder extends Model
 {
     use HasFactory;

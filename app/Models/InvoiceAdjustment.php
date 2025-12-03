@@ -6,36 +6,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use App\Models\SalesInvoice;
+use App\Models\User;
+use App\Models\ClientLedger;
 
-/**
- * App\Models\InvoiceAdjustment
- *
- * @property int $adjustment_id
- * @property int $sales_invoice_id
- * @property int $user_id
- * @property \Illuminate\Support\Carbon $adjustment_date
- * @property string $type
- * @property float $amount
- * @property string $reason
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\ClientLedger|null $ledgerEntry
- * @property-read \App\Models\SalesInvoice $salesInvoice
- * @property-read \App\Models\User $user
- * @method static \Illuminate\Database\Eloquent\Builder|InvoiceAdjustment newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|InvoiceAdjustment newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|InvoiceAdjustment query()
- * @method static \Illuminate\Database\Eloquent\Builder|InvoiceAdjustment whereAdjustmentDate($value)
- * @method static \Illuminate\Database\Eloquent\Builder|InvoiceAdjustment whereAdjustmentId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|InvoiceAdjustment whereAmount($value)
- * @method static \Illuminate\Database\Eloquent\Builder|InvoiceAdjustment whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|InvoiceAdjustment whereReason($value)
- * @method static \Illuminate\Database\Eloquent\Builder|InvoiceAdjustment whereSalesInvoiceId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|InvoiceAdjustment whereType($value)
- * @method static \Illuminate\Database\Eloquent\Builder|InvoiceAdjustment whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|InvoiceAdjustment whereUserId($value)
- * @mixin \Eloquent
- */
 class InvoiceAdjustment extends Model
 {
     use HasFactory;

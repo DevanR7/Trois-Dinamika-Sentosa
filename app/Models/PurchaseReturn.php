@@ -7,42 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use App\Models\PurchaseOrder;
+use App\Models\Supplier;
+use App\Models\User;
+use App\Models\PurchaseReturnItem;
 
-/**
- * App\Models\PurchaseReturn
- *
- * @property int $return_id
- * @property string $return_number
- * @property int $supplier_id
- * @property int $purchase_order_id
- * @property int $user_id User yang memproses retur
- * @property \Illuminate\Support\Carbon $return_date
- * @property string $return_handling_type Aksi: potong tagihan atau simpan jadi deposit
- * @property string|null $notes
- * @property string $total_amount
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\PurchaseReturnItem> $items
- * @property-read int|null $items_count
- * @property-read \App\Models\PurchaseOrder $purchaseOrder
- * @property-read \App\Models\Supplier $supplier
- * @property-read \App\Models\User $user
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseReturn newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseReturn newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseReturn query()
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseReturn whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseReturn whereNotes($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseReturn wherePurchaseOrderId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseReturn whereReturnDate($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseReturn whereReturnHandlingType($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseReturn whereReturnId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseReturn whereReturnNumber($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseReturn whereSupplierId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseReturn whereTotalAmount($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseReturn whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseReturn whereUserId($value)
- * @mixin \Eloquent
- */
 class PurchaseReturn extends Model
 {
     use HasFactory;

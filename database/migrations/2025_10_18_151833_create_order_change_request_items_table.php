@@ -13,11 +13,13 @@ return new class extends Migration
             $table->foreignId('order_change_request_id')->constrained('order_change_requests', 'request_id')->cascadeOnDelete();
             $table->foreignId('product_id')->constrained('products', 'product_id');
 
+            // UBAH DARI INTEGER KE DECIMAL
             // Kuantitas asli (jika item sudah ada sebelumnya dan diubah/dihapus)
-            $table->integer('original_quantity')->nullable();
+            $table->decimal('original_quantity', 15, 2)->nullable(); 
 
+            // UBAH DARI INTEGER KE DECIMAL
             // Kuantitas yang diminta klien (bisa 0 jika dihapus)
-            $table->integer('requested_quantity');
+            $table->decimal('requested_quantity', 15, 2);
 
             // Aksi yang diminta: tambah item baru, hapus item, atau ubah kuantitas
             $table->enum('action', ['add', 'remove', 'update_qty']);

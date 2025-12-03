@@ -1,122 +1,82 @@
-@extends('layouts.guest')
+@extends('client.layouts.guest')
 
 @section('content')
 
-    {{-- Judul --}}
-    <div class="text-center mb-4">
-        <h4 class="fw-bold">Atur Password Baru</h4>
-        <p class="text-muted" style="color: #555 !important;">Silakan masukkan password baru Anda.</p>
+    <div class="text-center mb-8">
+        <h4 class="text-xl font-bold text-[#0f172a] dark:text-white">Atur Password Baru</h4>
+        <p class="text-xs text-slate-500 mt-1">Silakan buat password baru untuk akun Anda.</p>
     </div>
 
-    {{-- Notifikasi --}}
     @if ($errors->any())
-        <div class="alert alert-danger">
-            <ul class="mb-0 ps-3">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
+        <div class="flex p-3 mb-6 text-xs text-red-700 bg-red-50 rounded-lg border border-red-100 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300 items-center animate-enter">
+            <i class="material-icons text-sm mr-2">error</i>
+            <span class="font-semibold">{{ $errors->first() }}</span>
         </div>
     @endif
 
-    {{-- Form Reset --}}
-    <form method="POST" action="{{ route('client.password.update') }}" class="login-form">
+    <form method="POST" action="{{ route('client.password.update') }}" class="space-y-4">
         @csrf
-
-        {{-- Input Token (Hidden) --}}
         <input type="hidden" name="token" value="{{ $token }}">
 
-        {{-- Input Email (Di-hardcode dari link) --}}
-        <div class="mb-3">
-            <label for="email" class="form-label">Email address</label>
-            <div class="input-wrapper">
-                <i class="bi bi-person input-icon"></i>
-                <input id="email" type="email" name="email"
-                       class="form-control @error('email') is-invalid @enderror"
-                       value="{{ $email ?? old('email') }}" required readonly
-                       style="background-color: #f3f4f6;">
+        {{-- Email Readonly --}}
+        <div>
+            <label class="block mb-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Email Address</label>
+            <div class="relative group">
+                <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                    <i class="material-icons text-slate-400 text-[20px]">email</i>
+                </div>
+                <input type="email" name="email" value="{{ $email ?? old('email') }}" required readonly
+                    class="bg-slate-100 border border-slate-200 text-slate-500 text-sm rounded-lg block w-full pl-12 p-3 cursor-not-allowed dark:bg-slate-800/50 dark:border-slate-700 dark:text-slate-500">
             </div>
         </div>
 
-        {{-- Input Password Baru --}}
-        <div class="mb-3">
-            <label for="password" class="form-label">Password Baru</label>
-            <div class="input-wrapper">
-                <i class="bi bi-lock input-icon"></i>
-                <input id="password" type="password" name="password"
-                       class="form-control @error('password') is-invalid @enderror"
-                       required 
-                       placeholder="Masukkan Password Baru">
-                <i class="bi bi-eye-slash" id="togglePassword"></i>
+        {{-- Password Baru --}}
+        <div>
+            <label class="block mb-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Password Baru</label>
+            <div class="relative group">
+                <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                    <i class="material-icons text-slate-400 group-focus-within:text-[#0f172a] dark:group-focus-within:text-white transition-colors duration-300 text-[20px]">lock</i>
+                </div>
+                <input type="password" name="password" id="password" required
+                    class="bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-lg focus:ring-2 focus:ring-[#0f172a]/20 focus:border-[#0f172a] block w-full pl-12 pr-16 p-3 dark:bg-slate-800 dark:border-slate-700 dark:text-white dark:focus:border-indigo-500 transition-all duration-300 placeholder-slate-400"
+                    placeholder="Masukkan Password Baru">
+                <div id="togglePassword" class="absolute inset-y-0 right-0 flex items-center pr-4 cursor-pointer text-[10px] font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 uppercase tracking-wider select-none transition-colors duration-300">
+                    SHOW
+                </div>
             </div>
         </div>
 
-        {{-- Input Konfirmasi Password --}}
-        <div class="mb-4">
-            <label for="password_confirmation" class="form-label">Konfirmasi Password</label>
-            <div class="input-wrapper">
-                <i class="bi bi-lock input-icon"></i>
-                <input id="password_confirmation" type="password" name="password_confirmation"
-                       class="form-control"
-                       required 
-                       placeholder="Ulangi Password Baru">
-            </div>
-
-            <div id="password-match-error" class="text-danger small mt-1 d-none">
-                Password dan Konfirmasi Password tidak cocok.
+        {{-- Konfirmasi Password --}}
+        <div>
+            <label class="block mb-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Konfirmasi Password</label>
+            <div class="relative group">
+                <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                    <i class="material-icons text-slate-400 group-focus-within:text-[#0f172a] dark:group-focus-within:text-white transition-colors duration-300 text-[20px]">lock_clock</i>
+                </div>
+                <input type="password" name="password_confirmation" required
+                    class="bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-lg focus:ring-2 focus:ring-[#0f172a]/20 focus:border-[#0f172a] block w-full pl-12 p-3 dark:bg-slate-800 dark:border-slate-700 dark:text-white dark:focus:border-indigo-500 transition-all duration-300 placeholder-slate-400"
+                    placeholder="Ulangi Password Baru">
             </div>
         </div>
 
-        {{-- Tombol Reset --}}
-        <div class="d-grid mb-4">
-            <button type="submit" class="btn btn-login">
-                Reset Password
-            </button>
-        </div>
+        <button type="submit" class="w-full text-white bg-[#0f172a] hover:bg-slate-800 focus:ring-4 focus:ring-slate-300 font-bold rounded-lg text-sm px-5 py-3.5 text-center shadow-lg hover:shadow-xl transform transition-all duration-300 active:scale-[0.98] dark:bg-indigo-600 dark:hover:bg-indigo-700 mt-4">
+            SIMPAN PASSWORD BARU
+        </button>
     </form>
 @endsection
 
-{{-- Script untuk toggle password DAN validasi --}}
 @push('scripts')
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            
-            // --- 1. LOGIKA TOGGLE PASSWORD ---
-            const togglePassword = document.querySelector('#togglePassword');
-            // 'password' akan didefinisikan ulang di bawah, jadi kita beri nama unik di sini
-            const passwordInputForToggle = document.getElementById('password'); 
-
-            if (togglePassword && passwordInputForToggle) {
-                togglePassword.addEventListener('click', function (e) {
-                    const type = passwordInputForToggle.getAttribute('type') === 'password' ? 'text' : 'password';
-                    passwordInputForToggle.setAttribute('type', type);
-                    this.classList.toggle('bi-eye');
-                    this.classList.toggle('bi-eye-slash');
-                });
-            }
-
-            // ===================================
-            //     TAMBAHKAN LOGIKA VALIDASI INI
-            // ===================================
-            
-            // --- 2. LOGIKA VALIDASI PASSWORD COCOK ---
-            const passwordInput = document.getElementById('password');
-            const passwordConfirmationInput = document.getElementById('password_confirmation');
-            const passwordError = document.getElementById('password-match-error');
-
-            if (passwordInput && passwordConfirmationInput && passwordError) {
-                
-                function validatePasswordMatch() {
-                    if (passwordInput.value !== passwordConfirmationInput.value && passwordConfirmationInput.value.length > 0) {
-                        passwordError.classList.remove('d-none'); // Tampilkan error
-                    } else {
-                        passwordError.classList.add('d-none'); // Sembunyikan error
-                    }
-                }
-
-                passwordInput.addEventListener('input', validatePasswordMatch);
-                passwordConfirmationInput.addEventListener('input', validatePasswordMatch);
-            }
-        });
-    </script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const toggleBtn = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('password');
+        if (toggleBtn && passwordInput) {
+            toggleBtn.addEventListener('click', function() {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                this.innerText = (type === 'text') ? 'HIDE' : 'SHOW';
+            });
+        }
+    });
+</script>
 @endpush

@@ -14,10 +14,11 @@ return new class extends Migration
             $table->string('product_code', 50)->unique();
             $table->string('product_name', 200);
             $table->text('description')->nullable();
+            $table->string('image_path')->nullable();
             $table->decimal('purchase_price', 15, 2)->nullable();
             $table->decimal('selling_price', 15, 2)->nullable();
-            $table->decimal('average_cost', 15, 2)->nullable()->default(0.00);
-            $table->integer('stock_quantity')->nullable();
+            $table->decimal('average_cost', 19, 4)->nullable()->default(0.00);
+            $table->decimal('stock_quantity', 15, 2)->nullable();
             $table->foreignId('unit_id')->nullable()->constrained('units', 'unit_id');
             $table->softDeletes();
             $table->timestamps();

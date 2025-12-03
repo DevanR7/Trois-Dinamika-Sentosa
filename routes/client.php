@@ -9,7 +9,7 @@ use App\Http\Controllers\Client\SalesPlacedOrderController; // Controller Riwaya
 use App\Http\Controllers\Client\ClientOnlineOrderController;  // Controller Order Online Klien
 use App\Http\Controllers\Client\OrderChangeRequestController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\MidtransController;
+use App\Http\Controllers\Admin\MidtransController;
 // Controller Lupa Password & Register
 use App\Http\Controllers\Client\Auth\ForgotPasswordController;
 use App\Http\Controllers\Client\Auth\ResetPasswordController;
@@ -51,15 +51,14 @@ Route::prefix('client')->name('client.')->group(function () {
 
             // Invoices
             Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
-            Route::get('invoices/batch-pay', [InvoiceController::class, 'showBatchPay'])
-                 ->name('invoices.batchPay.create');
-            
-            Route::post('invoices/batch-pay-midtrans', [MidtransController::class, 'payBatch'])
-                 ->name('invoices.batchPay.storeMidtrans'); // Ganti nama agar unik
-            
-            // ✅ TAMBAHKAN RUTE BARU INI
-            Route::post('invoices/batch-pay-manual', [InvoiceController::class, 'storeBatchProof'])
-                 ->name('invoices.batchPay.storeManual');
+            Route::get('invoices/bulk-pay', [InvoiceController::class, 'showBulkPay']) 
+                ->name('invoices.bulkPay.create'); // ✅
+
+            Route::post('invoices/bulk-pay-midtrans', [MidtransController::class, 'payBatch'])
+                ->name('invoices.bulkPay.storeMidtrans'); // ✅
+
+            Route::post('invoices/bulk-pay-manual', [InvoiceController::class, 'storeBatchProof'])
+                ->name('invoices.bulkPay.storeManual'); // ✅
 
             Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
             Route::post('invoices/{invoice}/upload-proof', [InvoiceController::class, 'uploadProof'])->name('invoices.uploadProof');

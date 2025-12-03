@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+use Illuminate\Support\Facades\Log;
 
 // DAFTAR MODEL
 use App\Models\User;
@@ -28,11 +29,6 @@ use App\Policies\AnnouncementPolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
-    /**
-     * The model to policy mappings for the application.
-     *
-     * @var array<class-string, class-string>
-     */
     protected $policies = [
         Order::class => OrderPolicy::class, 
         PurchaseOrder::class => PurchaseOrderPolicy::class,
@@ -44,50 +40,86 @@ class AuthServiceProvider extends ServiceProvider
         Announcement::class => AnnouncementPolicy::class,
     ];
 
-    /**
-     * Register any authentication / authorization services.
-     */
     public function boot(): void
     {
         $this->registerPolicies();
 
-        // --- 1. SUPER ADMIN (Bypass semua cek) ---
-        // Jika role user adalah 'admin', otomatis boleh melakukan apa saja
+        // =====================================================================
+        // 1. SUPER ADMIN BYPASS (Kunci Fleksibilitas Utama)
+        // =====================================================================
+        // Gate::before berjalan SEBELUM semua pengecekan lain.
+        // Jika user punya role 'admin' atau 'superadmin', langsung izinkan (return true).
+        // Kita gunakan strtolower agar 'Admin', 'ADMIN', 'admin' dianggap sama.
+        
         Gate::before(function ($user, $ability) {
-            if ($user->role === 'admin') { 
-                return true;
+            // Cek menggunakan kolom manual 'role' ATAU library Spatie 'hasRole'
+            $role = strtolower($user->role ?? '');
+            
+            if ($role === 'admin' || $role === 'superadmin') {
+                return true; 
+            }
+            
+            // Jika menggunakan Spatie:
+            if (method_exists($user, 'hasRole')) {
+                if ($user->hasRole('admin') || $user->hasRole('superadmin')) {
+                    return true;
+                }
             }
         });
 
-        // --- 2. GATE AKUNTANSI & PENGATURAN ---
-        // Digunakan di: ClosingBook, ManualJournal, Settings, PaymentMethod
-        Gate::define('manage-settings', function (User $user) {
-            return in_array($user->role, ['admin', 'accountant']); 
+        // =====================================================================
+        // 2. GATE DEFINITIONS (Fleksibel dengan Array)
+        // =====================================================================
+
+        // Helper function kecil untuk cek role (agar coding di bawah rapi)
+        $checkRoles = function($user, array $allowedRoles) {
+            $userRole = strtolower($user->role ?? '');
+            // Cek kolom manual
+            if (in_array($userRole, array_map('strtolower', $allowedRoles))) {
+                return true;
+            }
+            // Cek Spatie
+            if (method_exists($user, 'hasRole') && $user->hasAnyRole($allowedRoles)) {
+                return true;
+            }
+            return false;
+        };
+
+        // --- Gate: Akuntansi & Pengaturan ---
+        // Fleksibel: Tinggal tambah 'finance_manager' atau role lain ke array ini
+        Gate::define('manage-settings', function (User $user) use ($checkRoles) {
+            return $checkRoles($user, ['admin', 'accountant', 'superadmin']);
         });
 
-        // Digunakan di: BankReconciliation, PaymentClearance
-        Gate::define('manage-finance', function (User $user) {
-            return in_array($user->role, ['admin', 'accountant', 'finance']); 
+        // --- Gate: Keuangan (Rekonsiliasi & Kliring) ---
+        Gate::define('manage-finance', function (User $user) use ($checkRoles) {
+            return $checkRoles($user, ['admin', 'accountant', 'finance', 'finance_manager']); 
         });
 
-        // --- 3. GATE LAPORAN (View Reports) ---
-        // Digunakan di: ReportController, GeneralLedger, Expense, Loan (Index)
-        Gate::define('view-reports', function (User $user) {
-             return in_array($user->role, ['admin', 'accountant', 'manager', 'finance']);
+        // --- Gate: View Reports ---
+        Gate::define('view-reports', function (User $user) use ($checkRoles) {
+            return $checkRoles($user, ['admin', 'accountant', 'manager', 'finance', 'director']);
         });
 
-        // --- 4. GATE PENYESUAIAN INVOICE/PO (Adjustments) ---
-        Gate::define('create-invoice-adjustments', function (User $user) {
-            return in_array($user->role, ['admin', 'accountant']);
+        // --- Gate: Create Adjustments ---
+        Gate::define('create-invoice-adjustments', function (User $user) use ($checkRoles) {
+            return $checkRoles($user, ['admin', 'accountant', 'sales_manager']);
         });
         
-        Gate::define('delete-invoice-adjustments', function (User $user) {
-            return $user->role === 'admin'; // Hanya admin yang boleh hapus
+        // --- Gate: Delete Adjustments (YANG ERROR TADI) ---
+        // Sekarang jika ada role baru misal 'audit', tinggal tambahkan ke array.
+        Gate::define('delete-invoice-adjustments', function (User $user) use ($checkRoles) {
+            return $checkRoles($user, ['admin', 'superadmin', 'finance_manager']);
         });
         
-        // Gate khusus untuk manage payment methods (jika belum ada)
-        Gate::define('manage-payment-methods', function (User $user) {
-            return $user->role === 'admin';
+        // --- Gate: Payment Methods ---
+        Gate::define('manage-payment-methods', function (User $user) use ($checkRoles) {
+            return $checkRoles($user, ['admin', 'superadmin', 'it_support']);
         });
-    }   
+
+        // --- Gate: Manage Payment Clearance ---
+        Gate::define('manage-payment-clearance', function (User $user) use ($checkRoles) {
+            return $checkRoles($user, ['admin', 'finance', 'accountant']);
+        });
+    }    
 }

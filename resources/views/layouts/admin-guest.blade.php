@@ -4,113 +4,56 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content="{{ csrf_token() }}" />
-    <title>{{ config('app.name', 'Laravel') }} - Login</title>
+    <title>{{ config('app.name', 'Laravel') }} - Admin Login</title>
 
     <link rel="icon" type="image/x-icon" href="{{ asset('images/TDS-favicon.png') }}">
 
-    {{-- 1. FONTS --}}
+    {{-- 1. FONTS: Inter --}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    {{-- Font Utama Login: Hedvig Letters Sans --}}
-    <link href="https://fonts.googleapis.com/css2?family=Hedvig+Letters+Sans&display=swap" rel="stylesheet">
-    {{-- Icon Google --}}
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    {{-- 2. ICONS: Material Icons --}}
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
     
-    {{-- 2. VITE (Tailwind CSS & JS) --}}
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    {{-- 3. BOOTSTRAP (PENTING: Tambahkan ini agar layout rapi seperti Client) --}}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
 
-    <style>
-        /* Override Font Khusus Halaman Login */
-        body {
-            font-family: 'Hedvig Letters Sans', sans-serif;
-        }
-        
-        /* Memastikan partikel berada di layer paling belakang */
-        #particles-bg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
-        }
-    </style>
+    {{-- 4. CSS CUSTOM --}}
+    @vite(['resources/css/login.css', 'resources/js/app.js'])
 </head>
-<body class="bg-slate-50 text-slate-600 antialiased h-screen w-full overflow-hidden relative flex items-center justify-center">
+<body>
 
-    {{-- CONTAINER BACKGROUND PARTIKEL --}}
+    {{-- Background Partikel --}}
     <div id="particles-bg"></div>
 
-    {{-- WRAPPER KONTEN UTAMA (Z-Index tinggi agar di atas partikel) --}}
-    <div class="relative z-10 w-full p-4 flex items-center justify-center">
+    {{-- Wrapper Utama --}}
+    <div class="login-page-wrapper">
         @yield('content')
     </div>
 
-    {{-- SCRIPTS KHUSUS HALAMAN (Jika ada push stack) --}}
+    {{-- Script Tambahan --}}
     @stack('scripts')
     
-    {{-- LIBRARY PARTIKEL --}}
+    {{-- Library Partikel & Bootstrap JS --}}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tsparticles@2/tsparticles.bundle.min.js"></script>
     
-    {{-- KONFIGURASI PARTIKEL (Warna Slate agar selaras) --}}
+    {{-- Konfigurasi Partikel --}}
     <script>
         document.addEventListener('DOMContentLoaded', (event) => {
             tsParticles.load("particles-bg", {
                 fpsLimit: 60,
-                interactivity: {
-                    events: {
-                        onHover: {
-                            enable: true,
-                            mode: "repulse", // Efek menolak kursor
-                        },
-                        resize: true,
-                    },
-                    modes: {
-                        repulse: {
-                            distance: 100,
-                            duration: 0.4,
-                        },
-                    },
-                },
+                interactivity: { events: { onHover: { enable: true, mode: "repulse" } } },
                 particles: {
-                    color: {
-                        value: "#94a3b8", // Warna titik (Slate-400)
-                    },
-                    links: {
-                        color: "#cbd5e1", // Warna garis penghubung (Slate-300)
-                        distance: 150,
-                        enable: true,
-                        opacity: 0.5,
-                        width: 1,
-                    },
-                    move: {
-                        enable: true,
-                        speed: 1, // Kecepatan gerak lambat & kalem
-                        direction: "none",
-                        random: false,
-                        straight: false,
-                        outModes: {
-                            default: "bounce",
-                        },
-                    },
-                    number: {
-                        density: {
-                            enable: true,
-                            area: 800,
-                        },
-                        value: 80, // Jumlah partikel
-                    },
-                    opacity: {
-                        value: 0.5,
-                    },
-                    shape: {
-                        type: "circle",
-                    },
-                    size: {
-                        value: { min: 1, max: 5 },
-                    },
-                },
-                detectRetina: true,
+                    color: { value: "#94a3b8" },
+                    links: { color: "#cbd5e1", distance: 150, enable: true, opacity: 0.4, width: 1 },
+                    move: { enable: true, speed: 1 },
+                    number: { value: 60, density: { enable: true, area: 800 } },
+                    opacity: { value: 0.5 },
+                    shape: { type: "circle" },
+                    size: { value: { min: 1, max: 3 } },
+                }
             });
         });
     </script>

@@ -6,169 +6,183 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Client Portal - {{ config('app.name', 'Laravel') }}</title>
 
-    {{-- Aset CSS --}}
+    {{-- FONTS & ICONS (Samakan dengan Admin agar CSS .sidebar icon berfungsi) --}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Hedvig+Letters+Sans&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" />
-    <link rel="stylesheet" href="//code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css"> {{-- CSS jQuery UI (Untuk Draggable) --}}
+    
+    {{-- CSS Libraries (Select2 & SweetAlert - Sesuai Admin) --}}
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 
-    {{-- Stack CSS Tambahan dari Halaman Child --}}
     @stack('styles')
 
-    {{-- Vite Assets --}}
+    {{-- VITE (Tailwind) --}}
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
-    {{-- Inline style untuk fix overlap sementara --}}
-    <style>
-        /* Naikkan tombol notifikasi di layar kecil */
-        @media (max-width: 991.98px) { /* Bootstrap lg breakpoint - 1px */
-            #notificationBellButton {
-                bottom: 80px !important; /* Tinggikan dari bawah, sesuaikan jika perlu */
-            }
+    {{-- Script Dark Mode (Anti-Flicker) --}}
+    <script>
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark')
+        } else {
+            document.documentElement.classList.remove('dark')
         }
-    </style>
+    </script>
 </head>
-<body>
+{{-- Tambahkan x-data untuk mengontrol state global (Sidebar Mobile & Pengumuman) --}}
+<body class="bg-[#f8fafc] dark:bg-[#0f172a] transition-colors duration-300 font-sans antialiased text-slate-600 dark:text-slate-300"
+      x-data="{ 
+          mobileSidebarOpen: false, 
+          announcementOpen: false 
+      }">
 
-    <div class="sidebar-overlay"></div>
-    {{-- Memanggil komponen sidebar klien --}}
+    {{-- Overlay untuk Mobile Sidebar --}}
+    <div x-show="mobileSidebarOpen" 
+         @click="mobileSidebarOpen = false"
+         x-transition.opacity
+         class="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
+         style="display: none;"></div>
+
+    {{-- SIDEBAR --}}
     @include('layouts.client-sidebar')
 
-    {{-- Wrapper untuk konten utama --}}
-    <div class="main-wrapper flex-grow-1">
+    {{-- MAIN WRAPPER (Sesuai app.css) --}}
+    <main class="main-wrapper">
+        
+        {{-- NAVBAR CLIENT (Sederhana) --}}
+        <nav class="top-navbar px-6 py-3 flex justify-between items-center h-16">
+            <div class="flex items-center gap-4">
+                {{-- Tombol Toggle Sidebar Mobile --}}
+                <button @click="mobileSidebarOpen = !mobileSidebarOpen" 
+                        class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition lg:hidden">
+                    <i class="material-icons text-2xl">menu</i>
+                </button>
+                <h1 class="text-lg font-bold text-slate-800 dark:text-slate-100 tracking-tight">
+                    @yield('title', 'Portal Client')
+                </h1>
+            </div>
 
-        {{-- KONTEN UTAMA HALAMAN --}}
-        <main class="main-content">
-            @yield('content')
-        </main>
-
-    </div> {{-- Akhir main-wrapper --}}
-
-    {{-- Tombol Floating Menu (Mobile) --}}
-    <button class="btn btn-primary d-lg-none floating-menu-btn"
-            type="button"
-            id="sidebar-open"> <i class="bi bi-list"></i>
+            <div class="flex items-center gap-3">
+                 {{-- Dark Mode Toggle --}}
+                <div x-data>
+    <button 
+        @click="$store.darkMode.toggle()" 
+        class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors duration-200 focus:outline-none
+               text-slate-500 hover:bg-slate-100 hover:text-slate-700
+               dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+        title="Ganti Tema">
+        
+        {{-- Icon Matahari --}}
+        <i class="material-icons text-[20px]" x-show="$store.darkMode.on" style="display: none;">light_mode</i>
+        
+        {{-- Icon Bulan --}}
+        <i class="material-icons text-[20px]" x-show="!$store.darkMode.on">dark_mode</i>
     </button>
+</div>
 
-    {{-- ========================================================= --}}
-    {{--          FLOATING BUTTON & OFFCANVAS PENGUMUMAN           --}}
-    {{-- ========================================================= --}}
+                {{-- Tombol Lonceng (Trigger Panel Pengumuman) --}}
+                @if(isset($activeAnnouncements) && $activeAnnouncements->isNotEmpty())
+                <button @click="announcementOpen = true" class="relative p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition">
+                    <i class="material-icons text-[22px]">notifications</i>
+                    <span class="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                    </span>
+                </button>
+                @endif
+            </div>
+        </nav>
 
-    {{-- START: OFFCANVAS PENGUMUMAN --}}
-    @if(isset($activeAnnouncements) && $activeAnnouncements->isNotEmpty())
-    <div class="offcanvas offcanvas-end" tabindex="-1" id="announcementOffcanvas"
-         aria-labelledby="announcementOffcanvasLabel" style="max-width: 400px;"> {{-- Atur lebar panel --}}
-        <div class="offcanvas-header border-bottom">
-            <h5 class="offcanvas-title" id="announcementOffcanvasLabel">
-                <i class="bi bi-megaphone-fill me-2"></i> Pengumuman
-            </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        {{-- KONTEN UTAMA --}}
+        <div class="main-content p-6">
+            @yield('content')
         </div>
-        <div class="offcanvas-body">
-            {{-- Loop pengumuman --}}
-            @foreach($activeAnnouncements as $announcement)
-                <div class="mb-3 pb-3 {{ !$loop->last ? 'border-bottom' : '' }}">
-                    @if($announcement->title)
-                        <h6 class="fw-bold">{{ $announcement->title }}</h6>
-                    @endif
-                    <p class="mb-1 small">{!! nl2br(e($announcement->content)) !!}</p>
-                    <small class="text-muted">
-                        {{ $announcement->created_at->diffForHumans() }}
-                    </small>
+
+    </main>
+
+    {{-- PANEL PENGUMUMAN (Pengganti Offcanvas Bootstrap) --}}
+    @if(isset($activeAnnouncements) && $activeAnnouncements->isNotEmpty())
+    <div class="relative z-[1001]" aria-labelledby="slide-over-title" role="dialog" aria-modal="true" style="display: none;" x-show="announcementOpen">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+             x-show="announcementOpen"
+             x-transition.opacity
+             @click="announcementOpen = false"></div>
+
+        <div class="fixed inset-0 overflow-hidden">
+            <div class="absolute inset-0 overflow-hidden">
+                <div class="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
+                    <div class="pointer-events-auto w-screen max-w-md"
+                         x-show="announcementOpen"
+                         x-transition:enter="transform transition ease-in-out duration-500 sm:duration-700"
+                         x-transition:enter-start="translate-x-full"
+                         x-transition:enter-end="translate-x-0"
+                         x-transition:leave="transform transition ease-in-out duration-500 sm:duration-700"
+                         x-transition:leave-start="translate-x-0"
+                         x-transition:leave-end="translate-x-full">
+                        
+                        <div class="flex h-full flex-col overflow-y-scroll bg-white dark:bg-slate-800 shadow-xl border-l border-slate-200 dark:border-slate-700">
+                            <div class="px-4 py-6 sm:px-6 border-b border-slate-100 dark:border-slate-700">
+                                <div class="flex items-start justify-between">
+                                    <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100" id="slide-over-title">Pengumuman</h2>
+                                    <div class="ml-3 flex h-7 items-center">
+                                        <button type="button" class="rounded-md bg-white dark:bg-slate-800 text-slate-400 hover:text-slate-500 focus:outline-none" @click="announcementOpen = false">
+                                            <span class="sr-only">Close panel</span>
+                                            <i class="material-icons">close</i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="relative mt-6 flex-1 px-4 sm:px-6">
+                                {{-- List Pengumuman --}}
+                                <div class="space-y-6">
+                                    @foreach($activeAnnouncements as $announcement)
+                                    <div class="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-100 dark:border-slate-600">
+                                        @if($announcement->title)
+                                            <h3 class="font-bold text-indigo-600 dark:text-indigo-400 mb-1">{{ $announcement->title }}</h3>
+                                        @endif
+                                        <div class="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line leading-relaxed">
+                                            {!! $announcement->content !!}
+                                        </div>
+                                        <div class="mt-3 text-xs text-slate-400 flex items-center gap-1">
+                                            <i class="material-icons text-[14px]">schedule</i>
+                                            {{ $announcement->created_at->diffForHumans() }}
+                                        </div>
+                                    </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            @endforeach
+            </div>
         </div>
     </div>
     @endif
-    {{-- END: OFFCANVAS PENGUMUMAN --}}
 
-    {{-- ========================================================= --}}
-    {{--                          AKHIR BAGIAN NOTIFIKASI           --}}
-    {{-- ========================================================= --}}
-
-
-    {{-- Aset JavaScript (jQuery -> jQuery UI -> Bootstrap -> SweetAlert) --}}
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script> {{-- jQuery UI (Untuk Draggable) --}}
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    {{-- SCRIPTS LIBRARY --}}
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 
-    {{-- Script Notifikasi Global (SweetAlert) --}}
+    {{-- NOTIFICATION HANDLER --}}
     <script>
-        // Gunakan Toast untuk sukses
-        @if(session('success'))
-            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: '{{ session('success') }}', showConfirmButton: false, timer: 3000, timerProgressBar: true });
-        @endif
-        // Gunakan Modal standar untuk error
-        @if(session('error'))
-            Swal.fire({ icon: 'error', title: 'Gagal!', text: '{{ session('error') }}' });
-        @endif
-         // Notifikasi Info
-         @if(session('info'))
-            Swal.fire({ icon: 'info', title: 'Informasi', text: '{{ session('info') }}' });
-        @endif
-    </script>
-
-    {{-- @push untuk script halaman & logika draggable --}}
-    @push('scripts')
-    <script>
-        $(document).ready(function() { // Gunakan jQuery ready
-
-            // --- LOGIKA DRAGGABLE BUTTON ---
-            const notificationBellButton = $('#notificationBellButton'); // Target ID baru
-
-            if (notificationBellButton.length) {
-                // Cek apakah draggable sudah dimuat
-                if (typeof $.fn.draggable === 'function') {
-                    try {
-                        notificationBellButton.draggable({
-                            containment: "window", // Batasi di dalam window
-                            cursor: "grabbing",    // Ubah cursor
-
-                            // Simpan posisi terakhir
-                            stop: function( event, ui ) {
-                                localStorage.setItem('notificationButtonPos', JSON.stringify(ui.offset)); // Simpan posisi absolut
-                            }
-                        });
-
-                        // Terapkan posisi tersimpan saat load
-                        const savedPosition = localStorage.getItem('notificationButtonPos');
-                        if (savedPosition) {
-                           try {
-                               const pos = JSON.parse(savedPosition);
-                               if (typeof pos.top !== 'undefined' && typeof pos.left !== 'undefined') {
-                                   // Gunakan .css() untuk posisi fixed
-                                   notificationBellButton.css({
-                                       top: pos.top + 'px',
-                                       left: pos.left + 'px',
-                                       bottom: 'auto', // Override style inline awal
-                                       right: 'auto'   // Override style inline awal
-                                   });
-                               } else { localStorage.removeItem('notificationButtonPos'); }
-                           } catch(e) {
-                               console.error("Gagal load posisi tombol:", e);
-                               localStorage.removeItem('notificationButtonPos');
-                           }
-                        }
-                    } catch (e) {
-                         console.error("Error initializing draggable:", e);
-                    }
+        document.addEventListener('DOMContentLoaded', function() {
+            const safeToast = (msg, type) => {
+                if (typeof window.showToast === 'function') {
+                    window.showToast(msg, type);
                 } else {
-                    console.error("jQuery UI Draggable function not found!");
+                    Swal.fire({ toast: true, position: 'top-end', icon: type, title: msg, showConfirmButton: false, timer: 3000, timerProgressBar: true });
                 }
-            }
+            };
 
-            // --- (Tidak perlu script untuk show toast lagi) ---
-
-        }); // Akhir jQuery ready
+            @if(session('success')) safeToast("{{ session('success') }}", 'success'); @endif
+            @if(session('error')) safeToast("{{ session('error') }}", 'error'); @endif
+            @if(session('info')) safeToast("{{ session('info') }}", 'info'); @endif
+        });
     </script>
-    @endpush
 
-    {{-- PASTIKAN @stack ada di sini --}}
     @stack('scripts')
 </body>
 </html>

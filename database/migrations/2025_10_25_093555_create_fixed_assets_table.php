@@ -60,9 +60,6 @@ return new class extends Migration
 
             $table->timestamps();
         });
-
-        // Inisialisasi nilai buku = harga beli untuk data awal
-        DB::statement('UPDATE fixed_assets SET current_book_value = purchase_cost');
     }
 
     public function down(): void

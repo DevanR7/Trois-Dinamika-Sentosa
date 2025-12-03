@@ -5,35 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\PurchaseOrder;
+use App\Models\User;
 
-/**
- * App\Models\PurchaseOrderAdjustment
- *
- * @property int $adjustment_id
- * @property int $purchase_order_id
- * @property int $user_id
- * @property \Illuminate\Support\Carbon $adjustment_date
- * @property string $type
- * @property float $amount
- * @property string $reason
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\PurchaseOrder $purchaseOrder
- * @property-read \App\Models\User $user
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrderAdjustment newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrderAdjustment newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrderAdjustment query()
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrderAdjustment whereAdjustmentDate($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrderAdjustment whereAdjustmentId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrderAdjustment whereAmount($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrderAdjustment whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrderAdjustment wherePurchaseOrderId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrderAdjustment whereReason($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrderAdjustment whereType($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrderAdjustment whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrderAdjustment whereUserId($value)
- * @mixin \Eloquent
- */
 class PurchaseOrderAdjustment extends Model
 {
     use HasFactory;

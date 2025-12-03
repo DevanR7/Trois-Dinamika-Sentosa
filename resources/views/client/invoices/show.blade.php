@@ -1,350 +1,267 @@
-@extends('layouts.client')
+@extends('client.layouts.app')
+
+@section('title', 'Detail Invoice #' . $invoice->invoice_number)
+
+@push('styles')
+{{-- Select2 --}}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<style>
+    /* Fix Z-Index Select2 agar muncul di atas Modal Tailwind */
+    .select2-container--open { z-index: 9999999 !important; }
+    
+    /* Animasi Modal */
+    .modal-content-anim { animation: modalPop 0.3s ease-out forwards; }
+    @keyframes modalPop {
+        0% { transform: scale(0.95); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+</style>
+@endpush
 
 @php
     $client = Auth::guard('client')->user();
-    $allPayments = $invoice->payments; // Ambil 1x untuk efisiensi
+    $allPayments = $invoice->payments()->orderBy('created_at', 'desc')->get();
 
-    // 1. Untuk Ringkasan & Pembayaran
+    // 1. Logika Keuangan
     $sisaTagihan = $invoice->remaining_balance;
     $totalReturDipotong = $invoice->total_deducting_returns;
-    $totalReturKredit = $invoice->returns
-        ->where('return_handling_type', 'store_as_credit')
-        ->sum('total_amount');
+    $totalReturKredit = $invoice->returns->where('return_handling_type', 'store_as_credit')->sum('total_amount');
     
-    // 2. Untuk Saldo
-    $saldoKreditKlien = $client->balance; // Saldo available
-    $saldoKreditPending = $client->pending_balance; // Saldo pending
+    $saldoKreditKlien = $client->balance; 
+    $saldoKreditPending = $client->pending_balance; 
 
-    // 3. Untuk Logika Tombol Bayar & Verifikasi
+    // Cek Pembayaran Pending
     $pendingPayments = $allPayments->where('status', 'pending_verification');
     $pendingPaymentAmount = $pendingPayments->sum('amount');
-    $canPay = ($sisaTagihan - $pendingPaymentAmount) > 0.01;
-
-    // 4. Untuk Modal Midtrans
-    $amountToPayMidtrans = max(0, $sisaTagihan - $saldoKreditKlien);
     
-    // 5. ✅ TAMBAHKAN 2 BARIS INI
-    // Ini mengasumsikan $paymentMethods sudah dikirim dari Client/InvoiceController@show
-    $transferMethodId = $paymentMethods->firstWhere(fn($m) => str_contains(strtolower($m->name), 'transfer'))->payment_method_id ?? null;
-    $cashMethodId = $paymentMethods->firstWhere(fn($m) => str_contains(strtolower($m->name), 'cash'))->payment_method_id ?? null;
+    // Sisa Tagihan Final untuk UI
+    $finalBalanceUI = $sisaTagihan - $pendingPaymentAmount;
+    $canPay = $finalBalanceUI > 0.01;
+
+    // 2. Helper ID Metode Bayar
+    $pMethods = $paymentMethods ?? collect(); 
+    $transferMethodId = $pMethods->firstWhere(fn($m) => str_contains(strtolower($m->name), 'transfer'))->payment_method_id ?? '';
+    $cashMethodId = $pMethods->firstWhere(fn($m) => str_contains(strtolower($m->name), 'cash'))->payment_method_id ?? '';
 @endphp
 
 @section('content')
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <a href="{{ route('client.invoices.index') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Kembali ke Daftar
+<div class="max-w-5xl mx-auto space-y-6 pb-20">
+
+    {{-- HEADER --}}
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <a href="{{ route('client.invoices.index') }}" class="flex items-center text-slate-500 hover:text-slate-800 transition text-sm font-medium">
+            <i class="material-icons text-[18px] mr-1">arrow_back</i> Kembali ke Daftar
         </a>
 
-        <div class="d-flex flex-wrap gap-2">
-            @if(in_array($invoice->status, ['unpaid', 'partially_paid']) && $canPay)
-                <button type="button" class="btn btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#paymentMethodModal">
-                    <i class="bi bi-credit-card-fill me-2"></i> Bayar Tagihan
-                </button>
-            @endif
-        </div>
+        @if(in_array($invoice->status, ['unpaid', 'partially_paid']) && $canPay)
+            {{-- Tombol Trigger Modal Tailwind --}}
+            <button type="button" onclick="openModal('paymentMethodModal')" 
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-5 rounded-lg shadow-lg flex items-center gap-2 transition transform hover:-translate-y-0.5">
+                <i class="material-icons text-[20px]">credit_card</i> Bayar Tagihan
+            </button>
+        @endif
     </div>
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body p-5">
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <h2 class="fw-bold mb-1">INVOICE</h2>
-                    <p class="text-muted">#{{ $invoice->invoice_number }}</p>
-                </div>
-                <div class="col-md-6 text-md-end">
-                    <p class="mb-1"><strong>Tanggal Pesanan:</strong> {{ optional($invoice->order_date)->format('d F Y') }}</p>
-                    @if($invoice->due_date)<p class="mb-1"><strong>Jatuh Tempo:</strong> {{ optional($invoice->due_date)->format('d F Y') }}</p>@endif
-                    @if($invoice->sales)<p class="mb-1"><strong>Sales:</strong> {{ $invoice->sales->full_name }} ({{ $invoice->sales->sales_code }})</p>@endif
-                    <p class="mb-1">
-                        <strong>Status:</strong>
-                        @if($invoice->status == 'paid')
-                            <span class="badge bg-success fs-6">Lunas</span>
-                        @elseif($invoice->status == 'partially_paid')
-                            <span class="badge bg-info text-dark fs-6">Cicil</span>
-                        @elseif($invoice->status == 'cancelled')
-                            <span class="badge bg-danger fs-6">Dibatalkan</span>
-                        @else
-                            <span class="badge bg-warning text-dark fs-6">Belum Lunas</span>
-                        @endif
-                    </p>
-                </div>
-            </div>
-            <hr>
-            
-            <h5 class="fw-semibold mt-4">Rincian Invoice</h5>
-            <div class="table-responsive">
-                <table class="table table-bordered align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>No</th>
-                            <th>Produk</th>
-                            <th class="text-center">Kuantitas</th>
-                            <th class="text-end">Harga Satuan</th>
-                            <th class="text-end">Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($invoice->items as $item)
-                        <tr>
-                            <td>{{ $loop->iteration }}</td>
-                            <td>{{ $item->product->product_name ?? 'Produk Dihapus' }}</td>
-                            <td class="text-center">{{ $item->quantity }}</td>
-                            <td class="text-end">Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}</td>
-                            <td class="text-end fw-semibold">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
-                        </tr>
-                        @empty
-                        <tr><td colspan="5" class="text-center text-muted">Tidak ada item dalam invoice ini.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+    {{-- ALERT --}}
+    @if(session('success'))
+        <div class="bg-emerald-50 text-emerald-800 p-4 rounded-lg border border-emerald-200 flex items-center gap-2">
+            <i class="material-icons text-emerald-600">check_circle</i> {{ session('success') }}
+        </div>
+    @endif
+    @if(session('error'))
+        <div class="bg-red-50 text-red-800 p-4 rounded-lg border border-red-200 flex items-center gap-2">
+            <i class="material-icons text-red-600">error</i> {{ session('error') }}
+        </div>
+    @endif
 
-            @if($pendingPayments->isNotEmpty())
-            <div class="card my-4 border-warning">
-                <div class="card-header bg-warning text-dark">
-                    <h5 class="mb-0 fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>Menunggu Verifikasi Pembayaran</h5>
-                </div>
-                <div class="card-body">
-                    @foreach($pendingPayments as $payment)
-                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-3">
-                        <div>
-                            <div><strong>Jumlah:</strong> Rp {{ number_format($payment->amount, 0, ',', '.') }}</div>
-                            <div><strong>Tanggal Lapor:</strong> {{ $payment->created_at->format('d M Y H:i') }}</div>
-                            @if($payment->notes)
-                                <div class="text-muted small mt-1"><strong>Catatan Klien:</strong> {{ $payment->notes }}</div>
-                            @endif
-                        </div>
-                        <div class="d-flex gap-3 align-items-center">
-                            <div class="text-center">
-                                @if($payment->paymentMethod && str_contains(strtolower($payment->paymentMethod->name), 'cash') && $payment->receivedBy)
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" 
-                                            data-bs-toggle="popover" 
-                                            data-bs-title="Diterima Oleh" 
-                                            data-bs-content="{{ $payment->receivedBy->full_name }}">
-                                        Cash
-                                    </button>
-                                @elseif($payment->proof_of_payment_path)
-                                    <a href="{{ asset('storage/' . $payment->proof_of_payment_path) }}" target="_blank" class="btn btn-sm btn-outline-info">Lihat Bukti</a>
-                                @else
-                                    <span class="text-muted">-</span>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                    @endforeach
-                </div>
+    {{-- KARTU DETAIL INVOICE --}}
+    <div class="dashboard-card overflow-hidden">
+        {{-- Header Kartu --}}
+        <div class="bg-slate-50 dark:bg-slate-800/50 px-8 py-6 border-b border-slate-200 dark:border-slate-700 flex flex-col md:flex-row justify-between items-start">
+            <div>
+                <h1 class="text-3xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">INVOICE</h1>
+                <p class="text-slate-500 font-mono mt-1 text-lg">#{{ $invoice->invoice_number }}</p>
             </div>
-            @endif
-
-            @if($invoice->adjustments->isNotEmpty())
-            <h5 class="fw-semibold mt-4">Riwayat Penyesuaian (Koreksi)</h5>
-            <div class="table-responsive">
-                <table class="table table-sm table-bordered table-warning">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Tanggal</th>
-                            <th>Tipe</th>
-                            <th class="text-end">Nilai</th>
-                            <th>Alasan</th>
-                            <th>Dibuat Oleh</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($invoice->adjustments as $adjustment)
-                        <tr>
-                            <td>{{ $adjustment->adjustment_date->format('d M Y') }}</td>
-                            <td>
-                                @if($adjustment->type == 'credit_note')
-                                    <span class="badge bg-success">Nota Kredit</span>
-                                @else
-                                    <span class="badge bg-danger">Nota Debit</span>
-                                @endif
-                            </td>
-                            <td class="text-end fw-bold">
-                                Rp {{ number_format($adjustment->amount, 0, ',', '.') }}
-                            </td>
-                            <td>{{ $adjustment->reason }}</td>
-                            <td>{{ $adjustment->user->full_name ?? 'N/A' }}</td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+            <div class="text-right mt-4 md:mt-0">
+                @php
+                    $statusClass = [
+                        'paid' => 'bg-emerald-100 text-emerald-700 border-emerald-200',
+                        'partially_paid' => 'bg-sky-100 text-sky-700 border-sky-200',
+                        'cancelled' => 'bg-slate-100 text-slate-600 border-slate-200',
+                        'unpaid' => 'bg-amber-100 text-amber-700 border-amber-200',
+                    ];
+                    $label = [
+                        'paid' => 'LUNAS', 'partially_paid' => 'CICIL', 'cancelled' => 'DIBATALKAN', 'unpaid' => 'BELUM LUNAS'
+                    ];
+                @endphp
+                <span class="inline-block px-4 py-2 rounded-lg border {{ $statusClass[$invoice->status] ?? 'bg-gray-100' }} font-bold text-sm tracking-wide">
+                    {{ $label[$invoice->status] ?? strtoupper($invoice->status) }}
+                </span>
             </div>
-            @endif
+        </div>
 
-            @if($invoice->returns->isNotEmpty())
-            <h5 class="fw-semibold mt-4">Riwayat Retur</h5>
-            <div class="table-responsive">
-                <table class="table table-sm table-bordered table-info">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Tgl. Retur</th>
-                            <th>No. Retur</th>
-                            <th>Item yang Diretur</th>
-                            <th class="text-end">Nilai Retur</th>
-                            <th>Status/Tindakan</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($invoice->returns as $return)
-                        <tr>
-                            <td>{{ $return->return_date->format('d M Y') }}</td>
-                            <td>{{ $return->return_number }}</td>
-                            <td>
-                                <ul class="list-unstyled mb-0 small">
-                                @foreach($return->items as $item)
-                                    <li>- {{ $item->product->product_name ?? 'N/A' }} ({{ $item->quantity }} pcs)</li>
-                                @endforeach
-                                </ul>
-                            </td>
-                            <td class="text-end fw-bold">
-                                Rp {{ number_format($return->total_amount, 0, ',', '.') }}
-                            </td>
-                            <td>
-                                @if($return->return_handling_type == 'store_as_credit')
-                                    <span class="badge bg-success">Disimpan sebagai Kredit</span>
-                                @else
-                                    <span class="badge bg-warning text-dark">Memotong Tagihan</span>
-                                @endif
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-            @endif
-
-            @if($allPayments->isNotEmpty())
-            <h5 class="fw-semibold mt-4">Riwayat Pembayaran</h5>
-            <div class="table-responsive">
-                <table class="table table-sm table-bordered">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Tanggal Bayar</th>
-                            <th class="text-end">Jumlah</th>
-                            <th>Metode</th>
-                            <th>Status</th>
-                            <th>Catatan / Ref.</th>
-                            <th>Penerima / Bukti</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($allPayments as $payment)
-                        <tr>
-                            <td>{{ $payment->payment_date->format('d M Y') }}</td>
-                            <td class="text-end">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
-                            <td>
-                                {{ $payment->paymentMethod->name ?? ($payment->transaction_id ? 'Gateway / Kredit' : 'Kredit Klien') }}
-                            </td>
-                            <td>
-                                @if($payment->status == 'completed')
-                                    <span class="badge bg-success">Completed</span>
-                                @elseif($payment->status == 'pending_verification')
-                                    <span class="badge bg-warning text-dark">Pending Verifikasi</span>
-                                @elseif($payment->status == 'pending_clearance')
-                                    <span class="badge bg-info text-dark">Pending Kliring</span>
-                                @elseif($payment->status == 'failed')
-                                    <span class="badge bg-danger">Failed</span>
-                                @else
-                                    <span class="badge bg-secondary">{{ $payment->status }}</span>
-                                @endif
-                            </td>
-                            <td>
-                                {{ $payment->notes }}
-                                @if($payment->reference_number)
-                                    <strong class="d-block">Ref: {{ $payment->reference_number }}</strong>
-                                @endif
-                            </td>
-                             <td>
-                                @if($payment->paymentMethod && str_contains(strtolower($payment->paymentMethod->name), 'cash') && $payment->receivedBy)
-                                    {{ $payment->receivedBy->full_name }} (Sales)
-                                @elseif($payment->proof_of_payment_path)
-                                    <a href="{{ asset('storage/' . $payment->proof_of_payment_path) }}" target="_blank" class="btn btn-sm btn-outline-info">
-                                        Lihat Bukti
-                                    </a>
-                                @elseif($payment->transaction_id)
-                                    <span class="text-muted" data-bs-toggle="tooltip" title="TX ID: {{ $payment->transaction_id }}">
-                                        Gateway / Kredit
-                                    </span>
-                                @else
-                                    -
-                                @endif
-                            </td>
-                        </tr>
-                        @empty
-                        <tr>
-                            <td colspan="6" class="text-center text-muted">Belum ada riwayat pembayaran.</td>
-                        </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-            @endif
-
-            <div class="row mt-4">
-                <div class="col-md-7">
-                    @if($invoice->notes)
-                        <h6 class="fw-semibold">Catatan:</h6>
-                        <p class="text-muted fst-italic bg-light p-3 rounded">{{ $invoice->notes }}</p>
+        <div class="p-8">
+            {{-- Info Grid --}}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 text-sm">
+                <div>
+                    <p class="text-slate-500 uppercase font-bold text-xs tracking-wider mb-1">Diterbitkan Untuk</p>
+                    <p class="font-bold text-slate-800 dark:text-slate-200 text-base">{{ $invoice->client->client_name }}</p>
+                    @if($invoice->sales)
+                        <p class="text-slate-500 mt-1 flex items-center gap-1">
+                            <i class="material-icons text-[14px]">badge</i> Sales: {{ $invoice->sales->full_name }}
+                        </p>
                     @endif
                 </div>
-                <div class="col-md-5">
-                    <h5 class="fw-semibold mb-3">Ringkasan Keuangan</h5>
-                    <div class="border rounded p-3">
-                        <div class="d-flex justify-content-between fw-bold"><span>Total Tagihan Awal</span><span>Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span></div>
-                        
-                        @foreach ($invoice->adjustments as $adjustment)
-                             <div class="d-flex justify-content-between {{ $adjustment->type == 'credit_note' ? 'text-success' : 'text-danger' }} small">
-                                <span>{{ $adjustment->type == 'credit_note' ? 'Nota Kredit (Potongan)' : 'Nota Debit (Tambahan)' }}</span>
-                                <span>{{ $adjustment->type == 'credit_note' ? '(-)' : '(+)' }} Rp {{ number_format($adjustment->amount, 0, ',', '.') }}</span>
-                             </div>
-                        @endforeach
-                        
-                        @if($totalReturDipotong > 0)
-                            <div class="d-flex justify-content-between text-warning small"><span>Total Retur (Potong Tagihan)</span><span>(-) Rp {{ number_format($totalReturDipotong, 0, ',', '.') }}</span></div>
-                        @endif
-                        
-                        <hr class="my-1">
-                        <div class="d-flex justify-content-between text-success"><span>Sudah Dibayar</span><span>(-) Rp {{ number_format($invoice->amount_paid, 0, ',', '.') }}</span></div>
-                        
-                        @if($pendingPaymentAmount > 0)
-                            <div class="d-flex justify-content-between text-info">
-                                <span>Menunggu Verifikasi</span><span>(-) Rp {{ number_format($pendingPaymentAmount, 0, ',', '.') }}</span>
-                            </div>
-                        @endif
-                        
-                        @if($totalReturKredit > 0)
-                            <div class="d-flex justify-content-between text-info small"><span>(Nilai retur jadi kredit: Rp {{ number_format($totalReturKredit, 0, ',', '.') }})</span></div>
-                        @endif
-                        <hr class="my-1">
-                        
-                        {{-- ====================================================== --}}
-                        {{-- BLOK KODE YANG HARUS DIGANTI - MULAI --}}
-                        {{-- ====================================================== --}}
-                        @php
-                            $finalBalance = $sisaTagihan - $pendingPaymentAmount;
-                        @endphp
+                <div class="md:text-right space-y-2">
+                    <div>
+                        <span class="text-slate-500 font-bold mr-2">Tanggal Terbit:</span>
+                        <span class="text-slate-800 dark:text-slate-300">{{ optional($invoice->order_date)->format('d F Y') }}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-bold mr-2">Jatuh Tempo:</span>
+                        <span class="{{ optional($invoice->due_date)->isPast() && $invoice->status != 'paid' ? 'text-red-600 font-bold' : 'text-slate-800 dark:text-slate-300' }}">
+                            {{ optional($invoice->due_date)->format('d F Y') }}
+                        </span>
+                    </div>
+                </div>
+            </div>
 
-                        @if($finalBalance < -0.01)
-                            <div class="d-flex justify-content-between fw-bold fs-5 text-success">
-                                <span>Kelebihan Bayar</span>
-                                <span>Rp {{ number_format(abs($finalBalance), 0, ',', '.') }}</span>
+            <hr class="border-slate-100 dark:border-slate-700 my-8">
+
+            {{-- Tabel Produk --}}
+            <h3 class="font-bold text-slate-800 dark:text-slate-100 mb-4 text-lg">Rincian Item</h3>
+            <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden mb-8">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-500 font-semibold uppercase text-xs">
+                        <tr>
+                            <th class="p-3 w-12 text-center">#</th>
+                            <th class="p-3">Produk</th>
+                            <th class="p-3 text-center">Qty</th>
+                            <th class="p-3 text-right">Harga</th>
+                            <th class="p-3 text-right">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @foreach($invoice->items as $item)
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                            <td class="p-3 text-center text-slate-400">{{ $loop->iteration }}</td>
+                            <td class="p-3 font-medium text-slate-700 dark:text-slate-300">{{ $item->product->product_name ?? 'Produk Dihapus' }}</td>
+                            <td class="p-3 text-center text-slate-600 dark:text-slate-400">{{ $item->quantity }}</td>
+                            <td class="p-3 text-right text-slate-600 dark:text-slate-400">Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}</td>
+                            <td class="p-3 text-right font-bold text-slate-700 dark:text-slate-200">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                
+                {{-- KIRI: RIWAYAT --}}
+                <div class="space-y-6">
+                    @if($pendingPayments->isNotEmpty())
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <h5 class="font-bold text-amber-800 mb-2 flex items-center gap-2 text-sm uppercase">
+                            <i class="material-icons text-[18px]">hourglass_top</i> Menunggu Verifikasi
+                        </h5>
+                        <div class="space-y-2">
+                            @foreach($pendingPayments as $payment)
+                            <div class="flex justify-between text-sm border-b border-amber-200/50 pb-2 last:border-0 last:pb-0">
+                                <div>
+                                    <span class="block text-amber-900 font-bold">Rp {{ number_format($payment->amount, 0, ',', '.') }}</span>
+                                    <span class="text-xs text-amber-700">{{ $payment->created_at->format('d/m/y H:i') }}</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xs text-amber-700 badge bg-amber-200/50">Proses</span>
+                                </div>
                             </div>
-                        @elseif($finalBalance > 0.01)
-                            <div class="d-flex justify-content-between fw-bold fs-5 text-danger">
-                                <span>Sisa Tagihan</span>
-                                <span>Rp {{ number_format($finalBalance, 0, ',', '.') }}</span>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
+
+                    @php $successPayments = $allPayments->where('status', 'completed'); @endphp
+                    @if($successPayments->isNotEmpty())
+                    <div>
+                        <h5 class="font-bold text-slate-700 dark:text-slate-300 mb-3 text-sm uppercase flex items-center gap-2">
+                            <i class="material-icons text-[16px]">history</i> Riwayat Pembayaran
+                        </h5>
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden text-sm">
+                            <table class="w-full">
+                                <thead class="bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-500 uppercase">
+                                    <tr>
+                                        <th class="p-2 pl-3">Tgl</th>
+                                        <th class="p-2 text-right">Jumlah</th>
+                                        <th class="p-2 text-center">Metode</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                                    @foreach($successPayments as $pay)
+                                    <tr>
+                                        <td class="p-2 pl-3 text-slate-600 dark:text-slate-400">{{ $pay->payment_date->format('d/m/y') }}</td>
+                                        <td class="p-2 text-right font-bold text-emerald-600">Rp {{ number_format($pay->amount, 0, ',', '.') }}</td>
+                                        <td class="p-2 text-center text-xs text-slate-500">{{ $pay->paymentMethod->name ?? 'Saldo' }}</td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    @endif
+                </div>
+
+                {{-- KANAN: RINGKASAN --}}
+                <div>
+                    <div class="bg-slate-50 dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
+                        <h5 class="font-bold text-slate-800 dark:text-slate-100 mb-4 pb-2 border-b border-slate-200 dark:border-slate-700">
+                            Ringkasan Keuangan
+                        </h5>
+                        
+                        <div class="flex justify-between text-sm text-slate-600 dark:text-slate-400">
+                            <span>Total Tagihan Awal</span>
+                            <span class="font-bold text-slate-800 dark:text-slate-200">Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span>
+                        </div>
+
+                        @foreach ($invoice->adjustments as $adjustment)
+                            <div class="flex justify-between text-sm {{ $adjustment->type == 'credit_note' ? 'text-emerald-600' : 'text-red-600' }}">
+                                <span>{{ $adjustment->type == 'credit_note' ? 'Potongan (Nota Kredit)' : 'Tambahan (Nota Debit)' }}</span>
+                                <span>{{ $adjustment->type == 'credit_note' ? '-' : '+' }} Rp {{ number_format($adjustment->amount, 0, ',', '.') }}</span>
                             </div>
-                        @else
-                            <div class="d-flex justify-content-between fw-bold fs-5 text-success">
-                                <span>Sisa Tagihan</span>
-                                <span>Lunas</span>
+                        @endforeach
+
+                        <div class="border-t border-slate-200 dark:border-slate-700 my-2"></div>
+
+                        <div class="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
+                            <span>Sudah Dibayar</span>
+                            <span class="font-bold">- Rp {{ number_format($invoice->amount_paid, 0, ',', '.') }}</span>
+                        </div>
+
+                        @if($pendingPaymentAmount > 0)
+                            <div class="flex justify-between text-sm text-amber-600 dark:text-amber-500 italic">
+                                <span>Menunggu Verifikasi</span>
+                                <span>- Rp {{ number_format($pendingPaymentAmount, 0, ',', '.') }}</span>
                             </div>
                         @endif
-                        {{-- ====================================================== --}}
-                        {{-- BLOK KODE YANG HARUS DIGANTI - SELESAI --}}
-                        {{-- ====================================================== --}}
+
+                        <div class="border-t border-slate-300 dark:border-slate-600 my-3 pt-2">
+                            @if($finalBalanceUI < -0.01)
+                                <div class="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
+                                    <span class="font-bold text-lg uppercase tracking-wide">Kelebihan Bayar</span>
+                                    <span class="font-extrabold text-xl">Rp {{ number_format(abs($finalBalanceUI), 0, ',', '.') }}</span>
+                                </div>
+                            @elseif($finalBalanceUI > 0.01)
+                                <div class="flex justify-between items-center text-red-600 dark:text-red-400">
+                                    <span class="font-bold text-lg uppercase tracking-wide">Sisa Tagihan</span>
+                                    <span class="font-extrabold text-xl">Rp {{ number_format($finalBalanceUI, 0, ',', '.') }}</span>
+                                </div>
+                            @else
+                                <div class="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
+                                    <span class="font-bold text-lg uppercase tracking-wide">Status Akhir</span>
+                                    <span class="font-extrabold text-xl">LUNAS</span>
+                                </div>
+                            @endif
+                        </div>
                     </div>
                 </div>
             </div>
@@ -352,504 +269,462 @@
     </div>
 </div>
 
-<div class="modal fade" id="paymentMethodModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Pilih Metode Pembayaran</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+{{-- ======================================================================== --}}
+{{-- MODALS SECTION (TAILWIND STYLE) --}}
+{{-- ======================================================================== --}}
+
+{{-- 1. MODAL PILIH METODE --}}
+<div id="paymentMethodModal" class="fixed inset-0 z-[100] hidden" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeModal('paymentMethodModal')"></div>
+    <div class="fixed inset-0 z-10 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md modal-content-anim relative overflow-hidden">
+            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-slate-800">Pilih Metode Pembayaran</h3>
+                <button type="button" class="text-slate-400 hover:text-slate-600" onclick="closeModal('paymentMethodModal')"><i class="material-icons">close</i></button>
             </div>
-            <div class="modal-body">
-                <p>Silakan pilih cara Anda ingin membayar tagihan ini:</p>
-                <div class="d-grid gap-3">
-                    <button class="btn btn-outline-primary p-3" id="pay-manual-transfer-btn">
-                        <i class="bi bi-bank2 fs-4 me-2"></i>
-                        <div>
-                            <span class="fw-bold">Transfer Bank / Lainnya</span><br>
-                            <small>Upload bukti transfer manual, foto giro, dll.</small>
-                        </div>
-                    </button>
-                    <button class="btn btn-outline-success p-3" id="pay-cash-btn">
-                        <i class="bi bi-person-check-fill fs-4 me-2"></i>
-                        <div>
-                            <span class="fw-bold">Cash (via Sales)</span><br>
-                            <small>Pembayaran tunai melalui tim sales.</small>
-                        </div>
-                    </button>
-                    <button class="btn btn-outline-dark p-3" id="pay-online-btn">
-                        <i class="bi bi-credit-card-2-front-fill fs-4 me-2"></i>
-                        <div>
-                            <span class="fw-bold">Pembayaran Online</span><br>
-                            <small>Kartu Kredit, Virtual Account, dll.</small>
-                        </div>
-                    </button>
-                </div>
+            <div class="p-6 space-y-3">
+                <button type="button" onclick="switchToManual('transfer')" class="w-full group flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left">
+                    <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><i class="material-icons">upload_file</i></div>
+                    <div>
+                        <span class="block font-bold text-slate-700 group-hover:text-blue-700">Upload Bukti Transfer</span>
+                        <span class="block text-xs text-slate-500">Transfer bank manual & upload struk.</span>
+                    </div>
+                </button>
+                <button type="button" onclick="switchToManual('cash')" class="w-full group flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left">
+                    <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><i class="material-icons">payments</i></div>
+                    <div>
+                        <span class="block font-bold text-slate-700 group-hover:text-emerald-700">Tunai (Cash)</span>
+                        <span class="block text-xs text-slate-500">Bayar tunai titip melalui Sales.</span>
+                    </div>
+                </button>
+                <button type="button" onclick="switchToMidtrans()" class="w-full group flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 transition-all text-left">
+                    <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><i class="material-icons">credit_card</i></div>
+                    <div>
+                        <span class="block font-bold text-slate-700 group-hover:text-indigo-700">Pembayaran Online</span>
+                        <span class="block text-xs text-slate-500">QRIS, Virtual Account (Otomatis).</span>
+                    </div>
+                </button>
             </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="manualPaymentModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="manualPaymentModalTitle">Catat Pembayaran</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+{{-- 2. MODAL FORM MANUAL (TRANSFER/CASH) --}}
+<div id="manualPaymentModal" class="fixed inset-0 z-[100] hidden" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeModal('manualPaymentModal')"></div>
+    <div class="fixed inset-0 z-10 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md modal-content-anim relative">
+            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-slate-800" id="manualPaymentModalTitle">Konfirmasi Pembayaran</h3>
+                <button type="button" class="text-slate-400 hover:text-slate-600" onclick="closeModal('manualPaymentModal')"><i class="material-icons">close</i></button>
             </div>
             <form action="{{ route('client.invoices.uploadProof', $invoice->invoice_id) }}" method="POST" enctype="multipart/form-data" id="manual-payment-form">
                 @csrf
                 <input type="hidden" name="use_credit" id="manual-use-credit-hidden" value="0">
                 
-                <div class="modal-body">
-                    <div class="alert alert-info">
-                        <div class="d-flex justify-content-between fw-bold">
-                            <span>Sisa Tagihan:</span>
-                            <span id="manual-sisa-tagihan-display">Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</span>
-                        </div>
+                <div class="p-6 space-y-4">
+                    {{-- Info Tagihan --}}
+                    <div class="bg-blue-50 text-blue-800 p-3 rounded-lg border border-blue-100 text-sm flex justify-between items-center">
+                        <span>Sisa Tagihan Saat Ini:</span>
+                        <span class="font-bold text-base">Rp {{ number_format($finalBalanceUI, 0, ',', '.') }}</span>
                     </div>
-                    
+
+                    {{-- Opsi Saldo --}}
                     @if($saldoKreditKlien > 0)
-                    <div id="manual-credit-info" class="alert alert-success">
-                        <div class="d-flex justify-content-between fw-bold">
-                            <span>Saldo Kredit Tersedia:</span>
+                    <div class="bg-emerald-50 text-emerald-800 p-3 rounded-lg border border-emerald-100 text-sm">
+                        <div class="flex justify-between font-bold mb-2">
+                            <span>Saldo Deposit Tersedia:</span>
                             <span>Rp {{ number_format($saldoKreditKlien, 0, ',', '.') }}</span>
                         </div>
-                        <div class="form-check form-switch mt-2">
-                            <input class="form-check-input" type="checkbox" role="switch" id="manual-use-credit" value="1">
-                            <label class="form-check-label" for="manual-use-credit">Gunakan Saldo Kredit</label>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="manual-use-credit" value="1" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                            <label for="manual-use-credit" class="font-bold cursor-pointer select-none">Gunakan Saldo</label>
                         </div>
                     </div>
                     @endif
 
-                    <div id="cash-fields" class="d-none">
-                        <div class="mb-3">
-                            <label for="user_id_sales" class="form-label">Diterima oleh Sales <span class="text-danger">*</span></label>
-                            <select name="user_id_sales" id="user_id_sales" class="form-select">
-                                <option value="" disabled selected>-- Pilih Sales --</option>
-                                @foreach($salesUsers as $sales)
-                                    <option value="{{ $sales->user_id }}">{{ $sales->full_name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    {{-- Form Dinamis (Cash) --}}
+                    <div id="cash-fields" class="hidden">
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Diterima Sales <span class="text-red-500">*</span></label>
+                        <select name="user_id_sales" id="user_id_sales" class="w-full p-2 border border-slate-300 rounded-lg text-sm">
+                            <option value="" disabled selected>-- Pilih Sales --</option>
+                            @foreach(\App\Models\User::role('sales')->get() as $sales)
+                                <option value="{{ $sales->user_id }}">{{ $sales->full_name }}</option>
+                            @endforeach
+                        </select>
                     </div>
 
-                    <div id="transfer-fields" class="d-none">
-                        <div class="mb-3">
-                            <label for="payment_method_id" class="form-label">Metode Pembayaran <span class="text-danger">*</span></label>
-                            <select name="payment_method_id" id="payment_method_id" class="form-select">
+                    {{-- Form Dinamis (Transfer) --}}
+                    <div id="transfer-fields" class="hidden space-y-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Metode <span class="text-red-500">*</span></label>
+                            <select name="payment_method_id" id="payment_method_id" class="w-full p-2 border border-slate-300 rounded-lg text-sm">
                                 <option value="">-- Pilih Metode --</option>
-                                @foreach($paymentMethods as $method)
-                                    <option value="{{ $method->payment_method_id }}" 
-                                            data-config="{{ $method->required_fields_config }}">
-                                        {{ $method->name }}
-                                    </option>
+                                @foreach($pMethods as $method)
+                                    <option value="{{ $method->payment_method_id }}" data-config="{{ $method->required_fields_config }}">{{ $method->name }}</option>
                                 @endforeach
                             </select>
                         </div>
-
-                        <div class="mb-3" id="payment-reference-group" style="display: none;">
-                            <label for="reference_number" class="form-label">Nomor Referensi (Giro/Cek)</label>
-                            <input type="text" class="form-control" name="reference_number" id="reference_number">
+                        <div id="payment-reference-group" class="hidden">
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">No. Referensi</label>
+                            <input type="text" name="reference_number" id="reference_number" class="w-full p-2 border border-slate-300 rounded-lg text-sm">
                         </div>
-
-                        <div class="mb-3" id="payment-proof-group" style="display: none;">
-                            <label for="proof_of_payment" class="form-label">File Bukti Bayar (JPG, PNG)</label>
-                            <input type="file" class="form-control" name="proof_of_payment" id="proof_of_payment" accept="image/jpeg,image/png,image/jpg">
+                        <div id="payment-proof-group" class="hidden">
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Bukti Foto</label>
+                            <input type="file" name="proof_of_payment" id="proof_of_payment" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept="image/*">
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="payment_amount_display" class="form-label">Jumlah Dibayar (Manual/Cash) <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="payment_amount_display" placeholder="Rp 0">
+                    {{-- Input Nominal --}}
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Jumlah Dibayar (Manual) <span class="text-red-500">*</span></label>
+                        <input type="text" class="w-full p-3 border border-slate-300 rounded-lg font-bold text-lg focus:ring-2 focus:ring-indigo-500" id="payment_amount_display" placeholder="Rp 0">
                         <input type="hidden" name="payment_amount" id="payment_amount">
-                        <div id="amount-error" class="text-danger small mt-1 d-none"></div>
+                        <div id="amount-error" class="text-red-500 text-xs mt-1 hidden"></div>
                     </div>
-                    <div class="mb-3">
-                        <label for="notes" class="form-label">Catatan (Opsional)</label>
-                        <textarea name="notes" id="notes" class="form-control" rows="2"></textarea>
+
+                    {{-- Catatan --}}
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Catatan</label>
+                        <textarea name="notes" class="w-full p-2 border border-slate-300 rounded-lg text-sm" rows="2"></textarea>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary" id="submit-proof-btn">Kirim Bukti</button>
+                <div class="bg-slate-50 px-6 py-4 flex justify-end gap-3 rounded-b-2xl border-t border-slate-100">
+                    <button type="button" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 font-bold hover:bg-slate-100" onclick="closeModal('manualPaymentModal')">Batal</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 shadow-md" id="submit-proof-btn">Kirim Data</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="midtransPaymentModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Pembayaran Online Invoice #{{ $invoice->invoice_number }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+{{-- 3. MODAL MIDTRANS --}}
+<div id="midtransPaymentModal" class="fixed inset-0 z-[100] hidden" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeModal('midtransPaymentModal')"></div>
+    <div class="fixed inset-0 z-10 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md modal-content-anim relative">
+            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-slate-800">Pembayaran Online</h3>
+                <button type="button" class="text-slate-400 hover:text-slate-600" onclick="closeModal('midtransPaymentModal')"><i class="material-icons">close</i></button>
             </div>
-            
             <form id="midtrans-payment-form" action="{{ route('client.invoices.pay', $invoice->invoice_id) }}" method="POST">
                 @csrf
-                <div class="modal-body">
-                    
-                    <div class="alert alert-info">
-                        <div class="d-flex justify-content-between fw-bold">
-                            <span>Sisa Tagihan:</span>
-                            <span id="midtrans-sisa-tagihan-display">Rp {{ number_format($sisaTagihan, 0, ',', '.') }}</span>
-                        </div>
+                <div class="p-6 space-y-4">
+                    <div class="bg-indigo-50 text-indigo-900 p-4 rounded-lg border border-indigo-100 text-sm flex justify-between font-bold">
+                        <span>Total Sisa Tagihan:</span>
+                        <span>Rp {{ number_format($finalBalanceUI, 0, ',', '.') }}</span>
                     </div>
-                    
+
                     @if($saldoKreditKlien > 0)
-                    <div id="midtrans-credit-info" class="alert alert-success">
-                        <div class="d-flex justify-content-between fw-bold">
-                            <span>Saldo Kredit Tersedia:</span>
+                    <div class="bg-emerald-50 text-emerald-800 p-3 rounded-lg border border-emerald-100 text-sm">
+                        <div class="flex justify-between font-bold mb-2">
+                            <span>Saldo Deposit:</span>
                             <span>Rp {{ number_format($saldoKreditKlien, 0, ',', '.') }}</span>
                         </div>
-                        <div class="form-check form-switch mt-2">
-                            <input class="form-check-input" type="checkbox" role="switch" id="midtrans-use-credit" value="1">
-                            <label class="form-check-label" for="midtrans-use-credit">Gunakan Saldo Kredit</label>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="midtrans-use-credit" value="1" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                            <label for="midtrans-use-credit" class="font-bold cursor-pointer select-none">Gunakan Saldo</label>
                         </div>
                     </div>
                     @endif
-                    
-                    <div class="mb-3">
-                        <label for="midtrans-amount-formatted" class="form-label">Jumlah Pembayaran</label>
-                        <input type="text" class="form-control" id="midtrans-amount-formatted" required>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Jumlah Bayar Online <span class="text-red-500">*</span></label>
+                        <input type="text" class="w-full p-3 border border-slate-300 rounded-lg font-bold text-lg focus:ring-2 focus:ring-indigo-500" id="midtrans-amount-formatted" required>
                         <input type="hidden" name="amount" id="midtrans-amount-hidden">
                         <input type="hidden" name="use_credit" id="midtrans-use-credit-hidden" value="0">
-                        <div id="midtrans-amount-error" class="text-danger small mt-1 d-none"></div>
+                        <div id="midtrans-amount-error" class="text-red-500 text-xs mt-1 hidden"></div>
                     </div>
+                    
+                    <p class="text-xs text-center text-slate-400">Anda akan diarahkan ke halaman pembayaran aman Midtrans.</p>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary" id="midtrans-submit-btn">Lanjutkan ke Pembayaran</button>
+                <div class="bg-slate-50 px-6 py-4 flex justify-end gap-3 rounded-b-2xl border-t border-slate-100">
+                    <button type="button" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 font-bold hover:bg-slate-100" onclick="closeModal('midtransPaymentModal')">Batal</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 shadow-md" id="midtrans-submit-btn">Bayar Sekarang</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
 @endsection
 
-
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
 <script type="text/javascript"
     src="{{ config('midtrans.is_production') ? 'https://app.midtrans.com/snap/snap.js' : 'https://app.sandbox.midtrans.com/snap/snap.js' }}"
     data-client-key="{{ config('midtrans.client_key') }}"></script>
-<script type"text/javascript">
-    
-    const remainingBalance = parseFloat("{{ $sisaTagihan }}");
+
+<script>
+    // --- VARIABLES ---
+    const remainingBalance = parseFloat("{{ $finalBalanceUI }}");
     const currentCreditBalance = parseFloat("{{ $saldoKreditKlien }}");
     const transferMethodId = "{{ $transferMethodId }}";
     const cashMethodId = "{{ $cashMethodId }}";
 
+    // --- MODAL UTILS (Tailwind Way) ---
+    function openModal(id) {
+        document.getElementById(id).classList.remove('hidden');
+    }
+    function closeModal(id) {
+        document.getElementById(id).classList.add('hidden');
+    }
+    
+    // Switcher Functions
+    function switchToManual(type) {
+        closeModal('paymentMethodModal');
+        setupManualModal(type);
+        openModal('manualPaymentModal');
+    }
+    function switchToMidtrans() {
+        closeModal('paymentMethodModal');
+        setupMidtransModal();
+        openModal('midtransPaymentModal');
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
-        const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
-        [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl));
-        const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-        [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
-
-        const paymentMethodModal = new bootstrap.Modal(document.getElementById('paymentMethodModal'));
-        const manualPaymentModal = new bootstrap.Modal(document.getElementById('manualPaymentModal'));
-        const midtransPaymentModal = new bootstrap.Modal(document.getElementById('midtransPaymentModal'));
-
         
-        const manualPaymentForm = document.querySelector('#manualPaymentModal form');
-        if (manualPaymentForm) {
-            const titleEl = document.getElementById('manualPaymentModalTitle');
-            
-            const methodDropdown = document.getElementById('payment_method_id');
-            
-            const cashFields = document.getElementById('cash-fields');
-            const transferFields = document.getElementById('transfer-fields');
-            const salesSelect = document.getElementById('user_id_sales');
-            const proofInput = document.getElementById('proof_of_payment');
-            const proofGroup = document.getElementById('payment-proof-group');
-            const referenceInput = document.getElementById('reference_number');
-            const referenceGroup = document.getElementById('payment-reference-group');
-            
-            const submitBtn = document.getElementById('submit-proof-btn');
-            
-            const amountDisplay = document.getElementById('payment_amount_display');
-            const amountHidden = document.getElementById('payment_amount');
-            const amountError = document.getElementById('amount-error');
-            const useCreditCheck = document.getElementById('manual-use-credit');
-            const useCreditHidden = document.getElementById('manual-use-credit-hidden');
+        // =====================================================================
+        // 1. MANUAL PAYMENT LOGIC
+        // =====================================================================
+        const manualForm = document.getElementById('manual-payment-form');
+        const manualTitle = document.getElementById('manualPaymentModalTitle');
+        const cashFields = document.getElementById('cash-fields');
+        const transferFields = document.getElementById('transfer-fields');
+        const salesSelect = document.getElementById('user_id_sales');
+        const methodDropdown = document.getElementById('payment_method_id');
+        const proofGroup = document.getElementById('payment-proof-group');
+        const proofInput = document.getElementById('proof_of_payment');
+        const refGroup = document.getElementById('payment-reference-group');
+        const refInput = document.getElementById('reference_number');
+        
+        const manualAmountDisplay = document.getElementById('payment_amount_display');
+        const manualAmountHidden = document.getElementById('payment_amount');
+        const manualAmountError = document.getElementById('amount-error');
+        const manualUseCreditCheck = document.getElementById('manual-use-credit');
+        const manualUseCreditHidden = document.getElementById('manual-use-credit-hidden');
+        const manualSubmitBtn = document.getElementById('submit-proof-btn');
 
-            const autoNumericInstance = new AutoNumeric(amountDisplay, { 
-                decimalPlaces: 0, 
-                digitGroupSeparator: '.', 
-                decimalCharacter: ',',
-                currencySymbol: 'Rp ',
-                currencySymbolPlacement: 'p',
-                minimumValue: 0,
-            });
+        const manualAutoNumeric = new AutoNumeric(manualAmountDisplay, { 
+            decimalPlaces: 0, digitGroupSeparator: '.', decimalCharacter: ',', currencySymbol: 'Rp ', currencySymbolPlacement: 'p', minimumValue: 0 
+        });
 
-            function handleMethodConfigChange() {
-                if (!methodDropdown) return;
-                const selectedOption = methodDropdown.options[methodDropdown.selectedIndex];
-                const config = (selectedOption && !methodDropdown.disabled) ? selectedOption.dataset.config : 'none';
+        // Setup Manual Form
+        window.setupManualModal = function(type) {
+            manualForm.reset();
+            manualAmountError.classList.add('hidden');
+            
+            if (type === 'cash') {
+                manualTitle.textContent = 'Konfirmasi Bayar Tunai';
+                cashFields.classList.remove('hidden');
+                transferFields.classList.add('hidden');
+                salesSelect.required = true;
+                methodDropdown.required = false;
+            } else {
+                manualTitle.textContent = 'Upload Bukti Transfer';
+                cashFields.classList.add('hidden');
+                transferFields.classList.remove('hidden');
+                salesSelect.required = false;
+                methodDropdown.required = true;
+                methodDropdown.value = transferMethodId; 
+                // Trigger change manually to show fields
+                const event = new Event('change');
+                methodDropdown.dispatchEvent(event);
+            }
 
-                referenceGroup.style.display = 'none';
-                referenceInput.required = false;
-                proofGroup.style.display = 'none';
-                proofInput.required = false;
+            if (manualUseCreditCheck) {
+                manualUseCreditCheck.checked = false;
+                manualUseCreditHidden.value = '0';
+            }
+            manualAutoNumeric.set(remainingBalance);
+            manualAmountDisplay.disabled = false;
+        }
+
+        // Handle Method Change
+        if (methodDropdown) {
+            methodDropdown.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                const config = selectedOption ? selectedOption.dataset.config : 'none';
+
+                refGroup.classList.add('hidden'); refInput.required = false;
+                proofGroup.classList.add('hidden'); proofInput.required = false;
 
                 if (config === 'proof_only') {
-                    proofGroup.style.display = 'block';
-                    proofInput.required = true;
+                    proofGroup.classList.remove('hidden'); proofInput.required = true;
                 } else if (config === 'reference_only') {
-                    referenceGroup.style.display = 'block';
-                    referenceInput.required = true;
+                    refGroup.classList.remove('hidden'); refInput.required = true;
                 } else if (config === 'proof_and_reference') {
-                    proofGroup.style.display = 'block';
-                    proofInput.required = true;
-                    referenceGroup.style.display = 'block';
-                    referenceInput.required = true;
+                    proofGroup.classList.remove('hidden'); proofInput.required = true;
+                    refGroup.classList.remove('hidden'); refInput.required = true;
                 }
-            }
-
-            if (methodDropdown) {
-                methodDropdown.addEventListener('change', handleMethodConfigChange);
-            }
-
-            function toggleManualFields() {
-                const useCredit = useCreditCheck ? useCreditCheck.checked : false;
-                const creditIsSufficient = currentCreditBalance >= remainingBalance && remainingBalance > 0;
-
-                if (useCredit) {
-                    useCreditHidden.value = '1';
-                    if (creditIsSufficient) {
-                        autoNumericInstance.set(0);
-                        amountDisplay.disabled = true;
-                    } else {
-                        const shortfall = remainingBalance - currentCreditBalance;
-                        autoNumericInstance.set(shortfall);
-                        amountDisplay.disabled = false;
-                    }
-                } else {
-                    useCreditHidden.value = '0';
-                    autoNumericInstance.set(remainingBalance);
-                    amountDisplay.disabled = false;
-                }
-                validateManualAmount();
-            }
-
-            function validateManualAmount() {
-                const rawValue = autoNumericInstance.getNumericString();
-                amountHidden.value = rawValue;
-                const useCredit = useCreditCheck ? useCreditCheck.checked : false;
-                const totalPaymentValue = (useCredit ? currentCreditBalance : 0) + parseFloat(rawValue || 0);
-
-                let isValid = true;
-                let errorMessage = '';
-
-                if (rawValue === null || rawValue === '' || parseFloat(rawValue) < 0) {
-                     isValid = false;
-                }
-                
-                if (totalPaymentValue > (remainingBalance + 0.01)) {
-                    errorMessage = 'Info: Jumlah bayar melebihi sisa tagihan. Kelebihan akan jadi saldo kredit.';
-                    isError = false;
-                }
-                if (totalPaymentValue <= 0.01 && remainingBalance > 0.01) {
-                    isValid = false;
-                    errorMessage = 'Jumlah pembayaran harus lebih dari 0.';
-                    isError = true;
-                }
-
-                submitBtn.disabled = !isValid;
-                if (errorMessage) {
-                    amountError.textContent = errorMessage;
-                    amountError.classList.remove('d-none');
-                    amountError.classList.toggle('text-danger', isError);
-                    amountError.classList.toggle('text-success', !isError);
-                } else {
-                    amountError.classList.add('d-none');
-                }
-            }
-
-            if (useCreditCheck) {
-                useCreditCheck.addEventListener('change', toggleManualFields);
-            }
-            amountDisplay.addEventListener('keyup', validateManualAmount);
-            amountDisplay.addEventListener('change', validateManualAmount);
-
-            document.getElementById('pay-manual-transfer-btn').addEventListener('click', function() {
-                paymentMethodModal.hide();
-                titleEl.textContent = 'Konfirmasi Pembayaran Manual';
-                
-                cashFields.classList.add('d-none');
-                transferFields.classList.remove('d-none');
-                salesSelect.required = false;
-                
-                methodDropdown.value = transferMethodId; // Pre-select 'Transfer'
-                
-                if(useCreditCheck) useCreditCheck.checked = true;
-                toggleManualFields();
-                handleMethodConfigChange(); // Panggil untuk set form dinamis
-                manualPaymentModal.show();
-            });
-            
-            document.getElementById('pay-cash-btn').addEventListener('click', function() {
-                paymentMethodModal.hide();
-                titleEl.textContent = 'Konfirmasi Pembayaran Cash';
-                
-                transferFields.classList.add('d-none');
-                cashFields.classList.remove('d-none');
-                salesSelect.required = true;
-
-                methodDropdown.value = cashMethodId; // Pre-select 'Cash'
-                
-                if(useCreditCheck) useCreditCheck.checked = true;
-                toggleManualFields();
-                handleMethodConfigChange(); // Panggil untuk set form dinamis
-                manualPaymentModal.show();
             });
         }
 
-        document.getElementById('pay-online-btn').addEventListener('click', function() {
-            paymentMethodModal.hide();
-            midtransPaymentModal.show();
-        });
+        // Logic Saldo & Validasi Manual
+        if (manualUseCreditCheck) {
+            manualUseCreditCheck.addEventListener('change', function() {
+                const useCredit = this.checked;
+                manualUseCreditHidden.value = useCredit ? '1' : '0';
+                
+                if (useCredit) {
+                    if (currentCreditBalance >= remainingBalance) {
+                        manualAutoNumeric.set(0); 
+                        manualAmountDisplay.disabled = true;
+                    } else {
+                        manualAutoNumeric.set(remainingBalance - currentCreditBalance);
+                        manualAmountDisplay.disabled = false;
+                    }
+                } else {
+                    manualAutoNumeric.set(remainingBalance);
+                    manualAmountDisplay.disabled = false;
+                }
+                validateManualAmount();
+            });
+        }
 
+        function validateManualAmount() {
+            const rawVal = manualAutoNumeric.getNumericString();
+            manualAmountHidden.value = rawVal;
+            const val = parseFloat(rawVal || 0);
+            const useCredit = manualUseCreditCheck ? manualUseCreditCheck.checked : false;
+            const totalPaid = (useCredit ? currentCreditBalance : 0) + val;
+
+            let isValid = true;
+            let msg = '';
+
+            if (val < 0) isValid = false;
+            if (totalPaid > (remainingBalance + 1)) { 
+                msg = 'Info: Kelebihan bayar akan masuk ke Saldo Kredit.';
+                manualAmountError.classList.remove('text-red-500');
+                manualAmountError.classList.add('text-emerald-600');
+            } else {
+                manualAmountError.classList.add('text-red-500');
+                manualAmountError.classList.remove('text-emerald-600');
+            }
+
+            if (totalPaid <= 0 && remainingBalance > 0) {
+                isValid = false;
+                msg = 'Jumlah bayar tidak boleh 0.';
+            }
+
+            manualAmountError.textContent = msg;
+            manualAmountError.classList.toggle('hidden', !msg);
+            manualSubmitBtn.disabled = !isValid;
+        }
+
+        manualAmountDisplay.addEventListener('keyup', validateManualAmount);
+        manualAmountDisplay.addEventListener('change', validateManualAmount);
+
+
+        // =====================================================================
+        // 2. MIDTRANS LOGIC
+        // =====================================================================
         const midtransForm = document.getElementById('midtrans-payment-form');
-        const midtransAmountFormatted = document.getElementById('midtrans-amount-formatted');
+        const midtransAmountDisplay = document.getElementById('midtrans-amount-formatted');
         const midtransAmountHidden = document.getElementById('midtrans-amount-hidden');
         const midtransUseCreditCheck = document.getElementById('midtrans-use-credit');
         const midtransUseCreditHidden = document.getElementById('midtrans-use-credit-hidden');
         const midtransAmountError = document.getElementById('midtrans-amount-error');
         const midtransSubmitBtn = document.getElementById('midtrans-submit-btn');
 
-        if (midtransForm) {
-            const midtransAutoNumeric = new AutoNumeric(midtransAmountFormatted, {
-                decimalPlaces: 0,
-                digitGroupSeparator: '.',
-                decimalCharacter: ',',
-                currencySymbol: 'Rp ',
-                currencySymbolPlacement: 'p',
-                minimumValue: 0,
-            });
+        const midtransAutoNumeric = new AutoNumeric(midtransAmountDisplay, { 
+            decimalPlaces: 0, digitGroupSeparator: '.', decimalCharacter: ',', currencySymbol: 'Rp ', currencySymbolPlacement: 'p', minimumValue: 0 
+        });
 
-            function toggleMidtransFields() {
-                const useCredit = midtransUseCreditCheck ? midtransUseCreditCheck.checked : false;
-                const creditIsSufficient = currentCreditBalance >= remainingBalance && remainingBalance > 0;
+        window.setupMidtransModal = function() {
+            midtransForm.reset();
+            midtransAmountError.classList.add('hidden');
+            if (midtransUseCreditCheck) midtransUseCreditCheck.checked = false;
+            midtransUseCreditHidden.value = '0';
+            midtransAutoNumeric.set(remainingBalance);
+            midtransAmountDisplay.disabled = false;
+        }
 
+        if (midtransUseCreditCheck) {
+            midtransUseCreditCheck.addEventListener('change', function() {
+                const useCredit = this.checked;
+                midtransUseCreditHidden.value = useCredit ? '1' : '0';
                 if (useCredit) {
-                    midtransUseCreditHidden.value = '1';
-                    if (creditIsSufficient) {
-                        midtransAutoNumeric.set(0);
-                        midtransAmountFormatted.disabled = true;
+                    if (currentCreditBalance >= remainingBalance) {
+                        midtransAutoNumeric.set(0); 
+                        midtransAmountDisplay.disabled = true;
                     } else {
-                        const shortfall = remainingBalance - currentCreditBalance;
-                        midtransAutoNumeric.set(shortfall);
-                        midtransAmountFormatted.disabled = false;
+                        midtransAutoNumeric.set(remainingBalance - currentCreditBalance);
+                        midtransAmountDisplay.disabled = false;
                     }
                 } else {
-                    midtransUseCreditHidden.value = '0';
                     midtransAutoNumeric.set(remainingBalance);
-                    midtransAmountFormatted.disabled = false;
+                    midtransAmountDisplay.disabled = false;
                 }
                 validateMidtransAmount();
-            }
-
-            function validateMidtransAmount() {
-                const rawValue = midtransAutoNumeric.getNumericString();
-                midtransAmountHidden.value = rawValue;
-                const useCredit = midtransUseCreditCheck ? midtransUseCreditCheck.checked : false;
-                const totalPaymentValue = (useCredit ? currentCreditBalance : 0) + parseFloat(rawValue || 0);
-                let isValid = true;
-                let errorMessage = '';
-                let isError = true;
-
-                if (rawValue === null || rawValue === '' || parseFloat(rawValue) < 0) {
-                     isValid = false;
-                }
-                
-                if (totalPaymentValue > (remainingBalance + 0.01)) {
-                    errorMessage = 'Info: Jumlah bayar melebihi sisa tagihan.';
-                    isError = false;
-                }
-                if (totalPaymentValue <= 0.01 && remainingBalance > 0.01) {
-                    isValid = false;
-                    errorMessage = 'Jumlah pembayaran harus lebih dari 0.';
-                    isError = true;
-                }
-
-                midtransSubmitBtn.disabled = !isValid;
-                if (errorMessage) {
-                    midtransAmountError.textContent = errorMessage;
-                    midtransAmountError.classList.remove('d-none');
-                    midtransAmountError.classList.toggle('text-danger', isError);
-                    midtransAmountError.classList.toggle('text-success', !isError);
-                } else {
-                    midtransAmountError.classList.add('d-none');
-                }
-            }
-
-            if (midtransUseCreditCheck) {
-                midtransUseCreditCheck.addEventListener('change', toggleMidtransFields);
-            }
-            midtransAmountFormatted.addEventListener('keyup', validateMidtransAmount);
-            midtransAmountFormatted.addEventListener('change', validateMidtransAmount);
-
-            midtransPaymentModal._element.addEventListener('shown.bs.modal', function () {
-                if (midtransUseCreditCheck) {
-                    midtransUseCreditCheck.checked = true;
-                }
-                toggleMidtransFields();
-            });
-            
-            midtransForm.addEventListener('submit', function(event) {
-                event.preventDefault();
-                
-                const csrfToken = '{{ csrf_token() }}';
-                const formData = new FormData(this);
-                const payButton = this.querySelector('button[type="submit"]');
-                payButton.disabled = true;
-                payButton.innerHTML = 'Memproses...';
-
-                fetch(this.action, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Accept': 'application/json',
-                    },
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    const redirectUrl = "{{ route('client.invoices.index') }}";
-                    
-                    if (data.status === 'paid_by_credit') {
-                        window.location.href = redirectUrl + '?payment_success=1';
-                        return;
-                    }
-
-                    if (data.snap_token) {
-                        window.snap.pay(data.snap_token, {
-                            onSuccess: function(result){ window.location.href = redirectUrl + '?payment_success=1'; },
-                            onPending: function(result){ window.location.href = redirectUrl + '?payment_pending=1'; },
-                            onError: function(result){ 
-                                alert("Pembayaran gagal!");
-                                payButton.disabled = false;
-                                payButton.innerHTML = 'Lanjutkan ke Pembayaran';
-                            },
-                            onClose: function(){
-                                console.log('Snap pop-up ditutup oleh user.');
-                                payButton.disabled = false;
-                                payButton.innerHTML = 'Lanjutkan ke Pembayaran';
-                            }
-                        });
-                    } else {
-                        throw new Error(data.message || 'Gagal mendapatkan token pembayaran.');
-                    }
-                })
-                .catch(error => {
-                    alert('Error: ' . error.message);
-                    payButton.disabled = false;
-                    payButton.innerHTML = 'Lanjutkan ke Pembayaran';
-                });
             });
         }
+
+        function validateMidtransAmount() {
+            const rawVal = midtransAutoNumeric.getNumericString();
+            midtransAmountHidden.value = rawVal;
+            const val = parseFloat(rawVal || 0);
+            const useCredit = midtransUseCreditCheck ? midtransUseCreditCheck.checked : false;
+            const totalPaid = (useCredit ? currentCreditBalance : 0) + val;
+
+            let isValid = true;
+            let msg = '';
+
+            if (totalPaid > (remainingBalance + 1)) {
+                isValid = false; 
+                msg = 'Pembayaran online tidak boleh melebihi sisa tagihan.';
+            }
+            if (totalPaid <= 0 && remainingBalance > 0) {
+                isValid = false;
+                msg = 'Jumlah bayar tidak boleh 0.';
+            }
+
+            midtransAmountError.textContent = msg;
+            midtransAmountError.classList.toggle('hidden', !msg);
+            midtransSubmitBtn.disabled = !isValid;
+        }
+
+        midtransAmountDisplay.addEventListener('keyup', validateMidtransAmount);
+        midtransAmountDisplay.addEventListener('change', validateMidtransAmount);
+
+        // Submit Midtrans
+        midtransForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            const payButton = this.querySelector('button[type="submit"]');
+            payButton.disabled = true;
+            payButton.innerHTML = 'Memproses...';
+
+            fetch(this.action, {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                const redirectUrl = "{{ route('client.invoices.index') }}";
+                if (data.status === 'paid_by_credit') {
+                    window.location.href = redirectUrl + '?payment_success=1';
+                    return;
+                }
+                if (data.snap_token) {
+                    window.snap.pay(data.snap_token, {
+                        onSuccess: function(result){ window.location.href = redirectUrl + '?payment_success=1'; },
+                        onPending: function(result){ window.location.href = redirectUrl + '?payment_pending=1'; },
+                        onError: function(result){ alert("Pembayaran gagal!"); payButton.disabled = false; payButton.innerHTML = 'Bayar Sekarang'; },
+                        onClose: function(){ payButton.disabled = false; payButton.innerHTML = 'Bayar Sekarang'; }
+                    });
+                } else {
+                    throw new Error(data.message || 'Gagal token.');
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error.message);
+                payButton.disabled = false;
+                payButton.innerHTML = 'Bayar Sekarang';
+            });
+        });
     });
 </script>
 @endpush

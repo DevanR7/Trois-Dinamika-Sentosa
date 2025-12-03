@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id('item_id');
             $table->foreignId('return_id')->constrained('purchase_returns', 'return_id')->onDelete('cascade');
             $table->foreignId('product_id')->constrained('products', 'product_id');
-            $table->integer('quantity');
+            $table->decimal('quantity', 15, 2);
             $table->decimal('price_per_unit', 15, 2);
             $table->decimal('subtotal', 15, 2);
             $table->timestamps();

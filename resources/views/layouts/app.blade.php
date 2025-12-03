@@ -30,7 +30,7 @@
         }
     </script>
     
-    {{-- SCRIPT: SIDEBAR PRELOADER (Dari kode lama Anda) --}}
+    {{-- SCRIPT: SIDEBAR PRELOADER --}}
     <script>
         (function() {
             const isLocked = localStorage.getItem('isSidebarLocked') === 'true';
@@ -94,12 +94,51 @@
         </div>
     </main>
 
-    {{-- SCRIPTS --}}
+    {{-- SCRIPTS LIBRARY --}}
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
     
+    {{-- ✅ GLOBAL NOTIFICATION HANDLER (PERBAIKAN UTAMA) --}}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Fungsi helper jika window.showToast belum ready (fallback)
+            const safeToast = (msg, type) => {
+                if (typeof window.showToast === 'function') {
+                    window.showToast(msg, type);
+                } else {
+                    // Fallback ke SweetAlert biasa jika showToast belum ter-load
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: type,
+                        title: msg,
+                        showConfirmButton: false,
+                        timer: 3000,
+                        timerProgressBar: true
+                    });
+                }
+            };
+
+            @if(session('success'))
+                safeToast("{{ session('success') }}", 'success');
+            @endif
+
+            @if(session('error'))
+                safeToast("{{ session('error') }}", 'error');
+            @endif
+
+            @if(session('info'))
+                safeToast("{{ session('info') }}", 'info');
+            @endif
+            
+            @if(session('warning'))
+                safeToast("{{ session('warning') }}", 'warning');
+            @endif
+        });
+    </script>
+
     @stack("scripts")
 </body>
 </html>

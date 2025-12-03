@@ -16,17 +16,19 @@ return new class extends Migration
             $table->foreignId('opname_id')->constrained('stock_opnames', 'opname_id')->onDelete('cascade');
             $table->foreignId('product_id')->constrained('products', 'product_id');
             
-            $table->integer('system_qty'); // Stok di komputer saat opname
-            $table->integer('physical_qty'); // Stok fisik hasil hitungan
-            $table->integer('difference'); // physical - system
+            // UBAH SEMUA INTEGER MENJADI DECIMAL(15, 2)
+            $table->decimal('system_qty', 15, 2);   // Stok di komputer (bisa pecahan)
+            $table->decimal('physical_qty', 15, 2); // Stok fisik (bisa pecahan)
+            $table->decimal('difference', 15, 2);   // Selisih (bisa negatif dan pecahan)
             
-            $table->decimal('cost_per_unit', 15, 2); // HPP saat opname
-            $table->decimal('adjustment_value', 15, 2); // difference * cost_per_unit
+            // OPTIONAL: Sesuaikan presisi HPP dengan tabel products (19, 4) agar lebih akurat
+            $table->decimal('cost_per_unit', 19, 4); 
+            $table->decimal('adjustment_value', 15, 2); 
             
             $table->timestamps();
         });
     }
-
+    
     /**
      * Reverse the migrations.
      */

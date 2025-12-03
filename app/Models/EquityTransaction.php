@@ -7,37 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\ChartOfAccount;
 
-/**
- * App\Models\EquityTransaction
- *
- * @property int $transaction_id
- * @property \Illuminate\Support\Carbon $transaction_date
- * @property string $type
- * @property string $description
- * @property float $amount
- * @property int|null $user_id
- * @property int|null $equity_account_id
- * @property int|null $cash_bank_account_id
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read ChartOfAccount|null $cashBankAccount
- * @property-read ChartOfAccount|null $equityAccount
- * @property-read \App\Models\User|null $user
- * @method static \Illuminate\Database\Eloquent\Builder|EquityTransaction newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|EquityTransaction newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|EquityTransaction query()
- * @method static \Illuminate\Database\Eloquent\Builder|EquityTransaction whereAmount($value)
- * @method static \Illuminate\Database\Eloquent\Builder|EquityTransaction whereCashBankAccountId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|EquityTransaction whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|EquityTransaction whereDescription($value)
- * @method static \Illuminate\Database\Eloquent\Builder|EquityTransaction whereEquityAccountId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|EquityTransaction whereTransactionDate($value)
- * @method static \Illuminate\Database\Eloquent\Builder|EquityTransaction whereTransactionId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|EquityTransaction whereType($value)
- * @method static \Illuminate\Database\Eloquent\Builder|EquityTransaction whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|EquityTransaction whereUserId($value)
- * @mixin \Eloquent
- */
 class EquityTransaction extends Model
 {
     use HasFactory;

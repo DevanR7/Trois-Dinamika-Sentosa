@@ -1,0 +1,51 @@
+/* 1. IMPORT DULU (WAJIB DI ATAS) */
+@import '../components/utilities.css';
+@import '../components/sidebar.css';
+@import '../components/forms.css';
+@import '../components/alerts.css';
+
+/* 2. BARU PANGGIL TAILWIND */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 3. TERAKHIR CONFIG TEMA (INDIGO) */
+/* Variable ini tetap akan terbaca oleh file components di atas karena CSS Variables di-resolve saat runtime browser */
+@layer base {
+    :root {
+        /* Indigo-500 RGB */
+        --color-primary: 99 102 241; 
+    }
+
+    #nprogress .bar {
+        @apply text-indigo-600;
+    }
+
+    .nav_image {
+        @apply bg-indigo-600 !important;
+    }
+
+    .sidebar .link.active {
+        @apply border-l-indigo-500 !important;
+    }
+    .sidebar .link.active i {
+        @apply text-indigo-400 !important;
+    }
+
+    /* Helper Focus Ring */
+    .focus\:ring-primary-500:focus {
+        --tw-ring-color: rgb(var(--color-primary));
+    }
+    .focus\:border-primary-500:focus {
+        border-color: rgb(var(--color-primary));
+    }
+
+    /* Helper Colors */
+    .bg-primary-50 { background-color: rgb(238 242 255); }
+    .bg-primary-100 { background-color: rgb(224 231 255); }
+    .text-primary-600 { color: rgb(79 70 229); }
+    .text-primary-700 { color: rgb(67 56 202); }
+    
+    .ring-primary-500 { --tw-ring-color: rgb(99 102 241); }
+    .border-primary-500 { border-color: rgb(99 102 241); }
+}

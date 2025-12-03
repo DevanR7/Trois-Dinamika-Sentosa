@@ -35,7 +35,7 @@ class ProductImport implements ToModel, WithHeadingRow
         if (empty($productCode)) {
             // Generate kode unik: AUTO-TIMESTAMP-RANDOM
             // Contoh: AUTO-17315678-99
-            $productCode = 'AUTO-' . time() . '-' . rand(10, 99);
+            $productCode = 'AUTO-' . time() . '-' . strtoupper(\Illuminate\Support\Str::random(4));
         }
 
         // 4. Simpan Produk

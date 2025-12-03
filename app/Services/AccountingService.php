@@ -11,8 +11,16 @@ use Exception;
 class AccountingService
 {
     /**
-     * Mem-posting Jurnal Umum.
-     * * Format entry array diharapkan: ['account_id' => int, 'amount' => float, 'notes' => ?string]
+     * Mem-posting Jurnal Umum yang seimbang (balanced).
+     *
+     * @param string $journalGroupId ID unik untuk grup jurnal ini
+     * @param \Illuminate\Support\Carbon|string $entryDate Tanggal transaksi
+     * @param string $description Deskripsi umum untuk grup jurnal
+     * @param array $debitEntries Array [[account_id, amount, description_override (opsional)], ...]
+     * @param array $creditEntries Array [[account_id, amount, description_override (opsional)], ...]
+     * @param Model $referenceModel Model Eloquent yang menjadi sumber (e.g., $salesInvoice)
+     * @param int|null $userId ID user yang melakukan aksi (opsional)
+     * @throws \Exception Jika jurnal tidak seimbang (unbalanced)
      */
     public function postJournal(
         string $journalGroupId,
@@ -20,65 +28,80 @@ class AccountingService
         string $description,
         array $debitEntries,
         array $creditEntries,
-        Model $referenceModel
+        Model $referenceModel,
+        ?int $userId = null
     ) {
-        DB::transaction(function () use ($journalGroupId, $entryDate, $description, $debitEntries, $creditEntries, $referenceModel) {
+        DB::transaction(function () use ($journalGroupId, $entryDate, $description, $debitEntries, $creditEntries, $referenceModel, $userId) {  
             
+            $oldReconMap = GeneralLedger::where('journal_group_id', $journalGroupId)
+                ->whereNotNull('bank_reconciliation_id')
+                ->pluck('bank_reconciliation_id', 'chart_of_account_id')
+                ->toArray();
+
+            // 2. Hapus jurnal lama
+            GeneralLedger::where('journal_group_id', $journalGroupId)->delete();
+
             $totalDebit = 0;
             $totalCredit = 0;
             $journalsToCreate = [];
-            $userId = Auth::id();
-            $now = now();
 
-            // Helper function untuk memproses entry agar tidak duplikasi kode
-            $processEntry = function($entries, $isDebit) use (&$totalDebit, &$totalCredit, &$journalsToCreate, $journalGroupId, $entryDate, $description, $referenceModel, $userId, $now) {
-                foreach ($entries as $entry) {
-                    // Support format array lama (indexed) dan baru (named key)
-                    $accountId = $entry['account_id'] ?? $entry[0];
-                    $amount    = $entry['amount'] ?? $entry[1];
-                    $notes     = $entry['description'] ?? ($entry[2] ?? $description);
-
-                    if ($amount > 0) {
-                        if ($isDebit) {
-                            $totalDebit += $amount;
-                        } else {
-                            $totalCredit += $amount;
-                        }
-
-                        $journalsToCreate[] = [
-                            'journal_group_id'    => $journalGroupId,
-                            'chart_of_account_id' => $accountId,
-                            'entry_date'          => $entryDate,
-                            'debit'               => $isDebit ? $amount : 0,
-                            'credit'              => $isDebit ? 0 : $amount,
-                            'description'         => $notes,
-                            'reference_type'      => get_class($referenceModel),
-                            'reference_id'        => $referenceModel->getKey(),
-                            'user_id'             => $userId,
-                            'created_at'          => $now,
-                            'updated_at'          => $now,
-                        ];
-                    }
+            // Proses entri Debit
+            foreach ($debitEntries as $entry) {
+                $amount = $entry[1];
+                if ($amount > 0) {
+                    $totalDebit += $amount;
+                    $journalsToCreate[] = [
+                        'journal_group_id' => $journalGroupId,
+                        'chart_of_account_id' => $entry[0],
+                        'entry_date' => $entryDate,
+                        'debit' => $amount,
+                        'credit' => 0,
+                        'description' => $entry[2] ?? $description, // Gunakan deskripsi override jika ada
+                        'reference_type' => get_class($referenceModel),
+                        'reference_id' => $referenceModel->getKey(),
+                        'user_id' => $userId,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
                 }
-            };
-
-            // Proses Debit & Kredit
-            $processEntry($debitEntries, true);  // True = Debit
-            $processEntry($creditEntries, false); // False = Credit
-
-            // Validasi Keseimbangan dengan toleransi epsilon
-            $diff = abs($totalDebit - $totalCredit);
-            if ($diff > 0.001) {
-                throw new Exception("Jurnal tidak seimbang. Debit: " . number_format($totalDebit, 2) . ", Kredit: " . number_format($totalCredit, 2));
             }
 
-            // Hapus jurnal lama (Idempotency) - Pastikan journalGroupId Unik!
-            GeneralLedger::where('journal_group_id', $journalGroupId)->delete();
-
-            // Bulk Insert
-            if (!empty($journalsToCreate)) {
-                GeneralLedger::insert($journalsToCreate);
+            // Proses entri Kredit
+            foreach ($creditEntries as $entry) {
+                $amount = $entry[1];
+                if ($amount > 0) {
+                    $totalCredit += $amount;
+                    $journalsToCreate[] = [
+                        'journal_group_id' => $journalGroupId,
+                        'chart_of_account_id' => $entry[0],
+                        'entry_date' => $entryDate,
+                        'debit' => 0,
+                        'credit' => $amount,
+                        'description' => $entry[2] ?? $description, // Gunakan deskripsi override jika ada
+                        'reference_type' => get_class($referenceModel),
+                        'reference_id' => $referenceModel->getKey(),
+                        'user_id' => $userId,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
             }
+
+            foreach ($journalsToCreate as &$journal) {
+            $accId = $journal['chart_of_account_id'];
+            if (isset($oldReconMap[$accId])) {
+                $journal['bank_reconciliation_id'] = $oldReconMap[$accId];
+            }
+        }
+
+            // Validasi Keseimbangan Jurnal
+            // Kita gunakan toleransi kecil untuk error floating point
+            if (abs(round($totalDebit, 2) - round($totalCredit, 2)) > 0.01) {
+                throw new Exception("Jurnal tidak seimbang (Unbalanced Journal) untuk $journalGroupId. Debit: $totalDebit, Kredit: $totalCredit");
+            }
+        
+            // Masukkan jurnal baru
+            GeneralLedger::insert($journalsToCreate);
         });
     }
 }

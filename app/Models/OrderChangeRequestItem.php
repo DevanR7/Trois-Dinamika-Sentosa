@@ -5,37 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\OrderChangeRequest;
+use App\Models\Product;
 
-/**
- * App\Models\OrderChangeRequestItem
- *
- * @property int $item_id
- * @property int $order_change_request_id
- * @property int $product_id
- * @property int|null $original_quantity
- * @property int $requested_quantity
- * @property string $action
- * @property float $price_per_unit
- * @property float $subtotal
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\OrderChangeRequest $changeRequest
- * @property-read \App\Models\Product $product
- * @method static \Illuminate\Database\Eloquent\Builder|OrderChangeRequestItem newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|OrderChangeRequestItem newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder|OrderChangeRequestItem query()
- * @method static \Illuminate\Database\Eloquent\Builder|OrderChangeRequestItem whereAction($value)
- * @method static \Illuminate\Database\Eloquent\Builder|OrderChangeRequestItem whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|OrderChangeRequestItem whereItemId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|OrderChangeRequestItem whereOrderChangeRequestId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|OrderChangeRequestItem whereOriginalQuantity($value)
- * @method static \Illuminate\Database\Eloquent\Builder|OrderChangeRequestItem wherePricePerUnit($value)
- * @method static \Illuminate\Database\Eloquent\Builder|OrderChangeRequestItem whereProductId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|OrderChangeRequestItem whereRequestedQuantity($value)
- * @method static \Illuminate\Database\Eloquent\Builder|OrderChangeRequestItem whereSubtotal($value)
- * @method static \Illuminate\Database\Eloquent\Builder|OrderChangeRequestItem whereUpdatedAt($value)
- * @mixin \Eloquent
- */
 class OrderChangeRequestItem extends Model
 {
     use HasFactory;
@@ -53,6 +25,8 @@ class OrderChangeRequestItem extends Model
     ];
 
     protected $casts = [
+        'original_quantity' => 'float', 
+        'requested_quantity' => 'float', 
         'price_per_unit' => 'float',
         'subtotal' => 'float',
     ];
@@ -64,7 +38,6 @@ class OrderChangeRequestItem extends Model
 
     public function product(): BelongsTo
     {
-        // Gunakan withTrashed agar produk yang sudah dihapus tetap bisa ditampilkan
         return $this->belongsTo(Product::class, 'product_id', 'product_id')->withTrashed();
     }
 }

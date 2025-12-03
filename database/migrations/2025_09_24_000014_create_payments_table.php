@@ -6,9 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('payments', function (Blueprint $table) {
@@ -18,9 +15,10 @@ return new class extends Migration
                   ->constrained('sales_invoices', 'invoice_id')
                   ->onDelete('cascade');
 
-            // Dari create_batch_payments
-            $table->foreignId('batch_payment_id')->nullable()
-                  ->constrained('batch_payments', 'batch_payment_id')
+            // ✅ REVISI: Ganti 'batch_payment_id' menjadi 'bulk_sales_payment_id'
+            // ✅ REVISI: Arahkan constrained ke tabel 'bulk_sales_payments'
+            $table->foreignId('bulk_sales_payment_id')->nullable()
+                  ->constrained('bulk_sales_payments', 'bulk_sales_payment_id')
                   ->onDelete('set null');
 
             $table->foreignId('received_by_user_id')->nullable()
@@ -30,17 +28,14 @@ return new class extends Migration
             $table->date('payment_date');
             $table->decimal('amount', 15, 2);
 
-            // Dari modify_payment_tables
             $table->foreignId('payment_method_id')->nullable()
                   ->constrained('payment_methods', 'payment_method_id')
                   ->onDelete('set null');
 
-            // Dari add_bank_account_id_to_payment_tables
             $table->foreignId('company_bank_account_id')->nullable()
                   ->constrained('company_bank_accounts', 'company_bank_account_id')
                   ->nullOnDelete();
 
-            // DITAMBAHKAN dari add_reference_number_to_payment_tables
             $table->string('reference_number')->nullable()
                   ->comment('Untuk No. Giro, No. Cek, atau referensi lainnya');
 
@@ -59,9 +54,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('payments');

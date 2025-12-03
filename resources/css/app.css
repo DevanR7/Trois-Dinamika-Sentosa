@@ -113,71 +113,37 @@
    ========================================================================== */
 @layer components {
     
+     /* BUTTON LOADING SPINNER */
+  .btn-loading {
+      position: relative;
+      color: transparent !important;
+      pointer-events: none;
+      opacity: 0.8;
+  }
+  .btn-loading::after {
+      content: '';
+      position: absolute;
+      width: 1.25em;
+      height: 1.25em;
+      top: 50%;
+      left: 50%;
+      margin-top: -0.625em;
+      margin-left: -0.625em;
+      border: 2px solid currentColor;
+      border-radius: 50%;
+      border-right-color: transparent;
+      animation: spin 0.75s linear infinite;
+      /* Warna spinner (biasanya putih jika tombol berwarna, atau slate jika tombol outline) */
+      border-color: white; /* fallback */
+  }
+
+  .dark .btn-loading::after { border-color: #cbd5e1; } /* contoh untuk dark */
+  .btn-outline.btn-loading::after {
+       border-color: #4338ca; /* contoh indigo */
+  }
+
     /* --- SIDEBAR CONFIGURATION --- */
-    .sidebar { 
-        @apply fixed top-0 left-0 h-full w-[260px] bg-[#0f172a] z-[999] flex flex-col border-r border-slate-800 shadow-2xl transition-all duration-300 ease-in-out overflow-x-hidden; 
-        /* Di dark mode, border sidebar diperjelas sedikit */
-        @apply dark:border-r dark:border-slate-800;
-    }
-    .sidebar.close { @apply w-[80px]; }
-    .sidebar.locked { @apply w-[260px]; }
     
-    .sidebar .menu_container { 
-        @apply flex-1 overflow-y-auto py-2 overflow-x-hidden; 
-        scrollbar-width: none; 
-    }
-    .sidebar .menu_container::-webkit-scrollbar { display: none; }
-    
-    .logo_items { @apply flex items-center pt-6 pb-4 mb-2 h-[80px] pl-5 pr-2.5; }
-    .logo_items .nav_image { @apply flex items-center justify-center flex-shrink-0 bg-indigo-600 rounded-lg shadow-lg w-8 h-8 text-white; }
-    .logo_items .logo_text { @apply ml-3 whitespace-nowrap text-white font-bold text-lg tracking-tight; }
-    
-    .menu_title { @apply mt-6 mb-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest opacity-80 pl-5 whitespace-nowrap; }
-    
-    .sidebar .link { @apply flex items-center w-full text-slate-400 mb-1 relative cursor-pointer border-l-[3px] border-transparent pl-5 pr-2.5 h-12 transition-all duration-200; }
-    .sidebar .link:hover { @apply bg-slate-800/50 text-white; }
-    .sidebar .link.active { @apply bg-slate-800 text-white border-l-indigo-500 pl-[17px]; }
-    .sidebar .link i { @apply flex items-center justify-center text-[20px] text-slate-500 w-10 h-10 mr-0 transition-colors; }
-    .sidebar .link.active i { @apply text-indigo-400; }
-    .sidebar .link span { @apply ml-3 text-[13px] font-medium whitespace-nowrap transition-opacity duration-300; }
-    
-    /* Sidebar States */
-    .sidebar.close .logo_text, .sidebar.close .link span, .sidebar.close .dropdown-icon, .sidebar.close .profile_text, .sidebar.close #sidebar-close, .sidebar.close #lock-icon { 
-        @apply opacity-0 invisible absolute w-0 pointer-events-none; 
-    }
-    .sidebar.close .menu_title { @apply h-[1px] bg-slate-700/50 my-4 mx-auto p-0 opacity-100 w-[40px] text-[0] pl-0; }
-
-    .sidebar.locked .logo_text, .sidebar.locked .link span, .sidebar.locked .dropdown-icon, .sidebar.locked .profile_text, .sidebar.locked #lock-icon,
-    .sidebar.hover-expand .logo_text, .sidebar.hover-expand .link span, .sidebar.hover-expand .dropdown-icon, .sidebar.hover-expand .profile_text, .sidebar.hover-expand #lock-icon, .sidebar.hover-expand #sidebar-close {
-        @apply opacity-100 visible static w-auto pointer-events-auto delay-75;
-        display: flex !important;
-    }
-
-    .sidebar.hover-expand { width: 260px !important; box-shadow: 4px 0 24px rgba(0,0,0,0.3); }
-    .sidebar.hover-expand .menu_title { @apply h-auto bg-transparent mt-6 mb-2 w-auto text-[10px] pl-5 opacity-100 visible; }
-
-    /* Dropdown Animation */
-    .dropdown-icon { @apply ml-auto text-[16px] opacity-70 pr-2 transition-transform duration-300; }
-    .submenu { @apply flex flex-col bg-slate-900/50 overflow-hidden transition-all duration-300 ease-in-out; max-height: 0; opacity: 0; }
-    .has-submenu.open .submenu { max-height: 500px; opacity: 1; }
-    .has-submenu.open .dropdown-icon { transform: rotate(90deg); }
-    .submenu .link { @apply h-9 mb-0 border-l-0 text-slate-500 pl-[60px] text-[13px]; }
-    .submenu .link.active { @apply bg-transparent text-indigo-400 font-semibold pl-[60px]; }
-    .sidebar.close .submenu { display: none !important; }
-    .sidebar.hover-expand .submenu { display: flex !important; }
-
-    /* Sidebar Footer */
-    .sidebar_profile { @apply relative p-0 border-t border-slate-800 mt-auto; }
-    .profile_trigger { @apply w-full flex items-center gap-0 cursor-pointer hover:bg-slate-800/50 py-3 pl-5 pr-2.5; }
-    .profile_trigger .avatar-wrapper { @apply flex items-center justify-center rounded-full border-2 border-slate-700 overflow-hidden w-9 h-9 ml-[2px]; }
-    .profile_text { @apply ml-3 whitespace-nowrap text-slate-300 text-sm font-medium; }
-
-    /* Main Layout */
-    .main-wrapper { 
-        @apply relative min-h-screen flex flex-col ml-[260px] w-[calc(100%-260px)] transition-all duration-300;
-        @apply bg-[#f8fafc] dark:bg-[#0f172a]; /* Background utama berubah */
-    }
-    .sidebar.close ~ .main-wrapper { margin-left: 80px; width: calc(100% - 80px); }
 
     /* Top Navbar */
     nav.top-navbar {
@@ -258,6 +224,8 @@
         #lock-icon { display: none !important; }
     }
 }
+
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ==========================================================================
    4. SWEETALERT2 OVERRIDES (TOAST & MODAL - CLEAN THEME)

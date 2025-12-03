@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Route;
 
 class RouteServiceProvider extends ServiceProvider
 {
-    public const HOME = '/dashboard';
+    // Jangan arahkan ke /dashboard lagi
+    public const HOME = '/admin/dashboard';
 
     public function boot(): void
     {
@@ -26,9 +27,13 @@ class RouteServiceProvider extends ServiceProvider
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
 
-            // PASTIKAN BLOK INI ADA DAN BENAR
             Route::middleware('web')
                 ->group(base_path('routes/client.php'));
+
+            Route::middleware(['web'])
+                ->prefix('admin')
+                ->name('admin.')
+                ->group(base_path('routes/admin.php'));
         });
     }
 }

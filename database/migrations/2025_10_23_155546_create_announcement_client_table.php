@@ -14,9 +14,7 @@ return new class extends Migration
             
             // ✅ UBAH BARIS INI:
             // Tambahkan parameter kedua untuk constrained() yang berisi nama kolom PK
-            $table->foreignId('client_id')->constrained(
-                table: 'clients', column: 'client_id' // <-- Tentukan nama tabel dan kolom PK
-            )->onDelete('cascade');
+            $table->foreignId('client_id')->constrained('clients', 'client_id')->onDelete('cascade');
             
             // Primary key gabungan
             $table->primary(['announcement_id', 'client_id']);

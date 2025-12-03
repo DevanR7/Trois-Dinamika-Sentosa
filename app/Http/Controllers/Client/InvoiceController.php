@@ -8,6 +8,7 @@ use App\Models\Payment;
 use App\Models\ClientLedger;
 use App\Models\PaymentMethod;
 use App\Models\BatchPayment;
+use App\Models\BulkSalesPayment;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -80,7 +81,7 @@ class InvoiceController extends Controller
     // ============================================================
     // 3. Halaman Pembayaran Batch (Multi-Invoice)
     // ============================================================
-    public function showBatchPay(): View
+    public function showBulkPay(): View
     {
         $client = Auth::guard('client')->user();
 
@@ -101,7 +102,7 @@ class InvoiceController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('client.invoices.batch_pay', compact(
+        return view('client.invoices.bulk_pay', compact(
             'invoices',
             'availableBalance',
             'pendingBalance',
@@ -300,7 +301,7 @@ class InvoiceController extends Controller
             // }
             // Biarkan overpayment terjadi. JS di view sudah memberi info.
 
-            BatchPayment::create([
+            BulkSalesPayment::create([
                 'client_id'             => $client->client_id,
                 'processed_by_user_id'  => null,
                 'payment_date'          => now(),

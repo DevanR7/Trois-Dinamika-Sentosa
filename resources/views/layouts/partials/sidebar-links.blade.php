@@ -92,7 +92,7 @@
                 @endcan
 
                 @can('create-batch-purchase-payments')
-                <li class="item"><a class="link {{ request()->routeIs('batch-purchase-payments.*') ? 'active' : '' }}" href="{{ route('batch-purchase-payments.create') }}"><span>Bayar Hutang</span></a></li>
+                <li class="item"><a class="link {{ request()->routeIs('bulk-purchase-payments.*') ? 'active' : '' }}" href="{{ route('bulk-purchase-payments.create') }}"><span>Bayar Hutang</span></a></li>
                 @endcan
                 
                 @can('view-purchase-returns')
@@ -167,9 +167,9 @@
         @if(Auth::user()->canany(['view-invoices', 'create-batch-payments', 'manage-payment-clearance']))
         @php 
             $isActiveInv = request()->routeIs('invoices.*') || 
-                            request()->routeIs('invoice-adjustments.*') ||
-                            request()->routeIs('batch-payments.*') ||
-                            request()->routeIs('payment-clearance.*'); 
+                    request()->routeIs('invoice-adjustments.*') ||
+                    request()->routeIs('bulk-sales-payments.*') ||
+                    request()->routeIs('payment-clearance.*'); 
         @endphp
         <li class="item has-submenu {{ $isActiveInv ? 'open' : '' }}">
             <a class="link {{ $isActiveInv ? 'active' : '' }}" href="#">
@@ -186,12 +186,12 @@
                 <li class="item"><a class="link {{ request()->routeIs('invoice-adjustments.*') ? 'active' : '' }}" href="{{ route('invoice-adjustments.create') }}"><span>Penyesuaian Invoice</span></a></li>
                 @endcan
 
-                @can('create-batch-payments')
-                <li class="item"><a class="link {{ (request()->routeIs('batch-payments.*') && !request()->routeIs('batch-payments.pending')) ? 'active' : '' }}" href="{{ route('batch-payments.create') }}"><span>Terima Bulk (Bayar)</span></a></li>
+                @can('create-bulk-sales-payments')
+                <li class="item"><a class="link {{ request()->routeIs('bulk-sales-payments.create') ? 'active' : '' }}" href="{{ route('bulk-sales-payments.create') }}"><span>Terima Bulk (Bayar)</span></a></li>
                 @endcan
 
-                @can('review-batch-payments')
-                <li class="item"><a class="link {{ request()->routeIs('batch-payments.pending') ? 'active' : '' }}" href="{{ route('batch-payments.pending') }}"><span>Verifikasi Bayar</span></a></li>
+                @can('review-bulk-sales-payments')
+                <li class="item"><a class="link {{ request()->routeIs('bulk-sales-payments.pending') ? 'active' : '' }}" href="#"><span>Verifikasi Bayar</span></a></li>
                 @endcan
 
                 @can('manage-payment-clearance')

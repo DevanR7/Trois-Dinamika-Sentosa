@@ -10,26 +10,24 @@ use Symfony\Component\HttpFoundation\Response;
 
 class RedirectIfAuthenticated
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     */
-     public function handle(Request $request, Closure $next, string ...$guards): Response
+    public function handle(Request $request, Closure $next, string ...$guards): Response
     {
         $guards = empty($guards) ? [null] : $guards;
 
         foreach ($guards as $guard) {
+            // Cek apakah user sedang login menggunakan guard tersebut
             if (Auth::guard($guard)->check()) {
-                // --- INI ADALAH LOGIKA BARU YANG PENTING ---
                 
-                // Jika yang sudah login adalah 'client', arahkan ke dashboard klien.
+                // 1. Jika login sebagai CLIENT
                 if ($guard === 'client') {
                     return redirect()->route('client.dashboard');
                 }
 
-                // Jika tidak (guard adalah 'web' atau null), arahkan ke dashboard utama.
-                return redirect(RouteServiceProvider::HOME);
+                // 2. Jika login sebagai ADMIN (guard 'web' atau null)
+                // Kita arahkan langsung ke admin dashboard
+                if ($guard === 'web' || $guard === null) {
+                    return redirect()->route('admin.dashboard');
+                }
             }
         }
 

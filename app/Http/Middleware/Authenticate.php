@@ -28,7 +28,7 @@ class Authenticate extends Middleware
 
             // Jika tidak (diasumsikan route admin atau default), arahkan ke login admin
             // Pastikan route 'login' terdefinisi di routes/web.php atau auth.php
-            return route('login');
+            return route('admin.login');
         }
 
         // Jika request mengharapkan JSON, kembalikan null (akan melempar AuthenticationException)

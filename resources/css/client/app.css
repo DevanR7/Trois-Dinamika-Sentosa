@@ -1,0 +1,53 @@
+/* 1. IMPORT DULU (WAJIB DI ATAS) */
+@import '../components/utilities.css';
+@import '../components/sidebar.css';
+@import '../components/forms.css';
+@import '../components/alerts.css';
+
+/* 2. TAILWIND */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 3. CONFIG TEMA (EMERALD) */
+@layer base {
+    :root {
+        /* Emerald-500 RGB */
+        --color-primary: 16 185 129; 
+    }
+
+    #nprogress .bar {
+        @apply text-emerald-500;
+    }
+
+    .nav_image {
+        @apply bg-emerald-600 !important;
+    }
+
+    .sidebar .link.active {
+        @apply border-l-emerald-500 !important;
+    }
+    .sidebar .link.active i {
+        @apply text-emerald-400 !important;
+    }
+    .sidebar .link:hover {
+        @apply bg-slate-800 text-emerald-50 !important;
+    }
+
+    /* Helper Focus Ring */
+    .focus\:ring-primary-500:focus {
+        --tw-ring-color: rgb(var(--color-primary));
+    }
+    .focus\:border-primary-500:focus {
+        border-color: rgb(var(--color-primary));
+    }
+
+    /* Helper Colors */
+    .bg-primary-50 { background-color: rgb(236 253 245); }
+    .bg-primary-100 { background-color: rgb(209 250 229); }
+    .text-primary-600 { color: rgb(5 150 105); }
+    .text-primary-700 { color: rgb(4 120 87); }
+
+    .ring-primary-500 { --tw-ring-color: rgb(16 185 129); }
+    .border-primary-500 { border-color: rgb(16 185 129); }
+}

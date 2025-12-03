@@ -1,114 +1,175 @@
-@extends('layouts.client')
+@extends('client.layouts.app')
+
+@section('title', 'Ajukan Perubahan')
+
+@push('styles')
+    {{-- Load Select2 CSS --}}
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <style>
+        /* Styling khusus agar tinggi input Select2 konsisten */
+        .select2-container .select2-selection--single { height: 40px !important; display: flex; align-items: center; }
+        .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 38px !important; padding-left: 12px; }
+        .select2-container--default .select2-selection--single .select2-selection__arrow { height: 38px !important; }
+    </style>
+@endpush
 
 @section('content')
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        {{-- Tombol Kembali --}}
-        <a href="{{ route('client.sales-orders.show', $order->order_id) }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Kembali ke Detail Pesanan
+<div class="max-w-5xl mx-auto space-y-6 pb-20 animate-enter">
+
+    {{-- Header --}}
+    <div class="flex items-center justify-between">
+        <a href="{{ route('client.sales-orders.show', $order->order_id) }}" class="flex items-center text-slate-500 hover:text-slate-800 transition text-sm font-medium">
+            <i class="material-icons text-[18px] mr-1">arrow_back</i> Kembali ke Detail
         </a>
-        <h2 class="fw-bold mb-0">Ajukan Perubahan Pesanan: {{ $order->order_number }}</h2>
     </div>
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body p-4">
+    <div class="dashboard-card p-0 overflow-hidden shadow-sm border border-slate-200 rounded-xl bg-white">
+        <div class="bg-indigo-600 px-6 py-4 border-b border-indigo-700">
+            <h2 class="text-white font-bold text-lg flex items-center gap-2">
+                <i class="material-icons">edit_note</i>
+                Ajukan Perubahan Pesanan: {{ $order->order_number }}
+            </h2>
+        </div>
+        
+        <div class="p-6">
+            {{-- Error Handling --}}
             @if ($errors->any())
-                <div class="alert alert-danger"><ul class="mb-0">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
-            @endif
-            @if (session('error'))
-                <div class="alert alert-danger">{{ session('error') }}</div>
+                <div class="mb-6 bg-red-50 text-red-700 p-4 rounded-lg border border-red-200 shadow-sm">
+                    <div class="flex items-start gap-2">
+                        <i class="material-icons text-red-500">error</i>
+                        <ul class="list-disc list-inside text-sm mt-0.5">
+                            @foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach
+                        </ul>
+                    </div>
+                </div>
             @endif
 
             <form action="{{ route('client.sales-orders.requestChange.store', $order->order_id) }}" method="POST" id="change-request-form">
                 @csrf
 
-                {{-- PILIHAN JENIS PERMINTAAN --}}
-                <div class="mb-4">
-                    <label class="form-label fw-semibold">Jenis Permintaan <span class="text-danger">*</span></label>
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" name="request_type" id="type_cancel" value="cancel" {{ old('request_type') == 'cancel' ? 'checked' : '' }} required>
-                        <label class="form-check-label" for="type_cancel">
-                            Batalkan Seluruh Pesanan
+                {{-- 1. PILIHAN JENIS PERMINTAAN (Card Style) --}}
+                <div class="mb-8">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Jenis Permintaan <span class="text-red-500">*</span></label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {{-- Option: Cancel --}}
+                        <label class="cursor-pointer relative group">
+                            <input type="radio" name="request_type" value="cancel" class="peer sr-only" {{ old('request_type') == 'cancel' ? 'checked' : '' }} required>
+                            <div class="p-4 rounded-xl border-2 border-slate-200 hover:border-red-400 peer-checked:border-red-500 peer-checked:bg-red-50 transition-all shadow-sm h-full">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+                                        <i class="material-icons">cancel</i>
+                                    </div>
+                                    <div>
+                                        <h6 class="font-bold text-slate-700 group-hover:text-red-700 transition-colors">Batalkan Pesanan</h6>
+                                        <p class="text-xs text-slate-500">Batalkan seluruh pesanan ini.</p>
+                                    </div>
+                                    <i class="material-icons ml-auto text-red-500 opacity-0 peer-checked:opacity-100 transition-all transform scale-0 peer-checked:scale-100">check_circle</i>
+                                </div>
+                            </div>
                         </label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" name="request_type" id="type_modify" value="modify" {{ old('request_type', 'modify') == 'modify' ? 'checked' : '' }} required>
-                        <label class="form-check-label" for="type_modify">
-                            Ubah Item/Jumlah Pesanan
+
+                        {{-- Option: Modify --}}
+                        <label class="cursor-pointer relative group">
+                            <input type="radio" name="request_type" value="modify" class="peer sr-only" {{ old('request_type', 'modify') == 'modify' ? 'checked' : '' }} required>
+                            <div class="p-4 rounded-xl border-2 border-slate-200 hover:border-indigo-400 peer-checked:border-indigo-500 peer-checked:bg-indigo-50 transition-all shadow-sm h-full">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                                        <i class="material-icons">edit</i>
+                                    </div>
+                                    <div>
+                                        <h6 class="font-bold text-slate-700 group-hover:text-indigo-700 transition-colors">Ubah Item/Jumlah</h6>
+                                        <p class="text-xs text-slate-500">Tambah, kurang, atau hapus item.</p>
+                                    </div>
+                                    <i class="material-icons ml-auto text-indigo-500 opacity-0 peer-checked:opacity-100 transition-all transform scale-0 peer-checked:scale-100">check_circle</i>
+                                </div>
+                            </div>
                         </label>
                     </div>
                 </div>
 
-                {{-- CATATAN KLIEN --}}
-                <div class="mb-4">
-                    <label for="client_notes" class="form-label fw-semibold">Alasan / Catatan Permintaan</label>
-                    <textarea class="form-control" name="client_notes" id="client_notes" rows="3" placeholder="Jelaskan alasan pembatalan atau detail perubahan item...">{{ old('client_notes') }}</textarea>
+                {{-- 2. CATATAN KLIEN --}}
+                <div class="mb-8">
+                    <label for="client_notes" class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Alasan / Catatan</label>
+                    <textarea name="client_notes" id="client_notes" class="form-textarea w-full border-slate-300 rounded-lg focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition shadow-sm" rows="3" placeholder="Jelaskan alasan pembatalan atau detail perubahan..." required>{{ old('client_notes') }}</textarea>
                 </div>
 
-                {{-- BAGIAN UBAH ITEM (MUNCUL JIKA 'modify' DIPILIH) --}}
-                <div id="modify-items-section" class="mb-4 {{ old('request_type', 'modify') == 'modify' ? '' : 'd-none' }}">
-                    <h5 class="fw-semibold mb-3">Ajukan Perubahan Item</h5>
-                    <p class="text-muted small">Ubah kuantitas item yang ada (isi 0 untuk menghapus), atau tambahkan item baru. Harga satuan akan menggunakan harga terbaru saat permintaan diproses.</p>
-                    <div class="table-responsive">
-                        <table class="table table-bordered align-middle">
-                            <thead class="table-light">
+                {{-- 3. BAGIAN UBAH ITEM --}}
+                <div id="modify-items-section" class="mb-6 {{ old('request_type', 'modify') == 'modify' ? '' : 'hidden' }}">
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide">Daftar Perubahan Item</label>
+                        <button type="button" id="add-item-btn" class="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-lg transition">
+                            <i class="material-icons text-[16px]">add_circle</i> Tambah Produk
+                        </button>
+                    </div>
+
+                    <div class="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-xs">
                                 <tr>
-                                    <th>Produk</th>
-                                    <th class="text-center" style="width: 15%;">Kuantitas Asli</th>
-                                    <th class="text-center" style="width: 20%;">Kuantitas Diminta</th>
-                                    <th class="text-center" style="width: 10%;">Aksi</th>
+                                    <th class="p-3 pl-4 w-5/12">Produk</th>
+                                    <th class="p-3 text-center w-24">Asli</th>
+                                    <th class="p-3 text-center w-32">Baru</th>
+                                    <th class="p-3 text-center w-16">Hapus</th>
                                 </tr>
                             </thead>
-                            <tbody id="request-items-container">
-                                {{-- Item asli akan dimuat di sini oleh JavaScript --}}
+                            <tbody id="request-items-container" class="divide-y divide-slate-100 bg-white">
+                                {{-- JS Injected Here --}}
                             </tbody>
                         </table>
                     </div>
-                    <button type="button" id="add-item-btn" class="btn btn-secondary btn-sm">
-                        <i class="bi bi-plus-circle me-1"></i> Tambah Item Baru
-                    </button>
+                    
                     {{-- Pesan error validasi JS --}}
-                    <div id="items-validation-error" class="text-danger small mt-2 d-none">Pastikan semua item baru sudah dipilih produknya.</div>
+                    <div id="items-validation-error" class="text-red-500 text-xs mt-2 hidden flex items-center gap-1 bg-red-50 p-2 rounded border border-red-100">
+                        <i class="material-icons text-[14px]">error</i> <span>Pastikan item valid.</span>
+                    </div>
                 </div>
 
-                {{-- TOMBOL SUBMIT --}}
-                <div class="d-flex justify-content-end mt-4">
-                    <a href="{{ route('client.sales-orders.show', $order->order_id) }}" class="btn btn-light me-2">Batal</a>
-                    <button type="submit" class="btn btn-primary">Kirim Permintaan</button>
+                <div class="border-t border-slate-100 mt-8 pt-6 flex justify-end gap-3">
+                    <a href="{{ route('client.sales-orders.show', $order->order_id) }}" class="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-600 font-bold hover:bg-slate-50 transition shadow-sm">Batal</a>
+                    <button type="submit" class="px-6 py-2.5 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-700 shadow-md transition transform hover:-translate-y-0.5 flex items-center gap-2">
+                        <i class="material-icons text-sm">send</i> Kirim Permintaan
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-{{-- TEMPLATE UNTUK BARIS ITEM (digunakan JavaScript) --}}
+{{-- TEMPLATE UNTUK BARIS ITEM (Hidden) --}}
 <template id="item-row-template">
-    <tr>
-        <td>
-            <select class="form-select form-select-sm product-select" disabled> {{-- Select dinamis --}}
+    <tr class="group hover:bg-slate-50 transition-colors">
+        <td class="p-3 pl-4">
+            {{-- CLASS KHUSUS: 'request-change-select' --}}
+            <select class="request-change-select w-full text-sm" disabled style="width: 100%;">
                 <option value="">-- Pilih Produk --</option>
                  @foreach ($products as $product)
                     <option value="{{ $product->product_id }}" data-price="{{ $product->selling_price ?? 0 }}">{{ $product->product_name }}</option>
                 @endforeach
             </select>
             <input type="hidden" class="product-id-hidden">
-             <input type="hidden" class="original-quantity-hidden">
-             <input type="hidden" class="action-hidden">
+            <input type="hidden" class="original-quantity-hidden">
+            <input type="hidden" class="action-hidden">
         </td>
-        <td class="text-center original-quantity-display">-</td>
-        <td><input type="number" class="form-control form-control-sm requested-quantity" value="1" min="0"></td> {{-- min="0" agar bisa dihapus --}}
-        <td class="text-center">
-            <button type="button" class="btn btn-danger btn-sm remove-item-btn"><i class="bi bi-trash"></i></button>
+        <td class="p-3 text-center text-slate-500 font-mono original-quantity-display bg-slate-50/50">-</td>
+        <td class="p-3 text-center">
+        <input type="number" 
+           class="form-input text-center h-9 requested-quantity w-20 mx-auto border-slate-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition" 
+           value="1" 
+           min="0" 
+           step="0.01">
+        </td>
+        <td class="p-3 text-center">
+            <button type="button" class="remove-item-btn text-slate-400 hover:text-red-500 transition p-1.5 rounded-full hover:bg-red-50">
+                <i class="material-icons text-[20px]">delete</i>
+            </button>
         </td>
     </tr>
 </template>
 @endsection
 
 @push('scripts')
-{{-- Select2 CSS & JS jika belum ada di layout utama --}}
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> {{-- Select2 butuh jQuery --}}
+{{-- Load Scripts Manual untuk menghindari konflik --}}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
@@ -120,163 +181,188 @@ document.addEventListener('DOMContentLoaded', function () {
     const itemRowTemplate = document.getElementById('item-row-template');
     const addItemBtn = document.getElementById('add-item-btn');
     const submitBtn = form.querySelector('button[type="submit"]');
-    const itemsValidationError = document.getElementById('items-validation-error'); // Elemen pesan error
+    const itemsValidationError = document.getElementById('items-validation-error');
 
-    // Data item order asli dari PHP
     const originalOrderItems = @json($order->items->keyBy('product_id'));
-    // const allProducts = @json($products->keyBy('product_id')); // Tidak perlu lagi jika select sudah di template
-    let itemIndex = 0; // Untuk penamaan input array
+    let itemIndex = 0;
 
-    // --- FUNGSI VALIDASI ---
+    // --- 1. VALIDASI FORM ---
     function validateForm() {
         let isValid = true;
-        itemsValidationError.classList.add('d-none'); // Sembunyikan error dulu
+        itemsValidationError.classList.add('hidden'); 
 
-        // Hanya validasi jika tipe 'modify' dipilih
         if (form.querySelector('input[name="request_type"]:checked').value === 'modify') {
             const itemRows = itemsContainer.querySelectorAll('tr');
+            
+            // Cek minimal 1 item
             if (itemRows.length === 0) {
-                 // Jika tidak ada item sama sekali saat modify, anggap tidak valid
                  isValid = false;
-                 itemsValidationError.textContent = 'Harap tambahkan setidaknya satu item.';
-                 itemsValidationError.classList.remove('d-none');
+                 itemsValidationError.querySelector('span').textContent = 'Harap tambahkan setidaknya satu item.';
+                 itemsValidationError.classList.remove('hidden');
             } else {
+                 // Cek kelengkapan setiap baris
                  itemRows.forEach(row => {
                      const action = row.querySelector('.action-hidden').value;
                      const productId = row.querySelector('.product-id-hidden').value;
-                     const selectEl = $(row.querySelector('.product-select'));
-
-                     // Item baru (action='add') wajib punya product_id
+                     
                      if (action === 'add' && !productId) {
                          isValid = false;
-                         selectEl.addClass('is-invalid'); // Beri border merah
-                         itemsValidationError.textContent = 'Pastikan semua item baru sudah dipilih produknya.';
-                         itemsValidationError.classList.remove('d-none');
-                     } else {
-                          selectEl.removeClass('is-invalid'); // Hapus border merah jika valid
+                         itemsValidationError.querySelector('span').textContent = 'Semua item baru harus dipilih produknya.';
+                         itemsValidationError.classList.remove('hidden');
                      }
                  });
             }
         }
-        // Aktifkan/nonaktifkan tombol submit berdasarkan validasi
+        
         submitBtn.disabled = !isValid;
+        if (!isValid) {
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            submitBtn.classList.remove('hover:bg-indigo-700', 'shadow-md', 'transform');
+        } else {
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            submitBtn.classList.add('hover:bg-indigo-700', 'shadow-md', 'transform');
+        }
     }
 
-    // --- FUNGSI UTAMA ---
-
+    // --- 2. TOGGLE SECTION ---
     function toggleModifySection() {
         if (form.querySelector('input[name="request_type"]:checked').value === 'modify') {
-            modifySection.classList.remove('d-none');
+            modifySection.classList.remove('hidden');
+            // Load original items only once
             if (itemsContainer.children.length === 0) {
                 loadOriginalItems();
             }
         } else {
-            modifySection.classList.add('d-none');
+            modifySection.classList.add('hidden');
         }
-        validateForm(); // Validasi ulang saat section berubah
+        validateForm();
     }
 
-    function addRequestItemRow(itemData = null, isNew = false) {
+    // --- 3. ADD ITEM ROW ---
+    function addRequestItemRow(itemData = null) {
         const templateClone = itemRowTemplate.content.cloneNode(true);
         const newRow = templateClone.querySelector('tr');
-        const productSelect = newRow.querySelector('.product-select');
+        
+        const productSelect = newRow.querySelector('.request-change-select');
         const quantityInput = newRow.querySelector('.requested-quantity');
         const originalQtyDisplay = newRow.querySelector('.original-quantity-display');
         const removeBtn = newRow.querySelector('.remove-item-btn');
+        
         const productIdHidden = newRow.querySelector('.product-id-hidden');
         const originalQtyHidden = newRow.querySelector('.original-quantity-hidden');
         const actionHidden = newRow.querySelector('.action-hidden');
 
+        // Naming for Laravel Array Validation
         productIdHidden.name = `items[${itemIndex}][product_id]`;
         quantityInput.name = `items[${itemIndex}][quantity]`;
         originalQtyHidden.name = `items[${itemIndex}][original_quantity]`;
         actionHidden.name = `items[${itemIndex}][action]`;
 
+        // Populate Data
         if (itemData) {
+            // EXISTING ITEM
             productSelect.value = itemData.product_id;
-            productSelect.disabled = true;
+            productSelect.disabled = true; // Existing items cannot change product, only qty
             originalQtyDisplay.textContent = itemData.quantity;
             quantityInput.value = itemData.quantity;
+            
             productIdHidden.value = itemData.product_id;
             originalQtyHidden.value = itemData.quantity;
-            actionHidden.value = 'update_qty';
+            actionHidden.value = 'update_qty'; // Default action
         } else {
+            // NEW ITEM
              productSelect.disabled = false;
-             originalQtyDisplay.textContent = 'Baru';
+             originalQtyDisplay.textContent = '-';
              quantityInput.value = 1;
+             
              productIdHidden.value = '';
-             originalQtyHidden.value = '';
+             originalQtyHidden.value = 0;
              actionHidden.value = 'add';
         }
 
         itemsContainer.appendChild(newRow);
 
-        // Inisialisasi Select2 hanya untuk baris baru atau jika tidak disabled
+        // --- INIT SELECT2 (FIXED: No dropdownParent) ---
+        // Hanya init select2 jika dropdown enable (untuk item baru)
+        // Item lama biarkan disabled select biasa (tidak perlu select2)
         if (!productSelect.disabled) {
-           const select2Instance = $(productSelect).select2({
-                 placeholder: '-- Pilih Produk --',
-                 theme: 'bootstrap-5',
-                 dropdownParent: $(productSelect).parent()
-            }).on('change', function() {
-                 productIdHidden.value = $(this).val();
-                 validateForm(); // Validasi saat produk dipilih
-            });
-        }
+   $(productSelect).select2({
+         placeholder: '-- Pilih Produk --',
+         width: '100%',
+         dropdownCssClass: 'select2-dropdown-clean', // Gunakan class custom
+         // theme: 'bootstrap-5', // HAPUS INI
+         // dropdownParent: ... // HAPUS INI
+    }).on('change', function() {
+         productIdHidden.value = $(this).val();
+         validateForm();
+    });
+}
 
+        // --- EVENTS ---
+        
+        // Qty Change Logic
         quantityInput.addEventListener('input', function() {
-             const requestedQty = parseInt(this.value);
-             const originalQty = parseInt(originalQtyHidden.value);
+             const requestedQty = parseInt(this.value) || 0;
+             const originalQty = parseInt(originalQtyHidden.value) || 0;
 
             if (actionHidden.value !== 'add') {
+                // Logic untuk item existing
                  if (requestedQty === 0) {
                      actionHidden.value = 'remove';
-                     newRow.classList.add('table-danger');
-                 } else { // Jika > 0, selalu 'update_qty' meskipun sama dengan asli
+                     newRow.classList.add('bg-red-50'); // Visual feedback item dihapus
+                     quantityInput.classList.add('text-red-600', 'font-bold');
+                 } else { 
                      actionHidden.value = 'update_qty';
-                     newRow.classList.remove('table-danger');
+                     newRow.classList.remove('bg-red-50');
+                     quantityInput.classList.remove('text-red-600', 'font-bold');
                  }
             } else {
+                // Logic untuk item baru
                  if (requestedQty === 0) {
-                     $(productSelect).select2('destroy');
+                     // Jika qty 0 untuk item baru, hapus barisnya
+                     if(!productSelect.disabled) $(productSelect).select2('destroy');
                      newRow.remove();
-                     validateForm(); // Validasi ulang setelah baris dihapus
+                     validateForm();
                  }
             }
         });
 
+        // Remove Button Logic
         removeBtn.addEventListener('click', function() {
             if (actionHidden.value === 'add') {
-                 $(productSelect).select2('destroy');
+                 // Item baru -> Hapus dari DOM
+                 if(!productSelect.disabled) $(productSelect).select2('destroy');
                  newRow.remove();
             } else {
+                 // Item lama -> Set Qty 0 (Soft Delete request)
                  quantityInput.value = 0;
-                 quantityInput.dispatchEvent(new Event('input'));
+                 quantityInput.dispatchEvent(new Event('input')); // Trigger logic di atas
             }
-            validateForm(); // Validasi ulang setelah item dihapus/ditandai hapus
+            validateForm();
         });
 
         itemIndex++;
-        validateForm(); // Validasi saat baris ditambahkan
+        validateForm();
     }
 
      function loadOriginalItems() {
         itemsContainer.innerHTML = '';
         itemIndex = 0;
         Object.values(originalOrderItems).forEach(item => {
-            addRequestItemRow(item, false);
+            addRequestItemRow(item);
         });
-        validateForm(); // Validasi setelah item asli dimuat
+        validateForm();
     }
 
-    // --- EVENT LISTENERS ---
+    // Listeners
     requestTypeRadios.forEach(radio => {
         radio.addEventListener('change', toggleModifySection);
     });
-    addItemBtn.addEventListener('click', () => addRequestItemRow(null, true));
+    
+    addItemBtn.addEventListener('click', () => addRequestItemRow());
 
-    // --- INISIALISASI ---
-    toggleModifySection(); // Panggil ini dulu untuk setup awal
-
+    // Init state
+    toggleModifySection();
 });
 </script>
 @endpush

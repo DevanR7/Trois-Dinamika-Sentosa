@@ -2,8 +2,8 @@
 
 namespace App\View\Composers;
 
-namespace App\View\Composers;
 use App\Models\Order; // Import model Order
+
 use Illuminate\View\View;
 use Illuminate\Support\Facades\Auth; // Import Auth jika perlu filter user
 
