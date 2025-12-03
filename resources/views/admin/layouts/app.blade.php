@@ -6,19 +6,19 @@
     <meta name="csrf-token" content="{{ csrf_token() }}" />
     <title>{{ config("app.name", "Aplikasi Internal") }}</title>
     
-    {{-- 1. FONTS & ICONS (Google Fonts Tetap Dipertahankan) --}}
+    {{-- 1. FONTS (KEMBALI KE INTER) --}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
 
-    {{-- 2. CSS Library (Hanya Tom Select CSS, sisanya via Vite) --}}
+    {{-- 2. CSS Library --}}
     <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
     
-    {{-- 3. VITE (Memanggil CSS Global & JS KHUSUS ADMIN) --}}
+    {{-- 3. VITE --}}
     @vite(["resources/css/admin/app.css", "resources/js/admin/app.js"])
     
-    {{-- 4. SCRIPT: DARK MODE ANTI-FLICKER --}}
+    {{-- 4. DARK MODE SCRIPT --}}
     <script>
         if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark')
@@ -26,50 +26,47 @@
             document.documentElement.classList.remove('dark')
         }
     </script>
-    
-    {{-- 5. SCRIPT: SIDEBAR PRELOADER --}}
+
+    {{-- 5. PREVENT FLICKER SCRIPT --}}
     <script>
         (function() {
-            const isLocked = localStorage.getItem('isSidebarLocked') === 'true';
+            const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
             const isDesktop = window.innerWidth >= 1024;
-            if (isLocked && isDesktop) {
-                document.write(`<style id="nuclear-sidebar-style">#mainSidebar, #mainSidebar.close { width: 260px !important; } .main-wrapper { margin-left: 260px !important; width: calc(100% - 260px) !important; }</style>`);
+            if (isCollapsed && isDesktop) {
+                document.write(`<style>.main-wrapper { margin-left: 70px !important; }</style>`);
             }
         })();
     </script>
 </head>
 
-<body class="bg-[#f8fafc] dark:bg-[#0f172a] transition-colors duration-300 font-sans antialiased text-slate-600 dark:text-slate-300">
+<body class="bg-[#f8fafc] dark:bg-[#0f172a] font-sans antialiased text-slate-600 dark:text-slate-300">
     
     @include('admin.layouts.sidebar') 
 
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 lg:hidden hidden transition-opacity backdrop-blur-sm"></div>
 
-    <main class="main-wrapper">
+    <main class="main-wrapper min-h-screen ml-0 lg:ml-[260px] flex flex-col transition-all duration-300">
         
         {{-- NAVBAR --}}
-        <nav class="top-navbar px-6 py-3 flex justify-between items-center h-16">
+        <nav class="sticky top-0 z-30 px-6 py-3 flex justify-between items-center h-16 bg-white/80 dark:bg-[#11121a]/90 backdrop-blur-md border-b border-slate-200 dark:border-[#222533]">
             <div class="flex items-center gap-4">
-                <button id="sidebar-toggle" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition lg:hidden">
-                    <i class="material-icons text-2xl">menu</i>
+                <button id="sidebar-toggle-mobile" class="lg:hidden p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+                    <i class="material-icons">menu</i>
                 </button>
-                <h1 class="text-lg font-bold text-slate-800 dark:text-slate-100 tracking-tight">
+                
+                <h1 class="text-lg font-bold text-slate-800 dark:text-white tracking-tight">
                     @yield('title', 'Dashboard')
                 </h1>
             </div>
 
             <div class="flex items-center gap-3">
-                
-                {{-- DARK MODE SWITCHER --}}
                 <div x-data>
-                    <button 
-                        @click="$store.darkMode.toggle()" 
-                        class="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-all duration-200 focus:outline-none flex items-center justify-center" title="Ganti Tema">
+                    <button @click="$store.darkMode.toggle()" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                         <i class="material-icons text-[22px]" x-show="$store.darkMode.on" style="display: none;">light_mode</i>
                         <i class="material-icons text-[22px]" x-show="!$store.darkMode.on">dark_mode</i>
                     </button>
                 </div>
-
+                
                 <div class="h-8 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
                 <div class="hidden md:flex flex-col items-end mr-2">
@@ -79,25 +76,20 @@
             </div>
         </nav>
 
-        <div class="main-content p-6">
+        <div class="flex-1 p-6">
             @yield("content")
         </div>
     </main>
     
-    {{-- GLOBAL NOTIFICATION HANDLER --}}
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Kita panggil safeToast setelah DOM siap, karena window.showToast di-init di app.js
             const fireSessionToast = (msg, type) => {
-                // Cek apakah window.showToast sudah ada (dari alert.js)
                 if (typeof window.showToast === 'function') {
                     window.showToast(msg, type);
                 } else {
-                    console.warn('Toast module belum dimuat, menampilkan alert standar');
                     alert(msg);
                 }
             };
-
             @if(session('success')) fireSessionToast("{{ session('success') }}", 'success'); @endif
             @if(session('error')) fireSessionToast("{{ session('error') }}", 'error'); @endif
             @if(session('info')) fireSessionToast("{{ session('info') }}", 'info'); @endif

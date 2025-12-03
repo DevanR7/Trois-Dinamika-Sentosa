@@ -2,7 +2,7 @@
 
 @section('content')
 
-    {{-- Header Text (Judul Halaman) --}}
+    {{-- HEADER TEXT --}}
     <div class="text-center mb-8">
         {{-- Teks Mobile --}}
         <div class="lg:hidden">
@@ -17,7 +17,7 @@
         </div>
     </div>
 
-    {{-- Alert Error --}}
+    {{-- ALERT ERROR --}}
     @if ($errors->any())
         <div class="flex p-3 mb-6 text-xs text-red-700 bg-red-50 rounded-lg border border-red-100 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300 items-center animate-enter">
             <i class="material-icons text-sm mr-2">error</i>
@@ -25,7 +25,7 @@
         </div>
     @endif
 
-    {{-- Form --}}
+    {{-- FORM --}}
     <form method="POST" action="{{ route('admin.login') }}" class="space-y-5">
         @csrf
 
@@ -90,6 +90,7 @@
             <span>Masuk dengan Google</span>
         </a>
 
+        {{-- Footer Link --}}
         <div class="text-center mt-6 pt-2">
             <p class="text-xs text-slate-400">
                 Klien Eksternal? 

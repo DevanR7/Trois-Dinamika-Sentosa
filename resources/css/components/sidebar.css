@@ -1,92 +1,175 @@
-/* ==========================================================================
-   SIDEBAR COMPONENT
-   ========================================================================== */
+/* resources/css/components/sidebar.css */
 
-/* Mencegah animasi saat load awal */
-.sidebar.preload, .sidebar.preload ~ .main-wrapper { transition: none !important; }
-
-.sidebar { 
-    @apply fixed top-0 left-0 h-full w-[260px] bg-[#0f172a] z-[999] flex flex-col border-r border-slate-800 shadow-2xl transition-all duration-300 ease-in-out overflow-x-hidden; 
-    @apply dark:border-r dark:border-slate-800;
+/* --- 1. SETUP VAR & BASE --- */
+:root {
+    --sidebar-width: 260px;
+    --sidebar-collapsed-width: 70px;
+    --bg-sidebar: #11121a;
+    --bg-hover: #1a1c29;
+    --text-primary: #e6e6ef;
+    --text-secondary: #b0b3c1;
+    --accent-color: #5e63ff;
+    --border-color: #222533;
 }
 
-/* State Lebar */
-.sidebar.close { @apply w-[80px]; }
-.sidebar.locked { @apply w-[260px]; }
-
-/* Container Menu */
-.sidebar .menu_container { 
-    @apply flex-1 overflow-y-auto py-2 overflow-x-hidden; 
-    scrollbar-width: none; 
-}
-.sidebar .menu_container::-webkit-scrollbar { display: none; }
-
-/* Logo Section */
-.logo_items { @apply flex items-center pt-6 pb-4 mb-2 h-[80px] pl-5 pr-2.5; }
-.logo_items .nav_image { 
-    /* Warna Background ditentukan di app.css induk (admin/client) */
-    @apply flex items-center justify-center flex-shrink-0 rounded-lg shadow-lg w-8 h-8 text-white; 
-}
-.logo_items .logo_text { @apply ml-3 whitespace-nowrap text-white font-bold text-lg tracking-tight; }
-
-/* Judul Group Menu */
-.menu_title { @apply mt-6 mb-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest opacity-80 pl-5 whitespace-nowrap; }
-
-/* Link Menu */
-.sidebar .link { @apply flex items-center w-full text-slate-400 mb-1 relative cursor-pointer border-l-[3px] border-transparent pl-5 pr-2.5 h-12 transition-all duration-200; }
-.sidebar .link:hover { @apply bg-slate-800/50 text-white; }
-
-/* Link Active: Warna border dan icon akan di-override di app.css induk */
-.sidebar .link.active { @apply bg-slate-800 text-white pl-[17px]; }
-.sidebar .link i { @apply flex items-center justify-center text-[20px] text-slate-500 w-10 h-10 mr-0 transition-colors; }
-
-.sidebar .link span { @apply ml-3 text-[13px] font-medium whitespace-nowrap transition-opacity duration-300; }
-
-/* State Visibility saat Close/Locked */
-.sidebar.close .logo_text, .sidebar.close .link span, .sidebar.close .dropdown-icon, .sidebar.close .profile_text, .sidebar.close #sidebar-close, .sidebar.close #lock-icon { 
-    @apply opacity-0 invisible absolute w-0 pointer-events-none; 
-}
-.sidebar.close .menu_title { @apply h-[1px] bg-slate-700/50 my-4 mx-auto p-0 opacity-100 w-[40px] text-[0] pl-0; }
-
-.sidebar.locked .logo_text, .sidebar.locked .link span, .sidebar.locked .dropdown-icon, .sidebar.locked .profile_text, .sidebar.locked #lock-icon,
-.sidebar.hover-expand .logo_text, .sidebar.hover-expand .link span, .sidebar.hover-expand .dropdown-icon, .sidebar.hover-expand .profile_text, .sidebar.hover-expand #lock-icon, .sidebar.hover-expand #sidebar-close {
-    @apply opacity-100 visible static w-auto pointer-events-auto delay-75;
-    display: flex !important;
+.sidebar {
+    position: fixed;
+    top: 0; left: 0; height: 100%;
+    width: var(--sidebar-width);
+    background-color: var(--bg-sidebar);
+    border-right: 1px solid var(--border-color);
+    z-index: 50;
+    display: flex; flex-direction: column;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap; 
 }
 
-.sidebar.hover-expand { width: 260px !important; box-shadow: 4px 0 24px rgba(0,0,0,0.3); }
-.sidebar.hover-expand .menu_title { @apply h-auto bg-transparent mt-6 mb-2 w-auto text-[10px] pl-5 opacity-100 visible; }
+.sidebar.collapsed { width: var(--sidebar-collapsed-width); }
 
-/* Submenu / Dropdown */
-.dropdown-icon { @apply ml-auto text-[16px] opacity-70 pr-2 transition-transform duration-300; }
-.submenu { @apply flex flex-col bg-slate-900/50 overflow-hidden transition-all duration-300 ease-in-out; max-height: 0; opacity: 0; }
-.has-submenu.open .submenu { max-height: 500px; opacity: 1; }
-.has-submenu.open .dropdown-icon { transform: rotate(90deg); }
-.submenu .link { @apply h-9 mb-0 border-l-0 text-slate-500 pl-[60px] text-[13px]; }
-.submenu .link.active { @apply bg-transparent font-semibold pl-[60px]; /* Warna teks dihandle induk */ }
-.sidebar.close .submenu { display: none !important; }
-.sidebar.hover-expand .submenu { display: flex !important; }
-
-/* Sidebar Footer / Profile */
-.sidebar_profile { @apply relative p-0 border-t border-slate-800 mt-auto; }
-.profile_trigger { @apply w-full flex items-center gap-0 cursor-pointer hover:bg-slate-800/50 py-3 pl-5 pr-2.5; }
-.profile_trigger .avatar-wrapper { @apply flex items-center justify-center rounded-full border-2 border-slate-700 overflow-hidden w-9 h-9 ml-[2px]; }
-.profile_text { @apply ml-3 whitespace-nowrap text-slate-300 text-sm font-medium; }
-
-/* Layout Wrapper Utama */
-.main-wrapper { 
-    @apply relative min-h-screen flex flex-col ml-[260px] w-[calc(100%-260px)] transition-all duration-300;
-    @apply bg-[#f8fafc] dark:bg-[#0f172a];
+/* --- 2. TEKS & HEADER SECTION (PERBAIKAN ISSUE 1) --- */
+.sidebar-text, .logo-text, .menu-title-text, .badge-info, .dropdown-arrow {
+    opacity: 1;
+    transition: opacity 0.2s ease;
 }
-.sidebar.close ~ .main-wrapper { margin-left: 80px; width: calc(100% - 80px); }
 
-/* Responsive Mobile (Max Width 1023px) */
+/* Saat collapsed, elemen teks di dalam link hilang */
+.sidebar.collapsed .sidebar-text,
+.sidebar.collapsed .logo-text,
+.sidebar.collapsed .dropdown-arrow {
+    opacity: 0;
+    pointer-events: none;
+    display: none; /* Display none agar layout icon ke tengah sempurna */
+}
+
+/* KHUSUS JUDUL KATEGORI (Operasional, Transaksi, dll) */
+/* Kita hilangkan seluruh baris <li> section-header */
+.sidebar.collapsed .section-header {
+    display: none !important;
+}
+
+/* Header Logo & Toggle */
+.sidebar.collapsed .logo-wrapper { display: none !important; }
+.sidebar.collapsed .sidebar-header { justify-content: center !important; padding: 0 !important; }
+.sidebar.collapsed #toggle-sidebar-btn { margin: 0 auto; width: 40px; height: 40px; border-radius: 8px; }
+.sidebar.collapsed #toggle-icon { transform: rotate(180deg); }
+
+
+/* --- 3. MENU ITEM (KOTAK PERSEGI) --- */
+.menu-link {
+    display: flex; align-items: center; position: relative;
+    margin-bottom: 4px; min-height: 44px; 
+    transition: all 0.2s ease;
+}
+
+.sidebar.collapsed .menu-link {
+    justify-content: center !important;
+    padding: 0 !important;
+    width: 44px !important; height: 44px !important;
+    margin: 4px auto !important;
+    border-radius: 8px;
+}
+.sidebar.collapsed .icon-container {
+    margin-right: 0 !important; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+}
+.sidebar.collapsed .profile-wrapper { justify-content: center; padding: 0; }
+.sidebar.collapsed .profile-wrapper .sidebar-text { display: none; }
+
+
+/* --- 4. FLOATING SUBMENU (PERBAIKAN ISSUE 2) --- */
+.submenu {
+    overflow: hidden; background-color: #151720; transition: all 0.3s ease;
+}
+
+/* Container parent relative agar submenu nempel ke sini */
+.sidebar.collapsed .menu-item { position: relative; }
+
+.sidebar.collapsed .submenu {
+    position: absolute;
+    /* Geser menu sedikit menjauh (misal 5px dari sidebar) */
+    left: calc(100% + 5px); 
+    top: 0;
+    min-width: 220px;
+    background-color: var(--bg-sidebar);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+    z-index: 100;
+    
+    display: block !important; visibility: hidden; opacity: 0;
+    transform: translateX(-10px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* JEMBATAN TRANSPARAN (FIX MOUSE LEPAS) */
+/* Ini membuat area tak terlihat antara sidebar dan menu, sehingga mouse dianggap masih 'hover' */
+.sidebar.collapsed .submenu::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -20px; /* Tarik ke kiri sejauh 20px agar menempel ke icon sidebar */
+    width: 20px; /* Lebar jembatan */
+    height: 100%;
+    background: transparent; /* Tidak terlihat */
+}
+
+/* Trigger Hover */
+.sidebar.collapsed .menu-item:hover .submenu {
+    visibility: visible; opacity: 1; transform: translateX(0);
+}
+
+/* Header Popup */
+.sidebar.collapsed .submenu::before {
+    content: attr(data-label);
+    display: block; padding: 12px 16px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-color);
+    background-color: #0b0c11; border-radius: 8px 8px 0 0;
+}
+
+/* TAMPILKAN TEKS DI DALAM POPUP */
+.sidebar.collapsed .submenu .sidebar-text {
+    display: block !important; opacity: 1 !important;
+    pointer-events: auto !important; margin-left: 0;
+}
+
+/* --- 5. ACTIVE STATES --- */
+.menu-link.active-parent { background-color: var(--bg-hover); color: var(--accent-color); }
+.menu-link.active-parent::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background-color: var(--accent-color);
+    border-top-right-radius: 4px; border-bottom-right-radius: 4px; display: block;
+}
+.sidebar.collapsed .menu-link.active-parent::before { display: none; }
+
+.submenu-link {
+    display: flex; align-items: center; padding: 10px 16px;
+    color: var(--text-secondary); font-size: 0.875rem; transition: color 0.2s; white-space: nowrap;
+}
+.submenu-link:hover { color: #fff; }
+.submenu-link .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background-color: #475569; margin-right: 12px; flex-shrink: 0; transition: all 0.3s ease;
+}
+.submenu-link.active { color: #fff; font-weight: 500; }
+.submenu-link.active .dot { background-color: var(--accent-color); box-shadow: 0 0 8px rgba(94, 99, 255, 0.6); transform: scale(1.2); }
+
+
+/* --- 6. SCROLLBAR --- */
+.sidebar-scroll { overflow-y: auto; overflow-x: hidden; height: 100%; padding-bottom: 20px; }
+.sidebar.collapsed .sidebar-scroll { overflow-x: visible; } /* Penting agar popup visible */
+.sidebar-scroll::-webkit-scrollbar { width: 4px; }
+.sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background-color: #334155; border-radius: 20px; }
+
+/* --- 7. MOBILE --- */
 @media (max-width: 1023px) {
-    .sidebar { transform: translateX(-100%); width: 280px !important; }
-    .sidebar.mobile-open { transform: translateX(0) !important; box-shadow: 4px 0 24px rgba(0,0,0,0.3); }
-    .main-wrapper { margin-left: 0 !important; width: 100% !important; }
-    .sidebar.mobile-open .logo_text, .sidebar.mobile-open .link span, .sidebar.mobile-open .dropdown-icon, .sidebar.mobile-open .profile_text, .sidebar.mobile-open #sidebar-close { 
-        @apply opacity-100 visible static w-auto pointer-events-auto flex; 
+    .sidebar { transform: translateX(-100%); width: 260px !important; }
+    .sidebar.mobile-open { transform: translateX(0); }
+    .sidebar.collapsed .submenu {
+        position: static; width: auto; border: none; box-shadow: none;
+        visibility: visible; opacity: 1; transform: none; display: none;
     }
-    #lock-icon { display: none !important; }
+    .sidebar.collapsed .submenu.hidden { display: none !important; }
 }

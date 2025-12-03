@@ -2,27 +2,29 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 body {
+    /* Mengizinkan scroll jika konten panjang, mencegah scroll horizontal */
     overflow-y: auto; 
     overflow-x: hidden;
     min-height: 100vh;
 }
 
-/* Transisi halus */
-body, .login-card, .input-area, button, input {
-    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+/* Transisi Halus (Smoothness) untuk Dark Mode */
+body, .login-card, input, button, .login-logo, h1, h2, h4, p, span {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease;
 }
 
+/* Konfigurasi Partikel agar selalu di belakang */
 #particles-bg {
     position: fixed;
     width: 100%;
     height: 100%;
     top: 0;
     left: 0;
-    z-index: 0;
+    z-index: 0; 
     pointer-events: none;
 }
 
-/* --- TAMBAHAN: ANIMASI CARD MASUK --- */
+/* Keyframes Animasi Masuk (Fade Up) */
 @keyframes fadeInUp {
     from {
         opacity: 0;
@@ -38,5 +40,5 @@ body, .login-card, .input-area, button, input {
     animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Mencegah kedip pada AlpineJS */
+/* Utility untuk menyembunyikan elemen sebelum AlpineJS load */
 [x-cloak] { display: none !important; }

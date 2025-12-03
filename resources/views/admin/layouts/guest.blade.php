@@ -26,13 +26,13 @@
 </head>
 <body class="min-h-screen w-full font-sans antialiased text-slate-600 dark:text-slate-300 flex items-center justify-center bg-slate-50 dark:bg-[#0b1120] py-10 px-4 overflow-x-hidden">
 
-    {{-- PARTIKEL --}}
+    {{-- 1. PARTIKEL --}}
     <div id="particles-bg"></div>
 
-    {{-- CARD WRAPPER --}}
+    {{-- 2. CARD WRAPPER --}}
     <div class="login-card animate-enter relative w-full max-w-[1000px] min-h-[600px] h-auto bg-white dark:bg-[#1e293b] rounded-2xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-2 z-10">
         
-        {{-- PANEL KIRI (BRANDING DESKTOP) --}}
+        {{-- A. PANEL KIRI (BRANDING) --}}
         <div class="hidden lg:flex flex-col justify-between p-12 bg-[#0f172a] text-white h-full relative">
             <div class="flex items-center gap-3">
                 <img src="{{ asset('images/TDS-side-text.png') }}" alt="Logo" class="h-8 w-auto brightness-0 invert">
@@ -60,24 +60,26 @@
             </div>
         </div>
 
-        {{-- PANEL KANAN (CONTAINER KONTEN) --}}
-        {{-- Semua padding layout dan tombol dark mode ada di sini --}}
+        {{-- B. PANEL KANAN (CONTAINER FORM) --}}
         <div class="relative p-8 md:p-12 flex flex-col justify-center bg-white dark:bg-[#151f32] h-full transition-colors duration-300">
             
-            {{-- TOMBOL DARK MODE --}}
+            {{-- TOMBOL DARK MODE (Bulat Sempurna) --}}
             <div class="absolute top-6 right-6 z-20" x-data x-cloak>
-                <button @click="$store.darkMode.toggle()" class="w-10 h-10 p-0 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-yellow-400 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all focus:outline-none shadow-sm hover:shadow-md leading-none" title="Ganti Tema">
+                <button 
+                    @click="$store.darkMode.toggle()" 
+                    class="w-10 h-10 p-0 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-yellow-400 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all focus:outline-none shadow-sm hover:shadow-md leading-none" 
+                    title="Ganti Tema">
                     <i class="material-icons text-xl leading-none" x-show="!$store.darkMode.on">dark_mode</i>
                     <i class="material-icons text-xl leading-none" x-show="$store.darkMode.on" style="display: none;">light_mode</i>
                 </button>
             </div>
 
-            {{-- HEADER MOBILE (Logo Gambar dipindah kesini agar Login bersih) --}}
+            {{-- GAMBAR LOGO MOBILE (Dipindah kesini agar Login blade bersih) --}}
             <div class="lg:hidden text-center mb-4">
                 <img src="{{ asset('images/TDS-favicon.png') }}" alt="Logo" class="h-12 w-auto mx-auto mb-3 drop-shadow-md">
             </div>
 
-            {{-- SLOT UTAMA: Disini Login/Register disuntikkan --}}
+            {{-- YIELD CONTENT --}}
             @yield('content')
         </div>
 
@@ -85,10 +87,10 @@
 
     @stack('scripts')
     
-    {{-- Scripts Particles & Clock --}}
     <script src="https://cdn.jsdelivr.net/npm/tsparticles@2/tsparticles.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // Jam
             function updateClock() {
                 const now = new Date();
                 const timeEl = document.getElementById('clock-time');
@@ -103,6 +105,7 @@
             setInterval(updateClock, 1000);
             updateClock();
 
+            // Partikel
             const particleEl = document.getElementById("particles-bg");
             if(particleEl) {
                 tsParticles.load("particles-bg", {
