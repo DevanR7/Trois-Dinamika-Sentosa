@@ -17,11 +17,11 @@ return new class extends Migration
             $table->string('npwp', 30)->nullable();
             $table->string('bank_name', 50)->nullable();
             $table->string('account_number', 50)->nullable();
-            $table->softDeletes(); // Langsung ditambahkan di sini
+            $table->softDeletes();
             $table->timestamps();
         });
     }
-
+    
     public function down(): void
     {
         Schema::dropIfExists('suppliers');

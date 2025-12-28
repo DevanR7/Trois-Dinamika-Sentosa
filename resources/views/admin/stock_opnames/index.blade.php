@@ -1,144 +1,142 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Riwayat Stock Opname')
+@section('title', 'Stock Opname')
 
 @section('content')
-<div class="max-w-7xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-end gap-4 mb-8">
+
+    {{-- HEADER & ACTIONS --}}
+    <div class="page-header">
         <div>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Riwayat Stock Opname</h1>
-            <p class="text-slate-500 text-sm mt-1">Audit dan penyesuaian stok gudang secara berkala.</p>
+            <h1 class="page-title">Stock Opname</h1>
+            <p class="page-subtitle">Penyesuaian stok fisik dan sistem.</p>
         </div>
-        
-        <div class="flex gap-3 w-full sm:w-auto">
-            <a href="{{ route('admin.stock-opnames.worksheet') }}" 
-               class="flex-1 sm:flex-none h-[48px] px-6 bg-white border border-slate-300 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all shadow-sm flex items-center justify-center gap-2">
-                <i class="material-icons text-[18px]">print</i> Cetak Worksheet
+        <div class="flex items-center gap-3">
+            {{-- Tombol Download Worksheet (PDF) --}}
+            <a href="{{ route('admin.stock-opnames.worksheet') }}" target="_blank" class="btn btn-secondary">
+                <i class="material-icons text-sm mr-1">print</i> Download Lembar Kerja
             </a>
-            <a href="{{ route('admin.stock-opnames.create') }}" 
-               class="flex-1 sm:flex-none h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2">
-                <i class="material-icons text-[20px]">add</i> Mulai Opname
+            
+            <a href="{{ route('admin.stock-opnames.create') }}" class="btn btn-primary">
+                <i class="material-icons text-sm mr-1">add</i> Input Opname
             </a>
         </div>
     </div>
 
-    {{-- TABLE CARD --}}
-    <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
-        <div class="overflow-x-auto">
-            <table class="dashboard-table min-w-full">
-                <thead class="bg-slate-50 border-b border-slate-200">
+    {{-- TABLE LIST --}}
+    <div class="card">
+        <div class="table-container">
+            <table class="table-modern">
+                <thead>
                     <tr>
-                        <th class="pl-6 w-[15%]">No. Opname</th>
-                        <th class="w-[15%]">Tanggal</th>
-                        <th class="w-[20%]">Petugas</th>
-                        <th class="w-[20%]">Catatan</th>
-                        <th class="text-right w-[15%]">Nilai Penyesuaian</th>
-                        <th class="text-center w-[10%]">Status</th>
-                        <th class="text-center pr-6 w-[10%]">Aksi</th>
+                        <th>No. Opname</th>
+                        <th>Tanggal</th>
+                        <th>Petugas</th>
+                        <th>Catatan</th>
+                        <th class="text-right">Nilai Penyesuaian</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-center w-36">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-slate-100">
+                <tbody>
                     @forelse($opnames as $opname)
-                    <tr class="hover:bg-slate-50/50 transition-colors group">
-                        <td class="pl-6 py-4">
-                            <span class="text-sm font-bold text-indigo-600 font-mono group-hover:text-indigo-700 transition-colors">
+                        <tr>
+                            <td class="font-medium text-slate-700 dark:text-slate-200">
                                 {{ $opname->opname_number }}
-                            </span>
-                        </td>
-                        <td class="py-4">
-                            <div class="flex items-center gap-2 text-slate-600 text-sm">
-                                <i class="material-icons text-slate-400 text-[16px]">event</i>
+                            </td>
+                            <td>
                                 {{ $opname->opname_date->format('d M Y') }}
-                            </div>
-                        </td>
-                        <td class="py-4">
-                            <div class="flex items-center gap-2">
-                                <div class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 border border-slate-200 text-xs font-bold">
-                                    {{ substr($opname->user->full_name ?? 'S', 0, 1) }}
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold">
+                                        {{ substr($opname->user->full_name ?? 'U', 0, 1) }}
+                                    </div>
+                                    <span class="text-xs">{{ Str::limit($opname->user->full_name ?? '-', 15) }}</span>
                                 </div>
-                                <span class="text-sm text-slate-700 font-medium truncate max-w-[120px]">
-                                    {{ $opname->user->full_name ?? 'System' }}
+                            </td>
+                            <td class="text-xs text-slate-500 italic">
+                                {{ Str::limit($opname->notes, 30) ?? '-' }}
+                            </td>
+                            <td class="text-right font-mono text-sm">
+                                @php
+                                    $val = $opname->total_adjustment_value;
+                                    $color = $val > 0 ? 'text-emerald-600' : ($val < 0 ? 'text-rose-600' : 'text-slate-500');
+                                    $prefix = $val > 0 ? '+' : '';
+                                @endphp
+                                <span class="{{ $color }}">
+                                    {{ $prefix }} Rp {{ number_format($val, 0, ',', '.') }}
                                 </span>
-                            </div>
-                        </td>
-                        <td class="py-4">
-                            <span class="text-sm text-slate-500 italic truncate max-w-[150px] block" title="{{ $opname->notes }}">
-                                {{ $opname->notes ?: '-' }}
-                            </span>
-                        </td>
-                        <td class="text-right py-4">
-                            <span class="text-sm font-bold font-mono {{ $opname->total_adjustment_value < 0 ? 'text-red-600' : ($opname->total_adjustment_value > 0 ? 'text-emerald-600' : 'text-slate-400') }}">
-                                {{ $opname->total_adjustment_value > 0 ? '+' : '' }} Rp {{ number_format($opname->total_adjustment_value, 0, ',', '.') }}
-                            </span>
-                        </td>
-                        <td class="text-center py-4">
-                            @php 
-                                $isComplete = $opname->status == 'completed';
-                                $class = $isComplete ? 'status-completed' : 'status-draft';
-                                $icon = $isComplete ? 'verified' : 'edit_note';
-                                $label = $isComplete ? 'Selesai' : ucfirst($opname->status);
-                            @endphp
-                            <span class="status-badge {{ $class }}">
-                                <i class="material-icons text-[12px]">{{ $icon }}</i> {{ $label }}
-                            </span>
-                        </td>
-                        <td class="text-center pr-6 py-4">
-                            <div class="flex justify-center gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                                <a href="{{ route('admin.stock-opnames.show', $opname->opname_id) }}" 
-                                   class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm" 
-                                   title="Detail">
-                                    <i class="material-icons text-[16px]">visibility</i>
-                                </a>
-                                
-                                {{-- Global Delete Handler --}}
-                                <form action="{{ route('admin.stock-opnames.destroy', $opname->opname_id) }}" method="POST" class="delete-form">
-                                    @csrf @method('DELETE')
-                                    <button type="submit" 
-                                            data-name="Opname {{ $opname->opname_number }}"
-                                            data-title="Batalkan Opname?"
-                                            data-text="Stok akan dikembalikan dan jurnal dihapus. Aksi ini permanen."
-                                            data-btn-text="Ya, Batalkan"
-                                            class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 transition-all shadow-sm" 
-                                            title="Batalkan">
-                                        <i class="material-icons text-[16px]">cancel</i>
+                            </td>
+                            <td class="text-center">
+                                @if($opname->status == 'completed')
+                                    <span class="badge badge-success">Selesai</span>
+                                @elseif($opname->status == 'draft')
+                                    <span class="badge badge-warning">Draft</span>
+                                @else
+                                    <span class="badge badge-danger">Batal</span>
+                                @endif
+                            </td>
+                            <td class="text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <a href="{{ route('admin.stock-opnames.show', $opname->opname_id) }}" 
+                                       class="w-8 h-8 rounded-full flex items-center justify-center bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 transition-colors shadow-sm dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400"
+                                       title="Detail">
+                                        <i class="material-icons text-[18px] leading-none">visibility</i>
+                                    </a>
+
+                                    {{-- Hapus hanya jika perlu (biasanya opname jarang dihapus untuk audit trail) --}}
+                                    <button type="button" onclick="confirmDelete('{{ $opname->opname_id }}')" 
+                                            class="w-8 h-8 rounded-full flex items-center justify-center bg-rose-50 border border-transparent text-rose-600 hover:bg-rose-600 hover:text-white transition-colors shadow-sm dark:bg-rose-900/30 dark:text-rose-400"
+                                            title="Hapus">
+                                        <i class="material-icons text-[18px] leading-none">delete</i>
                                     </button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="7" class="py-16 text-center">
-                            <div class="flex flex-col items-center justify-center text-slate-400">
-                                <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                                    <i class="material-icons text-3xl opacity-30">history</i>
+                                    
+                                    <form id="delete-form-{{ $opname->opname_id }}" 
+                                          action="{{ route('admin.stock-opnames.destroy', $opname->opname_id) }}" 
+                                          method="POST" class="hidden">
+                                        @csrf
+                                        @method('DELETE')
+                                    </form>
                                 </div>
-                                <h3 class="text-slate-800 font-bold text-lg">Belum ada riwayat</h3>
-                                <p class="text-sm mt-1 max-w-xs">Belum ada Stock Opname yang dilakukan.</p>
-                                <a href="{{ route('admin.stock-opnames.create') }}" class="mt-4 text-indigo-600 font-bold text-sm hover:underline">Mulai Opname Baru</a>
-                            </div>
-                        </td>
-                    </tr>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="7" class="text-center p-8">
+                                <div class="flex flex-col items-center justify-center text-slate-400">
+                                    <i class="material-icons text-5xl mb-2">assignment_late</i>
+                                    <span>Belum ada data Stock Opname.</span>
+                                </div>
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
+        <div class="card-footer">
+            {{ $opnames->links() }}
+        </div>
     </div>
-    
-    <div class="mt-6">
-        {{ $opnames->links() }}
-    </div>
-</div>
+
 @endsection
 
 @push('scripts')
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Toast Handler only (Delete logic via Global app.js)
-        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
-        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
-    });
+    function confirmDelete(id) {
+        window.confirmDialog({
+            title: 'Hapus Opname?',
+            text: "Data stok akan dikembalikan ke posisi sebelum opname ini dilakukan. Jurnal akuntansi juga akan dihapus.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('delete-form-' + id).submit();
+            }
+        });
+    }
 </script>
 @endpush

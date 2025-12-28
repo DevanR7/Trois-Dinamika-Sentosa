@@ -1,69 +1,82 @@
 <!DOCTYPE html>
-<html lang="id">
+<html>
 <head>
-    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <title>Lembar Kerja Stock Opname</title>
     <style>
-        body { font-family: sans-serif; font-size: 12px; }
-        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        body { font-family: sans-serif; font-size: 12px; color: #333; }
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
         .header h1 { margin: 0; font-size: 18px; text-transform: uppercase; }
-        .header p { margin: 5px 0 0; }
+        .header p { margin: 5px 0 0; font-size: 11px; }
         
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #000; padding: 6px 8px; text-align: left; }
-        th { background-color: #f0f0f0; font-weight: bold; text-align: center; }
+        .meta { width: 100%; margin-bottom: 20px; }
+        .meta td { padding: 4px; }
+        .meta-label { font-weight: bold; width: 100px; }
         
-        /* Kolom Fisik dikosongkan/dibesarkan agar mudah ditulis tangan */
-        .col-fisik { width: 15%; } 
-        .col-ket { width: 20%; }
+        table.data { width: 100%; border-collapse: collapse; }
+        table.data th, table.data td { border: 1px solid #999; padding: 6px 8px; }
+        table.data th { background-color: #eee; text-align: left; font-weight: bold; text-transform: uppercase; font-size: 10px; }
         
-        .footer { margin-top: 30px; width: 100%; }
-        .signature { width: 30%; float: right; text-align: center; }
-        .signature-line { border-bottom: 1px solid #000; margin-top: 50px; }
+        .col-check { width: 30px; text-align: center; }
+        .col-code { width: 80px; }
+        .col-name { }
+        .col-unit { width: 50px; text-align: center; }
+        .col-qty { width: 120px; } /* Area kosong untuk tulis tangan */
         
-        .page-number:before { content: counter(page); }
+        .footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; font-size: 10px; color: #777; border-top: 1px solid #ddd; padding-top: 5px; }
     </style>
 </head>
 <body>
 
     <div class="header">
         <h1>Lembar Kerja Stock Opname</h1>
-        <p>Tanggal Cetak: {{ $date->format('d F Y H:i') }}</p>
+        <p>{{ config('app.name') }}</p>
     </div>
 
-    <table width="100%">
+    <table class="meta">
+        <tr>
+            <td class="meta-label">Tanggal Cetak:</td>
+            <td>{{ now()->format('d F Y, H:i') }}</td>
+            <td class="meta-label">Petugas:</td>
+            <td>_______________________</td>
+        </tr>
+        <tr>
+            <td class="meta-label">Lokasi/Gudang:</td>
+            <td>Semua Gudang</td>
+            <td class="meta-label">Validator:</td>
+            <td>_______________________</td>
+        </tr>
+    </table>
+
+    <table class="data">
         <thead>
             <tr>
-                <th style="width: 5%;">No</th>
-                <th style="width: 15%;">Kode Barang</th>
-                <th style="width: 35%;">Nama Produk</th>
-                <th style="width: 10%;">Satuan</th>
-                <th style="width: 10%;">Stok Sistem</th>
-                <th class="col-fisik">Stok Fisik (Isi)</th>
-                <th class="col-ket">Keterangan</th>
+                <th class="col-check">Cek</th>
+                <th class="col-code">Kode</th>
+                <th class="col-name">Nama Barang</th>
+                <th class="col-unit">Satuan</th>
+                <th class="col-qty">Stok Sistem</th>
+                <th class="col-qty">Stok Fisik (Isi)</th>
             </tr>
         </thead>
         <tbody>
             @foreach($products as $product)
-            <tr>
-                <td style="text-align: center;">{{ $loop->iteration }}</td>
-                <td>{{ $product->product_code }}</td>
-                <td>{{ $product->product_name }}</td>
-                <td style="text-align: center;">{{ $product->unit->name ?? '-' }}</td>
-                <td style="text-align: center;">{{ $product->stock_quantity }}</td>
-                <td></td> {{-- Kosong untuk tulis tangan --}}
-                <td></td> {{-- Kosong untuk keterangan --}}
-            </tr>
+                <tr>
+                    <td class="col-check">□</td>
+                    <td class="col-code">{{ $product->product_code }}</td>
+                    <td class="col-name">{{ $product->product_name }}</td>
+                    <td class="col-unit">{{ $product->unit->name ?? '-' }}</td>
+                    <td style="text-align: right; color: #777;">
+                        {{ number_format($product->stock_quantity, 0, ',', '.') }}
+                    </td>
+                    <td></td> {{-- Kolom kosong untuk ditulis --}}
+                </tr>
             @endforeach
         </tbody>
     </table>
 
     <div class="footer">
-        <div class="signature">
-            <p>Dihitung Oleh:</p>
-            <div class="signature-line"></div>
-            <p>( Petugas Gudang )</p>
-        </div>
+        Dicetak otomatis oleh Sistem pada {{ now()->format('d/m/Y H:i') }} | Halaman <span class="page-number"></span>
     </div>
 
 </body>

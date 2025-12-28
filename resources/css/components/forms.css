@@ -1,128 +1,117 @@
-/* ==========================================================================
-   FORMS & INPUTS (FLOWBITE STANDARD)
-   ========================================================================== */
+/* resources/css/components/forms.css */
 
-/* 1. RESET TYPOGRAPHY FOR INPUTS */
-/* Memastikan semua input menggunakan font yang sama dengan body */
-input, textarea, select, button {
-    font-family: inherit;
-}
+@layer components {
 
-/* 2. STANDARD FORM CONTROL (Match Flowbite) */
-/* Gunakan class ini di elemen <input> manual Anda */
-.form-control {
-    @apply bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5 transition-colors duration-200;
-    @apply focus:ring-1 focus:outline-none;
-    /* Dark Mode */
-    @apply dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white;
-}
+    /* 1. STANDARD INPUT STYLE (Menggantikan .form-control & .form-input lama) */
+    .form-input,
+    .form-select, 
+    .form-textarea,
+    .form-control /* Backward compatibility */ {
+        @apply bg-white border border-slate-300 text-slate-700 text-sm rounded-xl
+               block w-full px-4 py-2.5 transition-all duration-200 shadow-sm;
+        @apply placeholder:text-slate-400 placeholder:font-light;
+        @apply dark:bg-slate-800 dark:border-slate-600 dark:placeholder-slate-500
+               dark:text-slate-200;
+        
+        line-height: 1.5;
+    }
 
-/* Focus State: Warna ring/border akan diambil dari config 'primary' di app.css (indigo/emerald) */
-.form-control:focus {
-    @apply border-primary-500 ring-primary-500;
-}
+    /* 2. FOCUS STATES */
+    .form-input:focus,
+    .form-select:focus,
+    .form-textarea:focus,
+    .form-control:focus {
+        @apply ring-4 ring-indigo-500/10 border-indigo-500 outline-none;
+        @apply dark:ring-indigo-500/20 dark:border-indigo-400;
+    }
 
-/* Label Style */
-.form-label {
-    @apply block mb-2 text-sm font-medium text-gray-900 dark:text-white;
-}
+    /* 3. DISABLED STATE */
+    .form-input:disabled,
+    .form-select:disabled,
+    .form-textarea:disabled,
+    .form-control:disabled {
+        @apply bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200 shadow-none;
+        @apply dark:bg-slate-900 dark:border-slate-800 dark:text-slate-500;
+    }
 
+    /* 4. ERROR STATE */
+    .form-input.is-invalid,
+    .form-select.is-invalid,
+    .form-control.is-invalid {
+        @apply border-red-500 text-red-600 focus:ring-red-500/10 focus:border-red-500;
+        @apply dark:border-red-500 dark:text-red-400;
+    }
+    
+    .invalid-feedback {
+        @apply mt-1.5 text-xs text-red-500 dark:text-red-400 font-medium flex items-center gap-1;
+    }
 
-/* ==========================================================================
-   TOM SELECT OVERRIDES (To Match Flowbite Design)
-   ========================================================================== */
+    /* 5. LABELS */
+    .form-label {
+        @apply block mb-2 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide;
+    }
 
-/* Wrapper Utama Input */
-.ts-control {
-    @apply bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5 shadow-none transition-colors !important;
-    @apply dark:bg-gray-700 dark:border-gray-600 dark:text-white;
-    min-height: 42px; /* Samakan tinggi dengan input standar */
-    display: flex; 
-    align-items: center;
-    padding-right: 2rem !important; /* Space for arrow */
-}
+    /* Helper Classes for Labels */
+    .label-required::after {
+        content: "*";
+        @apply text-rose-500 text-sm font-bold ml-1;
+    }
+    
+    .label-optional::after {
+        content: "(Opsional)";
+        @apply text-slate-400 text-[10px] font-normal normal-case ml-1 italic;
+    }
 
-/* Hapus border bawaan saat focus, ganti dengan ring Tailwind */
-.ts-control.focus {
-    @apply ring-1 ring-primary-500 border-primary-500 !important;
-    box-shadow: none !important;
-}
+    /* 6. TEXTAREA SPECIFIC */
+    textarea.form-textarea,
+    textarea.form-control {
+        min-height: 100px;
+        resize: vertical;
+    }
 
-/* Input text typing di dalam Tom Select */
-.ts-control input {
-    @apply text-gray-900 dark:text-white !important;
-    font-size: 0.875rem !important; /* text-sm */
-    font-family: inherit !important;
-}
+    /* 7. CHECKBOX & RADIO */
+    .form-check-input {
+        @apply w-4 h-4 text-indigo-600 bg-white border-slate-300
+               rounded focus:ring-indigo-500 focus:ring-2 focus:ring-offset-1 transition-all;
+        @apply dark:bg-slate-700 dark:border-slate-600 dark:focus:ring-offset-slate-800;
+        cursor: pointer;
+    }
 
-/* Placeholder */
-.ts-control .item.placeholder {
-    @apply text-gray-400 dark:text-gray-400 !important;
-}
+    /* 8. INPUT GROUPS (Untuk Prepend/Append icon) */
+    .input-group {
+        @apply flex relative w-full;
+    }
+    
+    .input-group-text {
+        @apply inline-flex items-center px-4 bg-slate-50 border border-slate-300 text-slate-500
+               text-sm font-medium;
+        @apply dark:bg-slate-800 dark:border-slate-600 dark:text-slate-400;
+    }
+    
+    .input-group-text:first-child {
+        @apply rounded-l-xl border-r-0;
+    }
+    
+    .input-group-text:last-child {
+        @apply rounded-r-xl border-l-0;
+    }
 
-/* Dropdown Menu Container */
-.ts-dropdown {
-    @apply bg-white border border-gray-200 rounded-lg shadow-lg mt-1 !important;
-    @apply dark:bg-gray-800 dark:border-gray-700;
-    z-index: 50 !important;
-    padding: 0 !important;
-    overflow: hidden !important;
-}
+    .input-group .form-input:first-child { @apply rounded-r-none; }
+    .input-group .form-input:last-child { @apply rounded-l-none; }
+    .input-group .form-input:not(:first-child):not(:last-child) { @apply rounded-none; }
 
-/* Dropdown Options */
-.ts-dropdown .option {
-    @apply px-4 py-2 text-sm text-gray-700 dark:text-gray-200 cursor-pointer;
-}
-
-/* Option Hover / Active */
-.ts-dropdown .option.active, 
-.ts-dropdown .option:hover {
-    @apply bg-primary-50 text-primary-600 !important; /* Light Mode Hover */
-    @apply dark:bg-gray-600 dark:text-white !important; /* Dark Mode Hover */
-}
-
-/* Option Selected */
-.ts-dropdown .option.selected {
-    @apply bg-primary-100 text-primary-700 font-semibold !important;
-    @apply dark:bg-gray-600 dark:text-white !important;
-}
-
-/* Plugin: Remove Button (x) pada Multiple Select */
-.ts-wrapper.plugin-remove_button .item {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-200 text-gray-800 mr-1 !important;
-    @apply dark:bg-gray-600 dark:text-gray-200;
-}
-
-.ts-wrapper.plugin-remove_button .item .remove {
-    @apply border-l border-gray-300 ml-1 pl-1 text-gray-500 hover:text-red-500 !important;
-    @apply dark:border-gray-500 dark:text-gray-300 dark:hover:text-red-400;
-    font-size: 0.8rem;
-}
-
-/* Arrow Icon (Custom SVG) */
-.ts-wrapper.single .ts-control::after {
-    border: none !important;
-    content: " ";
-    display: block;
-    width: 1.5rem;
-    height: 1.5rem;
-    position: absolute;
-    top: 50%;
-    right: 0.5rem;
-    transform: translateY(-50%);
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280' stroke-width='2'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: 1rem;
-    pointer-events: none;
-}
-
-/* Dark Mode Arrow */
-.dark .ts-wrapper.single .ts-control::after {
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af' stroke-width='2'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3e%3c/svg%3e");
-}
-
-/* Rotate Arrow on Open */
-.ts-wrapper.dropdown-active .ts-control::after {
-    transform: translateY(-50%) rotate(180deg);
+    /* 9. UPLOAD AREA (Modern) */
+    .upload-area {
+    /* Hapus kata 'group' dari baris di bawah ini */
+    @apply relative w-full rounded-2xl border-2 border-dashed border-slate-300
+           dark:border-slate-600 bg-slate-50/50 dark:bg-slate-800/30
+           flex flex-col items-center justify-center cursor-pointer p-6
+           transition-all duration-300 hover:bg-indigo-50/30 dark:hover:bg-slate-800
+           hover:border-indigo-400 dark:hover:border-indigo-500;
+    }
+    
+    /* Jika Anda ingin efek hover pada icon di dalamnya, gunakan CSS standar ini: */
+    .upload-area:hover .material-icons {
+        @apply text-indigo-500 transition-colors duration-300;
+    }
 }

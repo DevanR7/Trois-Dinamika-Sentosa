@@ -11,10 +11,7 @@ class EquityTransaction extends Model
 {
     use HasFactory;
     protected $primaryKey = 'transaction_id';
-    
-    /**
-     * ✅ DIPERBARUI: Tambahkan kolom baru
-     */
+
     protected $fillable = [
         'transaction_date',
         'type', 
@@ -35,17 +32,11 @@ class EquityTransaction extends Model
         return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
 
-    /**
-     * Relasi ke Akun Ekuitas (COA).
-     */
     public function equityAccount(): BelongsTo
     {
         return $this->belongsTo(ChartOfAccount::class, 'equity_account_id', 'account_id');
     }
 
-    /**
-     * Relasi ke Akun Kas/Bank (COA).
-     */
     public function cashBankAccount(): BelongsTo
     {
         return $this->belongsTo(ChartOfAccount::class, 'cash_bank_account_id', 'account_id');

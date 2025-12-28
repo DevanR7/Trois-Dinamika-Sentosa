@@ -1,661 +1,550 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Buat PO Baru')
-
-@push('styles')
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <style>
-        /* Fix conflict styles */
-        .select2-container .select2-selection--single { height: 38px !important; }
-        .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 38px !important; }
-    </style>
-@endpush
+@section('title', 'Buat Purchase Order Baru')
 
 @section('content')
+    {{-- Container Alpine.js --}}
+    <div x-data="purchaseOrderCreate()" class="flex flex-col gap-6 pb-20">
 
-<div class="max-w-full mx-auto pb-20 animate-enter">
-
-    {{-- HEADER --}}
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div>
-            <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Buat Purchase Order Baru</h2>
-            <p class="text-slate-500 text-sm mt-1">Buat pesanan pembelian baru ke supplier.</p>
-        </div>
-        <a href="{{ route('admin.purchase-orders.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition shadow-sm text-sm font-bold">
-            <i class="material-icons text-sm mr-2">arrow_back</i> Kembali
-        </a>
-    </div>
-
-    {{-- ALERT ERROR --}}
-    @if ($errors->any())
-        <div class="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-            <i class="material-icons text-red-500 text-xl">error</i>
+        {{-- Top Bar --}}
+        <div class="flex items-center justify-between">
             <div>
-                <h3 class="text-sm font-bold text-red-800">Terdapat kesalahan input:</h3>
-                <ul class="mt-1 list-disc list-inside text-sm text-red-700">
-                    @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
+                <h2 class="page-title">Buat Pesanan Pembelian</h2>
+                <a href="{{ route('admin.purchase-orders.index') }}" class="flex items-center gap-1 text-sm text-slate-500 hover:text-indigo-600 transition-colors mt-1">
+                    <i class="material-icons text-base">arrow_back</i> Kembali ke Daftar
+                </a>
+            </div>
+            <button type="submit" form="po-form" class="btn btn-primary">
+                <i class="material-icons text-lg">save</i>
+                Simpan PO
+            </button>
+        </div>
+
+        {{-- Error Summary (Debugging Helper) --}}
+        @if ($errors->any())
+            <div class="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg text-sm">
+                <p class="font-bold mb-1">Gagal menyimpan data:</p>
+                <ul class="list-disc pl-5">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
                 </ul>
             </div>
-        </div>
-    @endif
+        @endif
 
-    <form action="{{ route('admin.purchase-orders.store') }}" method="POST" id="po-form">
-        @csrf
+        <form id="po-form" action="{{ route('admin.purchase-orders.store') }}" method="POST">
+            @csrf
 
-        <div class="space-y-6">
-            
-            {{-- 1. INFO PESANAN --}}
-            <div class="dashboard-card p-0 overflow-hidden">
-                <div class="bg-slate-50/50 px-6 py-4 border-b border-slate-100">
-                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                        <i class="material-icons text-indigo-500 text-sm">info</i> Informasi Supplier & Tanggal
-                    </h3>
+            {{-- 1. INFORMASI UTAMA (Header) --}}
+            <div class="card mb-6">
+                <div class="card-header">
+                    <h3 class="card-header-title">Informasi Pesanan & Supplier</h3>
                 </div>
-                <div class="p-6 grid grid-cols-1 md:grid-cols-12 gap-6">
-                    <div class="md:col-span-4">
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Supplier <span class="text-red-500">*</span></label>
-                        {{-- HAPUS class 'select2-basic' agar tidak bentrok dengan app.js --}}
-                        <select name="supplier_id" id="supplier_id" class="w-full po-select2" required>
-                            <option value="" disabled selected>-- Pilih Supplier --</option>
-                            @foreach ($suppliers as $supplier)
-                                <option value="{{ $supplier->supplier_id }}">{{ $supplier->supplier_name }}</option>
+                <div class="card-body grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {{-- Supplier --}}
+                    <div>
+                        <label class="form-label">Supplier <span class="text-red-500">*</span></label>
+                        <select name="supplier_id" class="tom-select w-full" required>
+                            <option value="">Pilih Supplier...</option>
+                            @foreach($suppliers as $supplier)
+                                <option value="{{ $supplier->supplier_id }}" {{ old('supplier_id') == $supplier->supplier_id ? 'selected' : '' }}>
+                                    {{ $supplier->supplier_name }}
+                                </option>
                             @endforeach
                         </select>
                     </div>
-                    
-                    <div class="md:col-span-3">
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Tanggal Pesan <span class="text-red-500">*</span></label>
-                        <input type="date" class="form-input" id="order_date" name="order_date" value="{{ now()->format('Y-m-d') }}" required>
-                    </div>
-                    
-                    <div class="md:col-span-2">
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Jatuh Tempo</label>
-                        <input type="date" class="form-input" id="due_date" name="due_date">
+
+                    {{-- Tanggal Order --}}
+                    <div>
+                        <label class="form-label">Tanggal Order <span class="text-red-500">*</span></label>
+                        <input type="date" name="order_date" value="{{ old('order_date', date('Y-m-d')) }}" class="form-input" required>
                     </div>
 
-                    <div class="md:col-span-3">
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Dipesan Oleh</label>
-                        <select name="requester_user_id" id="requester_user_id" class="w-full po-select2">
-                            <option value="">-- Pembelian Umum --</option>
-                            @foreach ($users as $user)
-                                <option value="{{ $user->user_id }}">{{ $user->full_name }}</option>
+                    {{-- Jatuh Tempo --}}
+                    <div>
+                        <label class="form-label">Jatuh Tempo</label>
+                        <input type="date" name="due_date" value="{{ old('due_date') }}" class="form-input">
+                    </div>
+
+                    {{-- Peminta --}}
+                    <div>
+                        <label class="form-label">Diminta Oleh</label>
+                        <select name="requester_user_id" class="tom-select w-full">
+                            <option value="">Pilih Staff...</option>
+                            @foreach($users as $user)
+                                <option value="{{ $user->user_id }}" {{ old('requester_user_id', Auth::id()) == $user->user_id ? 'selected' : '' }}>
+                                    {{ $user->full_name }}
+                                </option>
                             @endforeach
                         </select>
                     </div>
                 </div>
             </div>
 
-            {{-- 2. ITEM PESANAN --}}
-            <div class="dashboard-card p-0 overflow-hidden">
-                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row justify-between items-center gap-4">
+            {{-- 2. TABEL ITEM BARANG --}}
+            <div class="card mb-6 overflow-hidden">
+                <div class="card-header flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50/50">
                     <div class="flex items-center gap-2">
-                        <i class="material-icons text-indigo-500 text-sm">inventory_2</i>
-                        <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider">Daftar Barang</h3>
+                        <h3 class="card-header-title">Item Barang</h3>
+                        <span class="text-xs text-slate-400">(Input harga sebelum pajak)</span>
                     </div>
 
-                    {{-- TOOLBAR DISKON GLOBAL --}}
-                    <div class="flex items-center bg-white border border-slate-300 rounded-lg p-1 shadow-sm">
-                        <div class="px-3 border-r border-slate-200 bg-slate-50 rounded-l flex items-center">
-                            <span class="text-[10px] font-bold text-slate-500 uppercase">Bulk Disc</span>
-                        </div>
-                        <input type="text" id="bulk-chain-discount" 
-                               class="text-xs w-32 px-3 py-1.5 focus:outline-none font-mono text-slate-700" 
-                               placeholder="Contoh: 10+5">
+                    {{-- Bulk Discount --}}
+                    <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-lg p-1.5 shadow-sm">
+                        <span class="text-xs font-bold text-slate-500 uppercase ml-2">Diskon Massal:</span>
+                        <input type="text" x-model="bulkDiscValue" class="form-input h-8 text-sm w-32" placeholder="Cth: 50+9.91">
                         
-                        <button type="button" id="btn-apply-selected" 
-                                class="px-3 py-1.5 text-[10px] font-bold text-indigo-600 hover:bg-indigo-50 uppercase tracking-wide border-l border-slate-200 transition">
-                            Selected
+                        <button type="button" @click="applyBulkDiscount('selected')" 
+                                class="btn btn-sm btn-secondary h-8 px-3 border-r rounded-r-none whitespace-nowrap">
+                            Ke Terpilih
                         </button>
-                        <button type="button" id="btn-apply-all" 
-                                class="px-3 py-1.5 text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-r uppercase tracking-wide transition">
-                            Apply All
+                        <button type="button" @click="applyBulkDiscount('all')" 
+                                class="btn btn-sm btn-primary h-8 px-3 rounded-l-none whitespace-nowrap">
+                            Ke Semua
                         </button>
                     </div>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="dashboard-table w-full">
-                        <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200">
-                                <th class="w-10 text-center p-2">
-                                    <input type="checkbox" id="check-all-rows" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
-                                </th>
-                                <th class="min-w-[300px] p-2 text-left text-xs font-bold text-slate-500 uppercase pl-4">Produk</th> 
-                                <th class="w-32 text-center p-2 text-xs font-bold text-slate-500 uppercase">Qty</th> 
-                                <th class="w-40 text-right p-2 text-xs font-bold text-slate-500 uppercase">Harga Satuan (Rp)</th> 
-                                <th class="w-48 text-center p-2 text-xs font-bold text-slate-500 uppercase">Diskon Item (%)</th> 
-                                <th class="w-48 text-right p-2 text-xs font-bold text-slate-500 uppercase">Subtotal</th> 
-                                <th class="w-10 text-center p-2"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="product-items">
-                            {{-- JS Injects Rows Here --}}
-                        </tbody>
-                    </table>
                 </div>
                 
-                <div class="p-4 bg-slate-50 border-t border-slate-100 text-center">
-                     <button type="button" onclick="addProductRow()" class="inline-flex items-center px-6 py-3 bg-white border border-indigo-200 text-indigo-600 text-sm font-bold rounded-full hover:bg-indigo-50 transition shadow-sm uppercase tracking-wide hover:shadow-md transform hover:-translate-y-0.5">
-                        <i class="material-icons text-lg mr-2">add</i> Tambah Item Baris
-                    </button>
+                <div class="table-container border-0 shadow-none rounded-none overflow-x-auto">
+                    <table class="table-modern w-full min-w-[1300px]"> 
+                        <thead class="bg-slate-100 dark:bg-slate-800">
+                            <tr>
+                                <th class="w-[40px] text-center px-1">
+                                    <input type="checkbox" x-model="selectAll" @change="toggleSelectAll()" class="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                                </th>
+                                <th class="min-w-[350px]">Produk</th>
+                                <th class="w-[180px] text-right">Harga Beli (Rp)</th>
+                                <th class="w-[200px] text-center">Qty</th>
+                                <th class="w-[220px] text-center">
+                                    Diskon Bertingkat (%)
+                                    <span class="text-[10px] block text-slate-400 font-normal">cth: 50+9.91</span>
+                                </th>
+                                <th class="w-[180px] text-right">Total (Rp)</th>
+                                <th class="w-[50px] text-center"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(item, index) in items" :key="item.id">
+                                <tr>
+                                    {{-- Checkbox --}}
+                                    <td class="align-top p-2 text-center pt-4">
+                                        <input type="checkbox" x-model="item.selected" class="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                                    </td>
+                                    
+                                    {{-- Produk --}}
+                                    <td class="align-top p-2">
+                                        <select :name="`products[${index}][product_id]`" 
+                                                x-model="item.product_id"
+                                                x-init="initTomSelect($el, index)"
+                                                class="tom-select w-full" required>
+                                            <option value="">Cari Produk...</option>
+                                            @foreach($products as $prod)
+                                                <option value="{{ $prod->product_id }}" 
+                                                        data-price="{{ $prod->purchase_price ?? 0 }}" 
+                                                        data-unit="{{ $prod->unit->name ?? 'Pcs' }}">
+                                                    {{ $prod->product_name }} ({{ $prod->product_code }})
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        <div class="mt-1 flex gap-2">
+                                            <label class="flex items-center gap-1 cursor-pointer">
+                                                <input type="checkbox" :name="`products[${index}][update_master_price]`" value="1" class="rounded text-xs text-indigo-600 focus:ring-indigo-500">
+                                                <span class="text-[10px] text-slate-500">Update harga master</span>
+                                            </label>
+                                        </div>
+                                    </td>
+
+                                    {{-- Harga Beli --}}
+                                    <td class="align-top p-2">
+                                        <input type="text" 
+                                               x-model="item.price_visual"
+                                               @input="formatPriceInput(index, $event.target.value)"
+                                               class="form-input text-right text-sm w-full" 
+                                               placeholder="0">
+                                        <input type="hidden" :name="`products[${index}][price_per_unit]`" :value="item.price">
+                                    </td>
+
+                                    {{-- Qty --}}
+                                    <td class="align-top p-2">
+                                        <div class="flex items-center">
+                                            <input type="number" :name="`products[${index}][quantity]`" x-model.number="item.qty" 
+                                                   class="form-input text-center text-sm w-full rounded-r-none border-r-0 min-w-[80px]" 
+                                                   min="0.01" step="0.01" placeholder="1" required>
+                                            <span class="inline-flex items-center px-3 text-xs text-slate-500 bg-slate-100 border border-slate-300 rounded-r-lg h-[38px] min-w-[50px] justify-center truncate" 
+                                                  x-text="item.unit_name || 'Unit'">
+                                            </span>
+                                        </div>
+                                    </td>
+
+                                    {{-- Diskon --}}
+                                    <td class="align-top p-2">
+                                        <div class="flex flex-col gap-1 items-center">
+                                            <template x-for="(d, dIndex) in item.discounts" :key="dIndex">
+                                                <div class="flex items-center gap-1 w-full justify-center">
+                                                    <span class="text-[10px] text-slate-400 w-3 text-right" x-text="dIndex + 1 + '.'"></span>
+                                                    <input type="number" x-model="item.discounts[dIndex]" 
+                                                           @input="updateDiscString(index)"
+                                                           class="form-input text-center text-xs h-7 w-20" 
+                                                           placeholder="%" min="0" max="100" step="0.01">
+                                                    
+                                                    <button type="button" @click="removeDiscountLevel(index, dIndex)" 
+                                                            x-show="item.discounts.length > 1"
+                                                            class="text-rose-400 hover:text-rose-600 w-4">
+                                                        <i class="material-icons text-sm">remove_circle</i>
+                                                    </button>
+                                                    <div x-show="item.discounts.length <= 1" class="w-4"></div>
+                                                </div>
+                                            </template>
+                                            
+                                            <button type="button" @click="addDiscountLevel(index)" 
+                                                    class="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 mt-1 justify-center w-full">
+                                                <i class="material-icons text-[12px]">add</i> Level
+                                            </button>
+                                            
+                                            {{-- Input Hidden Array --}}
+                                            <template x-for="(d, dIndex) in item.discounts" :key="`hidden-${dIndex}`">
+                                                <input type="hidden" :name="`products[${index}][discounts][]`" :value="d">
+                                            </template>
+                                        </div>
+                                    </td>
+
+                                    {{-- Subtotal --}}
+                                    <td class="align-top p-2 text-right font-bold text-slate-700 dark:text-white pt-3">
+                                        <span x-text="formatRupiah(calculateRowTotal(item))"></span>
+                                    </td>
+
+                                    {{-- Hapus --}}
+                                    <td class="align-top p-2 text-center pt-3">
+                                        <button type="button" @click="removeItem(index)" class="text-rose-500 hover:text-rose-700 p-1 bg-rose-50 rounded" title="Hapus Baris">
+                                            <i class="material-icons text-lg">close</i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    
+                    {{-- Footer Table --}}
+                    <div class="p-4 bg-slate-50 border-t border-slate-200">
+                        <button type="button" @click="addItem()" class="btn btn-sm btn-secondary inline-flex items-center gap-2 border-dashed border-2 border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 transition-colors w-auto">
+                            <i class="material-icons text-lg">add_circle_outline</i> Tambah Baris Barang
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {{-- 3. RINGKASAN BIAYA --}}
-            <div class="dashboard-card p-6 border-t-4 border-indigo-500">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                    
-                    <div class="space-y-6">
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Catatan PO</label>
-                            <textarea class="form-textarea w-full bg-yellow-50/30 border-yellow-100 focus:border-yellow-400 focus:ring-yellow-200" name="notes" id="notes" rows="4" placeholder="Instruksi pengiriman..."></textarea>
-                        </div>
-
-                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                            <h4 class="text-xs font-bold text-slate-700 uppercase mb-3">Pengaturan Pajak</h4>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Pajak (PPN)</label>
-                                    <select name="tax_id" id="tax_id" class="w-full po-select2">
-                                        <option value="" selected>-- Tanpa Pajak --</option>
-                                        @foreach(\App\Models\Tax::where('is_active', true)->get() as $tax)
-                                            <option value="{{ $tax->id }}" data-rate="{{ $tax->rate }}">{{ $tax->name }} ({{ $tax->rate }}%)</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div>
-                                     <div class="flex items-center gap-2 mt-6">
-                                        <input type="checkbox" id="use_custom_dpp_factor" name="use_custom_dpp_factor" value="1" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer">
-                                        <label class="text-xs text-slate-600 cursor-pointer select-none" for="use_custom_dpp_factor">Override Faktor DPP</label>
-                                     </div>
-                                </div>
-                            </div>
-
-                            <div id="custom-dpp-container" class="mt-3 hidden">
-                                <label class="block text-[10px] text-slate-500 mb-1">Faktor DPP Manual (Contoh: 11/12)</label>
-                                <input type="text" class="form-input text-xs h-8 w-full" name="custom_dpp_factor" id="custom_dpp_factor" placeholder="0.91666666">
-                            </div>
-                        </div>
+            {{-- 3. BOTTOM SECTION (Split 2 Kolom) --}}
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {{-- KIRI: Catatan --}}
+                <div class="card h-fit">
+                    <div class="card-header">
+                        <h3 class="card-header-title">Catatan Tambahan</h3>
                     </div>
+                    <div class="card-body">
+                        <textarea name="notes" rows="4" class="form-input w-full" placeholder="Tulis catatan untuk supplier atau internal...">{{ old('notes') }}</textarea>
+                    </div>
+                </div>
 
-                    <div class="bg-slate-50/50 rounded-xl p-6 border border-slate-200 space-y-4 sticky top-6">
+                {{-- KANAN: Ringkasan Biaya --}}
+                <div class="card bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                    <div class="card-header bg-white dark:bg-slate-800">
+                        <h3 class="card-header-title">Ringkasan Biaya</h3>
+                    </div>
+                    <div class="card-body space-y-3">
                         
+                        {{-- Subtotal --}}
                         <div class="flex justify-between items-center text-sm">
-                            <span class="text-slate-500 font-medium">Subtotal Barang</span>
-                            <span class="font-bold text-slate-800 text-base" id="summary-subtotal">Rp 0</span>
+                            <span class="text-slate-600">Subtotal</span>
+                            <span class="font-bold text-base" x-text="formatRupiah(totals.subtotal)"></span>
+                            <input type="hidden" name="subtotal" :value="totals.subtotal">
                         </div>
 
-                        {{-- Diskon Faktur --}}
-                        <div class="flex justify-between items-center">
-                             <div class="flex items-center gap-2">
-                                <input type="checkbox" id="apply_disc_fee" name="apply_disc_fee" value="1" class="rounded border-slate-300 text-indigo-600 h-4 w-4">
-                                <label for="apply_disc_fee" class="text-xs font-bold text-slate-500 uppercase cursor-pointer">Diskon Faktur / Fee</label>
-                            </div>
-                            <div id="disc-fee-inputs" class="flex items-center gap-2 hidden">
-                                <input type="number" step="any" min="0" class="form-input text-xs w-16 text-right h-8" name="disc_fee_percent" id="disc_fee_percent" placeholder="%">
-                                <span class="text-slate-400">/</span>
-                                
-                                {{-- Hapus class input-currency agar tidak bentrok dengan app.js --}}
-                                <input type="text" class="form-input text-xs w-28 text-right h-8 po-autonumeric" id="disc_fee_amount_display" placeholder="Rp">
-                                <input type="hidden" name="disc_fee_amount" id="disc_fee_amount">
-                            </div>
-                            <span class="text-red-500 font-medium text-sm" id="summary-disc">- Rp 0</span>
-                        </div>
-
-                        {{-- Pembulatan --}}
-                        <div class="flex justify-between items-center">
+                        {{-- Diskon Akhir --}}
+                        <div class="flex items-center justify-between gap-2">
                             <div class="flex items-center gap-2">
-                                <input type="checkbox" id="apply_rounding_discount" name="apply_rounding_discount" value="1" class="rounded border-slate-300 text-indigo-600 h-4 w-4">
-                                <label for="apply_rounding_discount" class="text-xs font-bold text-slate-500 uppercase cursor-pointer">Pembulatan</label>
+                                <input type="checkbox" name="apply_disc_fee" value="1" x-model="applyDisc" class="rounded text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-sm text-slate-600">Diskon Akhir (%)</span>
+                            </div>
+                            <div x-show="applyDisc" class="w-24">
+                                <input type="number" name="disc_fee_percent" x-model.number="discPercent" class="form-input text-right h-8 text-sm" placeholder="0" step="0.01">
+                            </div>
+                        </div>
+                        <div x-show="applyDisc && totals.discAmount > 0" class="flex justify-between text-sm text-emerald-600">
+                            <span>Potongan</span>
+                            <span>- <span x-text="formatRupiah(totals.discAmount)"></span></span>
+                        </div>
+
+                        {{-- Diskon Pembulatan --}}
+                         <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" name="apply_rounding_discount" value="1" x-model="applyRounding" class="rounded text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-sm text-slate-600">Diskon Pembulatan (Nominal)</span>
+                            </div>
+                            <div x-show="applyRounding" class="w-32">
+                                <input type="number" name="rounding_discount_amount" x-model.number="roundingAmount" class="form-input text-right h-8 text-sm" placeholder="0" step="100">
+                            </div>
+                        </div>
+
+                        <hr class="border-slate-200 dark:border-slate-600">
+
+                        {{-- DPP Custom --}}
+                        <div class="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-lg border border-indigo-100 dark:border-indigo-800">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="use_custom_dpp_factor" value="1" x-model="useCustomDPP" class="rounded text-indigo-600 focus:ring-indigo-500">
+                                    <span class="text-sm font-bold text-indigo-700 dark:text-indigo-300">Gunakan Faktor DPP</span>
+                                </label>
                             </div>
                             
-                            <input type="text" class="form-input text-xs w-28 text-right h-8 hidden po-autonumeric" id="rounding_discount_amount_display" placeholder="Rp">
-                            <input type="hidden" name="rounding_discount_amount" id="rounding_discount_amount">
-                            
-                            <span class="text-red-500 font-medium text-sm" id="summary-rounding">- Rp 0</span>
+                            <div x-show="useCustomDPP" x-transition class="space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs text-slate-500">Nilai Faktor (Pecahan/Desimal)</span>
+                                    <input type="text" x-model="dppInput" class="form-input h-8 text-right text-xs w-24" placeholder="11/12">
+                                </div>
+                                
+                                <input type="hidden" name="custom_dpp_factor" :value="dppFactorValue">
+                                
+                                @error('custom_dpp_factor')
+                                    <p class="text-red-500 text-xs text-right">{{ $message }}</p>
+                                @enderror
+
+                                <div class="flex justify-between text-xs text-indigo-600 font-medium">
+                                    <span>Nilai DPP</span>
+                                    <span x-text="formatRupiah(totals.dpp)"></span>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="border-t border-dashed border-slate-300 my-2"></div>
-
-                        <div class="flex justify-between items-center text-xs text-slate-500">
-                            <span>DPP</span>
-                            <span id="summary-dpp">Rp 0</span>
+                        {{-- Pajak --}}
+                        <div class="flex items-center justify-between gap-4">
+                            <span class="text-sm text-slate-600">PPN / Pajak</span>
+                            <div class="w-48">
+                                <select name="tax_id" x-model="taxId" x-init="initTaxSelect($el)" class="tom-select w-full">
+                                    <option value="">Tanpa Pajak</option>
+                                    @foreach(\App\Models\Tax::where('is_active', true)->get() as $tax)
+                                        <option value="{{ $tax->id }}">{{ $tax->name }} ({{ $tax->rate }}%)</option>
+                                    @endforeach
+                                </select>
+                            </div>
                         </div>
-                        <div class="flex justify-between items-center text-sm text-slate-600">
-                            <span>PPN (<span id="summary-tax-rate">0</span>%)</span>
-                            <span class="font-bold" id="summary-ppn">Rp 0</span>
+                        <div x-show="totals.ppn > 0" class="flex justify-between text-sm text-slate-600">
+                            <span>Nilai Pajak</span>
+                            <span>+ <span x-text="formatRupiah(totals.ppn)"></span></span>
                         </div>
 
                         {{-- Ongkir --}}
-                        <div class="flex justify-between items-center pt-2">
-                            <label class="text-xs font-bold text-slate-500 uppercase">Ongkos Kirim</label>
-                            <div class="w-32">
-                                <input type="text" class="form-input text-right font-bold text-sm h-9 border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 rounded po-autonumeric" id="shipping_amount_display" placeholder="0">
-                                <input type="hidden" name="shipping_amount" id="shipping_amount">
-                            </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-slate-600">Biaya Kirim / Lainnya</span>
+                            <input type="number" name="shipping_amount" x-model.number="shipping" class="form-input text-right h-9 w-40" placeholder="0" step="1000">
                         </div>
 
-                        <div class="bg-indigo-50 rounded-lg p-4 flex justify-between items-center mt-4 border border-indigo-100">
-                            <span class="text-sm font-bold text-indigo-900 uppercase tracking-wider">Grand Total</span>
-                            <span class="text-2xl font-bold text-indigo-600 font-mono tracking-tight" id="summary-grand">Rp 0</span>
+                        <hr class="border-slate-200 dark:border-slate-600 border-dashed">
+
+                        {{-- Grand Total --}}
+                        <div class="flex justify-between items-center py-2">
+                            <span class="text-lg font-extrabold text-slate-800 dark:text-white">GRAND TOTAL</span>
+                            <span class="text-2xl font-extrabold text-indigo-600" x-text="formatRupiah(totals.grandTotal)"></span>
+                            <input type="hidden" name="total_amount" :value="totals.grandTotal">
                         </div>
 
                     </div>
                 </div>
-
-                {{-- TOMBOL AKSI --}}
-                <div class="flex justify-end gap-4 mt-8 pt-6 border-t border-slate-100">
-                    <button type="button" onclick="location.reload()" class="px-6 py-3 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-bold hover:bg-red-50 transition shadow-sm flex items-center gap-2">
-                         <i class="material-icons text-lg">refresh</i> Reset Form
-                    </button>
-                    <button type="submit" id="submit-btn" class="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 flex items-center gap-2">
-                        <i class="material-icons text-lg">save</i> Simpan Pesanan
-                    </button>
-                </div>
             </div>
 
-        </div>
-    </form>
-</div>
+        </form>
+    </div>
 
-{{-- TEMPLATE ROW --}}
-<template id="product-row-template">
-    <tr class="group transition-colors hover:bg-slate-50 border-b border-slate-100 last:border-0">
-        <td class="text-center align-middle p-2">
-            <input type="checkbox" class="row-checkbox rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer h-4 w-4">
-        </td>
-        <td class="p-2 align-top pl-4">
-            <select class="product-select" style="width: 100%;" required>
-                <option value="" data-unit="-" disabled selected>-- Cari Produk --</option>
-                @foreach ($products as $product)
-                    <option value="{{ $product->product_id }}"
-                            data-unit="{{ $product->unit->name ?? '' }}"
-                            data-default-price="{{ $product->purchase_price ?? 0 }}">
-                        {{ $product->product_name }}
-                    </option>
-                @endforeach
-            </select>
-            <div class="mt-1 flex items-center gap-2">
-                 <span class="text-[10px] text-slate-400 bg-slate-100 px-1.5 rounded unit-display">-</span>
-                 <label class="flex items-center gap-1 cursor-pointer">
-                    <input type="checkbox" class="update-master-price h-3 w-3 rounded border-slate-300 text-indigo-600" value="1">
-                    <span class="text-[9px] text-slate-500">Update Master Harga</span>
-                 </label>
-            </div>
-        </td>
-        <td class="p-2 align-top">
-            <div class="relative">
-                <input type="number" class="form-input quantity w-full text-center text-sm font-bold h-10" value="1" min="0.01" step="0.01" required>
-            </div>
-        </td>
-        <td class="p-2 align-top">
-            <div class="relative flex items-center">
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 z-10">
-                    <span class="text-slate-500 text-xs font-bold">Rp</span>
-                </div>
-                {{-- Display Input (Formatted) --}}
-                <input type="text" class="form-input purchase-price-formatted w-full pl-8 text-right text-sm font-medium h-10" placeholder="0">
-                {{-- Hidden Input (Raw Value) --}}
-                <input type="hidden" class="purchase-price-hidden" value="0">
-            </div>
-        </td>
-        <td class="p-2 align-top text-center">
-            <div class="discount-wrapper space-y-1 flex flex-col items-center">
-                <div class="flex items-center justify-center gap-1 relative w-full">
-                     <input type="number" step="any" min="0" max="100" class="discount-percentage form-input text-xs w-20 text-center h-8 p-1" name="products[INDEX][discounts][]" placeholder="0">
-                     <span class="text-xs text-slate-400 absolute right-6">%</span>
-                </div>
-            </div>
-            <button type="button" class="text-[10px] text-indigo-500 hover:underline mt-1 add-disc-btn font-bold flex items-center justify-center w-full gap-1">
-                <i class="material-icons text-[10px]">add</i> Lapis
-            </button>
-        </td>
-        <td class="p-2 align-middle text-right">
-            <span class="subtotal font-bold text-slate-700 text-sm">Rp 0</span>
-        </td>
-        <td class="p-2 align-middle text-center">
-            <button type="button" class="remove-product-btn text-slate-300 hover:text-red-500 transition p-1 rounded-full hover:bg-red-50">
-                <i class="material-icons text-lg">delete</i>
-            </button>
-        </td>
-    </tr>
-</template>
+    @push('scripts')
+    <script>
+        const taxRates = @json(\App\Models\Tax::where('is_active', true)->pluck('rate', 'id'));
 
-@endsection
-
-@push('scripts')
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const form = document.getElementById('po-form');
-        const productItemsContainer = document.getElementById('product-items');
-        const productRowTemplate = document.getElementById('product-row-template');
-
-        // Bulk Discount Elements
-        const inputBulkChain = document.getElementById('bulk-chain-discount');
-        const btnApplySelected = document.getElementById('btn-apply-selected');
-        const btnApplyAll = document.getElementById('btn-apply-all');
-        const checkAllRows = document.getElementById('check-all-rows');
-
-        // Elements Kalkulasi
-        const inputDiscFeePercent = document.getElementById('disc_fee_percent');
-        const inputDiscFeeAmountDisplay = document.getElementById('disc_fee_amount_display');
-        const inputDiscFeeAmountHidden = document.getElementById('disc_fee_amount');
-
-        const inputRoundingAmountDisplay = document.getElementById('rounding_discount_amount_display');
-        const inputRoundingAmountHidden = document.getElementById('rounding_discount_amount');
-
-        const inputShippingDisplay = document.getElementById('shipping_amount_display');
-        const inputShippingHidden = document.getElementById('shipping_amount');
-
-        const inputTaxId = document.getElementById('tax_id');
-        
-        const checkboxDiscFee = document.getElementById('apply_disc_fee');
-        const checkboxRounding = document.getElementById('apply_rounding_discount');
-        const checkboxCustomDpp = document.getElementById('use_custom_dpp_factor');
-        const inputCustomDpp = document.getElementById('custom_dpp_factor');
-
-        // Elements Display
-        const displaySubtotal = document.getElementById('summary-subtotal');
-        const displayDisc = document.getElementById('summary-disc');
-        const displayRounding = document.getElementById('summary-rounding');
-        const displayDpp = document.getElementById('summary-dpp');
-        const displayPpn = document.getElementById('summary-ppn');
-        const displayTaxRate = document.getElementById('summary-tax-rate');
-        const displayGrand = document.getElementById('summary-grand');
-
-        let productIndex = 0;
-
-        // --- 1. INIT UTILS ---
-        function formatCurrency(n) {
-            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Math.round(n || 0));
-        }
-
-        function parseFractionOrNumber(val) {
-            if (!val) return 1;
-            const str = String(val).trim();
-            if (str.includes('/')) {
-                const parts = str.split('/');
-                const num = parseFloat(parts[0]);
-                const den = parseFloat(parts[1]);
-                if (den !== 0 && !isNaN(num) && !isNaN(den)) return num / den;
-            }
-            return parseFloat(str.replace(',', '.')) || 1;
-        }
-
-        // Helper Init AutoNumeric (Display <-> Hidden Binding)
-        // unformatOnSubmit: false (karena kita punya hidden input manual)
-        function initBoundAutoNumeric(displayElement, hiddenElement) {
-            if (!displayElement) return;
-            const an = new AutoNumeric(displayElement, { 
-                decimalCharacter: ',', 
-                digitGroupSeparator: '.', 
-                decimalPlaces: 0, 
-                minimumValue: '0', 
-                emptyInputBehavior: 'zero',
-                currencySymbol: '', // Tidak pakai simbol di input (sudah ada di UI atau tidak perlu)
-                unformatOnSubmit: false 
-            });
-            
-            displayElement.addEventListener('autoNumeric:rawValueModified', e => {
-                hiddenElement.value = e.detail.newRawValue;
-                calculateTotals();
-            });
-            return an;
-        }
-
-        // Init AutoNumeric untuk field header
-        const anDiscFee = initBoundAutoNumeric(inputDiscFeeAmountDisplay, inputDiscFeeAmountHidden);
-        const anRounding = initBoundAutoNumeric(inputRoundingAmountDisplay, inputRoundingAmountHidden);
-        const anShipping = initBoundAutoNumeric(inputShippingDisplay, inputShippingHidden);
-
-        // --- 2. INIT SELECT2 (Manual, hindari bentrok app.js) ---
-        $('.po-select2').select2({ width: '100%', dropdownCssClass: 'select2-dropdown-clean', allowClear: true, placeholder: '-- Pilih --' });
-
-        // --- 3. ROW MANAGEMENT ---
-        window.addProductRow = function(data = null) {
-            const clone = productRowTemplate.content.cloneNode(true);
-            const tr = clone.querySelector('tr');
-            
-            // Naming Inputs
-            tr.querySelector('.product-select').name = `products[${productIndex}][product_id]`;
-            tr.querySelector('.quantity').name = `products[${productIndex}][quantity]`;
-            tr.querySelector('.purchase-price-hidden').name = `products[${productIndex}][price_per_unit]`;
-            tr.querySelector('.update-master-price').name = `products[${productIndex}][update_master_price]`;
-            
-            // Set Name Initial Discount
-            const initialDiscInput = tr.querySelector('.discount-percentage');
-            initialDiscInput.name = `products[${productIndex}][discounts][]`;
-
-            productItemsContainer.appendChild(tr);
-            
-            // Init Plugins for Row
-            const select = $(tr.querySelector('.product-select'));
-            select.select2({ width: '100%', placeholder: '-- Pilih Produk --', dropdownCssClass: 'select2-dropdown-clean' });
-
-            const priceInput = tr.querySelector('.purchase-price-formatted');
-            const priceHidden = tr.querySelector('.purchase-price-hidden');
-            const qtyInput = tr.querySelector('.quantity');
-            
-            // Init AutoNumeric Row (Binding ke Hidden)
-            const anPrice = new AutoNumeric(priceInput, { 
-                decimalCharacter: ',', 
-                digitGroupSeparator: '.', 
-                decimalPlaces: 0, 
-                minimumValue: '0',
-                unformatOnSubmit: false
-            });
-
-            // Events
-            select.on('select2:select', function(e) {
-                const option = e.params.data.element;
-                const unit = option.dataset.unit || '-';
-                const price = parseFloat(option.dataset.defaultPrice) || 0;
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('purchaseOrderCreate', () => ({
+                selectAll: false,
+                items: [
+                    { id: Date.now(), selected: false, product_id: '', price: 0, price_visual: '', qty: 1, unit_name: '', discounts: [0] }
+                ],
                 
-                tr.querySelector('.unit-display').textContent = unit;
-                if (priceInput.value == 0 || priceInput.value == '') {
-                    anPrice.set(price);
-                    priceHidden.value = price;
-                }
-                calculateTotals();
-            });
-
-            priceInput.addEventListener('autoNumeric:rawValueModified', e => {
-                priceHidden.value = e.detail.newRawValue;
-                calculateTotals();
-            });
-
-            qtyInput.addEventListener('input', calculateTotals);
-            
-            // Multiple Discount Logic
-            initialDiscInput.addEventListener('input', calculateTotals);
-            tr.querySelector('.add-disc-btn').addEventListener('click', () => {
-                addDiscountInputToRow(tr);
-            });
-
-            tr.querySelector('.remove-product-btn').addEventListener('click', function() {
-                select.select2('destroy');
-                tr.remove();
-                calculateTotals();
-            });
-
-            productIndex++;
-        };
-
-        function addDiscountInputToRow(tr, value = '') {
-            const discContainer = tr.querySelector('.discount-wrapper');
-            const nameAttr = tr.querySelector('.product-select').name; 
-            const rowIndexMatch = nameAttr.match(/products\[(\d+)\]/);
-            const rowIndex = rowIndexMatch ? rowIndexMatch[1] : productIndex;
-
-            const div = document.createElement('div');
-            div.className = 'flex items-center justify-center gap-1 relative w-full';
-            div.innerHTML = `
-                <input type="number" step="any" min="0" max="100" class="discount-percentage form-input text-xs w-20 text-center h-8 p-1" name="products[${rowIndex}][discounts][]" placeholder="0" value="${value}">
-                <span class="text-xs text-slate-400 absolute right-6">%</span>
-                <button type="button" class="text-red-400 hover:text-red-600 absolute -right-4" onclick="this.parentElement.remove(); calculateTotals();">&times;</button>
-            `;
-            div.querySelector('input').addEventListener('input', calculateTotals);
-            discContainer.appendChild(div);
-            calculateTotals();
-        }
-
-        // --- 4. BULK DISCOUNT LOGIC ---
-        function parseChainDiscount(str) {
-            if(!str) return [];
-            return str.split(/[,+]/).map(s => parseFloat(s.trim())).filter(n => !isNaN(n) && n > 0 && n <= 100);
-        }
-        
-        function applyBulkDiscountToRows(rows) {
-            const inputStr = inputBulkChain.value;
-            const discounts = parseChainDiscount(inputStr);
-
-            if (discounts.length === 0) {
-                Swal.fire('Format Salah', 'Gunakan format seperti: 10+5', 'warning');
-                return;
-            }
-
-            rows.forEach(tr => {
-                const container = tr.querySelector('.discount-wrapper');
-                container.innerHTML = ''; 
-                discounts.forEach(val => {
-                    addDiscountInputToRow(tr, val);
-                });
-            });
-
-            calculateTotals();
-        }
-
-        // Event Listeners for Bulk Actions
-        btnApplySelected.addEventListener('click', function() {
-            const checkedRows = Array.from(productItemsContainer.querySelectorAll('tr')).filter(tr => tr.querySelector('.row-checkbox').checked);
-            if(checkedRows.length === 0) {
-                Swal.fire('Pilih Item', 'Centang minimal satu baris produk.', 'info');
-                return;
-            }
-            applyBulkDiscountToRows(checkedRows);
-        });
-
-        btnApplyAll.addEventListener('click', function() {
-            const allRows = Array.from(productItemsContainer.querySelectorAll('tr'));
-            if(allRows.length === 0) return;
-            applyBulkDiscountToRows(allRows);
-        });
-
-        checkAllRows.addEventListener('change', function() {
-            const isChecked = this.checked;
-            productItemsContainer.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = isChecked);
-        });
-
-        // --- 5. CALCULATION ENGINE ---
-        window.calculateTotals = function() {
-            let subtotalGlobal = 0;
-
-            // Loop Rows
-            productItemsContainer.querySelectorAll('tr').forEach(row => {
-                const qty = parseFloat(row.querySelector('.quantity').value) || 0;
-                // Ambil dari hidden value (raw number)
-                const price = parseFloat(row.querySelector('.purchase-price-hidden').value) || 0;
+                applyDisc: false,
+                discPercent: 0,
+                applyRounding: false,
+                roundingAmount: 0,
+                shipping: 0,
+                taxId: '',
                 
-                let netPrice = price;
-                row.querySelectorAll('.discount-percentage').forEach(d => {
-                    const disc = parseFloat(d.value) || 0;
-                    if(disc > 0) {
-                        netPrice = netPrice * (1 - (disc / 100));
+                useCustomDPP: false,
+                dppInput: '11/12',
+                
+                bulkDiscValue: '',
+
+                init() {
+                    this.$watch('items', () => {}, { deep: true });
+                },
+
+                toggleSelectAll() { this.items.forEach(item => item.selected = this.selectAll); },
+
+                initTomSelect(el, index) {
+                    if (el.tomselect) el.tomselect.destroy();
+                    new TomSelect(el, {
+                        ...window.defaultTomSelectConfig,
+                        onChange: (value) => {
+                            this.items[index].product_id = value;
+                            const option = el.querySelector(`option[value="${value}"]`);
+                            if (option) {
+                                const price = parseFloat(option.dataset.price) || 0;
+                                const unit = option.dataset.unit || 'Unit';
+                                this.items[index].price = price;
+                                this.items[index].price_visual = this.formatRupiah(price, false);
+                                this.items[index].unit_name = unit;
+                            }
+                        }
+                    });
+                },
+
+                initTaxSelect(el) {
+                    if (el.tomselect) el.tomselect.destroy();
+                    new TomSelect(el, {
+                        ...window.defaultTomSelectConfig,
+                        onChange: (value) => { this.taxId = value; }
+                    });
+                },
+
+                addItem() {
+                    this.items.push({ id: Date.now(), selected: false, product_id: '', price: 0, price_visual: '', qty: 1, unit_name: '', discounts: [0] });
+                },
+
+                removeItem(index) {
+                    if (this.items.length > 1) { this.items.splice(index, 1); }
+                    else {
+                         this.items[0].product_id = ''; 
+                         this.items[0].price = 0; 
+                         this.items[0].price_visual = ''; 
+                         this.items[0].qty = 1; 
+                         this.items[0].discounts = [0];
+                         
+                         const selectEl = document.querySelector(`select[name="products[0][product_id]"]`);
+                         if(selectEl && selectEl.tomselect) selectEl.tomselect.clear();
                     }
-                });
+                },
 
-                const rowSubtotal = qty * netPrice;
-                row.querySelector('.subtotal').textContent = formatCurrency(rowSubtotal);
-                subtotalGlobal += rowSubtotal;
-            });
+                addDiscountLevel(index) { this.items[index].discounts.push(0); },
+                removeDiscountLevel(index, dIndex) { this.items[index].discounts.splice(dIndex, 1); },
+                updateDiscString(index) {}, 
 
-            // Header Discounts
-            let discFeeVal = 0;
-            if (checkboxDiscFee.checked) {
-                const pct = parseFloat(inputDiscFeePercent.value) || 0;
-                // Ambil dari hidden value
-                const amt = parseFloat(inputDiscFeeAmountHidden.value) || 0;
-                
-                if (pct > 0) discFeeVal = subtotalGlobal * (pct / 100);
-                else if (amt > 0) discFeeVal = amt;
-            }
+                applyBulkDiscount(target) {
+                    if(!this.bulkDiscValue) return;
+                    const parts = this.bulkDiscValue.toString().split('+').map(d => parseFloat(d) || 0);
+                    let appliedCount = 0;
+                    this.items.forEach(item => {
+                        if (target === 'all' || (target === 'selected' && item.selected)) {
+                            item.discounts = [...parts]; 
+                            appliedCount++;
+                        }
+                    });
+                    if (appliedCount > 0) showToast(`Diskon massal diterapkan.`, 'success');
+                    else showToast('Tidak ada item yang dipilih.', 'warning');
+                },
 
-            const roundingVal = checkboxRounding.checked ? (parseFloat(inputRoundingAmountHidden.value) || 0) : 0;
-            
-            let taxableBase = subtotalGlobal - discFeeVal - roundingVal;
-            if (taxableBase < 0) taxableBase = 0;
+                formatPriceInput(index, value) {
+                    const rawValue = value.replace(/\D/g, '');
+                    const floatValue = parseFloat(rawValue) || 0;
+                    this.items[index].price = floatValue;
+                    this.items[index].price_visual = new Intl.NumberFormat('id-ID').format(floatValue);
+                },
 
-            // Tax
-            let dppVal = taxableBase;
-            let ppnVal = 0;
-            const selectedTaxOption = $(inputTaxId).select2('data')[0];
-            const taxRate = (selectedTaxOption && selectedTaxOption.element) ? parseFloat(selectedTaxOption.element.dataset.rate) : 0;
+                get dppFactorCalc() {
+                    let val = 1;
+                    if (!this.useCustomDPP) return 1;
 
-            if (taxRate > 0) {
-                let dppFactor = 1; 
-                if (checkboxCustomDpp.checked) {
-                    dppFactor = parseFractionOrNumber(inputCustomDpp.value);
+                    try {
+                        const input = this.dppInput.toString().replace(/\s/g, '').replace(',', '.');
+                        if (input.includes('/')) {
+                            const parts = input.split('/');
+                            if (parts.length === 2) {
+                                const num = parseFloat(parts[0]);
+                                const den = parseFloat(parts[1]);
+                                if (!isNaN(num) && !isNaN(den) && den !== 0) {
+                                    val = num / den;
+                                }
+                            }
+                        } else {
+                            const floatVal = parseFloat(input);
+                            if (!isNaN(floatVal)) val = floatVal;
+                        }
+                    } catch (e) {
+                        val = 1;
+                    }
+                    return val;
+                },
+
+                get dppFactorValue() {
+                    return this.dppFactorCalc.toFixed(8);
+                },
+
+                calculateRowTotal(item) {
+                    const price = parseFloat(item.price) || 0;
+                    const qty = parseFloat(item.qty) || 0;
+                    let finalPrice = price;
+                    
+                    if (item.discounts && item.discounts.length > 0) {
+                        item.discounts.forEach(d => {
+                            let val = parseFloat(d);
+                            if (!isNaN(val) && val > 0) {
+                                finalPrice = finalPrice * (1 - (val / 100));
+                            }
+                        });
+                    }
+                    return finalPrice * qty;
+                },
+
+                get totals() {
+                    const subtotal = this.items.reduce((sum, item) => sum + this.calculateRowTotal(item), 0);
+                    let currentTotal = subtotal;
+                    let discAmount = 0;
+
+                    if (this.applyDisc) {
+                        discAmount = subtotal * ((parseFloat(this.discPercent) || 0) / 100);
+                        currentTotal -= discAmount;
+                    }
+                    if (this.applyRounding) {
+                        currentTotal -= (parseFloat(this.roundingAmount) || 0);
+                    }
+
+                    // DPP
+                    let dpp = currentTotal;
+                    if (this.useCustomDPP) {
+                        dpp = currentTotal * this.dppFactorCalc; 
+                    }
+
+                    // PPN
+                    let ppn = 0;
+                    if (this.taxId && taxRates[this.taxId]) {
+                        const rate = parseFloat(taxRates[this.taxId]);
+                        ppn = dpp * (rate / 100);
+                    }
+
+                    const grandTotal = currentTotal + ppn + (parseFloat(this.shipping) || 0);
+
+                    return {
+                        subtotal: subtotal,
+                        discAmount: discAmount,
+                        dpp: dpp,
+                        ppn: ppn,
+                        grandTotal: Math.max(0, Math.round(grandTotal))
+                    };
+                },
+
+                formatRupiah(value, withSymbol = true) {
+                    return new Intl.NumberFormat('id-ID', {
+                        style: withSymbol ? 'currency' : 'decimal',
+                        currency: 'IDR',
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0
+                    }).format(value || 0);
                 }
-                dppVal = taxableBase * dppFactor;
-                ppnVal = dppVal * (taxRate / 100);
-            }
-
-            const shippingVal = parseFloat(inputShippingHidden.value) || 0;
-            const grandTotal = taxableBase + ppnVal + shippingVal;
-
-            // Render Summary
-            displaySubtotal.textContent = formatCurrency(subtotalGlobal);
-            displayDisc.textContent = `(-) ${formatCurrency(discFeeVal)}`;
-            displayRounding.textContent = `(-) ${formatCurrency(roundingVal)}`;
-            displayDpp.textContent = formatCurrency(dppVal);
-            displayPpn.textContent = `(+) ${formatCurrency(ppnVal)}`;
-            displayTaxRate.textContent = taxRate;
-            displayGrand.textContent = formatCurrency(grandTotal);
-            
-            // Toggle Input Visibility
-            document.getElementById('disc-fee-inputs').classList.toggle('hidden', !checkboxDiscFee.checked);
-            document.getElementById('rounding_discount_amount_display').classList.toggle('hidden', !checkboxRounding.checked);
-            document.getElementById('custom-dpp-container').classList.toggle('hidden', !checkboxCustomDpp.checked);
-        };
-
-        // --- 6. EVENT LISTENERS ---
-        const calcTriggers = [inputDiscFeePercent, inputCustomDpp];
-        calcTriggers.forEach(el => el.addEventListener('input', calculateTotals));
-        $(inputTaxId).on('select2:select select2:unselect', calculateTotals);
-
-        [checkboxDiscFee, checkboxRounding, checkboxCustomDpp].forEach(el => {
-            el.addEventListener('change', calculateTotals);
+            }));
         });
-
-        // Add Initial Row
-        addProductRow();
-        
-        // Form Validation Interceptor
-        form.addEventListener('submit', function(e) {
-            if (productIndex === 0 || productItemsContainer.children.length === 0) {
-                e.preventDefault();
-                Swal.fire('Perhatian', 'Mohon tambahkan minimal satu item.', 'warning');
-                return;
-            }
-            // Convert fraction to decimal for backend
-            if (checkboxCustomDpp.checked && inputCustomDpp.value) {
-                inputCustomDpp.value = parseFractionOrNumber(inputCustomDpp.value);
-            }
-
-            const submitBtn = document.getElementById('submit-btn');
-            if(submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="material-icons animate-spin text-sm">sync</i> Menyimpan...';
-            }
-        });
-        
-        // Calc once on load
-        setTimeout(calculateTotals, 500);
-    });
-</script>
-@endpush
+    </script>
+    @endpush
+@endsection

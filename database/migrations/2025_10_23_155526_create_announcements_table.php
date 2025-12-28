@@ -10,12 +10,12 @@ return new class extends Migration
     {
         Schema::create('announcements', function (Blueprint $table) {
             $table->id();
-            $table->string('title')->nullable(); // Judul (opsional)
-            $table->text('content');             // Isi pengumuman
-            $table->enum('type', ['broadcast', 'targeted'])->default('broadcast'); // Tipe pengumuman
-            $table->boolean('is_active')->default(false); // Status aktif/tidak
+            $table->string('title')->nullable();
+            $table->text('content');
+            $table->enum('type', ['broadcast', 'targeted'])->default('broadcast');
+            $table->boolean('is_active')->default(false);
             $table->timestamps();
-            $table->softDeletes(); // Tambahkan soft delete
+            $table->softDeletes();
         });
     }
 

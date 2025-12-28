@@ -8,49 +8,66 @@ use App\Models\Supplier;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 class ProductImport implements ToModel, WithHeadingRow
 {
     public function model(array $row)
     {
-        // 1. Handle Satuan (Default: 'pcs' jika kosong)
-        $unitName = isset($row['satuan']) && trim($row['satuan']) !== '' 
-                    ? $row['satuan'] 
-                    : 'pcs';
-                    
-        $unit = Unit::firstOrCreate(['name' => $unitName]);
+        $productName = isset($row['product_name']) ? trim($row['product_name']) : '';
 
-        // 2. Handle Supplier (Default: 'Supplier Umum' jika kosong)
-        $supplierName = isset($row['nama_supplier']) && trim($row['nama_supplier']) !== '' 
-                        ? $row['nama_supplier'] 
-                        : 'Supplier Umum';
-
-        $supplier = Supplier::firstOrCreate(
-            ['supplier_name' => $supplierName],
-            ['address' => 'Alamat default (Auto-Import)', 'phone_number' => '-']
-        );
-
-        // 3. Handle Kode Produk (Auto-Generate jika kosong)
-        $productCode = $row['kode_produk'];
-        if (empty($productCode)) {
-            // Generate kode unik: AUTO-TIMESTAMP-RANDOM
-            // Contoh: AUTO-17315678-99
-            $productCode = 'AUTO-' . time() . '-' . strtoupper(\Illuminate\Support\Str::random(4));
+        if (empty($productName)) {
+            return null;
         }
 
-        // 4. Simpan Produk
-        // Gunakan updateOrCreate agar jika kode produk sudah ada, datanya diupdate (tidak error duplikat)
+        $unitInput = isset($row['unit_id']) ? trim($row['unit_id']) : null;
+        $unit = null;
+
+        if (is_numeric($unitInput)) {
+            $unit = Unit::find($unitInput);
+        } 
+
+        if (!$unit) {
+            $unitName = !empty($unitInput) && !is_numeric($unitInput) ? $unitInput : 'pcs';
+            $unit = Unit::firstOrCreate(['name' => $unitName]);
+        }
+
+        $supplierInput = isset($row['supplier_id']) ? trim($row['supplier_id']) : null;
+        $supplier = null;
+
+        if (is_numeric($supplierInput)) {
+            $supplier = Supplier::find($supplierInput);
+        }
+
+        if (!$supplier) {
+            $supplierName = !empty($supplierInput) && !is_numeric($supplierInput) ? $supplierInput : 'Supplier Umum';
+            $supplier = Supplier::firstOrCreate(
+                ['supplier_name' => $supplierName],
+                ['address' => '-', 'phone_number' => '-'] 
+            );
+        }
+
+        $productCode = isset($row['product_code']) ? trim($row['product_code']) : '';
+        
+        if (empty($productCode)) {
+            $productCode = 'AUTO-' . time() . '-' . strtoupper(Str::random(4));
+        }
+
+        $purchasePrice = isset($row['purchase_price']) ? (float) $row['purchase_price'] : 0;
+        $sellingPrice  = isset($row['selling_price']) ? (float) $row['selling_price'] : 0;
+        $stockQuantity = isset($row['stock_quantity']) ? (float) $row['stock_quantity'] : 0;
+
         return Product::updateOrCreate(
-            ['product_code' => $productCode], // Cek berdasarkan kode
+            ['product_code' => $productCode], 
             [
-                'product_name'   => $row['nama_produk'] ?? 'Produk Tanpa Nama',
-                'purchase_price' => $row['harga_beli'] ?? 0,
-                'selling_price'  => $row['harga_jual'] ?? 0,
-                'stock_quantity' => $row['stok_awal'] ?? 0,
-                'average_cost'   => $row['harga_beli'] ?? 0, // Set HPP awal = Harga Beli
-                'unit_id'        => $unit->unit_id,
+                'product_name'   => $productName,
                 'supplier_id'    => $supplier->supplier_id,
-                'description'    => $row['deskripsi'] ?? null,
+                'unit_id'        => $unit->unit_id,
+                'purchase_price' => $purchasePrice,
+                'selling_price'  => $sellingPrice,
+                'stock_quantity' => $stockQuantity,
+                'average_cost'   => DB::raw("CASE WHEN average_cost = 0 OR average_cost IS NULL THEN $purchasePrice ELSE average_cost END"),
+                'description'    => $row['description'] ?? null,
             ]
         );
     }

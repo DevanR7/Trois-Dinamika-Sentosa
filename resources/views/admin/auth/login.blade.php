@@ -17,13 +17,33 @@
         </div>
     </div>
 
-    {{-- ALERT ERROR --}}
-    @if ($errors->any())
+    {{-- ==================================================================== --}}
+    {{-- ALERT SECTION (UPDATED) --}}
+    {{-- ==================================================================== --}}
+    
+    {{-- 1. ERROR ALERT (Merah) --}}
+    {{-- Menangani error validasi form ATAU error session dari Controller (misal: belum approve) --}}
+    @if ($errors->any() || session('error'))
         <div class="flex p-3 mb-6 text-xs text-red-700 bg-red-50 rounded-lg border border-red-100 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300 items-center animate-enter">
             <i class="material-icons text-sm mr-2">error</i>
-            <span class="font-semibold">{{ $errors->first() }}</span>
+            <span class="font-semibold">
+                {{ $errors->first() ?: session('error') }}
+            </span>
         </div>
     @endif
+
+    {{-- 2. SUCCESS ALERT (Hijau) --}}
+    {{-- Menangani pesan sukses (misal: link reset password terkirim) --}}
+    @if (session('status') || session('success'))
+        <div class="flex p-3 mb-6 text-xs text-green-700 bg-green-50 rounded-lg border border-green-100 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300 items-center animate-enter">
+            <i class="material-icons text-sm mr-2">check_circle</i>
+            <span class="font-semibold">
+                {{ session('status') ?: session('success') }}
+            </span>
+        </div>
+    @endif
+
+    {{-- ==================================================================== --}}
 
     {{-- FORM --}}
     <form method="POST" action="{{ route('admin.login') }}" class="space-y-5">
@@ -104,6 +124,7 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Logic Show/Hide Password
             const toggleBtn = document.getElementById('togglePassword');
             const passwordInput = document.getElementById('password');
             if (toggleBtn && passwordInput) {
@@ -113,16 +134,22 @@
                     this.innerText = (type === 'text') ? 'HIDE' : 'SHOW';
                 });
             }
+
+            // Logic Button Loading State
             const form = document.querySelector('form');
             const btnLogin = document.getElementById('btn-login');
-            const btnText = btnLogin.querySelector('.btn-text');
-            const btnLoader = btnLogin.querySelector('.btn-loader');
-            if(form) {
+            const btnText = btnLogin ? btnLogin.querySelector('.btn-text') : null;
+            const btnLoader = btnLogin ? btnLogin.querySelector('.btn-loader') : null;
+            
+            if(form && btnLogin) {
                 form.addEventListener('submit', function() {
+                    // Hindari double submit
+                    if (btnLogin.disabled) return;
+                    
                     btnLogin.disabled = true;
                     btnLogin.classList.add('opacity-75', 'cursor-not-allowed');
-                    btnText.innerText = 'MEMPROSES...';
-                    btnLoader.classList.remove('hidden');
+                    if(btnText) btnText.innerText = 'MEMPROSES...';
+                    if(btnLoader) btnLoader.classList.remove('hidden');
                 });
             }
         });

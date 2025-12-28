@@ -22,7 +22,6 @@ class StockOpnameController extends Controller
     {
         $this->accountingService = $accountingService;
         $this->accountingSettings = $accountingSettingService;
-        // Tambahkan middleware permission jika perlu
         $this->middleware('can:manage-stock-opnames');
     }
 
@@ -34,23 +33,25 @@ class StockOpnameController extends Controller
 
     public function create()
     {
-        // Ambil semua produk untuk dihitung
-        // (Untuk sistem besar, mungkin perlu filter per kategori atau lokasi)
         $products = Product::orderBy('product_name')->get();
         return view('admin.stock_opnames.create', compact('products'));
     }
 
     public function store(Request $request)
-    {
+    {   
+        Log::info('Stock Opname Store Request:', $request->all());
+        
         $validated = $request->validate([
             'opname_date' => 'required|date',
             'notes' => 'nullable|string',
             'products' => 'required|array',
             'products.*.product_id' => 'required|exists:products,product_id',
-            'products.*.physical_qty' => 'required|integer|min:0',
+            'products.*.physical_qty' => 'required|numeric|min:0',
+            'confirmed' => 'sometimes|in:1'
         ]);
+        
+        Log::info('Stock Opname Validation Passed:', $validated);
 
-        // Validasi Akun
         $inventoryAccountId = $this->accountingSettings->getInventoryId();
         $adjustmentAccountId = $this->accountingSettings->getInventoryAdjustmentId();
 
@@ -60,28 +61,24 @@ class StockOpnameController extends Controller
 
         DB::beginTransaction();
         try {
-            // 1. Buat Header
             $opname = StockOpname::create([
                 'opname_number' => StockOpname::generateNumber(),
                 'opname_date' => $validated['opname_date'],
                 'notes' => $validated['notes'],
                 'user_id' => Auth::id(),
-                'status' => 'completed', // Langsung completed karena stok langsung berubah
-                'total_adjustment_value' => 0 // Nanti diupdate
+                'status' => 'completed', 
+                'total_adjustment_value' => 0
             ]);
 
             $totalAdjustmentValue = 0;
             $itemsToInsert = [];
 
-            // 2. Proses Item
             foreach ($validated['products'] as $itemData) {
                 $product = Product::lockForUpdate()->find($itemData['product_id']);
                 
                 $systemQty = $product->stock_quantity;
-                $physicalQty = (int)$itemData['physical_qty'];
+                $physicalQty = (float) $itemData['physical_qty'];
                 $difference = $physicalQty - $systemQty;
-                
-                // Jika tidak ada selisih, tetap catat tapi nilai 0
                 $cost = $product->average_cost;
                 $adjustmentValue = $difference * $cost;
 
@@ -96,7 +93,6 @@ class StockOpnameController extends Controller
                     'created_at' => now(), 'updated_at' => now()
                 ];
 
-                // Update Stok Produk
                 if ($difference != 0) {
                     $product->stock_quantity = $physicalQty;
                     $product->save();
@@ -107,7 +103,6 @@ class StockOpnameController extends Controller
             StockOpnameItem::insert($itemsToInsert);
             $opname->update(['total_adjustment_value' => $totalAdjustmentValue]);
 
-            // 3. Post Jurnal Akuntansi (Hanya jika ada selisih nilai)
             if (abs($totalAdjustmentValue) > 0.01) {
                 $journalGroupId = "SO-" . $opname->opname_number;
                 $description = "Penyesuaian Stok Opname #" . $opname->opname_number;
@@ -116,16 +111,10 @@ class StockOpnameController extends Controller
                 $creditEntries = [];
 
                 if ($totalAdjustmentValue < 0) {
-                    // KERUGIAN (Stok Hilang/Minus)
-                    // (Debit) Beban Selisih Stok
-                    // (Kredit) Persediaan Barang
                     $lossAmount = abs($totalAdjustmentValue);
                     $debitEntries[] = [$adjustmentAccountId, $lossAmount, "Selisih Kurang Stok"];
                     $creditEntries[] = [$inventoryAccountId, $lossAmount, "Pengurangan nilai persediaan"];
                 } else {
-                    // KEUNTUNGAN (Stok Lebih)
-                    // (Debit) Persediaan Barang
-                    // (Kredit) Beban Selisih Stok (sebagai pengurang beban/pendapatan lain)
                     $gainAmount = $totalAdjustmentValue;
                     $debitEntries[] = [$inventoryAccountId, $gainAmount, "Penambahan nilai persediaan"];
                     $creditEntries[] = [$adjustmentAccountId, $gainAmount, "Selisih Lebih Stok (Adjustment)"];
@@ -159,35 +148,19 @@ class StockOpnameController extends Controller
 
     public function destroy(StockOpname $stockOpname): \Illuminate\Http\RedirectResponse
     {
-        // Cek Transaction Lock (Penting agar tidak menghapus data periode yg sudah tutup buku)
         $journalGroupId = "SO-" . $stockOpname->opname_number;
-        // Pastikan trait ValidatesAccountingPeriod digunakan di class ini atau panggil manual servicenya
-        // Jika menggunakan trait:
-        // if ($error = $this->checkTransactionLock($stockOpname->opname_date, $journalGroupId)) {
-        //    return back()->with('error', "Gagal Hapus: " . $error);
-        // }
 
         DB::beginTransaction();
         try {
-            // 1. Kembalikan Stok Produk
-            // Kita balikkan logikanya: 
-            // Jika dulu fisik > sistem (Diff +), stok ditambah. Sekarang kita kurangi.
-            // Jika dulu fisik < sistem (Diff -), stok dikurangi. Sekarang kita tambah.
             foreach ($stockOpname->items as $item) {
                 $product = Product::lockForUpdate()->find($item->product_id);
                 if ($product) {
-                    // Gunakan pengurangan langsung terhadap difference
-                    // Contoh: Diff +5 (Stok nambah 5). Kita decrement 5 -> Stok berkurang 5 (Balik asal).
-                    // Contoh: Diff -5 (Stok kurang 5). Kita decrement -5 -> Stok bertambah 5 (Balik asal).
                     $product->decrement('stock_quantity', $item->difference);
                 }
             }
 
-            // 2. Hapus Jurnal Akuntansi (GL) secara langsung
-            // Kita tidak perlu membuat jurnal reversal karena transaksi utamanya dihapus.
             DB::table('general_ledgers')->where('journal_group_id', $journalGroupId)->delete();
 
-            // 3. Hapus Record Stock Opname (Cascade akan menghapus items)
             $stockOpname->delete();
 
             DB::commit();
@@ -203,7 +176,6 @@ class StockOpnameController extends Controller
 
     public function downloadWorksheet()
     {
-        // Ambil semua produk, urutkan berdasarkan nama/lokasi rak agar mudah dicek
         $products = Product::with('unit')
             ->orderBy('product_name', 'asc')
             ->get();
@@ -213,10 +185,7 @@ class StockOpnameController extends Controller
             'date' => now(),
         ];
 
-        // Load view PDF (kita buat setelah ini)
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('stock_opnames.pdf_worksheet', $data);
-        
-        // Set ukuran kertas A4 Portrait
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.stock_opnames.pdf_worksheet', $data);
         $pdf->setPaper('a4', 'portrait');
 
         return $pdf->download('Lembar-Kerja-Stock-Opname-' . now()->format('d-m-Y') . '.pdf');

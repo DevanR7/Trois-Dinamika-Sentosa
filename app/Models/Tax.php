@@ -22,7 +22,7 @@ class Tax extends Model
     ];
     
     public function salesInvoices()
-{
-    return $this->belongsToMany(SalesInvoice::class, 'invoice_tax', 'tax_id', 'invoice_id');
-}
+    {
+        return $this->belongsToMany(SalesInvoice::class, 'invoice_tax', 'tax_id', 'invoice_id');
+    }
 }

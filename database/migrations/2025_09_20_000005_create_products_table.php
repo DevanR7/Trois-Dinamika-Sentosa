@@ -10,7 +10,8 @@ return new class extends Migration
     {
         Schema::create('products', function (Blueprint $table) {
             $table->id('product_id');
-            $table->foreignId('supplier_id')->constrained('suppliers', 'supplier_id');
+            $table->foreignId('supplier_id')
+                ->constrained('suppliers', 'supplier_id');
             $table->string('product_code', 50)->unique();
             $table->string('product_name', 200);
             $table->text('description')->nullable();
@@ -19,12 +20,14 @@ return new class extends Migration
             $table->decimal('selling_price', 15, 2)->nullable();
             $table->decimal('average_cost', 19, 4)->nullable()->default(0.00);
             $table->decimal('stock_quantity', 15, 2)->nullable();
-            $table->foreignId('unit_id')->nullable()->constrained('units', 'unit_id');
+            $table->foreignId('unit_id')
+                ->nullable()
+                ->constrained('units', 'unit_id');
             $table->softDeletes();
             $table->timestamps();
         });
     }
-
+    
     public function down(): void
     {
         Schema::dropIfExists('products');

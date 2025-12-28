@@ -11,7 +11,6 @@ use App\Models\ChartOfAccount;
 class ManualJournalEntry extends Model
 {
     use HasFactory;
-
     protected $primaryKey = 'entry_id';
     
     protected $fillable = [
@@ -27,17 +26,11 @@ class ManualJournalEntry extends Model
         'credit' => 'float',
     ];
 
-    /**
-     * Relasi ke header
-     */
     public function manualJournal(): BelongsTo
     {
         return $this->belongsTo(ManualJournal::class, 'journal_id', 'journal_id');
     }
 
-    /**
-     * Relasi ke Akun COA
-     */
     public function account(): BelongsTo
     {
         return $this->belongsTo(ChartOfAccount::class, 'chart_of_account_id', 'account_id');

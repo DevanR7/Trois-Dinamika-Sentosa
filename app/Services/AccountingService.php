@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\GeneralLedger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Auth;
 use Exception;
 
 class AccountingService
@@ -31,23 +30,21 @@ class AccountingService
         Model $referenceModel,
         ?int $userId = null
     ) {
-        DB::transaction(function () use ($journalGroupId, $entryDate, $description, $debitEntries, $creditEntries, $referenceModel, $userId) {  
-            
+        DB::transaction(function () use ($journalGroupId, $entryDate, $description, $debitEntries, $creditEntries, $referenceModel, $userId) {
+
             $oldReconMap = GeneralLedger::where('journal_group_id', $journalGroupId)
                 ->whereNotNull('bank_reconciliation_id')
                 ->pluck('bank_reconciliation_id', 'chart_of_account_id')
                 ->toArray();
 
-            // 2. Hapus jurnal lama
             GeneralLedger::where('journal_group_id', $journalGroupId)->delete();
 
             $totalDebit = 0;
             $totalCredit = 0;
             $journalsToCreate = [];
 
-            // Proses entri Debit
             foreach ($debitEntries as $entry) {
-                $amount = $entry[1];
+                $amount = (float) $entry[1];
                 if ($amount > 0) {
                     $totalDebit += $amount;
                     $journalsToCreate[] = [
@@ -56,7 +53,7 @@ class AccountingService
                         'entry_date' => $entryDate,
                         'debit' => $amount,
                         'credit' => 0,
-                        'description' => $entry[2] ?? $description, // Gunakan deskripsi override jika ada
+                        'description' => $entry[2] ?? $description, 
                         'reference_type' => get_class($referenceModel),
                         'reference_id' => $referenceModel->getKey(),
                         'user_id' => $userId,
@@ -66,9 +63,8 @@ class AccountingService
                 }
             }
 
-            // Proses entri Kredit
             foreach ($creditEntries as $entry) {
-                $amount = $entry[1];
+                $amount = (float) $entry[1];
                 if ($amount > 0) {
                     $totalCredit += $amount;
                     $journalsToCreate[] = [
@@ -77,7 +73,7 @@ class AccountingService
                         'entry_date' => $entryDate,
                         'debit' => 0,
                         'credit' => $amount,
-                        'description' => $entry[2] ?? $description, // Gunakan deskripsi override jika ada
+                        'description' => $entry[2] ?? $description, 
                         'reference_type' => get_class($referenceModel),
                         'reference_id' => $referenceModel->getKey(),
                         'user_id' => $userId,
@@ -88,20 +84,19 @@ class AccountingService
             }
 
             foreach ($journalsToCreate as &$journal) {
-            $accId = $journal['chart_of_account_id'];
-            if (isset($oldReconMap[$accId])) {
-                $journal['bank_reconciliation_id'] = $oldReconMap[$accId];
+                $accId = $journal['chart_of_account_id'];
+                if (isset($oldReconMap[$accId])) {
+                    $journal['bank_reconciliation_id'] = $oldReconMap[$accId];
+                }
             }
-        }
+            unset($journal); 
 
-            // Validasi Keseimbangan Jurnal
-            // Kita gunakan toleransi kecil untuk error floating point
             if (abs(round($totalDebit, 2) - round($totalCredit, 2)) > 0.01) {
                 throw new Exception("Jurnal tidak seimbang (Unbalanced Journal) untuk $journalGroupId. Debit: $totalDebit, Kredit: $totalCredit");
             }
-        
-            // Masukkan jurnal baru
-            GeneralLedger::insert($journalsToCreate);
+            if (!empty($journalsToCreate)) {
+                GeneralLedger::insert($journalsToCreate);
+            }
         });
     }
 }

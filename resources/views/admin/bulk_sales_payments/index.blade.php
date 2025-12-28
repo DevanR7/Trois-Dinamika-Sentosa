@@ -3,111 +3,172 @@
 @section('title', 'Riwayat Pembayaran Massal')
 
 @section('content')
-<div class="max-w-7xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Riwayat Pembayaran Massal</h1>
-            <p class="text-slate-500 text-sm mt-1">Daftar seluruh transaksi pembayaran massal (Bulk Payment).</p>
-        </div>
-        <div class="flex gap-3">
-            {{-- Tombol ke Halaman Verifikasi --}}
-            <a href="{{ route('admin.bulk-sales-payments.pending') }}" class="h-[48px] px-6 bg-white border border-slate-300 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
-                <i class="material-icons text-[18px]">hourglass_top</i>
-                <span>Verifikasi Pending</span>
-            </a>
-
-            {{-- Tombol Buat Baru --}}
-            <a href="{{ route('admin.bulk-sales-payments.create') }}" class="h-[48px] px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5">
-                <i class="material-icons text-[20px] group-hover:rotate-90 transition-transform">add</i> 
-                <span>Buat Baru</span>
-            </a>
-        </div>
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-800 dark:text-white">Riwayat Bulk Payment</h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Daftar pembayaran gabungan dari pelanggan.</p>
     </div>
+    <div class="flex gap-2">
+        @can('review-batch-payments')
+            <a href="{{ route('admin.bulk-sales-payments.pending') }}" class="btn btn-secondary relative">
+                <i class="material-icons text-lg mr-1">pending_actions</i>
+                Verifikasi Pending
+            </a>
+        @endcan
+        @can('create-batch-payments')
+            <a href="{{ route('admin.bulk-sales-payments.create') }}" class="btn btn-primary">
+                <i class="material-icons text-lg mr-1">add</i>
+                Buat Pembayaran Baru
+            </a>
+        @endcan
+    </div>
+</div>
 
-    {{-- TABEL DATA --}}
-    <div class="dashboard-card p-0 overflow-hidden shadow-sm">
-        <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-                <thead class="bg-slate-50 border-b border-slate-200">
-                    <tr>
-                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ID Batch</th>
-                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Klien</th>
-                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Tanggal</th>
-                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Total Nominal</th>
-                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Metode</th>
-                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Status</th>
-                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100 bg-white">
-                    @forelse($bulkSalesPayments as $bulk)
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="px-6 py-4 text-sm font-mono text-indigo-600 font-bold">
-                                #{{ $bulk->bulk_sales_payment_id }}
-                            </td>
-                            <td class="px-6 py-4">
-                                <div class="text-sm font-bold text-slate-800">{{ $bulk->client->client_name ?? 'N/A' }}</div>
-                                <div class="text-xs text-slate-500">Diproses: {{ $bulk->processedByUser->full_name ?? 'System' }}</div>
-                            </td>
-                            <td class="px-6 py-4 text-sm text-slate-600">
-                                {{ $bulk->payment_date->format('d M Y') }}
-                            </td>
-                            <td class="px-6 py-4 text-sm font-bold text-slate-800 text-right font-mono">
-                                Rp {{ number_format($bulk->total_amount, 0, ',', '.') }}
-                            </td>
-                            <td class="px-6 py-4 text-sm text-slate-600">
-                                {{ $bulk->paymentMethod->name ?? 'N/A' }}
-                            </td>
-                            <td class="px-6 py-4 text-center">
-                                @if($bulk->status == 'completed' || $bulk->status == 'approved')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
-                                        Completed
-                                    </span>
-                                @elseif($bulk->status == 'rejected' || $bulk->status == 'failed')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">
-                                        {{ ucfirst($bulk->status) }}
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
-                                        {{ ucfirst(str_replace('_', ' ', $bulk->status)) }}
-                                    </span>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 text-right">
-                                {{-- Jika status pending, arahkan ke halaman verifikasi, jika tidak ke detail biasa --}}
-                                @if($bulk->status == 'pending_verification')
-                                    <a href="{{ route('admin.bulk-sales-payments.showPending', $bulk->bulk_sales_payment_id) }}" 
-                                       class="text-amber-600 hover:text-amber-800 font-bold text-xs uppercase tracking-wide">
-                                        Verifikasi
-                                    </a>
-                                @else
-                                    <a href="{{ route('admin.bulk-sales-payments.show', $bulk->bulk_sales_payment_id) }}" 
-                                       class="text-indigo-600 hover:text-indigo-800 font-bold text-xs uppercase tracking-wide">
-                                        Detail
-                                    </a>
-                                @endif
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="7" class="px-6 py-12 text-center text-slate-400">
-                                <i class="material-icons text-4xl mb-2 opacity-20">receipt_long</i>
-                                <p class="text-sm">Belum ada riwayat pembayaran massal.</p>
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        
-        {{-- Pagination --}}
-        @if($bulkSalesPayments->hasPages())
-            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50">
-                {{ $bulkSalesPayments->links() }}
+{{-- SECTION FILTER --}}
+<div class="card mb-6">
+    <div class="card-body">
+        <form action="{{ route('admin.bulk-sales-payments.index') }}" method="GET">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                
+                {{-- Search --}}
+                <div class="md:col-span-4">
+                    <label class="form-label">Pencarian</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="material-icons text-slate-400 text-lg">search</i>
+                        </div>
+                        <input type="text" name="search" class="form-input pl-10" 
+                               placeholder="Cari ID, Ref, atau Nama Klien..." 
+                               value="{{ request('search') }}">
+                    </div>
+                </div>
+
+                {{-- Tanggal Mulai --}}
+                <div class="md:col-span-2">
+                    <label class="form-label">Dari Tanggal</label>
+                    <input type="date" name="start_date" class="form-input" 
+                           value="{{ request('start_date') }}">
+                </div>
+
+                {{-- Tanggal Sampai --}}
+                <div class="md:col-span-2">
+                    <label class="form-label">Sampai Tanggal</label>
+                    <input type="date" name="end_date" class="form-input" 
+                           value="{{ request('end_date') }}">
+                </div>
+
+                {{-- Status --}}
+                <div class="md:col-span-2">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="">Semua Status</option>
+                        <option value="completed" {{ request('status') == 'completed' ? 'selected' : '' }}>Selesai</option>
+                        <option value="approved" {{ request('status') == 'approved' ? 'selected' : '' }}>Disetujui</option>
+                        <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
+                        <option value="pending_verification" {{ request('status') == 'pending_verification' ? 'selected' : '' }}>Verifikasi</option>
+                        <option value="rejected" {{ request('status') == 'rejected' ? 'selected' : '' }}>Ditolak</option>
+                    </select>
+                </div>
+
+                {{-- Buttons --}}
+                <div class="md:col-span-2 flex gap-2">
+                    <button type="submit" class="btn btn-primary w-full justify-center">
+                        <i class="material-icons text-lg">filter_list</i>
+                    </button>
+                    <a href="{{ route('admin.bulk-sales-payments.index') }}" 
+                       class="btn btn-secondary w-full justify-center" 
+                       title="Reset Filter">
+                        <i class="material-icons text-lg text-slate-500">refresh</i>
+                    </a>
+                </div>
+
             </div>
-        @endif
+        </form>
     </div>
+</div>
+
+{{-- SECTION TABLE --}}
+<div class="card">
+    <div class="table-container">
+        <table class="table-modern">
+            <thead>
+                <tr>
+                    <th>Ref #</th>
+                    <th>Tanggal</th>
+                    <th>Pelanggan</th>
+                    <th>Metode</th>
+                    <th class="text-right">Total Bayar</th>
+                    <th>Status</th>
+                    <th class="text-center">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($bulkSalesPayments as $payment)
+                    <tr>
+                        <td>
+                            <span class="font-mono font-medium text-indigo-600 dark:text-indigo-400">
+                                #{{ $payment->bulk_sales_payment_id }}
+                            </span>
+                            @if($payment->reference_number)
+                                <div class="text-xs text-slate-500 mt-0.5">Ref: {{ $payment->reference_number }}</div>
+                            @endif
+                        </td>
+                        <td>{{ $payment->payment_date->format('d M Y') }}</td>
+                        <td>
+                            <div class="font-medium">{{ $payment->client->client_name }}</div>
+                        </td>
+                        <td>
+                            @if($payment->paymentMethod)
+                                {{ $payment->paymentMethod->name }}
+                            @else
+                                <span class="text-slate-400 italic">Kredit/Deposit</span>
+                            @endif
+                        </td>
+                        <td class="text-right font-bold text-slate-700 dark:text-slate-200">
+                            Rp {{ number_format($payment->total_amount, 0, ',', '.') }}
+                        </td>
+                        <td>
+                            @if($payment->status === 'completed' || $payment->status === 'approved')
+                                <span class="badge badge-success">Selesai</span>
+                            @elseif($payment->status === 'pending_verification' || $payment->status === 'pending')
+                                <span class="badge badge-warning">Pending</span>
+                            @elseif($payment->status === 'rejected' || $payment->status === 'failed')
+                                <span class="badge badge-danger">Ditolak</span>
+                            @else
+                                <span class="badge badge-secondary">{{ $payment->status }}</span>
+                            @endif
+                        </td>
+                        <td class="text-center">
+                            {{-- BUTTON SHOW DIPERBAIKI (Tidak kecil lagi) --}}
+                            <a href="{{ route('admin.bulk-sales-payments.show', $payment->bulk_sales_payment_id) }}" 
+                               class="btn btn-secondary btn-sm h-8 w-8 p-0 rounded-lg inline-flex items-center justify-center"
+                               data-tooltip-target="tooltip-view-{{ $payment->bulk_sales_payment_id }}">
+                                <i class="material-icons text-base">visibility</i>
+                            </a>
+                            <div id="tooltip-view-{{ $payment->bulk_sales_payment_id }}" role="tooltip" class="absolute z-10 invisible inline-block px-3 py-2 text-sm font-medium text-white transition-opacity duration-300 bg-gray-900 rounded-lg shadow-sm opacity-0 tooltip dark:bg-gray-700">
+                                Detail
+                                <div class="tooltip-arrow" data-popper-arrow></div>
+                            </div>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="7" class="text-center py-8 text-slate-500">
+                            <div class="flex flex-col items-center justify-center">
+                                <i class="material-icons text-4xl mb-2 text-slate-300">receipt_long</i>
+                                <p>Data pembayaran tidak ditemukan.</p>
+                            </div>
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+    
+    @if($bulkSalesPayments->hasPages())
+        <div class="card-footer">
+            {{ $bulkSalesPayments->links() }}
+        </div>
+    @endif
 </div>
 @endsection

@@ -3,122 +3,143 @@
 @section('title', 'Tambah Metode Pembayaran')
 
 @section('content')
-<div class="max-w-2xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-            <nav class="flex items-center gap-2 text-sm text-slate-500 mb-1">
-                <a href="{{ route('admin.payment-methods.index') }}" class="hover:text-indigo-600 transition-colors">Metode</a>
-                <span class="mx-2 text-slate-300">/</span>
-                <span class="text-slate-800 font-semibold">Baru</span>
-            </nav>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Tambah Metode</h1>
-        </div>
-        <a href="{{ route('admin.payment-methods.index') }}" 
-           class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
-            <i class="material-icons text-[18px]">arrow_back</i> Kembali
-        </a>
-    </div>
 
-    {{-- ALERT ERROR --}}
-    @if ($errors->any())
-        <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-md shadow-sm">
-            <div class="flex items-start gap-3">
-                <i class="material-icons text-red-600 text-xl mt-0.5">error_outline</i>
-                <div>
-                    <h3 class="text-sm font-bold text-red-800">Terdapat kesalahan input</h3>
-                    <ul class="mt-1 list-disc list-inside text-xs text-red-700">
-                        @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
-                    </ul>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    <form action="{{ route('admin.payment-methods.store') }}" method="POST">
-        @csrf
+    <div class="max-w-5xl mx-auto">
         
-        <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
-            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                    <i class="material-icons text-[20px]">payments</i>
-                </div>
-                <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Form Data Metode</h3>
+        {{-- Navigation --}}
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h1 class="page-title">Tambah Metode</h1>
+                <p class="page-subtitle">Konfigurasi jenis pembayaran baru.</p>
             </div>
-            
-            <div class="p-6 space-y-6">
+            <a href="{{ route('admin.payment-methods.index') }}" class="btn btn-secondary">
+                <i class="material-icons text-sm mr-1">arrow_back</i> Kembali
+            </a>
+        </div>
+
+        <form action="{{ route('admin.payment-methods.store') }}" method="POST">
+            @csrf
+
+            <div class="card mb-6">
+                <div class="card-header">
+                    <h3 class="card-header-title">Informasi Umum</h3>
+                </div>
+                <div class="card-body grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    {{-- Nama Metode --}}
+                    <div class="md:col-span-2">
+                        <label class="form-label label-required">Nama Metode</label>
+                        <input type="text" name="name" 
+                               class="form-input @error('name') is-invalid @enderror" 
+                               placeholder="Contoh: Transfer BCA, Tunai, Cek/Giro" 
+                               value="{{ old('name') }}" required>
+                        @error('name') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </div>
+
+                    {{-- Tipe Proses --}}
+                    <div>
+                        <label class="form-label label-required">Tipe Proses</label>
+                        <select name="type" class="tom-select" required>
+                            <option value="direct" {{ old('type') == 'direct' ? 'selected' : '' }}>Langsung (Direct/Cash)</option>
+                            <option value="pending" {{ old('type') == 'pending' ? 'selected' : '' }}>Butuh Verifikasi (Transfer)</option>
+                            <option value="gateway" {{ old('type') == 'gateway' ? 'selected' : '' }}>Otomatis (Gateway)</option>
+                        </select>
+                        <div class="form-hint mt-1 text-[10px] text-slate-500">
+                            Menentukan alur dasar sistem. Gateway khusus untuk Midtrans/Xendit.
+                        </div>
+                        @error('type') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </div>
+
+                    {{-- Status Aktif --}}
+                    <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700 h-[74px]">
+                        <div>
+                            <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Status Aktif</span>
+                            <p class="text-xs text-slate-500">Metode ini dapat dipilih saat transaksi.</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" name="is_active" value="1" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                        </label>
+                    </div>
+
+                </div>
+            </div>
+
+            {{-- KONFIGURASI TERPISAH --}}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
-                {{-- Nama Metode --}}
-                <div>
-                    <label for="name" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Nama Metode <span class="text-red-500">*</span></label>
-                    <input type="text" name="name" id="name" value="{{ old('name') }}" class="form-input" placeholder="Contoh: Transfer BCA, Giro Mundur" required>
-                    @error('name') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                </div>
-
-                {{-- Tipe Proses --}}
-                <div>
-                    <label for="type" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Tipe Proses <span class="text-red-500">*</span></label>
-                    <select name="type" id="type" class="form-input select2-basic" required>
-                        <option value="direct" @selected(old('type') == 'direct')>Direct (Langsung Masuk Kas/Bank)</option>
-                        <option value="pending" @selected(old('type') == 'pending')>Pending (Butuh Kliring - Cek/Giro)</option>
-                        <option value="gateway" @selected(old('type') == 'gateway')>Payment Gateway (Otomatis)</option>
-                    </select>
-                    <p class="mt-1.5 text-[11px] text-slate-400 flex items-center gap-1">
-                        <i class="material-icons text-[12px]">info</i> Pilih "Pending" jika pembayaran butuh proses pencairan (seperti Cek/Giro).
-                    </p>
-                    @error('type') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                </div>
-
-                {{-- Konfigurasi Wajib Isi --}}
-                <div>
-                    <label for="required_fields_config" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Data Wajib Isi (Pelanggan) <span class="text-red-500">*</span></label>
-                    <select name="required_fields_config" id="required_fields_config" class="form-input select2-basic" required>
-                        <option value="none" @selected(old('required_fields_config', 'none') == 'none')>Tidak Ada (Langsung Nominal)</option>
-                        <option value="proof_only" @selected(old('required_fields_config') == 'proof_only')>Wajib Upload Bukti Foto</option>
-                        <option value="reference_only" @selected(old('required_fields_config') == 'reference_only')>Wajib Isi No. Referensi</option>
-                        <option value="proof_and_reference" @selected(old('required_fields_config') == 'proof_and_reference')>Wajib Bukti & Referensi</option>
-                    </select>
-                    @error('required_fields_config') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                </div>
-
-                {{-- Status Switch --}}
-                <div class="pt-4 border-t border-slate-100">
-                    <label class="flex items-center cursor-pointer group w-fit">
-                        <div class="relative">
-                            <input type="checkbox" id="is_active" name="is_active" value="1" checked class="sr-only peer">
-                            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                {{-- 1. CONFIG PORTAL CLIENT --}}
+                <div class="card border-t-4 border-indigo-500 shadow-sm">
+                    <div class="card-header bg-indigo-50/50 dark:bg-indigo-900/10 border-b border-indigo-100 dark:border-indigo-800">
+                        <div class="flex items-center gap-2">
+                            <i class="material-icons text-indigo-600">person</i>
+                            <h3 class="font-bold text-indigo-900 dark:text-indigo-300 text-sm uppercase">Konfigurasi Portal Client</h3>
                         </div>
-                        <div class="ml-3">
-                            <span class="text-sm font-medium text-slate-700 group-hover:text-indigo-600 transition-colors block">Status Aktif</span>
-                            <span class="text-[11px] text-slate-400 block">Aktifkan metode ini agar muncul di pilihan.</span>
+                        <p class="text-xs text-indigo-600/80 mt-1">Aturan saat Client melakukan pembayaran sendiri.</p>
+                    </div>
+                    <div class="card-body space-y-4">
+                        <div>
+                            <label class="form-label label-required">Syarat Input Klien</label>
+                            <select name="client_input_config" class="form-select">
+                                <option value="none">Langsung (Tanpa Syarat)</option>
+                                <option value="proof_only">Wajib Upload Bukti</option>
+                                <option value="reference_only">Wajib No. Referensi</option>
+                                <option value="proof_and_reference" selected>Wajib Bukti & Referensi</option>
+                            </select>
+                            <p class="form-hint">Apa yang harus diupload/diisi oleh klien?</p>
                         </div>
-                    </label>
+                        <div>
+                            <label class="form-label label-required">Status Awal Transaksi</label>
+                            <select name="client_status_default" class="form-select">
+                                <option value="pending_verification" selected>Pending (Menunggu Verifikasi Admin)</option>
+                                <option value="completed">Langsung Lunas (Otomatis)</option>
+                            </select>
+                            <p class="form-hint">Status default setelah klien submit bayar.</p>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- 2. CONFIG PORTAL INTERNAL --}}
+                <div class="card border-t-4 border-emerald-500 shadow-sm">
+                    <div class="card-header bg-emerald-50/50 dark:bg-emerald-900/10 border-b border-emerald-100 dark:border-emerald-800">
+                        <div class="flex items-center gap-2">
+                            <i class="material-icons text-emerald-600">admin_panel_settings</i>
+                            <h3 class="font-bold text-emerald-900 dark:text-emerald-300 text-sm uppercase">Konfigurasi Portal Internal</h3>
+                        </div>
+                        <p class="text-xs text-emerald-600/80 mt-1">Aturan saat Admin/Sales mencatat pembayaran.</p>
+                    </div>
+                    <div class="card-body space-y-4">
+                        <div>
+                            <label class="form-label label-required">Syarat Input Staff</label>
+                            <select name="internal_input_config" class="form-select">
+                                <option value="none" selected>Bebas (Tanpa Syarat)</option>
+                                <option value="proof_only">Wajib Upload Bukti</option>
+                                <option value="reference_only">Wajib No. Referensi</option>
+                                <option value="proof_and_reference">Wajib Bukti & Referensi</option>
+                            </select>
+                            <p class="form-hint">Apa yang wajib diisi oleh staff?</p>
+                        </div>
+                        <div>
+                            <label class="form-label label-required">Status Awal Transaksi</label>
+                            <select name="internal_status_default" class="form-select">
+                                <option value="completed" selected>Langsung Lunas (Completed)</option>
+                                <option value="pending_verification">Pending (Perlu Approval Lain)</option>
+                            </select>
+                            <p class="form-hint">Status default saat staff mencatat pembayaran.</p>
+                        </div>
+                    </div>
                 </div>
 
             </div>
 
-            {{-- Footer Actions --}}
-            <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
-                <a href="{{ route('admin.payment-methods.index') }}" 
-                   class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center shadow-sm">
-                    Batal
-                </a>
-                <button type="submit" 
-                        class="h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5">
-                    <i class="material-icons text-[20px] group-hover:scale-110 transition-transform">save</i> Simpan
+            {{-- Submit --}}
+            <div class="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700 flex justify-end">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="material-icons text-sm mr-2">save</i> Simpan Metode
                 </button>
             </div>
-        </div>
-    </form>
-</div>
-@endsection
 
-@push('scripts')
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
-        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
-    });
-</script>
-@endpush
+        </form>
+    </div>
+
+@endsection

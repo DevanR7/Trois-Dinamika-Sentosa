@@ -6,19 +6,14 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('payment_gateway_callbacks', function (Blueprint $table) {
             $table->id('callback_id');
-            
-            // Dimodifikasi dari migrasi make_invoice_id_nullable
-            $table->foreignId('invoice_id')->nullable() // <-- Diubah
-                  ->constrained(table: 'sales_invoices', column: 'invoice_id')
-                  ->onDelete('set null'); // <-- Diubah
-
+            $table->foreignId('invoice_id')
+                ->nullable()
+                ->constrained('sales_invoices', 'invoice_id')
+                ->onDelete('set null');
             $table->string('vendor_transaction_id');
             $table->string('status', 50);
             $table->decimal('amount', 15, 2);
@@ -27,10 +22,7 @@ return new class extends Migration
             $table->timestamp('processed_at')->useCurrent();
         });
     }
-
-    /**
-     * Reverse the migrations.
-     */
+    
     public function down(): void
     {
         Schema::dropIfExists('payment_gateway_callbacks');

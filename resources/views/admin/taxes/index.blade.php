@@ -1,81 +1,87 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Pengaturan Pajak')
+@section('title', 'Manajemen Pajak')
 
 @section('content')
-<div class="max-w-5xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER SECTION --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+
+    {{-- HEADER & ACTIONS --}}
+    <div class="page-header">
         <div>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Pengaturan Pajak</h1>
-            <p class="text-slate-500 text-sm mt-1">Daftar semua tarif pajak yang berlaku (PPN, PPh, dll).</p>
+            <h1 class="page-title">Tarif Pajak</h1>
+            <p class="page-subtitle">Atur persentase pajak (PPN, PPh) untuk transaksi.</p>
         </div>
-        <div>
-            <a href="{{ route('admin.taxes.create') }}" 
-               class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-md shadow-indigo-200 transition-all flex items-center gap-2">
-                <i class="material-icons text-[20px]">add</i> Tambah Tarif
+        <div class="flex items-center gap-3">
+            <a href="{{ route('admin.taxes.create') }}" class="btn btn-primary">
+                <i class="material-icons text-sm mr-1">add</i> Tambah Pajak
             </a>
         </div>
     </div>
 
-    {{-- TABEL --}}
-    <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
-        <div class="overflow-x-auto">
-            <table class="dashboard-table w-full">
-                <thead class="bg-slate-50 border-b border-slate-200">
+    {{-- TABLE DATA --}}
+    <div class="card max-w-4xl">
+        <div class="table-container">
+            <table class="table-modern">
+                <thead>
                     <tr>
-                        <th class="pl-6 w-1/2">Nama Pajak</th>
-                        <th>Tarif (%)</th>
+                        <th class="w-16 text-center">#</th>
+                        <th>Nama Pajak</th>
+                        <th class="text-right">Persentase (%)</th>
                         <th class="text-center">Status</th>
-                        <th class="text-center w-32 pr-6">Aksi</th>
+                        <th class="text-center w-36">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100 bg-white">
-                    @forelse ($taxes as $tax)
-                        <tr class="hover:bg-slate-50/80 transition-colors group">
-                            <td class="pl-6 py-4">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
-                                        <i class="material-icons text-[18px]">percent</i>
-                                    </div>
-                                    <span class="font-bold text-slate-700">{{ $tax->name }}</span>
+                <tbody>
+                    @forelse($taxes as $index => $tax)
+                        <tr>
+                            <td class="text-center text-slate-500">{{ $taxes->firstItem() + $index }}</td>
+                            <td>
+                                <div class="font-bold text-slate-700 dark:text-slate-200">
+                                    {{ $tax->name }}
                                 </div>
                             </td>
-                            <td class="py-4">
-                                <span class="text-sm font-mono font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded border border-slate-200">
-                                    {{ number_format($tax->rate, 2, ',', '.') }}%
-                                </span>
+                            <td class="text-right font-mono font-semibold text-slate-700 dark:text-slate-300">
+                                {{ number_format($tax->rate, 2) }}%
                             </td>
-                            <td class="py-4 text-center">
-                                @if ($tax->is_active)
-                                    <span class="status-badge status-completed">
-                                        <i class="material-icons text-[12px]">check_circle</i> Aktif
-                                    </span>
+                            <td class="text-center">
+                                @if($tax->is_active)
+                                    <span class="badge badge-success">Aktif</span>
                                 @else
-                                    <span class="status-badge status-rejected">
-                                        <i class="material-icons text-[12px]">block</i> Non-Aktif
-                                    </span>
+                                    <span class="badge badge-secondary">Non-Aktif</span>
                                 @endif
                             </td>
-                            <td class="py-4 text-center pr-6">
-                                <a href="{{ route('admin.taxes.edit', $tax->id) }}" 
-                                   class="inline-flex items-center justify-center w-8 h-8 bg-white text-slate-500 rounded-lg border border-slate-200 shadow-sm hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all" 
-                                   title="Edit">
-                                    <i class="material-icons text-[16px]">edit</i>
-                                </a>
+                            <td class="text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    
+                                    {{-- Edit Button --}}
+                                    <a href="{{ route('admin.taxes.edit', $tax->id) }}" 
+                                       class="w-9 h-9 rounded-full flex items-center justify-center bg-indigo-50 border border-transparent text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors shadow-sm dark:bg-indigo-900/30 dark:text-indigo-400"
+                                       title="Edit">
+                                        <i class="material-icons text-[18px] leading-none">edit</i>
+                                    </a>
+
+                                    {{-- Delete Button --}}
+                                    <button type="button" onclick="confirmDelete('{{ $tax->id }}', '{{ $tax->name }}')" 
+                                            class="w-9 h-9 rounded-full flex items-center justify-center bg-rose-50 border border-transparent text-rose-600 hover:bg-rose-600 hover:text-white transition-colors shadow-sm dark:bg-rose-900/30 dark:text-rose-400"
+                                            title="Hapus">
+                                        <i class="material-icons text-[18px] leading-none">delete</i>
+                                    </button>
+                                    
+                                    <form id="delete-form-{{ $tax->id }}" 
+                                          action="{{ route('admin.taxes.destroy', $tax->id) }}" 
+                                          method="POST" class="hidden">
+                                        @csrf
+                                        @method('DELETE')
+                                    </form>
+
+                                </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="py-12 text-center">
-                                <div class="flex flex-col items-center justify-center">
-                                    <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-slate-300">
-                                        <i class="material-icons text-4xl">percent</i>
-                                    </div>
-                                    <h3 class="text-lg font-medium text-slate-900">Belum ada data</h3>
-                                    <p class="text-slate-500 text-sm mt-1 max-w-xs">Silakan tambahkan tarif pajak baru.</p>
-                                    <a href="{{ route('admin.taxes.create') }}" class="mt-4 text-indigo-600 font-bold text-sm hover:underline">Tambah Tarif</a>
+                            <td colspan="5" class="text-center p-8">
+                                <div class="flex flex-col items-center justify-center text-slate-400">
+                                    <i class="material-icons text-5xl mb-2">percent</i>
+                                    <span>Belum ada data pajak.</span>
                                 </div>
                             </td>
                         </tr>
@@ -83,16 +89,31 @@
                 </tbody>
             </table>
         </div>
+        
+        <div class="card-footer">
+            {{ $taxes->links() }}
+        </div>
     </div>
-</div>
+
 @endsection
 
 @push('scripts')
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Tampilkan Toast Success/Error (Hanya logic session, karena delete tidak ada)
-        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
-        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
-    });
+    function confirmDelete(id, name) {
+        window.confirmDialog({
+            title: 'Hapus Pajak?',
+            text: "Data pajak '" + name + "' akan dihapus permanen.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('delete-form-' + id).submit();
+            }
+        });
+    }
 </script>
 @endpush

@@ -11,7 +11,6 @@ use App\Models\ChartOfAccount;
 class CompanyBankAccount extends Model
 {
     use HasFactory;
-
     protected $primaryKey = 'company_bank_account_id';
 
     protected $fillable = [
@@ -22,7 +21,6 @@ class CompanyBankAccount extends Model
         'is_active',
     ];
 
-    // Relasi ke semua transaksi yang masuk ke akun ini
     public function salesPayments(): HasMany
     {
         return $this->hasMany(Payment::class, 'company_bank_account_id', 'company_bank_account_id');
@@ -32,10 +30,7 @@ class CompanyBankAccount extends Model
     {
         return $this->hasMany(PurchaseOrderPayment::class, 'company_bank_account_id', 'company_bank_account_id');
     }
-
-    /**
-     * Relasi ke Akun Aset (COA) yang mewakili akun bank ini.
-     */
+    
     public function account(): BelongsTo
     {
         return $this->belongsTo(ChartOfAccount::class, 'chart_of_account_id', 'account_id');

@@ -1,51 +1,46 @@
-/* 1. IMPORT DULU (WAJIB DI ATAS) */
+/* resources/css/admin/app.css */
+
+/* 1. IMPORT COMPONENTS */
 @import '../components/utilities.css';
 @import '../components/sidebar.css';
 @import '../components/forms.css';
-@import '../components/alerts.css';
+@import '../components/alerts.css'; 
+@import '../components/tomselect-custom.css';
+@import '../components/layout.css';
 
-/* 2. BARU PANGGIL TAILWIND */
+/* 2. TAILWIND DIRECTIVES */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 3. TERAKHIR CONFIG TEMA (INDIGO) */
-/* Variable ini tetap akan terbaca oleh file components di atas karena CSS Variables di-resolve saat runtime browser */
-@layer base {
-    :root {
-        /* Indigo-500 RGB */
-        --color-primary: 99 102 241; 
-    }
+/* 3. CUSTOM PAGE STYLES */
+@layer components {
+    /* CATATAN: 
+        Class .sidebar, .main-wrapper, body.layout-compact 
+        sekarang sepenuhnya dikendalikan oleh file sidebar.css Anda.
+        Tidak ada override disini.
+    */
 
-    #nprogress .bar {
-        @apply text-indigo-600;
+    /* Styling tambahan untuk Table Modern */
+    .table-container {
+        @apply w-full overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700;
     }
-
-    .nav_image {
-        @apply bg-indigo-600 !important;
+    .table-modern {
+        @apply w-full text-sm text-left text-slate-600 dark:text-slate-400;
     }
-
-    .sidebar .link.active {
-        @apply border-l-indigo-500 !important;
+    .table-modern thead {
+        @apply text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/50 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700;
     }
-    .sidebar .link.active i {
-        @apply text-indigo-400 !important;
+    .table-modern th {
+        @apply px-6 py-4 font-bold tracking-wider whitespace-nowrap;
     }
-
-    /* Helper Focus Ring */
-    .focus\:ring-primary-500:focus {
-        --tw-ring-color: rgb(var(--color-primary));
+    .table-modern td {
+        @apply px-6 py-4 border-b border-slate-100 dark:border-slate-800/50 whitespace-nowrap align-middle;
     }
-    .focus\:border-primary-500:focus {
-        border-color: rgb(var(--color-primary));
+    .table-modern tr:last-child td {
+        @apply border-b-0;
     }
-
-    /* Helper Colors */
-    .bg-primary-50 { background-color: rgb(238 242 255); }
-    .bg-primary-100 { background-color: rgb(224 231 255); }
-    .text-primary-600 { color: rgb(79 70 229); }
-    .text-primary-700 { color: rgb(67 56 202); }
-    
-    .ring-primary-500 { --tw-ring-color: rgb(99 102 241); }
-    .border-primary-500 { border-color: rgb(99 102 241); }
+    .table-modern tr:hover {
+        @apply bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors;
+    }
 }

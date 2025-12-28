@@ -1,174 +1,174 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Proses Verifikasi Pembayaran')
+@section('title', 'Review Pembayaran Massal #' . $bulkSalesPayment->bulk_sales_payment_id)
 
 @section('content')
-<div class="max-w-7xl mx-auto pb-20 animate-enter">
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Review Pembayaran Massal</h1>
+        <p class="text-sm text-slate-500">Ref: #{{ $bulkSalesPayment->bulk_sales_payment_id }}</p>
+    </div>
+    <a href="{{ route('admin.bulk-sales-payments.pending') }}" class="btn btn-secondary">
+        <i class="material-icons text-lg mr-1">arrow_back</i>
+        Kembali
+    </a>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-            <nav class="flex text-sm text-slate-500 mb-1">
-                <a href="{{ route('admin.bulk-sales-payments.pending') }}" class="hover:text-indigo-600 transition-colors">Verifikasi</a>
-                <span class="mx-2 text-slate-300">/</span>
-                <span class="text-slate-800 font-semibold">Detail Transaksi</span>
-            </nav>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Verifikasi Bulk Payment</h1>
+    {{-- Info & Bukti --}}
+    <div class="space-y-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-header-title">Info Pembayaran</h3>
+            </div>
+            <div class="card-body text-sm space-y-3">
+                <div class="flex justify-between border-b border-slate-100 dark:border-slate-700 pb-2">
+                    <span class="text-slate-500">Pelanggan</span>
+                    <span class="font-bold">{{ $bulkSalesPayment->client->client_name }}</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-100 dark:border-slate-700 pb-2">
+                    <span class="text-slate-500">Tanggal</span>
+                    <span class="font-medium">{{ $bulkSalesPayment->payment_date->format('d M Y') }}</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-100 dark:border-slate-700 pb-2">
+                    <span class="text-slate-500">Metode</span>
+                    <span class="font-medium">{{ $bulkSalesPayment->paymentMethod->name ?? '-' }}</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-100 dark:border-slate-700 pb-2">
+                    <span class="text-slate-500">No. Referensi</span>
+                    <span class="font-mono">{{ $bulkSalesPayment->reference_number ?? '-' }}</span>
+                </div>
+                <div class="flex justify-between items-center pt-2">
+                    <span class="text-slate-500">Total Transfer (Cash)</span>
+                    <span class="text-lg font-bold text-indigo-600">
+                        Rp {{ number_format($bulkSalesPayment->total_amount, 0, ',', '.') }}
+                    </span>
+                </div>
+            </div>
         </div>
-        <a href="{{ route('admin.bulk-sales-payments.pending') }}" class="h-[48px] px-6 bg-white border border-slate-300 rounded-lg font-bold text-sm text-slate-700 hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
-            <i class="material-icons text-[18px]">arrow_back</i> Kembali
-        </a>
+
+        @if($bulkSalesPayment->proof_of_payment_path)
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-header-title">Bukti Pembayaran</h3>
+                </div>
+                <div class="card-body p-0">
+                    <a href="{{ asset('storage/' . $bulkSalesPayment->proof_of_payment_path) }}" target="_blank">
+                        <img src="{{ asset('storage/' . $bulkSalesPayment->proof_of_payment_path) }}" 
+                             alt="Bukti Bayar" 
+                             class="w-full h-auto rounded-b-xl hover:opacity-90 transition-opacity">
+                    </a>
+                </div>
+            </div>
+        @endif
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    {{-- Invoice & Actions --}}
+    <div class="lg:col-span-2 space-y-6">
         
-        {{-- KOLOM KIRI: DETAIL --}}
-        <div class="lg:col-span-2 space-y-6">
-            <div class="dashboard-card p-0 overflow-hidden shadow-sm">
-                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                    <div class="p-2 bg-blue-50 rounded-lg text-blue-600">
-                        <i class="material-icons text-[20px]">receipt_long</i>
-                    </div>
-                    <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Informasi Pembayaran</h3>
-                </div>
-                
-                <div class="p-6">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        
-                        {{-- Klien --}}
-                        <div class="sm:col-span-2 flex items-center gap-4 pb-6 border-b border-slate-100">
-                            <div class="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100">
-                                <i class="material-icons text-xl">business</i>
-                            </div>
-                            <div>
-                                <p class="text-xs font-bold text-slate-400 uppercase">Klien</p>
-                                {{-- GANTI VARIABEL JADI $bulkSalesPayment --}}
-                                <h4 class="text-lg font-bold text-slate-800">{{ $bulkSalesPayment->client->client_name ?? 'N/A' }}</h4>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Metode Pembayaran</label>
-                            <span class="inline-flex items-center px-3 py-1 rounded-md text-sm font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                                {{ $bulkSalesPayment->paymentMethod->name ?? 'N/A' }}
-                            </span>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Tanggal Lapor</label>
-                            <div class="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                                <i class="material-icons text-slate-400 text-[16px]">event</i>
-                                <span>{{ $bulkSalesPayment->created_at->format('d F Y, H:i') }}</span>
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Diterima Oleh</label>
-                            <span class="text-sm font-medium text-slate-800">
-                                {{ str_contains(strtolower($bulkSalesPayment->paymentMethod->name ?? ''), 'cash') ? ($salesUser->full_name ?? '-') : '(Menunggu Verifikasi)' }}
-                            </span>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Bukti Transfer</label>
-                            @if(!empty($details['proof_path']))
-                                <a href="{{ asset('storage/' . $details['proof_path']) }}" target="_blank" class="inline-flex items-center text-sm font-bold text-indigo-600 hover:text-indigo-800 hover:underline gap-1">
-                                    <i class="material-icons text-[18px]">image</i> Lihat Bukti
-                                </a>
-                            @else
-                                <span class="text-slate-400 text-sm italic">Tidak ada bukti dilampirkan.</span>
-                            @endif
-                        </div>
-
-                        <div class="sm:col-span-2">
-                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Catatan</label>
-                            <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-600 italic min-h-[60px]">
-                                "{{ $details['notes'] ?? 'Tidak ada catatan.' }}"
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
+        {{-- Daftar Invoice yang dibayar --}}
+        <div class="card">
+            <div class="card-header bg-slate-50 dark:bg-slate-800/50">
+                <h3 class="card-header-title">Alokasi Tagihan</h3>
             </div>
+            <div class="table-container">
+                <table class="table-modern">
+                    <thead>
+                        <tr>
+                            <th>No. Invoice</th>
+                            <th>Tanggal</th>
+                            <th class="text-right">Sisa Tagihan</th>
+                            {{-- Kita tidak menampilkan detail alokasi per invoice karena di Pending belum dihitung final --}}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($invoices as $inv)
+                            <tr>
+                                <td class="font-medium">{{ $inv->invoice_number }}</td>
+                                <td>{{ $inv->order_date->format('d/m/Y') }}</td>
+                                <td class="text-right text-slate-700 dark:text-slate-300">
+                                    Rp {{ number_format($inv->remaining_balance, 0, ',', '.') }}
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            @if(isset($details['credit_amount_to_use']) && $details['credit_amount_to_use'] > 0)
+                <div class="p-4 bg-indigo-50 dark:bg-indigo-900/20 text-sm text-indigo-700 dark:text-indigo-300 border-t border-indigo-100 dark:border-indigo-800">
+                    <i class="material-icons text-base align-bottom mr-1">info</i>
+                    Pembayaran ini juga akan menggunakan <strong>Saldo Kredit</strong> sebesar 
+                    <strong>Rp {{ number_format($details['credit_amount_to_use'], 0, ',', '.') }}</strong>
+                </div>
+            @endif
         </div>
 
-        {{-- KOLOM KANAN: AKSI --}}
-        <div class="lg:col-span-1 space-y-6">
-            
-            {{-- Card Nominal --}}
-            <div class="dashboard-card p-6 text-center shadow-md bg-gradient-to-br from-white to-slate-50">
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Total Nominal</p>
-                <h2 class="text-3xl font-bold text-emerald-600 font-mono tracking-tight">Rp {{ number_format($bulkSalesPayment->total_amount, 0, ',', '.') }}</h2>
-            </div>
-
-            {{-- Card Aksi --}}
-            <div class="dashboard-card p-6 shadow-lg border-t-4 border-indigo-500">
-                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide mb-4 flex items-center gap-2">
-                    <i class="material-icons text-indigo-600">verified_user</i> Aksi Verifikasi
-                </h3>
-
-                {{-- FORM APPROVE --}}
-                <form action="{{ route('admin.bulk-sales-payments.approve', $bulkSalesPayment->bulk_sales_payment_id) }}" method="POST" class="form-confirm space-y-4">
-                    @csrf
-                    <div>
-                        <label for="company_bank_account_id" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Setor Ke Akun (Kas/Bank)</label>
-                        <select name="company_bank_account_id" id="company_bank_account_id" class="form-input select2-verif" style="width: 100%" required>
-                            <option value="">-- Pilih Akun --</option>
-                            @foreach($companyBankAccounts as $account)
-                                <option value="{{ $account->company_bank_account_id }}">
-                                    {{ $account->bank_name }} - {{ $account->account_number }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+        {{-- Action Buttons --}}
+        <div class="card border border-slate-200 dark:border-slate-700 shadow-lg">
+            <div class="card-body">
+                <div class="flex flex-col md:flex-row gap-4 justify-end">
                     
-                    <button type="submit" 
-                            data-title="Setujui Pembayaran?" 
-                            data-text="Dana akan dialokasikan ke invoice terkait dan jurnal akan diposting." 
-                            data-btn-text="Ya, Setujui" 
-                            data-btn-color="#059669" 
-                            data-icon="question"
-                            class="w-full h-[48px] bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-md transition flex justify-center items-center gap-2 hover:-translate-y-0.5">
-                        <i class="material-icons text-[18px]">check_circle</i> Setujui & Alokasikan
-                    </button>
-                </form>
+                    {{-- Form Reject --}}
+                    <form action="{{ route('admin.bulk-sales-payments.reject', $bulkSalesPayment->bulk_sales_payment_id) }}" method="POST" class="w-full md:w-auto" id="form-reject">
+                        @csrf
+                        <button type="button" onclick="confirmReject()" class="btn btn-danger w-full">
+                            <i class="material-icons text-lg mr-1">close</i>
+                            Tolak Pembayaran
+                        </button>
+                        <input type="hidden" name="reason" id="reject-reason">
+                    </form>
 
-                <hr class="border-dashed border-slate-200 my-4">
+                    {{-- Form Approve --}}
+                    <form action="{{ route('admin.bulk-sales-payments.approve', $bulkSalesPayment->bulk_sales_payment_id) }}" method="POST" class="w-full md:w-1/2" id="form-approve">
+                        @csrf
+                        <div class="flex flex-col gap-3">
+                            <select name="company_bank_account_id" class="tom-select w-full" required>
+                                <option value="">Pilih Akun Bank Penerima...</option>
+                                @foreach($companyBankAccounts as $bank)
+                                    <option value="{{ $bank->company_bank_account_id }}" 
+                                        {{ $bulkSalesPayment->company_bank_account_id == $bank->company_bank_account_id ? 'selected' : '' }}>
+                                        {{ $bank->bank_name }} - {{ $bank->account_name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <button type="submit" class="btn btn-success w-full justify-center">
+                                <i class="material-icons text-lg mr-1">check</i>
+                                Setujui & Posting Jurnal
+                            </button>
+                        </div>
+                    </form>
 
-                {{-- FORM REJECT --}}
-                <form action="{{ route('admin.bulk-sales-payments.reject', $bulkSalesPayment->bulk_sales_payment_id) }}" method="POST" class="form-confirm">
-                    @csrf
-                    <div class="mb-4">
-                        <label for="reason" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Alasan Penolakan</label>
-                        <input type="text" name="reason" id="reason" class="form-input text-sm" placeholder="Contoh: Bukti transfer tidak valid" required>
-                    </div>
-
-                    <button type="submit" 
-                            data-title="Tolak Pembayaran?" 
-                            data-text="Status akan menjadi Rejected. Saldo kredit (jika dipakai) akan dikembalikan ke klien." 
-                            data-btn-text="Ya, Tolak" 
-                            data-btn-color="#ef4444" 
-                            data-icon="warning"
-                            class="w-full h-[48px] bg-white border border-red-200 text-red-600 rounded-lg text-sm font-bold hover:bg-red-50 transition flex justify-center items-center gap-2 shadow-sm">
-                        <i class="material-icons text-[18px]">cancel</i> Tolak Pembayaran
-                    </button>
-                </form>
-
+                </div>
             </div>
         </div>
 
     </div>
 </div>
-@endsection
 
-{{-- PUSH SCRIPT SAMA SAJA --}}
-@push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
-$(document).ready(function() {
-    $('.select2-verif').select2({ placeholder: '-- Pilih Akun --', width: '100%', dropdownCssClass: 'select2-dropdown-clean' });
-    @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
-    @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
-});
+    function confirmReject() {
+        window.confirmDialog({
+            title: 'Tolak Pembayaran?',
+            text: "Masukkan alasan penolakan:",
+            input: 'text',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Ya, Tolak',
+            cancelButtonText: 'Batal',
+            inputValidator: (value) => {
+                if (!value) {
+                    return 'Alasan harus diisi!'
+                }
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('reject-reason').value = result.value;
+                document.getElementById('form-reject').submit();
+            }
+        })
+    }
 </script>
-@endpush
+@endsection

@@ -1,117 +1,132 @@
 // resources/js/components/sidebar.js
 
 export function initSidebarLogic() {
+    const body = document.body;
     const sidebar = document.getElementById('mainSidebar');
-    const mainContent = document.querySelector('.main-wrapper'); 
-    const toggleBtn = document.getElementById('toggle-sidebar-btn');
-    const toggleIcon = document.getElementById('toggle-icon');
-    
-    // Mobile Elements
-    const mobileOverlay = document.getElementById('sidebar-overlay');
-    const mobileToggleBtn = document.getElementById('sidebar-toggle-mobile');
+    const overlay = document.getElementById('sidebar-overlay');
+    const toggleBtnDesktop = document.getElementById('toggle-desktop');
+    const toggleBtnMobile = document.getElementById('sidebar-toggle');
+    const sidebarScroll = document.querySelector('.sidebar-scroll');
+
+    // --- ELEMENT PROFIL BARU ---
+    const profileTrigger = document.getElementById('profile-trigger-btn'); // Tombol yang diklik
+    const profilePopup = document.getElementById('profile-popup');         // Popup menu
 
     if (!sidebar) return;
 
-    // --- 1. Load State ---
-    let isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+    // --- 1. STATE INITIALIZATION ---
+    let isCompact = localStorage.getItem('sidebarState') === 'compact';
 
-    // --- 2. Function Apply Layout ---
-    const applySidebarState = () => {
-        const isDesktop = window.innerWidth >= 1024;
-
-        if (isDesktop) {
-            if (isCollapsed) {
-                // Mode Collapse
-                sidebar.classList.add('collapsed');
-                if (mainContent) mainContent.style.marginLeft = '70px';
-                if (toggleIcon) toggleIcon.style.transform = 'rotate(180deg)';
-                
-                // Tutup semua submenu (accordion style) saat masuk mode collapse
-                document.querySelectorAll('.submenu').forEach(el => el.classList.add('hidden'));
-                document.querySelectorAll('.dropdown-arrow').forEach(el => el.classList.remove('rotate-180'));
+    function applyState() {
+        if (window.innerWidth >= 1024) {
+            if (isCompact) {
+                body.classList.add('layout-compact');
+                closeAllSubmenus();
             } else {
-                // Mode Expand
-                sidebar.classList.remove('collapsed');
-                if (mainContent) mainContent.style.marginLeft = '260px';
-                if (toggleIcon) toggleIcon.style.transform = 'rotate(0deg)';
+                body.classList.remove('layout-compact');
             }
+            body.classList.remove('mobile-open');
         } else {
-            // Mobile Mode
-            sidebar.classList.remove('collapsed');
-            if (mainContent) mainContent.style.marginLeft = '0';
+            body.classList.remove('layout-compact');
         }
-    };
+    }
+    applyState();
 
-    // --- 3. Toggle Button Event ---
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', (e) => {
+    // --- 2. TOGGLE SIDEBAR ---
+    if (toggleBtnDesktop) {
+        toggleBtnDesktop.addEventListener('click', (e) => {
             e.preventDefault();
-            isCollapsed = !isCollapsed;
-            localStorage.setItem('sidebarCollapsed', isCollapsed);
-            applySidebarState();
+            isCompact = !isCompact;
+            localStorage.setItem('sidebarState', isCompact ? 'compact' : 'expanded');
+            applyState();
         });
     }
 
-    // --- 4. DROPDOWN CLICK LOGIC ---
-    const sidebarScroll = document.querySelector('.sidebar-scroll');
+    function toggleMobile() {
+        body.classList.toggle('mobile-open');
+        if (overlay) overlay.classList.toggle('hidden');
+    }
+
+    if (toggleBtnMobile) toggleBtnMobile.addEventListener('click', toggleMobile);
+    if (overlay) overlay.addEventListener('click', toggleMobile);
+
+    // --- 3. SUBMENU LOGIC ---
+    function closeAllSubmenus() {
+        document.querySelectorAll('.submenu-wrapper').forEach(el => {
+            el.classList.remove('open');
+            el.style.maxHeight = '0px';
+        });
+        document.querySelectorAll('.dropdown-toggle').forEach(el => {
+            el.classList.remove('active-parent');
+            const arrow = el.querySelector('.arrow-icon');
+            if(arrow) arrow.classList.remove('rotate-180');
+        });
+    }
+
     if (sidebarScroll) {
         sidebarScroll.addEventListener('click', function(e) {
-            // Cari elemen tombol dropdown
-            const toggleLink = e.target.closest('.sidebar-dropdown-toggle');
-            
-            if (toggleLink) {
+            const toggleBtn = e.target.closest('.dropdown-toggle');
+            if (toggleBtn) {
                 e.preventDefault();
-
-                // LOGIKA: Jika sidebar sedang COLLAPSED, buka sidebar dulu
-                if (sidebar.classList.contains('collapsed') && window.innerWidth >= 1024) {
-                    // 1. Ubah state jadi expand
-                    isCollapsed = false;
-                    localStorage.setItem('sidebarCollapsed', 'false');
-                    applySidebarState(); 
-
-                    // 2. Buka menu target secara otomatis (setelah jeda sangat singkat agar transisi smooth)
-                    setTimeout(() => {
-                        const parentLi = toggleLink.closest('li');
-                        const submenu = parentLi.querySelector('.submenu');
-                        const arrow = toggleLink.querySelector('.dropdown-arrow');
-                        
-                        if (submenu) {
-                            submenu.classList.remove('hidden');
-                            if (arrow) arrow.classList.add('rotate-180');
-                        }
-                    }, 50);
-
-                    return;
-                }
-
-                // Jika sidebar sudah TERBUKA, toggle seperti biasa (Accordion)
-                const parentLi = toggleLink.closest('li');
-                const submenu = parentLi.querySelector('.submenu');
-                const arrow = toggleLink.querySelector('.dropdown-arrow');
-
-                if (submenu) {
-                    submenu.classList.toggle('hidden');
-                    if (arrow) arrow.classList.toggle('rotate-180');
+                if (body.classList.contains('layout-compact')) {
+                    isCompact = false;
+                    localStorage.setItem('sidebarState', 'expanded');
+                    applyState();
+                    setTimeout(() => toggleMenuLogic(toggleBtn), 200);
+                } else {
+                    toggleMenuLogic(toggleBtn);
                 }
             }
         });
     }
 
-    // --- 5. Mobile Logic ---
-    const toggleMobile = () => {
-        sidebar.classList.toggle('mobile-open');
-        if (mobileOverlay) mobileOverlay.classList.toggle('hidden');
-    };
+    function toggleMenuLogic(btn) {
+        const parentLi = btn.closest('li');
+        const submenu = parentLi.querySelector('.submenu-wrapper');
+        const arrow = btn.querySelector('.arrow-icon');
 
-    if (mobileToggleBtn) mobileToggleBtn.addEventListener('click', toggleMobile);
-    if (mobileOverlay) mobileOverlay.addEventListener('click', toggleMobile);
+        if (submenu) {
+            const isOpen = submenu.classList.contains('open');
+            if (!isOpen) closeAllSubmenus(); 
 
-    // --- 6. Init ---
-    applySidebarState();
-    window.addEventListener('resize', applySidebarState);
+            if (!isOpen) {
+                submenu.classList.add('open');
+                submenu.style.maxHeight = submenu.scrollHeight + "px";
+                if (arrow) arrow.classList.add('rotate-180');
+                btn.classList.add('active-parent');
+            } else {
+                submenu.classList.remove('open');
+                submenu.style.maxHeight = '0px';
+                if (arrow) arrow.classList.remove('rotate-180');
+                btn.classList.remove('active-parent');
+            }
+        }
+    }
+
+    // --- 4. PROFILE POPUP ANIMATION LOGIC (NEW) ---
+    if (profileTrigger && profilePopup) {
+        // Toggle saat diklik
+        profileTrigger.addEventListener('click', (e) => {
+            e.stopPropagation(); // Mencegah event bubbling
+            profilePopup.classList.toggle('show');
+        });
+
+        // Tutup saat klik di luar (Outside Click)
+        document.addEventListener('click', (e) => {
+            // Jika yang diklik BUKAN popup DAN BUKAN tombol trigger
+            if (!profilePopup.contains(e.target) && !profileTrigger.contains(e.target)) {
+                profilePopup.classList.remove('show');
+            }
+        });
+    }
+
+    // --- 5. UTILS ---
+    window.addEventListener('resize', applyState);
     
-    // Transisi konten
-    setTimeout(() => {
-        if (mainContent) mainContent.classList.add('transition-all', 'duration-300');
-    }, 100);
+    const savedScroll = localStorage.getItem('sidebarScrollPosition');
+    if (savedScroll && sidebarScroll) { sidebarScroll.scrollTop = parseInt(savedScroll); }
+    
+    window.addEventListener('beforeunload', () => {
+        if(sidebarScroll) localStorage.setItem('sidebarScrollPosition', sidebarScroll.scrollTop);
+    });
 }

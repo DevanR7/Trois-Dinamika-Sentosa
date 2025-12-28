@@ -3,120 +3,192 @@
 @section('title', 'Migrasi Data')
 
 @section('content')
-<div class="max-w-7xl mx-auto pb-20 animate-enter">
-    
+
     {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+    <div class="page-header">
         <div>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Migrasi Data (Import Excel)</h1>
-            <p class="text-slate-500 text-sm mt-1">Upload file Excel untuk mengimpor data massal ke dalam sistem.</p>
+            <h1 class="page-title">Migrasi Data</h1>
+            <p class="page-subtitle">Import data massal (Produk & Klien) menggunakan file Excel.</p>
         </div>
-        {{-- Opsional: Tombol Download Template --}}
-        {{-- <a href="#" class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
-            <i class="material-icons text-[18px]">download</i> Download Template
-        </a> --}}
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-        
-        {{-- KARTU 1: IMPORT PRODUK --}}
-        <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5 flex flex-col h-full">
-            <div class="px-6 py-5 border-b border-slate-100 bg-slate-50/50 flex items-center gap-4">
-                <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 flex-shrink-0">
-                    <i class="material-icons text-[24px]">inventory_2</i>
-                </div>
-                <div>
-                    <h4 class="text-base font-bold text-slate-800">Import Produk</h4>
-                    <p class="text-xs text-slate-500">Upload data stok & inventaris baru.</p>
+    {{-- WARNING ALERT --}}
+    <div class="mb-8 p-4 bg-amber-50 border-l-4 border-amber-500 rounded-r-xl shadow-sm dark:bg-amber-900/10 dark:border-amber-600">
+        <div class="flex items-start gap-3">
+            <i class="material-icons text-amber-600 dark:text-amber-500 mt-0.5">warning</i>
+            <div class="text-sm text-amber-800 dark:text-amber-400 leading-relaxed">
+                <strong>Perhatian:</strong>
+                <ul class="list-disc ml-4 mt-1 space-y-1">
+                    <li>Pastikan format file Excel sesuai dengan template yang disediakan.</li>
+                    <li>Data yang diimport akan ditambahkan ke database (tidak menimpa data lama kecuali kode/ID sama).</li>
+                    <li>Disarankan untuk melakukan <strong>Backup Database</strong> sebelum melakukan import massal.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        {{-- CARD 1: IMPORT PRODUK --}}
+        <div class="card h-full flex flex-col">
+            <div class="card-header bg-indigo-50/50 dark:bg-indigo-900/10 border-b border-indigo-100 dark:border-indigo-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center dark:bg-indigo-900/30 dark:text-indigo-400">
+                        <i class="material-icons">inventory_2</i>
+                    </div>
+                    <div>
+                        <h3 class="card-header-title text-indigo-900 dark:text-indigo-300">Import Produk</h3>
+                        <p class="text-xs text-slate-500">Stok, Harga Beli, Harga Jual</p>
+                    </div>
                 </div>
             </div>
-            
-            <div class="p-6 flex-grow flex flex-col justify-between">
-                <div>
-                    <div class="bg-indigo-50 rounded-lg p-4 mb-6 border border-indigo-100">
-                        <p class="text-[10px] font-bold text-indigo-400 uppercase mb-2 tracking-wider">Kolom Excel Wajib:</p>
-                        <div class="flex flex-wrap gap-1">
-                            @foreach(['kode_produk', 'nama_produk', 'harga_beli', 'harga_jual', 'stok_awal', 'satuan', 'nama_supplier', 'deskripsi'] as $col)
-                                <span class="inline-block px-2 py-1 bg-white text-indigo-700 text-[10px] font-mono rounded border border-indigo-200">{{ $col }}</span>
-                            @endforeach
+            <div class="card-body flex-1 flex flex-col justify-between">
+                
+                <div class="mb-6">
+                    <p class="text-sm text-slate-600 dark:text-slate-300 mb-4">
+                        Unduh template Excel di bawah ini untuk memastikan kolom data sesuai dengan sistem.
+                    </p>
+                    {{-- Pastikan Anda membuat route untuk download template atau taruh file di public --}}
+                    <a href="{{ route('admin.migration.template', 'products') }}" class="btn btn-sm btn-secondary w-full justify-center">
+                        <i class="material-icons text-sm mr-2">download</i> Download Template Produk
+                    </a>
+                </div>
+
+                <form action="{{ route('admin.migration.import-products') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
+                    @csrf
+                    
+                    {{-- Upload Area --}}
+                    <div class="upload-area" id="uploadProduct">
+                        <input type="file" name="file" id="fileProduct" 
+                               class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                               accept=".xlsx, .xls" required>
+                        
+                        <div class="text-center transition-all duration-300" id="placeholderProduct">
+                            <i class="material-icons text-4xl text-slate-300 mb-2">upload_file</i>
+                            <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Klik atau seret file Excel</p>
+                            <p class="text-[10px] text-slate-400 mt-1">Format: .xlsx, .xls</p>
+                        </div>
+
+                        {{-- File Info (Hidden by default) --}}
+                        <div class="text-center hidden" id="infoProduct">
+                            <i class="material-icons text-4xl text-emerald-500 mb-2">description</i>
+                            <p class="text-sm font-bold text-slate-700 dark:text-slate-200 break-all" id="filenameProduct"></p>
+                            <p class="text-[10px] text-indigo-500 mt-1 cursor-pointer hover:underline">Ganti File</p>
                         </div>
                     </div>
+                    @error('file') <div class="invalid-feedback text-center">{{ $message }}</div> @enderror
 
-                    <form action="{{ route('admin.migration.import-products') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
-                        @csrf
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">File Excel (.xlsx)</label>
-                            <input type="file" name="file" required 
-                                   class="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer bg-slate-50 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                                   accept=".xlsx, .xls">
-                        </div>
-                        
-                        <button type="submit" class="w-full h-[48px] bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5">
-                            <i class="material-icons text-[20px] group-hover:scale-110 transition-transform">upload_file</i> 
-                            Mulai Import Produk
-                        </button>
-                    </form>
-                </div>
+                    <button type="submit" class="btn btn-primary w-full justify-center">
+                        <i class="material-icons text-sm mr-2">publish</i> Upload Data Produk
+                    </button>
+                </form>
+
             </div>
         </div>
 
-        {{-- KARTU 2: IMPORT KLIEN --}}
-        <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5 flex flex-col h-full">
-            <div class="px-6 py-5 border-b border-slate-100 bg-slate-50/50 flex items-center gap-4">
-                <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 flex-shrink-0">
-                    <i class="material-icons text-[24px]">groups</i>
-                </div>
-                <div>
-                    <h4 class="text-base font-bold text-slate-800">Import Klien</h4>
-                    <p class="text-xs text-slate-500">Upload data pelanggan massal.</p>
+        {{-- CARD 2: IMPORT KLIEN --}}
+        <div class="card h-full flex flex-col">
+            <div class="card-header bg-emerald-50/50 dark:bg-emerald-900/10 border-b border-emerald-100 dark:border-emerald-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center dark:bg-emerald-900/30 dark:text-emerald-400">
+                        <i class="material-icons">groups</i>
+                    </div>
+                    <div>
+                        <h3 class="card-header-title text-emerald-900 dark:text-emerald-300">Import Klien</h3>
+                        <p class="text-xs text-slate-500">Data Pelanggan & Kontak</p>
+                    </div>
                 </div>
             </div>
-            
-            <div class="p-6 flex-grow flex flex-col justify-between">
-                <div>
-                    <div class="bg-emerald-50 rounded-lg p-4 mb-6 border border-emerald-100">
-                        <p class="text-[10px] font-bold text-emerald-500 uppercase mb-2 tracking-wider">Kolom Excel Wajib:</p>
-                        <div class="flex flex-wrap gap-1">
-                            @foreach(['nama_klien', 'email', 'no_telepon', 'alamat', 'pic'] as $col)
-                                <span class="inline-block px-2 py-1 bg-white text-emerald-700 text-[10px] font-mono rounded border border-emerald-200">{{ $col }}</span>
-                            @endforeach
+            <div class="card-body flex-1 flex flex-col justify-between">
+                
+                <div class="mb-6">
+                    <p class="text-sm text-slate-600 dark:text-slate-300 mb-4">
+                        Gunakan template ini untuk mendaftarkan banyak pelanggan sekaligus.
+                    </p>
+                    <a href="{{ route('admin.migration.template', 'clients') }}" class="btn btn-sm btn-secondary w-full justify-center">
+                        <i class="material-icons text-sm mr-2">download</i> Download Template Klien
+                    </a>
+                </div>
+
+                <form action="{{ route('admin.migration.import-clients') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
+                    @csrf
+                    
+                    {{-- Upload Area --}}
+                    <div class="upload-area" id="uploadClient">
+                        <input type="file" name="file" id="fileClient" 
+                               class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                               accept=".xlsx, .xls" required>
+                        
+                        <div class="text-center transition-all duration-300" id="placeholderClient">
+                            <i class="material-icons text-4xl text-slate-300 mb-2">upload_file</i>
+                            <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Klik atau seret file Excel</p>
+                            <p class="text-[10px] text-slate-400 mt-1">Format: .xlsx, .xls</p>
+                        </div>
+
+                        <div class="text-center hidden" id="infoClient">
+                            <i class="material-icons text-4xl text-emerald-500 mb-2">description</i>
+                            <p class="text-sm font-bold text-slate-700 dark:text-slate-200 break-all" id="filenameClient"></p>
+                            <p class="text-[10px] text-indigo-500 mt-1 cursor-pointer hover:underline">Ganti File</p>
                         </div>
                     </div>
+                    @error('file') <div class="invalid-feedback text-center">{{ $message }}</div> @enderror
 
-                    <form action="{{ route('admin.migration.import-clients') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
-                        @csrf
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">File Excel (.xlsx)</label>
-                            <input type="file" name="file" required 
-                                   class="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer bg-slate-50 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                                   accept=".xlsx, .xls">
-                        </div>
-                        
-                        <button type="submit" class="w-full h-[48px] bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5">
-                            <i class="material-icons text-[20px] group-hover:scale-110 transition-transform">upload_file</i> 
-                            Mulai Import Klien
-                        </button>
-                    </form>
-                </div>
+                    <button type="submit" class="btn btn-primary w-full justify-center">
+                        <i class="material-icons text-sm mr-2">publish</i> Upload Data Klien
+                    </button>
+                </form>
+
             </div>
         </div>
 
     </div>
-</div>
+
 @endsection
 
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
-        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
         
-        // Handle Validation Errors from Server
-        @if ($errors->any())
-            @foreach($errors->all() as $error)
-                window.showToast("{{ $error }}", 'error');
-            @endforeach
-        @endif
+        // Fungsi reusable untuk handling UI file upload
+        function handleFileUpload(inputId, placeholderId, infoId, nameId, containerId) {
+            const input = document.getElementById(inputId);
+            const placeholder = document.getElementById(placeholderId);
+            const info = document.getElementById(infoId);
+            const nameDisplay = document.getElementById(nameId);
+            const container = document.getElementById(containerId);
+
+            input.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    const file = this.files[0];
+                    nameDisplay.textContent = file.name;
+                    
+                    // Toggle UI
+                    placeholder.classList.add('hidden');
+                    info.classList.remove('hidden');
+                    container.classList.add('border-emerald-500', 'bg-emerald-50/50', 'dark:bg-emerald-900/20');
+                } else {
+                    // Reset
+                    placeholder.classList.remove('hidden');
+                    info.classList.add('hidden');
+                    container.classList.remove('border-emerald-500', 'bg-emerald-50/50', 'dark:bg-emerald-900/20');
+                }
+            });
+        }
+
+        // Init untuk Produk
+        handleFileUpload('fileProduct', 'placeholderProduct', 'infoProduct', 'filenameProduct', 'uploadProduct');
+        
+        // Init untuk Klien
+        handleFileUpload('fileClient', 'placeholderClient', 'infoClient', 'filenameClient', 'uploadClient');
+
+        // Loading state pada form submit
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', function() {
+                const btn = this.querySelector('button[type="submit"]');
+                btn.classList.add('is-loading');
+                btn.disabled = true;
+            });
+        });
     });
 </script>
 @endpush

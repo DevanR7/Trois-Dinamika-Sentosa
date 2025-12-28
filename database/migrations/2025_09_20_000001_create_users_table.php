@@ -12,8 +12,8 @@ return new class extends Migration
             $table->bigIncrements('user_id');
             $table->string('google_id')->nullable()->unique();
             $table->string('username', 50)->unique();
-            $table->string('password', 255)->nullable(); // Dibuat nullable untuk login via Google
-            $table->boolean('is_approved')->default(false); 
+            $table->string('password', 255)->nullable();
+            $table->boolean('is_approved')->default(false);
             $table->string('full_name', 100);
             $table->string('email', 255)->unique();
             $table->string('sales_code', 10)->nullable()->unique();
@@ -25,7 +25,7 @@ return new class extends Migration
             $table->softDeletes();
         });
     }
-
+    
     public function down(): void
     {
         Schema::dropIfExists('users');

@@ -23,35 +23,23 @@ class ExpenseController extends Controller
     public function __construct(AccountingService $accountingService)
     {
         $this->accountingService = $accountingService;
-        
-        // ✅ TAMBAHKAN BLOK INI
-        // Hanya yang bisa 'view-reports' boleh lihat daftar (index)
         $this->middleware('can:view-reports')->only(['index']);
-        
-        // (Opsional) Jika Anda ingin permission terpisah untuk mengelola beban
         // $this->middleware('can:manage-expenses')->except(['index']);
     }
     
-    /**
-     * Menampilkan daftar pengeluaran.
-     */
     public function index(Request $request): View
     {
         // $this->authorize('viewAny', Expense::class); 
-        
-        // ✅ Perbarui query untuk load relasi baru
         $query = Expense::with(['user', 'expenseAccount', 'cashBankAccount']); 
 
-        // Filter berdasarkan pencarian (deskripsi / kategori string)
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('description', 'like', "%{$search}%")
-                  ->orWhere('category', 'like', "%{$search}%"); // Masih cari di kolom category
+                  ->orWhere('category', 'like', "%{$search}%");
             });
         }
         
-        // Filter tanggal (Sama)
         if ($request->filled('start_date')) {
             $query->whereDate('expense_date', '>=', $request->start_date);
         }
@@ -65,21 +53,15 @@ class ExpenseController extends Controller
         return view('admin.expenses.index', compact('expenses', 'totalExpenses'));
     }
 
-    /**
-     * Menampilkan form untuk membuat pengeluaran baru.
-     */
     public function create(): View
     {
         // $this->authorize('create', Expense::class);
         
-        // ✅ Ambil akun Kategori Beban dari COA
         $expenseAccounts = ChartOfAccount::where('account_type', 'Beban')
                                 ->where('is_active', true)
                                 ->orderBy('account_number')
                                 ->get();
-        
-        // ✅ Ambil akun Sumber Dana (Kas/Bank) dari COA
-        // Asumsi akun Kas/Bank adalah 'Aset'
+
         $cashAccounts = ChartOfAccount::where('account_type', 'Aset')
                                 ->where('is_active', true)
                                 ->orderBy('account_number')
@@ -88,9 +70,6 @@ class ExpenseController extends Controller
         return view('admin.expenses.create', compact('expenseAccounts', 'cashAccounts'));
     }
 
-    /**
-     * Menyimpan pengeluaran baru ke database.
-     */
     public function store(Request $request): RedirectResponse
     {
         // $this->authorize('create', Expense::class);
@@ -99,17 +78,14 @@ class ExpenseController extends Controller
             'expense_date' => 'required|date',
             'amount' => 'required|numeric|min:1',
             'description' => 'required|string|max:1000',
-            // ✅ Validasi kolom baru
             'chart_of_account_id' => 'required|exists:chart_of_accounts,account_id',
             'cash_bank_account_id' => 'required|exists:chart_of_accounts,account_id',
         ]);
 
-        // Ambil nama kategori dari COA untuk disimpan di kolom 'category' (legacy)
         $expenseAccount = ChartOfAccount::find($validated['chart_of_account_id']);
         
         DB::beginTransaction();
         try {
-            // 1. Simpan data pengeluaran
             $expense = Expense::create([
                 'expense_date' => $validated['expense_date'],
                 'amount' => $validated['amount'],
@@ -120,16 +96,13 @@ class ExpenseController extends Controller
                 'category' => $expenseAccount->account_name, // Simpan nama akun
             ]);
 
-            // 2. Post Jurnal Akuntansi
             $journalGroupId = "EXP-" . $expense->expense_id;
             $description = "Beban: " . $expense->description;
 
             $debitEntries = [
-                // [Akun Beban, Jumlah]
                 [$validated['chart_of_account_id'], $validated['amount']]
             ];
             $creditEntries = [
-                // [Akun Kas/Bank, Jumlah]
                 [$validated['cash_bank_account_id'], $validated['amount']]
             ];
 
@@ -139,7 +112,7 @@ class ExpenseController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $expense, // Model referensi
+                $expense,
                 Auth::id()
             );
 
@@ -152,20 +125,15 @@ class ExpenseController extends Controller
         }
     }
 
-    /**
-     * Menampilkan form untuk mengedit pengeluaran.
-     */
     public function edit(Expense $expense): View
     {
         // $this->authorize('update', $expense);
-        
-        // ✅ Ambil akun Kategori Beban dari COA
+
         $expenseAccounts = ChartOfAccount::where('account_type', 'Beban')
                                 ->where('is_active', true)
                                 ->orderBy('account_number')
                                 ->get();
         
-        // ✅ Ambil akun Sumber Dana (Kas/Bank) dari COA
         $cashAccounts = ChartOfAccount::where('account_type', 'Aset')
                                 ->where('is_active', true)
                                 ->orderBy('account_number')
@@ -173,18 +141,14 @@ class ExpenseController extends Controller
 
         return view('admin.expenses.edit', compact('expense', 'expenseAccounts', 'cashAccounts'));
     }
-    /**
-     * Mengupdate data pengeluaran di database.
-     */
+
     public function update(Request $request, Expense $expense): RedirectResponse
     {   
-        // 1. Cek Data Lama (Apakah terkunci?)
         $journalGroupId = "EXP-" . $expense->expense_id;
+
         if ($error = $this->checkTransactionLock($expense->expense_date, $journalGroupId)) {
             return back()->with('error', "Gagal Update: " . $error);
         }
-        
-        // 2. Cek Tanggal Baru (Apakah masuk tahun yang ditutup?)
         if ($request->filled('expense_date') && $this->isDateClosed($request->expense_date)) {
             return back()->with('error', "Gagal Update: Tanggal baru masuk periode tutup buku.");
         }
@@ -195,7 +159,6 @@ class ExpenseController extends Controller
             'expense_date' => 'required|date',
             'amount' => 'required|numeric|min:1',
             'description' => 'required|string|max:1000',
-            // ✅ Validasi kolom baru
             'chart_of_account_id' => 'required|exists:chart_of_accounts,account_id',
             'cash_bank_account_id' => 'required|exists:chart_of_accounts,account_id',
         ]);
@@ -204,7 +167,6 @@ class ExpenseController extends Controller
 
         DB::beginTransaction();
         try {
-            // 1. Update data pengeluaran
             $expense->update([
                 'expense_date' => $validated['expense_date'],
                 'amount' => $validated['amount'],
@@ -214,7 +176,6 @@ class ExpenseController extends Controller
                 'category' => $expenseAccount->account_name, // Simpan nama akun
             ]);
 
-            // 2. Post ulang Jurnal Akuntansi (Service kita akan hapus yg lama)
             $journalGroupId = "EXP-" . $expense->expense_id;
             $description = "Beban (Update): " . $expense->description;
 
@@ -231,7 +192,7 @@ class ExpenseController extends Controller
                 $description,
                 $debitEntries,
                 $creditEntries,
-                $expense, // Model referensi
+                $expense, 
                 Auth::id()
             );
 
@@ -244,9 +205,6 @@ class ExpenseController extends Controller
         }
     }
 
-    /**
-     * Menghapus data pengeluaran dari database.
-     */
     public function destroy(Expense $expense): RedirectResponse
     {   
         $journalGroupId = "EXP-" . $expense->expense_id;
@@ -258,23 +216,19 @@ class ExpenseController extends Controller
         
         DB::beginTransaction();
         try {
-            // 1. Hapus Jurnal terkait
-            // Kita jurnal balik (reversal)
             $journalGroupId = "EXP-REVERSAL-" . $expense->expense_id;
             $description = "Reversal Beban: " . $expense->description;
 
             $debitEntries = [
-                // [Akun Kas/Bank, Jumlah]
                 [$expense->cash_bank_account_id, $expense->amount]
             ];
             $creditEntries = [
-                // [Akun Beban, Jumlah]
                 [$expense->chart_of_account_id, $expense->amount]
             ];
             
             $this->accountingService->postJournal(
                 $journalGroupId,
-                now(), // Tanggal reversal adalah hari ini
+                now(), 
                 $description,
                 $debitEntries,
                 $creditEntries,
@@ -282,10 +236,8 @@ class ExpenseController extends Controller
                 Auth::id()
             );
             
-            // 2. Hapus Jurnal Asli (EXP-...)
             DB::table('general_ledgers')->where('journal_group_id', "EXP-" . $expense->expense_id)->delete();
 
-            // 3. Hapus data pengeluaran
             $expense->delete();
             
             DB::commit();

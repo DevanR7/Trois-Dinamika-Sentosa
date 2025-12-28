@@ -3,14 +3,11 @@
 namespace App\Events;
 
 use App\Models\SalesInvoice;
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Number;
 
 class PaymentStatusUpdated implements ShouldBroadcast
 {
@@ -33,8 +30,6 @@ class PaymentStatusUpdated implements ShouldBroadcast
      */
     public function broadcastOn(): array
     {
-        // Kita membuat channel "privat" agar hanya user yang berhak yang bisa mendengar.
-        // Channel ini spesifik untuk setiap invoice.
         return [
             new PrivateChannel('invoice.' . $this->invoice->invoice_id),
         ];
@@ -54,7 +49,6 @@ class PaymentStatusUpdated implements ShouldBroadcast
      */
     public function broadcastWith(): array
     {
-        // Kita refresh data invoice untuk memastikan data terbaru yang dikirim
         $this->invoice->refresh();
 
         $totalRetur = $this->invoice->returns->sum('total_amount');

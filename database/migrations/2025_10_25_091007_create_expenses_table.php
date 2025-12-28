@@ -14,24 +14,18 @@ return new class extends Migration
             $table->string('category')->nullable(); 
             $table->text('description');
             $table->decimal('amount', 15, 2);
-            
             $table->foreignId('user_id')
-                  ->nullable()
-                  ->constrained('users', 'user_id')
-                  ->nullOnDelete();
-            
-            // Hapus ->after()
+                ->nullable()
+                ->constrained('users', 'user_id')
+                ->nullOnDelete();
             $table->foreignId('chart_of_account_id')
-                  ->nullable()
-                  ->constrained('chart_of_accounts', 'account_id')
-                  ->nullOnDelete();
-
-            // Hapus ->after()
+                ->nullable()
+                ->constrained('chart_of_accounts', 'account_id')
+                ->nullOnDelete();
             $table->foreignId('cash_bank_account_id')
-                  ->nullable()
-                  ->constrained('chart_of_accounts', 'account_id')
-                  ->nullOnDelete();
-            
+                ->nullable()
+                ->constrained('chart_of_accounts', 'account_id')
+                ->nullOnDelete();
             $table->timestamps();
         });
     }

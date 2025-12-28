@@ -1,204 +1,261 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Manajemen Supplier')
+@section('title', 'Data Supplier')
 
 @section('content')
-<div class="max-w-6xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER SECTION --}}
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Manajemen Supplier</h1>
-            <p class="text-slate-500 text-sm mt-1">Daftar vendor dan pemasok barang.</p>
-        </div>
+    <div class="flex flex-col gap-6">
         
-        {{-- ACTION BUTTONS --}}
-        <div class="flex flex-wrap gap-2 w-full md:w-auto">
-            @if(request('status') === 'deleted')
-                <a href="{{ route('admin.suppliers.index') }}" 
-                   class="px-5 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
-                    <i class="material-icons text-[18px]">arrow_back</i> Kembali ke Aktif
-                </a>
-            @else
-                <a href="{{ route('admin.suppliers.index', ['status' => 'deleted']) }}" 
-                   class="px-5 py-2.5 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm flex items-center gap-2">
-                    <i class="material-icons text-[18px] text-slate-400">archive</i> Arsip
-                </a>
-                <a href="{{ route('admin.suppliers.create') }}" 
-                   class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-md shadow-indigo-200 transition-all flex items-center gap-2">
-                    <i class="material-icons text-[18px]">add</i> Tambah Supplier
-                </a>
-            @endif
-        </div>
-    </div>
-
-    {{-- LIST DATA (MENGGUNAKAN COMPONENT) --}}
-    <div class="space-y-4">
-        @forelse ($suppliers as $supplier)
-        
-            {{-- Panggil Component Accordion --}}
-            <x-ui.accordion-card id="supp-{{ $supplier->supplier_id }}">
-                
-                {{-- SLOT: HEADER (Tampilan luar saat tertutup) --}}
-                <x-slot name="header">
-                {{-- Kiri: Info Utama --}}
-                <div class="flex items-center gap-4 pr-4 flex-grow min-w-0">
-                    {{-- Icon --}}
-                    <div class="w-12 h-12 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0 border border-indigo-100">
-                        <i class="material-icons text-xl">business</i>
-                    </div>
-                    {{-- Teks Nama --}}
-                    <div class="min-w-0">
-                        <h3 class="text-base font-bold text-slate-800 truncate">{{ $supplier->supplier_name }}</h3>
-                        <p class="text-xs text-slate-500 flex items-center gap-1 mt-0.5 truncate">
-                            <i class="material-icons text-[14px]">person</i> {{ $supplier->person_in_charge ?? 'Belum ada PIC' }}
-                        </p>
-                    </div>
-                </div>
-
-                {{-- Kanan: Saldo & Status (Diperbaiki) --}}
-                <div class="flex items-center gap-3 sm:gap-5 ml-auto flex-shrink-0 pl-4">
-                    
-                    {{-- Blok Saldo --}}
-                    <div class="flex flex-col items-end text-right">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-tight mb-0.5">
-                            Saldo Deposit
-                        </span>
-                        <span class="text-sm font-bold font-mono {{ $supplier->balance > 0 ? 'text-emerald-600' : 'text-slate-600' }} leading-tight">
-                            Rp {{ number_format($supplier->balance, 0, ',', '.') }}
-                        </span>
-                    </div>
-
-                    {{-- Garis Pemisah Vertikal (Agar lebih rapi) --}}
-                    <div class="hidden sm:block w-px h-8 bg-slate-200"></div>
-
-                    {{-- Badge Status --}}
-                    <div>
-                        @if($supplier->trashed())
-                            <span class="status-badge status-rejected">
-                                <i class="material-icons text-[12px]">archive</i> <span class="hidden sm:inline">Arsip</span>
-                            </span>
-                        @else
-                            <span class="status-badge status-completed">
-                                <i class="material-icons text-[12px]">check_circle</i> <span class="hidden sm:inline">Aktif</span>
-                            </span>
-                        @endif
-                    </div>
-
-                </div>
-            </x-slot>
-
-                {{-- SLOT: UTAMA (Isi detail saat dibuka) --}}
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-                    
-                    {{-- Kolom 1: Kontak --}}
-                    <div>
-                        <h4 class="text-xs font-bold text-slate-500 uppercase mb-3 tracking-wide">Kontak & Alamat</h4>
-                        <ul class="space-y-2 text-slate-600">
-                            <li class="flex items-center gap-2">
-                                <i class="material-icons text-indigo-400 text-[16px]">phone</i> 
-                                {{ $supplier->phone_number ?? '-' }}
-                            </li>
-                            <li class="flex items-start gap-2">
-                                <i class="material-icons text-indigo-400 text-[16px]">location_on</i> 
-                                <span class="leading-relaxed">{{ $supplier->address ?? '-' }}</span>
-                            </li>
-                        </ul>
-                    </div>
-
-                    {{-- Kolom 2: Bank --}}
-                    <div>
-                        <h4 class="text-xs font-bold text-slate-500 uppercase mb-3 tracking-wide">Informasi Bank</h4>
-                        <ul class="space-y-2 text-slate-600">
-                            <li class="flex justify-between border-b border-dashed border-slate-200 pb-1">
-                                <span class="text-xs text-slate-400">NPWP</span> 
-                                <span class="font-mono text-xs">{{ $supplier->npwp ?? '-' }}</span>
-                            </li>
-                            <li class="flex justify-between border-b border-dashed border-slate-200 pb-1">
-                                <span class="text-xs text-slate-400">Bank</span> 
-                                <span>{{ $supplier->bank_name ?? '-' }}</span>
-                            </li>
-                            <li class="flex justify-between border-b border-dashed border-slate-200 pb-1">
-                                <span class="text-xs text-slate-400">Rekening</span> 
-                                <span class="font-mono font-medium">{{ $supplier->account_number ?? '-' }}</span>
-                            </li>
-                        </ul>
-                    </div>
-
-                    {{-- Kolom 3: Action Buttons --}}
-                    <div class="flex flex-col gap-2 justify-center md:border-l md:border-slate-200 md:pl-6">
-                        @if($supplier->trashed())
-                            {{-- Tombol RESTORE (Hijau) --}}
-                            <form action="{{ route('admin.suppliers.restore', $supplier->supplier_id) }}" method="POST" class="form-confirm w-full">
-                                @csrf @method('PATCH')
-                                <button type="submit" 
-                                        data-title="Pulihkan Supplier?"
-                                        data-text="Supplier <b>{{ $supplier->supplier_name }}</b> akan dikembalikan ke status aktif."
-                                        data-btn-text="Ya, Pulihkan!"
-                                        data-btn-color="#10b981"
-                                        data-icon="question"
-                                        class="w-full px-3 py-2 bg-white border border-emerald-300 text-emerald-700 rounded-lg text-xs font-bold hover:bg-emerald-50 transition flex items-center justify-center gap-2 shadow-sm">
-                                    <i class="material-icons text-[16px]">restore</i> Pulihkan
-                                </button>
-                            </form>
-                        @else
-                            {{-- Tombol DETAIL & EDIT --}}
-                            <div class="flex gap-2">
-                                <a href="{{ route('admin.suppliers.show', $supplier->supplier_id) }}" 
-                                   class="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 transition text-center shadow-sm">
-                                    Detail
-                                </a>
-                                <a href="{{ route('admin.suppliers.edit', $supplier->supplier_id) }}" 
-                                   class="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition text-center shadow-sm">
-                                    Edit
-                                </a>
-                            </div>
-                            
-                            {{-- Tombol ARSIP (Merah) --}}
-                            <form action="{{ route('admin.suppliers.destroy', $supplier->supplier_id) }}" method="POST" class="form-confirm w-full">
-                                @csrf @method('DELETE')
-                                <button type="submit" 
-                                        data-name="{{ $supplier->supplier_name }}"
-                                        data-title="Arsipkan Supplier?"
-                                        data-text="Supplier <b>{{ $supplier->supplier_name }}</b> akan dipindahkan ke arsip."
-                                        data-btn-text="Ya, Arsipkan!"
-                                        data-btn-color="#ef4444"
-                                        class="w-full px-3 py-2 bg-white border border-red-200 text-red-600 rounded-lg text-xs font-bold hover:bg-red-50 hover:border-red-300 transition flex items-center justify-center gap-2 shadow-sm">
-                                    <i class="material-icons text-[16px]">archive</i> Arsipkan
-                                </button>
-                            </form>
-                        @endif
-                    </div>
-                </div>
-
-            </x-ui.accordion-card>
-
-        @empty
-            {{-- Empty State --}}
-            <div class="col-span-full py-16 text-center bg-white rounded-xl border border-dashed border-slate-300">
-                <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 mx-auto">
-                    <i class="material-icons text-slate-300 text-4xl">inventory</i>
-                </div>
-                <h3 class="text-lg font-bold text-slate-700">Belum ada Supplier</h3>
-                <p class="text-slate-500 text-sm mt-1 max-w-xs mx-auto">Mulai tambahkan data vendor atau pemasok Anda di sini.</p>
+        {{-- Header & Tools --}}
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h2 class="page-title">Data Supplier</h2>
+                <p class="page-subtitle">Kelola data pemasok, deposit, dan informasi kontak.</p>
             </div>
-        @endforelse
+            <a href="{{ route('admin.suppliers.create') }}" class="btn btn-primary">
+                <i class="material-icons text-lg">add</i>
+                Tambah Supplier
+            </a>
+        </div>
+
+        {{-- Filter & Search --}}
+        <div class="card p-4">
+            <form method="GET" action="{{ route('admin.suppliers.index') }}" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                
+                {{-- Search --}}
+                <div class="col-span-1 md:col-span-2">
+                    <label class="form-label text-xs">Cari Supplier / PIC</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                            <i class="material-icons text-lg">search</i>
+                        </span>
+                        <input type="text" name="search" value="{{ request('search') }}" 
+                               class="form-input pl-10" 
+                               placeholder="Cari nama supplier, PIC, atau telepon...">
+                    </div>
+                </div>
+
+                {{-- Status Filter --}}
+                <div>
+                    <label class="form-label text-xs">Status Data</label>
+                    <select name="status" class="tom-select w-full">
+                        <option value="active" {{ request('status') != 'deleted' ? 'selected' : '' }}>Aktif</option>
+                        <option value="deleted" {{ request('status') == 'deleted' ? 'selected' : '' }}>Diarsipkan (Terhapus)</option>
+                    </select>
+                </div>
+
+                {{-- Action Buttons --}}
+                <div class="flex items-end gap-2">
+                    <button type="submit" class="btn btn-secondary flex-1">
+                        <i class="material-icons text-lg">filter_list</i>
+                        Filter
+                    </button>
+                    @if(request()->anyFilled(['search', 'status']))
+                        <a href="{{ route('admin.suppliers.index') }}" class="btn btn-danger-solid px-3" title="Reset Filter">
+                            <i class="material-icons">close</i>
+                        </a>
+                    @endif
+                </div>
+            </form>
+        </div>
+
+        {{-- Supplier List (Accordion Style) --}}
+        <div class="flex flex-col gap-3">
+            @forelse($suppliers as $supplier)
+                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden transition-all duration-200 hover:shadow-md hover:border-indigo-200 dark:hover:border-slate-600" 
+                     x-data="{ expanded: false }">
+                    
+                    {{-- ACCORDION HEADER (Visible Always) --}}
+                    <div @click="expanded = !expanded" class="p-4 flex items-center justify-between cursor-pointer group">
+                        <div class="flex items-center gap-4">
+                            {{-- Avatar --}}
+                            <div class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 font-bold text-sm group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                                {{ substr($supplier->supplier_name, 0, 1) }}
+                            </div>
+
+                            {{-- Nama & Status Ringkas --}}
+                            <div>
+                                <h3 class="font-bold text-slate-700 dark:text-white text-sm sm:text-base group-hover:text-indigo-600 transition-colors">
+                                    {{ $supplier->supplier_name }}
+                                </h3>
+                                <p class="text-xs text-slate-500 flex items-center gap-1">
+                                    <i class="material-icons text-[12px]">person</i> {{ $supplier->person_in_charge ?? '-' }}
+                                    <span class="mx-1">•</span>
+                                    <i class="material-icons text-[12px]">phone</i> {{ $supplier->phone_number ?? '-' }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-4">
+                            {{-- Info Cepat: Saldo --}}
+                            <div class="hidden sm:flex flex-col items-end mr-2">
+                                <span class="text-[10px] text-slate-400 uppercase font-bold">Saldo Deposit</span>
+                                <span class="text-sm font-bold text-indigo-600 dark:text-indigo-400">Rp {{ number_format($supplier->balance, 0, ',', '.') }}</span>
+                            </div>
+
+                            {{-- Status Badge --}}
+                            <div class="hidden sm:block">
+                                @if($supplier->trashed())
+                                    <span class="badge badge-danger">Diarsipkan</span>
+                                @else
+                                    <span class="badge badge-success">Aktif</span>
+                                @endif
+                            </div>
+
+                            {{-- Arrow Icon --}}
+                            <div class="text-slate-400 transition-transform duration-300" :class="expanded ? 'rotate-180' : ''">
+                                <i class="material-icons text-xl">expand_more</i>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ACCORDION BODY (Details) --}}
+                    <div x-show="expanded" x-collapse class="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700 px-4 py-6">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            
+                            {{-- KOLOM 1: Informasi Keuangan & Hutang --}}
+                            <div class="flex flex-col gap-4 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-700 pb-4 lg:pb-0 lg:pr-6">
+                                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                    <i class="material-icons text-[14px]">monetization_on</i> Keuangan & Tagihan
+                                </h4>
+                                
+                                {{-- Kalkulasi Sisa Hutang (Logic View) --}}
+                                @php
+                                    $unpaidPos = $supplier->purchaseOrders->whereIn('payment_status', ['unpaid', 'partially_paid']);
+                                    $debtAmount = $unpaidPos->sum('remaining_balance');
+                                    $poCount = $unpaidPos->count();
+                                @endphp
+
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-slate-600 dark:text-slate-300">Sisa Hutang (AP)</span>
+                                    <div class="text-right">
+                                        <span class="font-bold text-rose-600">Rp {{ number_format($debtAmount, 0, ',', '.') }}</span>
+                                        @if($poCount > 0)
+                                            <div class="text-[10px] text-slate-400">{{ $poCount }} PO Belum Lunas</div>
+                                        @endif
+                                    </div>
+                                </div>
+                                
+                                <div class="flex justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-700/50">
+                                    <span class="text-sm text-slate-600 dark:text-slate-300">Saldo Deposit</span>
+                                    <span class="font-bold text-indigo-600 dark:text-indigo-400">
+                                        Rp {{ number_format($supplier->balance, 0, ',', '.') }}
+                                    </span>
+                                </div>
+
+                                @if($supplier->pending_balance > 0)
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm text-slate-500">Deposit Tertahan</span>
+                                        <span class="text-xs font-bold text-amber-500 bg-amber-50 px-2 py-0.5 rounded">
+                                            Rp {{ number_format($supplier->pending_balance, 0, ',', '.') }}
+                                        </span>
+                                    </div>
+                                @endif
+                            </div>
+
+                            {{-- KOLOM 2: Detail Identitas --}}
+                            <div class="flex flex-col gap-3 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-700 pb-4 lg:pb-0 lg:pr-6">
+                                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                    <i class="material-icons text-[14px]">info</i> Identitas & Bank
+                                </h4>
+                                
+                                <div class="space-y-2">
+                                    <div class="flex items-start gap-2 text-sm">
+                                        <i class="material-icons text-slate-400 text-sm mt-0.5">account_balance</i>
+                                        <div class="flex flex-col">
+                                            <span class="font-medium text-slate-700 dark:text-slate-200">{{ $supplier->bank_name ?? '-' }}</span>
+                                            <span class="text-xs text-slate-500">{{ $supplier->account_number ?? 'No. Rek: -' }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-2 text-sm">
+                                        <i class="material-icons text-slate-400 text-sm">badge</i>
+                                        <span class="text-slate-600 dark:text-slate-300">NPWP: {{ $supplier->npwp ?? '-' }}</span>
+                                    </div>
+
+                                    <div class="flex items-start gap-2 text-sm">
+                                        <i class="material-icons text-slate-400 text-sm mt-0.5">location_on</i>
+                                        <span class="text-slate-600 dark:text-slate-300 leading-tight">{{ $supplier->address ?? '-' }}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- KOLOM 3: Aksi --}}
+                            <div class="flex flex-col gap-4 justify-between">
+                                <div>
+                                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Aksi & Kontrol</h4>
+                                    
+                                    <div class="flex flex-wrap gap-2">
+                                        @if($supplier->trashed())
+                                            {{-- Restore Button --}}
+                                            <form action="{{ route('admin.suppliers.restore', $supplier->supplier_id) }}" method="POST" class="w-full">
+                                                @csrf @method('PATCH')
+                                                <button type="submit" class="btn btn-sm btn-success w-full justify-center">
+                                                    <i class="material-icons text-[16px]">restore</i> Pulihkan
+                                                </button>
+                                            </form>
+                                        @else
+                                            {{-- Detail --}}
+                                            <a href="{{ route('admin.suppliers.show', $supplier->supplier_id) }}" class="btn btn-sm btn-primary flex-1 justify-center">
+                                                <i class="material-icons text-[16px]">visibility</i> Detail
+                                            </a>
+
+                                            {{-- Edit --}}
+                                            <a href="{{ route('admin.suppliers.edit', $supplier->supplier_id) }}" class="btn btn-sm btn-secondary flex-1 justify-center">
+                                                <i class="material-icons text-[16px]">edit</i> Edit
+                                            </a>
+
+                                            {{-- Delete (Archive) --}}
+                                            <button type="button" onclick="deleteSupplier({{ $supplier->supplier_id }}, '{{ $supplier->supplier_name }}')" class="btn btn-sm btn-danger w-full justify-center mt-2">
+                                                <i class="material-icons text-[16px]">delete</i> Arsipkan
+                                            </button>
+                                            <form id="delete-form-{{ $supplier->supplier_id }}" action="{{ route('admin.suppliers.destroy', $supplier->supplier_id) }}" method="POST" class="hidden">
+                                                @csrf @method('DELETE')
+                                            </form>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                {{-- Meta Info --}}
+                                <div class="text-right">
+                                    <p class="text-[10px] text-slate-400">Terdaftar: {{ $supplier->created_at->format('d M Y') }}</p>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            @empty
+                <div class="card p-8 flex flex-col items-center justify-center text-slate-400">
+                    <i class="material-icons text-5xl mb-3">inventory_2</i>
+                    <p class="text-base font-medium">Tidak ada data supplier.</p>
+                    <p class="text-sm mt-1">Coba ubah kata kunci pencarian atau filter status.</p>
+                </div>
+            @endforelse
+        </div>
+
+        {{-- Pagination --}}
+        @if($suppliers->hasPages())
+            <div class="mt-4">
+                {{ $suppliers->links('vendor.pagination.admin') }}
+            </div>
+        @endif
     </div>
 
-    {{-- Pagination --}}
-    <div class="mt-6">
-        {{ $suppliers->appends(request()->query())->links() }}
-    </div>
-</div>
+    @push('scripts')
+    <script>
+        function deleteSupplier(id, name) {
+            confirmDialog({
+                title: 'Arsipkan Supplier?',
+                text: `Anda akan mengarsipkan supplier <b>${name}</b>.<br>Data tidak hilang permanen, namun tidak akan muncul di opsi pembelian.`,
+                icon: 'warning',
+                confirmText: 'Ya, Arsipkan',
+                confirmColor: 'danger'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('delete-form-' + id).submit();
+                }
+            });
+        }
+    </script>
+    @endpush
 @endsection
-
-@push('scripts')
-<script>
-    // Hanya menangani Session Toast
-    // Animasi dropdown & SweetAlert sudah otomatis ditangani app.js & component
-    document.addEventListener('DOMContentLoaded', function() {
-        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
-        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
-    });
-</script>
-@endpush

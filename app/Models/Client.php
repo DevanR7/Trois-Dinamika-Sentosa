@@ -17,12 +17,8 @@ use Illuminate\Auth\Passwords\CanResetPassword as CanResetPasswordTrait;
 class Client extends Authenticatable implements CanResetPassword
 {
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes, CanResetPasswordTrait;
-
     protected $primaryKey = 'client_id';
 
-    /**
-     * The attributes that are mass assignable.
-     */
     protected $fillable = [
         'client_name',
         'email',
@@ -32,56 +28,35 @@ class Client extends Authenticatable implements CanResetPassword
         'phone_number',
         'is_approved',
         'is_locked',
-        'google_id', // Make sure google_id is fillable if you set it during registration/login
+        'google_id', 
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * The attributes that should be cast.
-     */
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
         'is_approved' => 'boolean',
     ];
 
-    /**
-     * Mengirim notifikasi reset password kustom.
-     *
-     * @param  string  $token
-     * @return void
-     */
     public function sendPasswordResetNotification($token)
     {
         $this->notify(new ClientResetPasswordNotification($token));
     }
 
-    /**
-     * Get all of the sales invoices for the Client.
-     */
     public function salesInvoices(): HasMany
     {
         return $this->hasMany(SalesInvoice::class, 'client_id', 'client_id');
     }
 
-    /**
-     * Get all of the orders for the Client.
-     * ✅ BERUBAH: Nama method dan model yang dirujuk.
-     */
-    public function orders(): HasMany // ✅ BERUBAH: Nama method
+    public function orders(): HasMany 
     {
-        // ✅ BERUBAH: Model yang dirujuk
         return $this->hasMany(Order::class, 'client_id', 'client_id');
     }
 
-    // You might also want a relationship for client-created orders specifically
     public function clientOrders(): HasMany
     {
         return $this->hasMany(Order::class, 'client_id', 'client_id')->where('order_source', 'client');
@@ -97,26 +72,13 @@ class Client extends Authenticatable implements CanResetPassword
         return $this->hasMany(ClientLedger::class, 'client_id', 'client_id');
     }
 
-    /**
-     * Accessor untuk mendapatkan saldo kredit saat ini.
-     * Panggil ini di view/controller: $client->balance
-     *
-     * @return float
-     */
     public function getBalanceAttribute(): float
     {
-        // ✅ DIUBAH: Hanya menjumlahkan yang statusnya 'available'
         return $this->ledgers()->where('status', 'available')->sum('amount');
     }
 
-    /**
-     * ✅ BARU: Accessor untuk mendapatkan saldo kredit yang DITAHAN (pending).
-     *
-     * @return float
-     */
     public function getPendingBalanceAttribute(): float
     {
-        // Hanya menjumlahkan kredit 'pending' (debit tidak pernah pending)
         return $this->ledgers()
                     ->where('status', 'pending')
                     ->where('type', 'credit')

@@ -10,24 +10,16 @@ return new class extends Migration
     {
         Schema::create('order_change_request_items', function (Blueprint $table) {
             $table->id('item_id');
-            $table->foreignId('order_change_request_id')->constrained('order_change_requests', 'request_id')->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained('products', 'product_id');
-
-            // UBAH DARI INTEGER KE DECIMAL
-            // Kuantitas asli (jika item sudah ada sebelumnya dan diubah/dihapus)
+            $table->foreignId('order_change_request_id')
+                ->constrained('order_change_requests', 'request_id')
+                ->cascadeOnDelete();
+            $table->foreignId('product_id')
+                ->constrained('products', 'product_id');
             $table->decimal('original_quantity', 15, 2)->nullable(); 
-
-            // UBAH DARI INTEGER KE DECIMAL
-            // Kuantitas yang diminta klien (bisa 0 jika dihapus)
             $table->decimal('requested_quantity', 15, 2);
-
-            // Aksi yang diminta: tambah item baru, hapus item, atau ubah kuantitas
             $table->enum('action', ['add', 'remove', 'update_qty']);
-
-            // Simpan harga saat request dibuat (opsional, tapi bagus untuk audit)
             $table->decimal('price_per_unit', 15, 2);
-            $table->decimal('subtotal', 15, 2); // requested_quantity * price_per_unit
-
+            $table->decimal('subtotal', 15, 2);
             $table->timestamps();
         });
     }

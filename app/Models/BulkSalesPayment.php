@@ -26,8 +26,6 @@ class BulkSalesPayment extends Model
         'details',
         'reference_number',
         'proof_of_payment_path',
-        
-        // Kolom untuk Approval/Rejection
         'approved_by_user_id',
         'approved_at',
         'rejected_by_user_id',
@@ -48,22 +46,16 @@ class BulkSalesPayment extends Model
         return $this->belongsTo(Client::class, 'client_id', 'client_id');
     }
 
-    /**
-     * ✅ INI BAGIAN PENTINGNYA
-     * Nama fungsi ini HARUS 'processedByUser' agar sesuai dengan Controller.
-     */
     public function processedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'processed_by_user_id', 'user_id');
     }
 
-    // Relasi Approved By
     public function approvedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by_user_id', 'user_id');
     }
 
-    // Relasi Rejected By
     public function rejectedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'rejected_by_user_id', 'user_id');

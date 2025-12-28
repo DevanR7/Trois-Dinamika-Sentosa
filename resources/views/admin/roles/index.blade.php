@@ -3,96 +3,94 @@
 @section('title', 'Manajemen Role')
 
 @section('content')
-<div class="max-w-7xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+
+    {{-- HEADER & ACTIONS --}}
+    <div class="page-header">
         <div>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Manajemen Role</h1>
-            <p class="text-slate-500 text-sm mt-1">Atur peran pengguna dan hak akses sistem.</p>
+            <h1 class="page-title">Manajemen Role</h1>
+            <p class="page-subtitle">Atur hak akses pengguna dalam sistem.</p>
         </div>
-        <div class="mt-4 sm:mt-0">
-            <a href="{{ route('admin.roles.create') }}" class="h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2">
-                <i class="material-icons text-[20px]">add</i> Tambah Role
+        <div class="flex items-center gap-3">
+            <a href="{{ route('admin.roles.create') }}" class="btn btn-primary">
+                <i class="material-icons text-sm mr-1">add_moderator</i> Tambah Role
             </a>
         </div>
     </div>
 
-    {{-- TABLE CARD --}}
-    <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
-        <div class="overflow-x-auto">
-            <table class="dashboard-table min-w-full">
-                <thead class="bg-slate-50 border-b border-slate-200">
+    {{-- TABLE DATA --}}
+    <div class="card">
+        <div class="table-container">
+            <table class="table-modern">
+                <thead>
                     <tr>
-                        <th class="pl-6 w-1/4">Nama Role</th>
-                        <th>Hak Akses (Permissions)</th>
-                        <th class="text-center w-32 pr-6">Aksi</th>
+                        <th class="w-16 text-center">#</th>
+                        <th>Nama Role</th>
+                        <th>Guard</th>
+                        <th>Jumlah Permission</th>
+                        <th>Pengguna Terkait</th>
+                        <th class="text-center w-36">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100 bg-white">
-                    @forelse ($roles as $role)
-                        <tr class="hover:bg-slate-50/50 transition-colors group">
-                            <td class="pl-6 py-4 align-top">
-                                <div class="flex items-center gap-2">
-                                    <i class="material-icons text-slate-400 text-[18px]">badge</i>
-                                    <span class="text-sm font-bold text-slate-700 group-hover:text-indigo-600 transition-colors">
-                                        {{ Str::title($role->name) }}
-                                    </span>
+                <tbody>
+                    @forelse($roles as $index => $role)
+                        <tr>
+                            <td class="text-center text-slate-500">{{ $roles->firstItem() + $index }}</td>
+                            <td>
+                                <div class="font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wide">
+                                    {{ $role->name }}
                                 </div>
                             </td>
-                            <td class="py-4 align-top">
-                                <div class="flex flex-wrap gap-1.5">
-                                    @foreach($role->permissions->take(8) as $permission)
-                                        <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 uppercase tracking-wide">
-                                            {{ str_replace(['-', '_'], ' ', $permission->name) }}
-                                        </span>
-                                    @endforeach
-                                    
-                                    @if($role->permissions->count() > 8)
-                                        <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-white text-indigo-600 border border-indigo-100">
-                                            +{{ $role->permissions->count() - 8 }} lainnya
-                                        </span>
-                                    @endif
-                                    
-                                    @if($role->permissions->isEmpty())
-                                        <span class="text-xs text-slate-400 italic flex items-center gap-1">
-                                            <i class="material-icons text-[14px]">block</i> Tidak ada akses
-                                        </span>
-                                    @endif
+                            <td>
+                                <span class="badge badge-primary font-mono text-xs">{{ $role->guard_name }}</span>
+                            </td>
+                            <td>
+                                <span class="badge {{ $role->permissions->count() > 0 ? 'badge-success' : 'badge-warning' }}">
+                                    {{ $role->permissions->count() }} Akses
+                                </span>
+                            </td>
+                            <td>
+                                <div class="text-sm text-slate-600 dark:text-slate-400">
+                                    {{ $role->users()->count() }} User
                                 </div>
                             </td>
-                            <td class="pr-6 py-4 align-top text-center">
-                                <div class="flex justify-center items-center gap-2">
+                            <td class="text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    
+                                    {{-- Edit Button --}}
                                     <a href="{{ route('admin.roles.edit', $role->id) }}" 
-                                       class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-amber-600 hover:border-amber-200 transition-colors shadow-sm" 
-                                       title="Edit">
-                                        <i class="material-icons text-[16px]">edit</i>
+                                       class="w-9 h-9 rounded-full flex items-center justify-center bg-indigo-50 border border-transparent text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors shadow-sm dark:bg-indigo-900/30 dark:text-indigo-400"
+                                       title="Edit Akses">
+                                        <i class="material-icons text-[18px] leading-none">manage_accounts</i>
                                     </a>
-                                    
-                                    {{-- Global Delete Handler --}}
-                                    <form action="{{ route('admin.roles.destroy', $role->id) }}" method="POST" class="delete-form inline-block">
-                                        @csrf @method('DELETE')
-                                        <button type="submit" 
-                                                data-name="{{ Str::title($role->name) }}"
-                                                data-title="Hapus Role?"
-                                                data-text="Pastikan tidak ada user yang menggunakan role <b>{{ Str::title($role->name) }}</b>."
-                                                class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 transition-colors shadow-sm" 
-                                                title="Hapus">
-                                            <i class="material-icons text-[16px]">delete</i>
+
+                                    {{-- Delete Button (Proteksi Admin) --}}
+                                    @if(!in_array($role->name, ['admin', 'superadmin']))
+                                        <button type="button" onclick="confirmDelete('{{ $role->id }}', '{{ $role->name }}')" 
+                                                class="w-9 h-9 rounded-full flex items-center justify-center bg-rose-50 border border-transparent text-rose-600 hover:bg-rose-600 hover:text-white transition-colors shadow-sm dark:bg-rose-900/30 dark:text-rose-400"
+                                                title="Hapus Role">
+                                            <i class="material-icons text-[18px] leading-none">delete</i>
                                         </button>
-                                    </form>
+                                        
+                                        <form id="delete-form-{{ $role->id }}" 
+                                              action="{{ route('admin.roles.destroy', $role->id) }}" 
+                                              method="POST" class="hidden">
+                                            @csrf
+                                            @method('DELETE')
+                                        </form>
+                                    @else
+                                        {{-- Spacer jika tombol delete tidak ada agar kolom tetap rapi --}}
+                                        <div class="w-9 h-9"></div> 
+                                    @endif
+
                                 </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="3" class="px-6 py-16 text-center">
+                            <td colspan="6" class="text-center p-8">
                                 <div class="flex flex-col items-center justify-center text-slate-400">
-                                    <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                                        <i class="material-icons text-4xl opacity-30">gpp_bad</i>
-                                    </div>
-                                    <h3 class="text-base font-bold text-slate-800">Belum ada data role</h3>
-                                    <p class="text-sm mt-1">Silakan tambahkan role baru.</p>
+                                    <i class="material-icons text-5xl mb-2">lock_open</i>
+                                    <span>Belum ada role yang dibuat.</span>
                                 </div>
                             </td>
                         </tr>
@@ -100,15 +98,31 @@
                 </tbody>
             </table>
         </div>
+        
+        <div class="card-footer">
+            {{ $roles->links() }}
+        </div>
     </div>
-</div>
+
 @endsection
 
 @push('scripts')
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
-        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
-    });
+    function confirmDelete(id, name) {
+        window.confirmDialog({
+            title: 'Hapus Role?',
+            text: "Role '" + name + "' akan dihapus permanen. Pastikan tidak ada user yang menggunakan role ini.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('delete-form-' + id).submit();
+            }
+        });
+    }
 </script>
 @endpush

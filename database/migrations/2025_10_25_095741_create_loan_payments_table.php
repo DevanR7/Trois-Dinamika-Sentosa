@@ -10,40 +10,26 @@ return new class extends Migration
     {
         Schema::create('loan_payments', function (Blueprint $table) {
             $table->id('payment_id');
-            
-            // Relasi ke pinjaman induk
             $table->foreignId('loan_id')
-                  ->constrained('loans', 'loan_id')
-                  ->onDelete('cascade');
-            
-            $table->date('payment_date'); // Tanggal bayar
-            
-            // Rincian pembayaran
-            $table->decimal('principal_paid', 15, 2); // Cicilan Pokok (mengurangi utang)
-            $table->decimal('interest_paid', 15, 2);  // Beban Bunga (masuk ke Laba Rugi)
-            $table->decimal('total_paid', 15, 2);     // Total (pokok + bunga)
-            
+                ->constrained('loans', 'loan_id')
+                ->onDelete('cascade');
+            $table->date('payment_date');
+            $table->decimal('principal_paid', 15, 2);
+            $table->decimal('interest_paid', 15, 2);
+            $table->decimal('total_paid', 15, 2);
             $table->text('notes')->nullable();
-            
             $table->foreignId('user_id')
-                  ->nullable()
-                  ->constrained('users', 'user_id')
-                  ->nullOnDelete();
-
-            // === Gabungan dari modify_loan_payments_table_for_accounting ===
-
-            // 1. Akun Beban Bunga (didebit)
+                ->nullable()
+                ->constrained('users', 'user_id')
+                ->nullOnDelete();
             $table->foreignId('interest_expense_account_id')
-                  ->nullable()
-                  ->constrained('chart_of_accounts', 'account_id')
-                  ->nullOnDelete();
-
-            // 2. Akun Kas/Bank (dikredit saat pembayaran)
+                ->nullable()
+                ->constrained('chart_of_accounts', 'account_id')
+                ->nullOnDelete();
             $table->foreignId('cash_bank_account_id')
-                  ->nullable()
-                  ->constrained('chart_of_accounts', 'account_id')
-                  ->nullOnDelete();
-
+                ->nullable()
+                ->constrained('chart_of_accounts', 'account_id')
+                ->nullOnDelete();
             $table->timestamps();
         });
     }

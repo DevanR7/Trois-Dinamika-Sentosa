@@ -13,7 +13,6 @@ if (!function_exists('setting')) {
      */
     function setting($key, $default = null)
     {
-        // Ambil dari cache jika ada untuk performa lebih baik
         return Cache::rememberForever('settings.' . $key, function () use ($key, $default) {
             $setting = Setting::find($key);
             return $setting ? $setting->value : $default;

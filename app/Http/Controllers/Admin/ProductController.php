@@ -14,16 +14,12 @@ use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
-    /**
-     * Menampilkan daftar produk dengan dukungan pencarian dan pengurutan.
-     */
     public function index(Request $request): View
     {
         $this->authorize('viewAny', Product::class);
 
         $query = Product::with('unit');
 
-        // Filter berdasarkan kata kunci
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -32,7 +28,6 @@ class ProductController extends Controller
             });
         }
 
-        // Urutan berdasarkan parameter 'sort'
         if ($request->filled('sort')) {
             switch ($request->sort) {
                 case 'A-Z':
@@ -59,9 +54,6 @@ class ProductController extends Controller
         return view('admin.products.index', compact('products'));
     }
 
-    /**
-     * Menampilkan formulir untuk menambahkan produk baru.
-     */
     public function create(): View
     {
         $this->authorize('create', Product::class);
@@ -72,9 +64,6 @@ class ProductController extends Controller
         return view('admin.products.create', compact('units', 'suppliers'));
     }
 
-    /**
-     * Menyimpan produk baru ke database.
-     */
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', Product::class);
@@ -100,9 +89,6 @@ class ProductController extends Controller
         return redirect()->route('admin.products.index')->with('success', 'Produk baru berhasil ditambahkan!');
     }
 
-    /**
-     * Menampilkan detail lengkap suatu produk.
-     */
     public function show(Product $product): View
     {
         $this->authorize('view', $product);
@@ -110,9 +96,6 @@ class ProductController extends Controller
         return view('admin.products.show', compact('product'));
     }
 
-    /**
-     * Menampilkan formulir edit untuk produk yang ada.
-     */
     public function edit(Product $product): View
     {
         $this->authorize('update', $product);
@@ -123,9 +106,6 @@ class ProductController extends Controller
         return view('admin.products.edit', compact('product', 'units', 'suppliers'));
     }
 
-    /**
-     * Memperbarui data produk yang ada.
-     */
     public function update(Request $request, Product $product): RedirectResponse
     {
         $this->authorize('update', $product);
@@ -153,18 +133,10 @@ class ProductController extends Controller
         return redirect()->route('admin.products.index')->with('success', 'Produk berhasil diupdate!');
     }
 
-    /**
-     * Menghapus produk (soft delete).
-     */
     public function destroy(Product $product): RedirectResponse
     {
         $this->authorize('delete', $product);
-
-        // Opsional: hapus file gambar secara fisik
-        // if ($product->image_path) {
-        //     Storage::disk('public')->delete($product->image_path);
-        // }
-
+        
         $product->delete();
 
         return redirect()->route('admin.products.index')->with('success', 'Produk berhasil dihapus!');

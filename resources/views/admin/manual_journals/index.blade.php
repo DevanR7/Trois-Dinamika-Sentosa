@@ -1,113 +1,128 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Jurnal Umum')
+@section('title', 'Jurnal Umum Manual')
 
 @section('content')
-<div class="max-w-7xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-end gap-4 mb-8">
+
+    {{-- HEADER & ACTIONS --}}
+    <div class="page-header">
         <div>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Jurnal Umum Manual</h1>
-            <p class="text-slate-500 text-sm mt-1">Kelola transaksi jurnal manual non-otomatis.</p>
+            <h1 class="page-title">Jurnal Umum Manual</h1>
+            <p class="page-subtitle">Input transaksi jurnal penyesuaian atau koreksi secara manual.</p>
         </div>
-        <a href="{{ route('admin.manual-journals.create') }}" class="h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5">
-            <i class="material-icons text-[20px] group-hover:rotate-90 transition-transform">add</i> 
-            <span>Buat Jurnal</span>
-        </a>
+        <div class="flex items-center gap-3">
+            <a href="{{ route('admin.manual-journals.create') }}" class="btn btn-primary">
+                <i class="material-icons text-sm mr-1">post_add</i> Buat Jurnal
+            </a>
+        </div>
     </div>
 
-    {{-- FILTER --}}
-    <div class="dashboard-card p-6 mb-6 shadow-sm">
-        <form action="{{ route('admin.manual-journals.index') }}" method="GET">
-            <div class="flex flex-col md:flex-row gap-4 items-end">
-                <div class="flex-grow w-full">
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Pencarian</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="material-icons text-slate-400 text-[20px]">search</i>
-                        </div>
-                        <input type="text" name="search" value="{{ request('search') }}" 
-                            class="form-input pl-10" 
-                            placeholder="Cari Nomor Jurnal atau Deskripsi...">
+    {{-- FILTER & SEARCH --}}
+    <div class="card mb-6">
+        <div class="card-body">
+            <form action="{{ route('admin.manual-journals.index') }}" method="GET" class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                
+                {{-- Search Bar --}}
+                <div class="md:col-span-12">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white dark:bg-slate-800">
+                            <i class="material-icons text-slate-400">search</i>
+                        </span>
+                        <input type="text" name="search" class="form-input border-l-0 pl-0" 
+                               placeholder="Cari nomor jurnal atau deskripsi..." 
+                               value="{{ request('search') }}">
+                        <button type="submit" class="btn btn-secondary rounded-l-none border-l-0">
+                            Cari
+                        </button>
                     </div>
                 </div>
-                <div class="w-full md:w-auto">
-                    <button type="submit" class="w-full md:w-auto h-[48px] px-6 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-bold text-sm shadow-sm transition flex items-center justify-center gap-2">
-                        <i class="material-icons text-[18px]">filter_list</i> Filter
-                    </button>
-                </div>
-            </div>
-        </form>
+
+            </form>
+        </div>
     </div>
 
-    {{-- TABEL --}}
-    <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
-        <div class="overflow-x-auto">
-            <table class="dashboard-table min-w-full">
-                <thead class="bg-slate-50 border-b border-slate-200">
+    {{-- TABLE DATA --}}
+    <div class="card">
+        <div class="table-container">
+            <table class="table-modern">
+                <thead>
                     <tr>
-                        <th class="pl-6 w-32">Tanggal</th>
-                        <th>No. Jurnal</th>
+                        <th>Tanggal & Nomor</th>
                         <th>Deskripsi</th>
-                        <th class="text-right">Total Nilai</th>
-                        <th>User</th>
-                        <th class="text-center w-32 pr-6">Aksi</th>
+                        <th class="text-right">Total Debit</th>
+                        <th class="text-right">Total Kredit</th>
+                        <th>Dibuat Oleh</th>
+                        <th class="text-center w-36">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100 bg-white">
-                    @forelse ($manualJournals as $journal)
-                        <tr class="hover:bg-slate-50/50 transition-colors group">
-                            <td class="pl-6 py-4 text-sm text-slate-600 whitespace-nowrap">
-                                {{ $journal->entry_date->format('d/m/Y') }}
-                            </td>
-                            <td class="py-4">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 font-mono">
+                <tbody>
+                    @forelse($manualJournals as $journal)
+                        <tr>
+                            <td>
+                                <div class="font-bold text-slate-700 dark:text-slate-200">
+                                    {{ $journal->entry_date->format('d M Y') }}
+                                </div>
+                                <div class="text-xs text-slate-500 font-mono">
                                     {{ $journal->journal_number }}
-                                </span>
+                                </div>
                             </td>
-                            <td class="py-4 text-sm text-slate-600 italic">
-                                <span class="line-clamp-1" title="{{ $journal->description }}">
-                                    {{ Str::limit($journal->description, 50) }}
-                                </span>
+                            <td class="text-sm text-slate-600 dark:text-slate-300 max-w-xs truncate">
+                                {{ $journal->description }}
                             </td>
-                            <td class="py-4 text-right text-sm font-bold text-slate-800 font-mono">
+                            <td class="text-right font-mono text-slate-700 dark:text-slate-300">
                                 Rp {{ number_format($journal->total_debit, 0, ',', '.') }}
                             </td>
-                            <td class="py-4 text-xs text-slate-500">
-                                {{ $journal->user->name ?? 'System' }}
+                            <td class="text-right font-mono text-slate-700 dark:text-slate-300">
+                                Rp {{ number_format($journal->total_credit, 0, ',', '.') }}
                             </td>
-                            <td class="pr-6 py-4 text-center">
-                                <div class="flex justify-center gap-2">
-                                    <a href="{{ route('admin.manual-journals.show', $journal) }}" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition shadow-sm" title="Detail">
-                                        <i class="material-icons text-[16px]">visibility</i>
-                                    </a>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-bold">
+                                        {{ substr($journal->user->full_name ?? 'S', 0, 1) }}
+                                    </div>
+                                    <span class="text-xs">{{ Str::limit($journal->user->full_name ?? 'System', 15) }}</span>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <div class="flex items-center justify-center gap-2">
                                     
-                                    <a href="{{ route('admin.manual-journals.edit', $journal) }}" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-amber-600 hover:bg-amber-50 hover:border-amber-200 transition shadow-sm" title="Edit">
-                                        <i class="material-icons text-[16px]">edit</i>
+                                    {{-- Detail --}}
+                                    <a href="{{ route('admin.manual-journals.show', $journal->journal_id) }}" 
+                                       class="w-9 h-9 rounded-full flex items-center justify-center bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 transition-colors shadow-sm dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400"
+                                       title="Detail">
+                                        <i class="material-icons text-[18px] leading-none">visibility</i>
                                     </a>
+
+                                    {{-- Edit --}}
+                                    <a href="{{ route('admin.manual-journals.edit', $journal->journal_id) }}" 
+                                       class="w-9 h-9 rounded-full flex items-center justify-center bg-indigo-50 border border-transparent text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors shadow-sm dark:bg-indigo-900/30 dark:text-indigo-400"
+                                       title="Edit">
+                                        <i class="material-icons text-[18px] leading-none">edit</i>
+                                    </a>
+
+                                    {{-- Delete --}}
+                                    <button type="button" onclick="confirmDelete('{{ $journal->journal_id }}', '{{ $journal->journal_number }}')" 
+                                            class="w-9 h-9 rounded-full flex items-center justify-center bg-rose-50 border border-transparent text-rose-600 hover:bg-rose-600 hover:text-white transition-colors shadow-sm dark:bg-rose-900/30 dark:text-rose-400"
+                                            title="Hapus">
+                                        <i class="material-icons text-[18px] leading-none">delete</i>
+                                    </button>
                                     
-                                    <form action="{{ route('admin.manual-journals.destroy', $journal) }}" method="POST" class="delete-form inline-block">
-                                        @csrf @method('DELETE')
-                                        <button type="submit" 
-                                                data-title="Hapus Jurnal?" 
-                                                data-text="Tindakan ini akan membuat <b>Jurnal Pembalik (Reversal)</b> secara otomatis."
-                                                class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-red-600 hover:bg-red-50 hover:border-red-200 transition shadow-sm" title="Hapus">
-                                            <i class="material-icons text-[16px]">delete</i>
-                                        </button>
+                                    <form id="delete-form-{{ $journal->journal_id }}" 
+                                          action="{{ route('admin.manual-journals.destroy', $journal->journal_id) }}" 
+                                          method="POST" class="hidden">
+                                        @csrf
+                                        @method('DELETE')
                                     </form>
+
                                 </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-16 text-center">
+                            <td colspan="6" class="text-center p-8">
                                 <div class="flex flex-col items-center justify-center text-slate-400">
-                                    <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-slate-300">
-                                        <i class="material-icons text-4xl">content_paste_off</i>
-                                    </div>
-                                    <h3 class="text-base font-bold text-slate-700">Belum ada jurnal</h3>
-                                    <p class="text-sm mt-1">Silakan buat jurnal manual baru.</p>
+                                    <i class="material-icons text-5xl mb-2">library_books</i>
+                                    <span>Belum ada jurnal manual.</span>
                                 </div>
                             </td>
                         </tr>
@@ -116,20 +131,30 @@
             </table>
         </div>
         
-        @if($manualJournals->hasPages())
-            <div class="px-6 py-4 border-t border-slate-200 bg-slate-50/80">
-                {{ $manualJournals->links() }}
-            </div>
-        @endif
+        <div class="card-footer">
+            {{ $manualJournals->links() }}
+        </div>
     </div>
-</div>
+
 @endsection
 
 @push('scripts')
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
-        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
-    });
+    function confirmDelete(id, number) {
+        window.confirmDialog({
+            title: 'Hapus Jurnal?',
+            text: "Jurnal #" + number + " akan dihapus permanen beserta postingan buku besarnya.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('delete-form-' + id).submit();
+            }
+        });
+    }
 </script>
 @endpush

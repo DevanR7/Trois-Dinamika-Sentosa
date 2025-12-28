@@ -1,197 +1,162 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Detail Retur Pembelian')
+@section('title', 'Detail Retur #' . $purchaseReturn->return_number)
 
 @section('content')
-<div class="max-w-6xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+<div class="flex flex-col gap-6 pb-10">
+
+    {{-- Header --}}
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-            <nav class="flex text-sm text-slate-500 mb-1">
-                <a href="{{ route('admin.purchase-returns.index') }}" class="hover:text-indigo-600 transition-colors font-medium">Retur Pembelian</a>
-                <span class="mx-2 text-slate-300">/</span>
-                <span class="text-slate-800 font-semibold">Detail</span>
-            </nav>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-3">
-                No. Retur: <span class="font-mono text-indigo-600 bg-indigo-50 px-2 rounded">{{ $purchaseReturn->return_number }}</span>
-            </h1>
+            <div class="flex items-center gap-3 mb-1">
+                <h2 class="page-title text-3xl">{{ $purchaseReturn->return_number }}</h2>
+                <span class="badge badge-danger flex items-center gap-1">
+                    <i class="material-icons text-[14px]">assignment_return</i> Retur Pembelian
+                </span>
+            </div>
+            <p class="text-sm text-slate-500">
+                Dibuat pada {{ $purchaseReturn->created_at->format('d M Y H:i') }} oleh {{ $purchaseReturn->user->full_name ?? 'System' }}
+            </p>
         </div>
-        <a href="{{ route('admin.purchase-returns.index') }}" class="h-[48px] px-6 bg-white border border-slate-300 rounded-lg text-slate-700 text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
-            <i class="material-icons text-[18px]">arrow_back</i> Kembali
-        </a>
+        
+        <div class="flex gap-2">
+            <a href="{{ route('admin.purchase-returns.index') }}" class="btn btn-secondary">
+                <i class="material-icons text-lg">arrow_back</i> Kembali
+            </a>
+            
+            {{-- Tombol Hapus (Hanya contoh, pastikan controller punya validasi) --}}
+            <button onclick="confirmDelete()" class="btn btn-white border border-rose-200 text-rose-600 hover:bg-rose-50">
+                <i class="material-icons text-lg">delete</i> Batalkan Retur
+            </button>
+            <form id="delete-form" action="{{ route('admin.purchase-returns.destroy', $purchaseReturn->return_id) }}" method="POST" class="hidden">
+                @csrf
+                @method('DELETE')
+            </form>
+        </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+    {{-- Info Cards --}}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {{-- KOLOM KIRI (Span 8) --}}
-        <div class="lg:col-span-8 space-y-8">
-            
-            {{-- CARD 1: INFO TRANSAKSI --}}
-            <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
-                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
-                        <i class="material-icons text-[20px]">info</i>
-                    </div>
-                    <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Informasi Transaksi</h3>
+        {{-- Card 1: Supplier & PO --}}
+        <div class="card p-5">
+            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Referensi</h4>
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Supplier</span>
+                    <a href="{{ route('admin.suppliers.show', $purchaseReturn->supplier_id) }}" class="font-bold text-indigo-600 hover:underline">
+                        {{ $purchaseReturn->supplier->supplier_name }}
+                    </a>
                 </div>
-                
-                <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {{-- Supplier --}}
-                    <div class="flex items-start gap-4">
-                        <div class="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0 border border-indigo-100">
-                            <i class="material-icons text-xl">store</i>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1 tracking-wide">Supplier</label>
-                            <h4 class="text-base font-bold text-slate-900">{{ $purchaseReturn->supplier->supplier_name }}</h4>
-                            <div class="mt-2 flex flex-wrap items-center gap-2">
-                                <span class="text-xs text-slate-500">PO Asli:</span>
-                                <a href="{{ route('admin.purchase-orders.show', $purchaseReturn->purchase_order_id) }}" class="text-xs font-bold text-indigo-600 hover:underline font-mono bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
-                                    {{ $purchaseReturn->purchaseOrder->po_number }}
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-
-                    {{-- Lainnya --}}
-                    <div class="space-y-4 border-l border-slate-100 pl-0 md:pl-8">
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs font-bold text-slate-500 uppercase">Tanggal Retur</span>
-                            <span class="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                <i class="material-icons text-slate-400 text-[16px]">event</i>
-                                {{ optional($purchaseReturn->return_date)->format('d F Y') }}
-                            </span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs font-bold text-slate-500 uppercase">Diproses Oleh</span>
-                            <span class="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                <i class="material-icons text-slate-400 text-[16px]">person</i>
-                                {{ $purchaseReturn->user->full_name ?? 'System' }}
-                            </span>
-                        </div>
-                    </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">No. PO Asal</span>
+                    <a href="{{ route('admin.purchase-orders.show', $purchaseReturn->purchase_order_id) }}" class="font-bold text-indigo-600 hover:underline">
+                        {{ $purchaseReturn->purchaseOrder->po_number }}
+                    </a>
                 </div>
             </div>
+        </div>
 
-            {{-- CARD 2: ITEM --}}
-            <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
-                <div class="px-6 py-4 border-b border-red-100 flex items-center gap-2 bg-red-50/50">
-                    <i class="material-icons text-red-500 text-lg">assignment_return</i>
-                    <h3 class="text-xs font-bold text-red-700 uppercase tracking-wider">Item Dikembalikan</h3>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="dashboard-table min-w-full">
-                        <thead class="bg-slate-50 border-b border-slate-200">
-                            <tr>
-                                <th class="pl-6 text-center w-12">#</th>
-                                <th>Produk</th>
-                                <th class="text-center">Qty</th>
-                                <th class="text-right">Harga Beli (@)</th>
-                                <th class="text-right pr-6">Subtotal</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            @forelse($purchaseReturn->items as $item)
-                            <tr class="hover:bg-slate-50 transition-colors">
-                                <td class="pl-6 py-4 text-center text-sm text-slate-500">{{ $loop->iteration }}</td>
-                                <td class="py-4">
-                                    <div class="text-sm font-bold text-slate-800">{{ $item->product->product_name ?? 'Produk Dihapus' }}</div>
-                                </td>
-                                <td class="py-4 text-center">
-                                    <span class="inline-block px-2.5 py-1 rounded-md bg-red-50 text-xs font-bold text-red-700 border border-red-100 shadow-sm">
-                                        {{ $item->quantity }} {{ $item->product->unit->name ?? '' }}
-                                    </span>
-                                </td>
-                                <td class="py-4 text-right text-sm text-slate-600 font-mono">
-                                    Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}
-                                </td>
-                                <td class="pr-6 py-4 text-right text-sm font-bold text-slate-900 font-mono">
-                                    Rp {{ number_format($item->subtotal, 0, ',', '.') }}
-                                </td>
-                            </tr>
-                            @empty
-                            <tr><td colspan="5" class="text-center py-8 text-slate-500 italic">Tidak ada item.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {{-- CARD 3: ALASAN --}}
-            @if($purchaseReturn->notes)
-            <div class="bg-amber-50 rounded-xl border border-amber-100 p-5 flex gap-4 items-start shadow-sm">
-                <div class="bg-amber-100 p-2 rounded-full text-amber-600">
-                    <i class="material-icons text-xl">sticky_note_2</i>
+        {{-- Card 2: Status & Penanganan --}}
+        <div class="card p-5">
+            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Metode Retur</h4>
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500">
+                    <i class="material-icons">settings_backup_restore</i>
                 </div>
                 <div>
-                    <h4 class="text-xs font-bold text-amber-800 uppercase mb-1 tracking-wide">Alasan Retur</h4>
-                    <p class="text-sm text-amber-900 italic leading-relaxed">"{{ $purchaseReturn->notes }}"</p>
-                </div>
-            </div>
-            @endif
-
-        </div>
-
-        {{-- KOLOM KANAN: SUMMARY & AKSI (Span 4) --}}
-        <div class="lg:col-span-4 space-y-6">
-            
-            <div class="dashboard-card p-6 shadow-xl sticky top-6 border-t-4 border-indigo-500">
-                <h3 class="card-title mb-6 border-b border-slate-100 pb-3 flex items-center gap-2">
-                    <i class="material-icons text-indigo-600">calculate</i> Ringkasan Nilai
-                </h3>
-
-                <div class="flex flex-col items-center justify-center mb-8 bg-slate-50 p-6 rounded-xl border border-slate-100">
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Total Retur</span>
-                    <span class="text-3xl font-bold text-red-600 font-mono tracking-tight">Rp {{ number_format($purchaseReturn->total_amount, 0, ',', '.') }}</span>
-                </div>
-
-                {{-- Opsi Refund --}}
-                <div class="mb-6">
-                    <h4 class="text-xs font-bold text-slate-400 uppercase mb-2 tracking-wider">Metode Pengembalian</h4>
-                    @if($purchaseReturn->return_handling_type == 'store_as_deposit')
-                        <div class="flex items-center gap-2 text-green-700 bg-green-50 px-3 py-2 rounded-md border border-green-100">
-                            <i class="material-icons">account_balance_wallet</i>
-                            <span class="text-sm font-bold">Masuk Saldo Deposit</span>
-                        </div>
-                    @elseif($purchaseReturn->return_handling_type == 'deduct_invoice')
-                        <div class="flex items-center gap-2 text-blue-700 bg-blue-50 px-3 py-2 rounded-md border border-blue-100">
-                            <i class="material-icons">receipt_long</i>
-                            <span class="text-sm font-bold">Potong Tagihan PO</span>
-                        </div>
+                    @if($purchaseReturn->return_handling_type == 'deduct_invoice')
+                        <span class="block font-bold text-slate-800 dark:text-white">Potong Tagihan</span>
+                        <span class="text-xs text-slate-500">Mengurangi hutang PO</span>
                     @else
-                        <div class="flex items-center gap-2 text-gray-600 bg-gray-100 px-3 py-2 rounded-md">
-                            <i class="material-icons">help_outline</i>
-                            <span class="text-sm">Tidak Diketahui</span>
-                        </div>
+                        <span class="block font-bold text-slate-800 dark:text-white">Simpan sbg Deposit</span>
+                        <span class="text-xs text-slate-500">Menjadi saldo kredit supplier</span>
                     @endif
                 </div>
-
-                <div class="border-t border-dashed border-slate-200 pt-6">
-                    {{-- GLOBAL DELETE HANDLER --}}
-                    <form action="{{ route('admin.purchase-returns.destroy', $purchaseReturn->return_id) }}" method="POST" class="delete-form">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" 
-                                data-title="Batalkan Retur?" 
-                                data-text="Stok akan dikembalikan dan nilai retur dihapus. <b>Data tidak dapat dikembalikan!</b>" 
-                                data-btn-text="Ya, Hapus Permanen"
-                                class="w-full h-[48px] bg-white border border-red-200 text-red-600 rounded-lg text-sm font-bold hover:bg-red-50 transition shadow-sm flex items-center justify-center gap-2 group">
-                            <i class="material-icons text-[20px] group-hover:scale-110 transition-transform">delete_forever</i> Batalkan Retur
-                        </button>
-                    </form>
-                    
-                    <div class="mt-4 flex items-start gap-2 text-[11px] text-slate-400 bg-slate-50 p-3 rounded border border-slate-100">
-                        <i class="material-icons text-[14px] mt-0.5">info</i>
-                        <p class="leading-tight">
-                            Membatalkan retur akan mengurangi stok barang kembali (jika stok sudah bertambah) dan membatalkan penyesuaian saldo hutang/deposit.
-                        </p>
-                    </div>
-                </div>
             </div>
-
         </div>
 
+        {{-- Card 3: Total Nilai --}}
+        <div class="card p-5 bg-gradient-to-br from-rose-600 to-rose-700 text-white border-none">
+            <h4 class="text-rose-100 text-xs font-bold uppercase tracking-wider mb-1">Total Nilai Retur</h4>
+            <h3 class="text-3xl font-bold">Rp {{ number_format($purchaseReturn->total_amount, 0, ',', '.') }}</h3>
+            <p class="text-xs text-rose-100 mt-1 opacity-80">{{ $purchaseReturn->return_date->format('d F Y') }}</p>
+        </div>
     </div>
+
+    {{-- Detail Barang --}}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-header-title">Rincian Barang Dikembalikan</h3>
+        </div>
+        <div class="table-container border-0 shadow-none rounded-none">
+            <table class="table-modern w-full">
+                <thead class="bg-slate-50 dark:bg-slate-800/50">
+                    <tr>
+                        <th class="w-[40%]">Produk</th>
+                        <th class="w-[20%] text-right">Harga Beli (Satuan)</th>
+                        <th class="w-[20%] text-center">Qty Retur</th>
+                        <th class="w-[20%] text-right">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($purchaseReturn->items as $item)
+                        <tr>
+                            <td>
+                                <div class="font-bold text-slate-700 dark:text-white">{{ $item->product->product_name }}</div>
+                                <div class="text-xs text-slate-500">{{ $item->product->product_code }}</div>
+                            </td>
+                            <td class="text-right">
+                                Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}
+                            </td>
+                            <td class="text-center font-bold text-slate-700 dark:text-white">
+                                {{ number_format($item->quantity, 0, ',', '.') }} {{ $item->product->unit->name ?? 'Unit' }}
+                            </td>
+                            <td class="text-right font-bold text-rose-600">
+                                Rp {{ number_format($item->subtotal, 0, ',', '.') }}
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+                <tfoot class="bg-slate-50 dark:bg-slate-800/30 font-bold">
+                    <tr>
+                        <td colspan="3" class="text-right py-4 text-slate-600">TOTAL RETUR</td>
+                        <td class="text-right py-4 px-6 text-rose-600 text-lg">
+                            Rp {{ number_format($purchaseReturn->total_amount, 0, ',', '.') }}
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        
+        {{-- Notes --}}
+        @if($purchaseReturn->notes)
+            <div class="p-6 border-t border-slate-100 dark:border-slate-700">
+                <h4 class="text-xs font-bold text-slate-400 uppercase mb-2">Catatan</h4>
+                <div class="bg-slate-50 dark:bg-slate-800 p-3 rounded text-slate-600 dark:text-slate-300 text-sm italic">
+                    "{{ $purchaseReturn->notes }}"
+                </div>
+            </div>
+        @endif
+    </div>
+
 </div>
+
+@push('scripts')
+<script>
+    function confirmDelete() {
+        confirmDialog({
+            title: 'Batalkan Retur?',
+            text: 'Stok barang akan dikembalikan ke gudang dan nilai retur akan dibatalkan dari hutang/deposit.',
+            icon: 'warning',
+            confirmText: 'Ya, Batalkan',
+            confirmColor: 'danger'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('delete-form').submit();
+            }
+        });
+    }
+</script>
+@endpush
 @endsection

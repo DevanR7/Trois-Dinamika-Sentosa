@@ -9,10 +9,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Announcement extends Model
 {
-    // ✅ Tambahkan traits ini
     use HasFactory, SoftDeletes;
 
-    // ✅ Definisikan fillable
     protected $fillable = [
         'title',
         'content',
@@ -20,15 +18,10 @@ class Announcement extends Model
         'is_active',
     ];
 
-    // ✅ Definisikan cast (opsional tapi bagus)
     protected $casts = [
         'is_active' => 'boolean',
     ];
 
-    /**
-     * ✅ Tambahkan relasi ini:
-     * Klien yang ditargetkan oleh pengumuman ini (jika type='targeted').
-     */
     public function clients(): BelongsToMany
     {
         return $this->belongsToMany(Client::class, 'announcement_client', 'announcement_id', 'client_id');

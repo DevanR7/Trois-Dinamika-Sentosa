@@ -10,39 +10,24 @@ class Setting extends Model
 {
     use HasFactory;
 
-    protected $primaryKey = 'key'; // Gunakan 'key' sebagai primary key
-    public $incrementing = false; // Primary key bukan auto-increment
-    protected $keyType = 'string'; // Tipe data primary key adalah string
-
+    protected $primaryKey = 'key'; 
+    public $incrementing = false; 
+    protected $keyType = 'string'; 
     protected $fillable = ['key', 'value'];
 
-    /**
-     * Helper untuk mengambil semua setting dan menyimpannya di cache.
-     * @return array
-     */
     public static function getAllSettings(): array
     {
-        // Cache selama 60 menit (Anda bisa sesuaikan)
         return Cache::remember('app_settings', 60 * 60, function () {
             return self::all()->pluck('value', 'key')->toArray();
         });
     }
 
-    /**
-     * Helper untuk mengambil satu nilai setting dari cache.
-     * @param string $key
-     * @param mixed $default
-     * @return mixed
-     */
     public static function getValue(string $key, $default = null)
     {
         $settings = self::getAllSettings();
         return $settings[$key] ?? $default;
     }
 
-    /**
-     * Hapus cache secara otomatis saat setting di-update.
-     */
     protected static function booted()
     {
         static::saved(function () {

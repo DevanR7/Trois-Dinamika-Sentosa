@@ -109,7 +109,7 @@
                     window.showToast(msg, type);
                 } else {
                     // Fallback ke SweetAlert biasa jika showToast belum ter-load
-                    Swal.fire({
+                    window.confirmDialog({
                         toast: true,
                         position: 'top-end',
                         icon: type,

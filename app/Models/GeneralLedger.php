@@ -11,7 +11,6 @@ use App\Models\ChartOfAccount;
 class GeneralLedger extends Model
 {
     use HasFactory;
-
     protected $primaryKey = 'ledger_id';
 
     protected $fillable = [
@@ -33,25 +32,16 @@ class GeneralLedger extends Model
         'credit' => 'float',
     ];
 
-    /**
-     * Relasi ke akun (COA) yang digunakan.
-     */
     public function account(): BelongsTo
     {
         return $this->belongsTo(ChartOfAccount::class, 'chart_of_account_id', 'account_id');
     }
 
-    /**
-     * Relasi ke model sumber (SalesInvoice, PurchaseOrder, etc.).
-     */
     public function reference(): MorphTo
     {
         return $this->morphTo();
     }
 
-    /**
-     * Relasi ke user yang mem-posting.
-     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');

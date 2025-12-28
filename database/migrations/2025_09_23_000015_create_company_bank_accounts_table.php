@@ -10,20 +10,18 @@ return new class extends Migration
     {
         Schema::create('company_bank_accounts', function (Blueprint $table) {
             $table->id('company_bank_account_id');
-            $table->string('bank_name'); 
-            $table->string('account_name'); 
-            $table->string('account_number')->nullable(); 
-
+            $table->string('bank_name');
+            $table->string('account_name');
+            $table->string('account_number')->nullable();
             $table->foreignId('chart_of_account_id')
-                  ->nullable()
-                  ->constrained('chart_of_accounts', 'account_id')
-                  ->nullOnDelete();
-
+                ->nullable()
+                ->constrained('chart_of_accounts', 'account_id')
+                ->nullOnDelete();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
     }
-
+    
     public function down(): void
     {
         Schema::dropIfExists('company_bank_accounts');

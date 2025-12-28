@@ -1,193 +1,221 @@
 @extends('client.layouts.app')
 
-@section('title', 'Edit Profil')
+@section('title', 'Profil Saya')
 
 @section('content')
-<div class="max-w-7xl mx-auto">
-    
-    {{-- Header Halaman --}}
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+
+    {{-- Page Header --}}
+    <div class="page-header">
         <div>
-            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100 tracking-tight">Pengaturan Profil</h2>
-            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Kelola informasi akun dan keamanan Anda.</p>
+            <h1 class="page-title">Pengaturan Akun</h1>
+            <p class="page-subtitle">Kelola informasi perusahaan dan keamanan akun Anda.</p>
         </div>
     </div>
 
-    {{-- Alert Error Global (Jika ada error validasi) --}}
-    @if ($errors->any())
-        <div class="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
-            <i class="material-icons text-red-500 mt-0.5">error</i>
+    {{-- Alert jika diarahkan paksa karena profil belum lengkap --}}
+    @if(session('info'))
+        <div class="p-4 mb-6 text-sm text-blue-800 rounded-xl bg-blue-50 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-800 flex items-start gap-3" role="alert">
+            <i class="material-icons text-base">info</i>
             <div>
-                <h3 class="text-sm font-bold text-red-800 dark:text-red-300">Terdapat kesalahan input:</h3>
-                <ul class="mt-1 list-disc list-inside text-xs text-red-700 dark:text-red-400">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
+                <span class="font-bold">Perhatian:</span> {{ session('info') }}
             </div>
         </div>
     @endif
 
-    {{-- FORMULIR UTAMA (Dibungkus satu form agar tombol submit menangani semuanya) --}}
-    <form method="post" action="{{ route('client.profile.update') }}">
-        @csrf
-        @method('patch')
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-            {{-- KOLOM KIRI: INFORMASI AKUN (Lebar 2/3) --}}
-            <div class="lg:col-span-2 space-y-6">
-                
-                {{-- Kartu: Detail Profil --}}
-                <div class="dashboard-card p-6">
-                    <div class="flex items-center gap-3 mb-6 border-b border-slate-100 dark:border-slate-700 pb-4">
-                        <div class="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                            <i class="material-icons">person</i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-slate-800 dark:text-slate-100 text-lg">Informasi Dasar</h3>
-                            <p class="text-xs text-slate-500">Perbarui detail identitas perusahaan/klien.</p>
-                        </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {{-- LEFT COLUMN: Profile Card --}}
+        <div class="lg:col-span-1">
+            <div class="card sticky top-24">
+                <div class="card-body text-center flex flex-col items-center">
+                    
+                    {{-- Avatar --}}
+                    <div class="w-24 h-24 rounded-full bg-gradient-to-br from-slate-800 to-[#0f172a] text-white flex items-center justify-center text-3xl font-bold shadow-lg ring-4 ring-slate-50 dark:ring-slate-700 mb-4">
+                        {{ substr($client->client_name, 0, 1) }}
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        {{-- Nama Klien --}}
-                        <div class="col-span-2">
-                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                    <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-1">
+                        {{ $client->client_name }}
+                    </h3>
+                    
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mb-4 flex items-center gap-1">
+                        <i class="material-icons text-[14px]">email</i>
+                        {{ $client->email }}
+                    </p>
+
+                    {{-- Status Badge --}}
+                    <div class="flex gap-2 justify-center mb-6">
+                        @if($client->is_approved)
+                            <span class="badge badge-success badge-pill">
+                                <i class="material-icons text-[12px] mr-1">verified</i> Terverifikasi
+                            </span>
+                        @else
+                            <span class="badge badge-warning badge-pill">Menunggu Persetujuan</span>
+                        @endif
+                    </div>
+
+                    <div class="w-full border-t border-slate-100 dark:border-slate-700/50 pt-4 text-left">
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Informasi Sistem</p>
+                        <div class="flex justify-between items-center py-2 text-sm">
+                            <span class="text-slate-600 dark:text-slate-400">Bergabung</span>
+                            <span class="font-medium text-slate-800 dark:text-white">{{ $client->created_at->format('d M Y') }}</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 text-sm">
+                            <span class="text-slate-600 dark:text-slate-400">Login Terakhir</span>
+                            <span class="font-medium text-slate-800 dark:text-white">Hari ini</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- RIGHT COLUMN: Edit Form --}}
+        <div class="lg:col-span-2">
+            <div class="card">
+                <form action="{{ route('client.profile.update') }}" method="POST" class="flex flex-col h-full">
+                    @csrf
+                    @method('PATCH')
+
+                    {{-- Section 1: Informasi Umum --}}
+                    <div class="card-header bg-transparent pb-0 border-b-0">
+                        <h3 class="card-header-title text-sm flex items-center gap-2">
+                            <i class="material-icons text-slate-400">business</i>
+                            Informasi Perusahaan & Kontak
+                        </h3>
+                    </div>
+                    
+                    <div class="card-body grid gap-6">
+                        {{-- Email (Read Only) --}}
+                        <div>
+                            <label class="block mb-2 text-xs font-bold text-slate-700 dark:text-white uppercase tracking-wider">
+                                Email (Login)
+                            </label>
+                            <input type="email" value="{{ $client->email }}" disabled 
+                                class="bg-slate-100 border border-slate-200 text-slate-500 text-sm rounded-lg focus:ring-0 focus:border-slate-200 block w-full p-2.5 cursor-not-allowed dark:bg-slate-700 dark:border-slate-600 dark:text-slate-400">
+                            <p class="mt-1 text-[10px] text-slate-400">Email tidak dapat diubah. Hubungi admin untuk perubahan email.</p>
+                        </div>
+
+                        {{-- Nama Perusahaan/Klien --}}
+                        <div>
+                            <label for="client_name" class="block mb-2 text-sm font-medium text-slate-900 dark:text-white">
                                 Nama Perusahaan / Klien <span class="text-red-500">*</span>
                             </label>
-                            <div class="relative">
-                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                                    <i class="material-icons text-[18px]">business</i>
-                                </span>
-                                <input type="text" name="client_name" value="{{ old('client_name', $client->client_name) }}" 
-                                       class="form-input pl-10" placeholder="Nama Lengkap Perusahaan" required>
-                            </div>
+                            <input type="text" id="client_name" name="client_name" value="{{ old('client_name', $client->client_name) }}" required
+                                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 dark:bg-slate-800 dark:border-slate-600 dark:placeholder-slate-400 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500 transition-colors @error('client_name') border-red-500 @enderror">
+                            @error('client_name')
+                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                            @enderror
                         </div>
 
-                        {{-- PIC --}}
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
-                                Narahubung (PIC)
-                            </label>
-                            <div class="relative">
-                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                                    <i class="material-icons text-[18px]">badge</i>
-                                </span>
-                                <input type="text" name="person_in_charge" value="{{ old('person_in_charge', $client->person_in_charge) }}" 
-                                       class="form-input pl-10" placeholder="Nama PIC">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            {{-- PIC --}}
+                            <div>
+                                <label for="person_in_charge" class="block mb-2 text-sm font-medium text-slate-900 dark:text-white">
+                                    PIC (Penanggung Jawab) <span class="text-red-500">*</span>
+                                </label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+                                        <i class="material-icons text-slate-400 text-sm">person</i>
+                                    </div>
+                                    <input type="text" id="person_in_charge" name="person_in_charge" value="{{ old('person_in_charge', $client->person_in_charge) }}"
+                                        class="ps-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 dark:bg-slate-800 dark:border-slate-600 dark:text-white transition-colors @error('person_in_charge') border-red-500 @enderror">
+                                </div>
+                                @error('person_in_charge')
+                                    <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                @enderror
                             </div>
-                        </div>
 
-                        {{-- Telepon --}}
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
-                                Nomor Telepon / WA
-                            </label>
-                            <div class="relative">
-                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                                    <i class="material-icons text-[18px]">call</i>
-                                </span>
-                                <input type="text" name="phone_number" value="{{ old('phone_number', $client->phone_number) }}" 
-                                       class="form-input pl-10" placeholder="Contoh: 08123456789">
+                            {{-- No HP --}}
+                            <div>
+                                <label for="phone_number" class="block mb-2 text-sm font-medium text-slate-900 dark:text-white">
+                                    No. Telepon / WhatsApp <span class="text-red-500">*</span>
+                                </label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+                                        <i class="material-icons text-slate-400 text-sm">phone</i>
+                                    </div>
+                                    <input type="text" id="phone_number" name="phone_number" value="{{ old('phone_number', $client->phone_number) }}"
+                                        class="ps-10 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 dark:bg-slate-800 dark:border-slate-600 dark:text-white transition-colors @error('phone_number') border-red-500 @enderror">
+                                </div>
+                                @error('phone_number')
+                                    <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                @enderror
                             </div>
                         </div>
 
                         {{-- Alamat --}}
-                        <div class="col-span-2">
-                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
-                                Alamat Lengkap
-                            </label>
-                            <div class="relative">
-                                <span class="absolute top-3 left-0 flex items-start pl-3 text-slate-400">
-                                    <i class="material-icons text-[18px]">place</i>
-                                </span>
-                                <textarea name="address" class="form-input pl-10 min-h-[100px] py-3" 
-                                          placeholder="Alamat lengkap pengiriman/kantor">{{ old('address', $client->address) }}</textarea>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Tombol Simpan (Mobile/Tablet Only - agar mudah dijangkau) --}}
-                <div class="lg:hidden">
-                    <button type="submit" class="w-full btn-primary bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2">
-                        <i class="material-icons">save</i> Simpan Perubahan
-                    </button>
-                </div>
-            </div>
-
-            {{-- KOLOM KANAN: KEAMANAN & PASSWORD (Lebar 1/3) --}}
-            <div class="lg:col-span-1 space-y-6">
-                
-                {{-- Kartu: Keamanan --}}
-                <div class="dashboard-card p-6 border-t-4 border-t-amber-500">
-                    <div class="flex items-center gap-3 mb-6 border-b border-slate-100 dark:border-slate-700 pb-4">
-                        <div class="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
-                            <i class="material-icons">lock</i>
-                        </div>
                         <div>
-                            <h3 class="font-bold text-slate-800 dark:text-slate-100 text-lg">Keamanan</h3>
-                            <p class="text-xs text-slate-500">Ganti password akun.</p>
+                            <label for="address" class="block mb-2 text-sm font-medium text-slate-900 dark:text-white">
+                                Alamat Lengkap <span class="text-red-500">*</span>
+                            </label>
+                            <textarea id="address" name="address" rows="3"
+                                class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-slate-800 dark:border-slate-600 dark:placeholder-slate-400 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500 transition-colors @error('address') border-red-500 @enderror">{{ old('address', $client->address) }}</textarea>
+                            @error('address')
+                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                            @enderror
                         </div>
                     </div>
-                    
-                    <div class="space-y-4">
-                        <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-xs text-blue-700 dark:text-blue-300 mb-4 flex gap-2">
-                            <i class="material-icons text-[16px]">info</i>
-                            <span>Kosongkan kolom di bawah jika Anda tidak ingin mengubah password.</span>
+
+                    <div class="border-t border-slate-100 dark:border-slate-700/50 my-2"></div>
+
+                    {{-- Section 2: Keamanan (Ganti Password) --}}
+                    <div class="card-header bg-transparent pb-0 border-b-0 pt-4">
+                        <h3 class="card-header-title text-sm flex items-center gap-2 text-amber-600 dark:text-amber-500">
+                            <i class="material-icons">lock</i>
+                            Ganti Password (Opsional)
+                        </h3>
+                    </div>
+
+                    <div class="card-body grid gap-6 pt-2">
+                        <div class="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-900/20 text-xs text-amber-800 dark:text-amber-400">
+                            Kosongkan bagian ini jika Anda tidak ingin mengubah password akun Anda.
                         </div>
 
-                        {{-- Current Password --}}
-                        <div x-data="{ show: false }">
-                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                        <div>
+                            <label for="current_password" class="block mb-2 text-sm font-medium text-slate-900 dark:text-white">
                                 Password Saat Ini
                             </label>
-                            <div class="relative">
-                                <input :type="show ? 'text' : 'password'" name="current_password" class="form-input pr-10">
-                                <button type="button" @click="show = !show" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none">
-                                    <i class="material-icons text-[18px]" x-text="show ? 'visibility' : 'visibility_off'"></i>
-                                </button>
-                            </div>
+                            <input type="password" id="current_password" name="current_password" autocomplete="current-password"
+                                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 dark:bg-slate-800 dark:border-slate-600 dark:text-white transition-colors @error('current_password') border-red-500 @enderror">
+                            @error('current_password')
+                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                            @enderror
                         </div>
 
-                        {{-- New Password --}}
-                        <div x-data="{ show: false }">
-                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
-                                Password Baru
-                            </label>
-                            <div class="relative">
-                                <input :type="show ? 'text' : 'password'" name="password" class="form-input pr-10">
-                                <button type="button" @click="show = !show" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none">
-                                    <i class="material-icons text-[18px]" x-text="show ? 'visibility' : 'visibility_off'"></i>
-                                </button>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div>
+                                <label for="password" class="block mb-2 text-sm font-medium text-slate-900 dark:text-white">
+                                    Password Baru
+                                </label>
+                                <input type="password" id="password" name="password" autocomplete="new-password"
+                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 dark:bg-slate-800 dark:border-slate-600 dark:text-white transition-colors @error('password') border-red-500 @enderror">
+                                @error('password')
+                                    <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                @enderror
                             </div>
-                        </div>
 
-                        {{-- Confirm Password --}}
-                        <div x-data="{ show: false }">
-                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
-                                Konfirmasi Password
-                            </label>
-                            <div class="relative">
-                                <input :type="show ? 'text' : 'password'" name="password_confirmation" class="form-input pr-10">
-                                <button type="button" @click="show = !show" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none">
-                                    <i class="material-icons text-[18px]" x-text="show ? 'visibility' : 'visibility_off'"></i>
-                                </button>
+                            <div>
+                                <label for="password_confirmation" class="block mb-2 text-sm font-medium text-slate-900 dark:text-white">
+                                    Konfirmasi Password Baru
+                                </label>
+                                <input type="password" id="password_confirmation" name="password_confirmation" autocomplete="new-password"
+                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 dark:bg-slate-800 dark:border-slate-600 dark:text-white transition-colors">
                             </div>
                         </div>
                     </div>
 
-                    {{-- Tombol Simpan (Desktop) --}}
-                    <div class="mt-8 hidden lg:block">
-                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-md transition-all duration-200 flex items-center justify-center gap-2 hover:-translate-y-0.5">
-                            <i class="material-icons">save</i> Simpan Perubahan
+                    <div class="card-footer bg-slate-50 dark:bg-slate-800/50 flex flex-col sm:flex-row justify-end gap-3 mt-auto">
+                        <a href="{{ route('client.dashboard') }}" class="btn btn-secondary order-2 sm:order-1">
+                            Batal
+                        </a>
+                        <button type="submit" class="btn btn-primary order-1 sm:order-2">
+                            <i class="material-icons text-sm">save</i>
+                            Simpan Perubahan
                         </button>
                     </div>
-                </div>
+                </form>
             </div>
-
         </div>
-    </form>
-</div>
+    </div>
+
 @endsection

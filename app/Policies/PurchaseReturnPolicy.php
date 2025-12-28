@@ -1,5 +1,7 @@
 <?php
+
 namespace App\Policies;
+
 use App\Models\PurchaseReturn;
 use App\Models\User;
 

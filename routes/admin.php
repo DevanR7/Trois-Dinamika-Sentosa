@@ -2,87 +2,81 @@
 
 use Illuminate\Support\Facades\Route;
 
-// ==============================================================================
-// IMPORT CONTROLLERS (SEMUA MENGACU KE NAMESPACE ADMIN)
-// ==============================================================================
-
-// Auth & Core
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ProfileController;
+use App\Http\Controllers\Admin\GoogleAuthController;
+use App\Http\Controllers\Admin\ProductController;
+use App\Http\Controllers\Admin\StockOpnameController;
+use App\Http\Controllers\Admin\ClientController;
+use App\Http\Controllers\Admin\SalesOrderController;
+use App\Http\Controllers\Admin\ClientOrderReviewController;
+use App\Http\Controllers\Admin\OrderChangeRequestController;
+use App\Http\Controllers\Admin\SalesInvoiceController;
+use App\Http\Controllers\Admin\SalesReturnController;
+use App\Http\Controllers\Admin\InvoiceAdjustmentController;
+use App\Http\Controllers\Admin\SupplierController;
+use App\Http\Controllers\Admin\PurchaseOrderController;
+use App\Http\Controllers\Admin\PurchaseOrderPaymentController; 
+use App\Http\Controllers\Admin\PurchaseOrderAdjustmentController;
+use App\Http\Controllers\Admin\PurchaseReturnController;
+use App\Http\Controllers\Admin\BulkSalesPaymentController;
+use App\Http\Controllers\Admin\BulkPurchasePaymentController;
+use App\Http\Controllers\Admin\PaymentClearanceController;
+use App\Http\Controllers\Admin\PaymentController; 
+use App\Http\Controllers\Admin\ExpenseController;
+use App\Http\Controllers\Admin\LoanController;
+use App\Http\Controllers\Admin\LoanPaymentController;
+use App\Http\Controllers\Admin\ChartOfAccountController;
+use App\Http\Controllers\Admin\ManualJournalController;
+use App\Http\Controllers\Admin\FixedAssetController;
+use App\Http\Controllers\Admin\EquityTransactionController;
+use App\Http\Controllers\Admin\BankReconciliationController;
+use App\Http\Controllers\Admin\ClosingBookController;
+use App\Http\Controllers\Admin\GeneralLedgerController;
+use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SettingController;
-use App\Http\Controllers\Admin\GoogleAuthController;
-use App\Http\Controllers\Admin\AnnouncementController;
-use App\Http\Controllers\Admin\DataMigrationController;
-
-// Master Data & Inventory
-use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\UnitController;
-use App\Http\Controllers\Admin\StockOpnameController;
-
-// Sales & Clients
-use App\Http\Controllers\Admin\ClientController;
-use App\Http\Controllers\Admin\SalesOrderController;
-use App\Http\Controllers\Admin\SalesInvoiceController;
-use App\Http\Controllers\Admin\SalesReturnController;
-use App\Http\Controllers\Admin\ClientOrderReviewController;
-use App\Http\Controllers\Admin\OrderChangeRequestController;
-use App\Http\Controllers\Admin\InvoiceAdjustmentController;
-use App\Http\Controllers\Admin\BulkSalesPaymentController; // Controller yang diperbaiki
-
-// Purchase & Suppliers
-use App\Http\Controllers\Admin\SupplierController;
-use App\Http\Controllers\Admin\PurchaseOrderController;
-use App\Http\Controllers\Admin\PurchaseOrderPaymentController;
-use App\Http\Controllers\Admin\PurchaseReturnController;
-use App\Http\Controllers\Admin\BulkPurchasePaymentController;
-use App\Http\Controllers\Admin\PurchaseOrderAdjustmentController;
-
-// Finance & Accounting
-use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\TaxController;
 use App\Http\Controllers\Admin\PaymentMethodController;
-use App\Http\Controllers\Admin\PaymentClearanceController;
-use App\Http\Controllers\Admin\ExpenseController;
-use App\Http\Controllers\Admin\FixedAssetController;
-use App\Http\Controllers\Admin\EquityTransactionController;
-use App\Http\Controllers\Admin\LoanController;
-use App\Http\Controllers\Admin\LoanPaymentController;
 use App\Http\Controllers\Admin\CompanyBankAccountController;
-use App\Http\Controllers\Admin\ChartOfAccountController;
-use App\Http\Controllers\Admin\ManualJournalController;
-use App\Http\Controllers\Admin\BankReconciliationController;
-use App\Http\Controllers\Admin\GeneralLedgerController;
-use App\Http\Controllers\Admin\ClosingBookController;
-use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\AnnouncementController;
+use App\Http\Controllers\Admin\DataMigrationController;
+use App\Http\Controllers\Admin\MidtransController;
 
 /*
 |--------------------------------------------------------------------------
 | Admin Routes
 |--------------------------------------------------------------------------
-| Prefix URL  : /admin  (Diatur di RouteServiceProvider)
-| Prefix Name : admin.  (Diatur di RouteServiceProvider)
-| Middleware  : web     (Diatur di RouteServiceProvider)
+| Prefix URL  : /admin
+| Prefix Name : admin.
+| Middleware  : web, auth, verified (applied in groups below)
 */
 
-// --- 1. ADMIN AUTHENTICATION ---
+// --- 1. AUTHENTICATION (Guest) ---
 require __DIR__.'/admin-auth.php';
 
-// --- 2. GOOGLE AUTH (Admin) ---
-// URL: /admin/auth/google
+Route::get('/cek-php', function () {
+    phpinfo();
+});
+
+// --- 2. GOOGLE AUTH ---
 Route::get('auth/google', [GoogleAuthController::class, 'redirectToGoogle'])->name('auth.google');
-Route::get('auth/google/callback', [GoogleAuthController::class, 'handleGoogleCallback']);
+Route::get('auth/google/callback', [GoogleAuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
 
+Route::get('/', function () {
+    return redirect()->back(302, [], route('admin.dashboard'));
+})->middleware('auth');
 
-// --- 3. PROTECTED ADMIN ROUTES ---
+// --- 3. PROTECTED ROUTES ---
 Route::middleware(['auth', 'verified'])->group(function () {
 
     // ========================================================================
-    // A. DASHBOARD & PROFILE
+    // A. DASHBOARD & PROFILE (Menu Utama)
     // ========================================================================
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    
+
     Route::controller(ProfileController::class)->group(function () {
         Route::get('/profile', 'edit')->name('profile.edit');
         Route::patch('/profile', 'update')->name('profile.update');
@@ -90,49 +84,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/profile', 'destroy')->name('profile.destroy');
     });
 
-    // ========================================================================
-    // B. SYSTEM & MASTER DATA
-    // ========================================================================
-    Route::resource('users', UserController::class);
-    Route::patch('users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
-    Route::patch('users/{user}/restore', [UserController::class, 'restore'])->name('users.restore')->withTrashed();
-
-    Route::resource('roles', RoleController::class)->except(['show']);
-    
-    Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
-    Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
-    
-    Route::resource('units', UnitController::class)->except(['show']);
-    Route::resource('taxes', TaxController::class)->except(['show']);
-    
-    // Payment Methods & Archive
-    Route::resource('payment-methods', PaymentMethodController::class)->except(['show']);
-    Route::prefix('archived-payment-methods')->name('payment-methods.archived.')
-        ->middleware('permission:manage-payment-methods')->group(function () {
-            Route::get('/', [PaymentMethodController::class, 'archivedIndex'])->name('index');
-            Route::post('/{id}/restore', [PaymentMethodController::class, 'restore'])->name('restore');
-            Route::delete('/{id}/force-delete', [PaymentMethodController::class, 'forceDelete'])->name('forceDelete');
-    });
-
-    Route::resource('announcements', AnnouncementController::class);
-    Route::patch('announcements/{announcement}/restore', [AnnouncementController::class, 'restore'])->name('announcements.restore')->withTrashed();
-    Route::delete('announcements/{announcement}/force-delete', [AnnouncementController::class, 'forceDelete'])->name('announcements.forceDelete')->withTrashed();
-
-    Route::resource('company-bank-accounts', CompanyBankAccountController::class)
-        ->except(['show'])
-        ->middleware('permission:manage-bank-accounts');
 
     // ========================================================================
-    // C. INVENTORY & PRODUCTS
+    // B. INVENTORY SECTION (Produk & Stok)
     // ========================================================================
     Route::resource('products', ProductController::class);
     
+    // Stock Opname
     Route::get('/stock-opnames/worksheet', [StockOpnameController::class, 'downloadWorksheet'])->name('stock-opnames.worksheet');
     Route::resource('stock-opnames', StockOpnameController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
 
+
     // ========================================================================
-    // D. SALES & CLIENT MANAGEMENT
+    // C. SALES SECTION (Penjualan)
     // ========================================================================
+    
+    // 1. Clients
     Route::resource('clients', ClientController::class)->except(['show']);
     Route::controller(ClientController::class)->prefix('clients')->name('clients.')->group(function () {
         Route::patch('/{client}/approve', 'approve')->name('approve');
@@ -142,9 +109,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{client}', 'show')->name('show')->withTrashed();
     });
 
+    // 2. Sales Orders (SO)
     Route::resource('sales-orders', SalesOrderController::class)->parameters(['sales-orders' => 'order']);
-    
-    // Client Reviews & Change Requests
+
+    // 3. Reviews & Change Requests
     Route::prefix('client-order-reviews')->name('client-order-reviews.')->group(function() {
         Route::get('/', [ClientOrderReviewController::class, 'index'])->name('index'); 
         Route::get('/{order}', [ClientOrderReviewController::class, 'show'])->name('show'); 
@@ -158,7 +126,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{changeRequest}/process', [OrderChangeRequestController::class, 'process'])->name('process');
     });
 
-    // Invoices
+    // 4. Invoices (Faktur)
     Route::resource('invoices', SalesInvoiceController::class);
     Route::controller(SalesInvoiceController::class)->prefix('invoices')->name('invoices.')->group(function(){
         Route::get('/create/from-order/{order}', 'createFromOrder')->name('createFromOrder');
@@ -166,7 +134,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{invoice}/download', 'downloadPDF')->name('pdf');
         Route::post('/{invoice}/confirm', 'confirm')->name('confirm');
     });
-    
+
+    // 5. Invoice Adjustments
     Route::prefix('invoice-adjustments')->name('invoice-adjustments.')->group(function () {
         Route::get('/create', [InvoiceAdjustmentController::class, 'create'])->name('create');
         Route::get('/create-manual/{invoice}', [InvoiceAdjustmentController::class, 'createManual'])->name('create.manual');
@@ -176,48 +145,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/{invoiceAdjustment}', [InvoiceAdjustmentController::class, 'destroy'])->name('destroy');
     });
 
+    // 6. Sales Returns
     Route::resource('sales-returns', SalesReturnController::class);
 
-    // Single Payments
-    Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('payments.store');
-    Route::delete('/payments/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
-    Route::post('/payments/{payment}/approve', [PaymentController::class, 'approve'])->name('payments.approve');
-    Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
-
-    // ------------------------------------------------------------------------
-    // [REVISI PENTING] Bulk Sales Payment (Dengan Route Pending & ShowPending)
-    // ------------------------------------------------------------------------
-    Route::controller(BulkSalesPaymentController::class)
-        ->prefix('bulk-sales-payments')
-        ->name('bulk-sales-payments.')
-        ->group(function () {
-            // 1. History / Index
-            Route::get('/', 'index')->name('index'); 
-            
-            // 2. Form Buat Baru
-            Route::get('/create', 'create')->name('create');
-            Route::post('/', 'store')->name('store');
-
-            // 3. List Pending (Antrian Verifikasi) -> Mengatasi error orange
-            Route::get('/pending', 'pending')->name('pending'); 
-
-            // 4. Detail Pending (Khusus verifikasi) -> Mengatasi error orange
-            Route::get('/pending/{bulkSalesPayment}', 'showPending')->name('showPending');
-
-            // 5. Detail Umum (History)
-            Route::get('/{bulkSalesPayment}', 'show')->name('show');
-
-            // 6. Action
-            Route::post('/{bulkSalesPayment}/approve', 'approve')->name('approve');
-            Route::post('/{bulkSalesPayment}/reject', 'reject')->name('reject');
-        });
 
     // ========================================================================
-    // E. PURCHASING & SUPPLIERS
+    // D. PURCHASING SECTION (Pembelian)
     // ========================================================================
+    
+    // 1. Suppliers
     Route::resource('suppliers', SupplierController::class);
     Route::patch('suppliers/{supplier}/restore', [SupplierController::class, 'restore'])->name('suppliers.restore')->withTrashed();
 
+    // 2. Purchase Orders (PO)
     Route::resource('purchase-orders', PurchaseOrderController::class);
     Route::controller(PurchaseOrderController::class)->prefix('purchase-orders')->name('purchase-orders.')->group(function(){
         Route::post('/{purchaseOrder}/cancel', 'cancel')->name('cancel');
@@ -227,6 +167,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{purchaseOrder}/download-pdf', 'downloadPDF')->name('pdf');
     });
 
+    // 3. PO Adjustments
     Route::prefix('purchase-order-adjustments')->name('purchase-order-adjustments.')->group(function () {
         Route::get('/create', [PurchaseOrderAdjustmentController::class, 'create'])->name('create');
         Route::get('/create-manual/{purchaseOrder}', [PurchaseOrderAdjustmentController::class, 'createManual'])->name('create.manual');
@@ -236,39 +177,36 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/{purchaseOrderAdjustment}', [PurchaseOrderAdjustmentController::class, 'destroy'])->name('destroy');
     });
 
+    // 4. Purchase Returns
     Route::resource('purchase-returns', PurchaseReturnController::class);
 
-    Route::post('/purchase-orders/{purchaseOrder}/payments', [PurchaseOrderPaymentController::class, 'store'])->name('purchase-orders.payments.store');
-    Route::delete('/purchase-order-payments/{payment}', [PurchaseOrderPaymentController::class, 'destroy'])->name('purchase-orders.payments.destroy');
+
+    // ========================================================================
+    // E. FINANCE SECTION (Keuangan & Arus Kas)
+    // ========================================================================
     
+    // 1. Bulk Sales Payments (Terima Piutang)
+    Route::controller(BulkSalesPaymentController::class)
+        ->prefix('bulk-sales-payments')
+        ->name('bulk-sales-payments.')
+        ->group(function () {
+            Route::get('/', 'index')->name('index'); 
+            Route::get('/create', 'create')->name('create');
+            Route::post('/', 'store')->name('store');
+            Route::get('/pending', 'pending')->name('pending'); 
+            Route::get('/pending/{bulkSalesPayment}', 'showPending')->name('showPending');
+            Route::get('/{bulkSalesPayment}', 'show')->name('show');
+            Route::post('/{bulkSalesPayment}/approve', 'approve')->name('approve');
+            Route::post('/{bulkSalesPayment}/reject', 'reject')->name('reject');
+        });
+        
+    // 2. Bulk Purchase Payments (Bayar Hutang)
     Route::prefix('bulk-purchase-payments')->name('bulk-purchase-payments.')->group(function () {
         Route::get('/create', [BulkPurchasePaymentController::class, 'create'])->name('create');
         Route::post('/', [BulkPurchasePaymentController::class, 'store'])->name('store');
     });
 
-    // ========================================================================
-    // F. FINANCE & ACCOUNTING
-    // ========================================================================
-    Route::resource('chart-of-accounts', ChartOfAccountController::class)->except(['show']);
-    
-    Route::resource('expenses', ExpenseController::class);
-    Route::resource('fixed-assets', FixedAssetController::class);
-    Route::resource('equity-transactions', EquityTransactionController::class);
-    
-    Route::resource('loans', LoanController::class);
-    Route::resource('loans.payments', LoanPaymentController::class)->only(['create', 'store', 'destroy'])->scoped();
-
-    Route::resource('manual-journals', ManualJournalController::class)->except(['show']);
-    Route::get('manual-journals/{manualJournal}', [ManualJournalController::class, 'show'])->name('manual-journals.show');
-
-    Route::resource('bank-reconciliations', BankReconciliationController::class)->except(['edit']);
-
-    Route::get('/closing-book', [ClosingBookController::class, 'index'])->name('closing-book.index');
-    Route::post('/closing-book', [ClosingBookController::class, 'store'])->name('closing-book.store');
-    
-    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
-    Route::get('/reports/general-ledger', [GeneralLedgerController::class, 'index'])->name('reports.general-ledger');
-
+    // 3. Payment Clearance (Kliring)
     Route::middleware(['permission:manage-payment-clearance'])->prefix('payment-clearance')->name('payment-clearance.')->group(function () {
         Route::get('/', [PaymentClearanceController::class, 'index'])->name('index');
         Route::post('/sales/{payment}/approve', [PaymentClearanceController::class, 'approveSalesPayment'])->name('sales.approve');
@@ -277,13 +215,104 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/purchase/{purchaseOrderPayment}/reject', [PaymentClearanceController::class, 'rejectPurchasePayment'])->name('purchase.reject');
     });
 
-    // ========================================================================
-    // G. INTERNAL APIs & HELPERS (For Admin UI AJAX)
-    // ========================================================================
-    // URL: /admin/api/...
-    
-    Route::get('/api/clients/{client}/unpaid-invoices', [BulkSalesPaymentController::class, 'getUnpaidInvoicesApi'])->name('api.clients.unpaid-invoices');
+    // 4. Expenses (Biaya Ops)
+    Route::resource('expenses', ExpenseController::class);
 
+    // 5. Loans (Pinjaman)
+    Route::resource('loans', LoanController::class);
+
+    // [FIX] Menggunakan Custom Group agar nama route sesuai dengan View (admin.loan-payments.*)
+    Route::prefix('loans/{loan}/payments')->name('loan-payments.')->group(function () {
+        Route::get('create', [LoanPaymentController::class, 'create'])->name('create');
+        Route::post('/', [LoanPaymentController::class, 'store'])->name('store');
+        Route::delete('{payment}', [LoanPaymentController::class, 'destroy'])->name('destroy');
+    });
+
+    // 6. Single Payment Helpers (Used in modals inside Invoice/PO View)
+    Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('payments.store');
+    Route::delete('/payments/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
+    Route::post('/payments/{payment}/approve', [PaymentController::class, 'approve'])->name('payments.approve'); 
+    Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
+
+    Route::post('/purchase-orders/{purchaseOrder}/payments', [PurchaseOrderPaymentController::class, 'store'])->name('purchase-orders.payments.store');
+    Route::delete('/purchase-order-payments/{payment}', [PurchaseOrderPaymentController::class, 'destroy'])->name('purchase-orders.payments.destroy');
+
+    Route::prefix('midtrans')->name('midtrans.')->group(function () {
+        // Single Payment (Show Invoice Admin)
+        Route::post('/pay/{invoice}', [MidtransController::class, 'pay'])->name('pay');
+        // Bulk Payment (Create Bulk Admin)
+        Route::post('/pay-batch', [MidtransController::class, 'payBatch'])->name('payBatch');
+    });
+
+
+    // ========================================================================
+    // F. ACCOUNTING SECTION (Akuntansi)
+    // ========================================================================
+    
+    Route::resource('chart-of-accounts', ChartOfAccountController::class)->except(['show']);
+    Route::resource('manual-journals', ManualJournalController::class)->except(['show']);
+    Route::get('manual-journals/{manualJournal}', [ManualJournalController::class, 'show'])->name('manual-journals.show');
+    
+    Route::resource('fixed-assets', FixedAssetController::class);
+    Route::resource('equity-transactions', EquityTransactionController::class);
+    
+    Route::resource('bank-reconciliations', BankReconciliationController::class)->except(['edit']);
+
+    Route::get('/closing-book', [ClosingBookController::class, 'index'])->name('closing-book.index');
+    Route::post('/closing-book', [ClosingBookController::class, 'store'])->name('closing-book.store');
+    
+    // Reports
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/general-ledger', [GeneralLedgerController::class, 'index'])->name('reports.general-ledger');
+
+
+    // ========================================================================
+    // G. SYSTEM & SETTINGS SECTION (Pengaturan)
+    // ========================================================================
+
+    // 1. Settings & Profile PT
+    Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
+    Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
+
+    // 2. Users & Roles
+    Route::resource('users', UserController::class);
+    Route::patch('users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
+    Route::patch('users/{user}/restore', [UserController::class, 'restore'])->name('users.restore')->withTrashed();
+    Route::resource('roles', RoleController::class)->except(['show']);
+
+    // 3. Master Data Keuangan (Bank, Pajak, Metode Bayar, Satuan)
+    Route::resource('company-bank-accounts', CompanyBankAccountController::class)
+        ->except(['show'])
+        ->middleware('permission:manage-bank-accounts');
+    Route::resource('taxes', TaxController::class)->except(['show']);
+    Route::resource('units', UnitController::class)->except(['show']);
+
+    Route::resource('payment-methods', PaymentMethodController::class)->except(['show']);
+    Route::prefix('archived-payment-methods')->name('payment-methods.archived.')
+        ->middleware('permission:manage-payment-methods')->group(function () {
+            Route::get('/', [PaymentMethodController::class, 'archivedIndex'])->name('index');
+            Route::post('/{id}/restore', [PaymentMethodController::class, 'restore'])->name('restore');
+            Route::delete('/{id}/force-delete', [PaymentMethodController::class, 'forceDelete'])->name('forceDelete');
+    });
+
+    // 4. Announcements
+    Route::resource('announcements', AnnouncementController::class);
+    Route::patch('announcements/{announcement}/restore', [AnnouncementController::class, 'restore'])->name('announcements.restore')->withTrashed();
+    Route::delete('announcements/{announcement}/force-delete', [AnnouncementController::class, 'forceDelete'])->name('announcements.forceDelete')->withTrashed();
+
+    // 5. Data Migration
+    Route::get('/migration', [DataMigrationController::class, 'index'])->name('migration.index');
+    Route::get('/migration/template/{type}', [DataMigrationController::class, 'downloadTemplate'])->name('migration.template');
+    Route::post('/migration/products', [DataMigrationController::class, 'importProducts'])->name('migration.import-products');
+    Route::post('/migration/clients', [DataMigrationController::class, 'importClients'])->name('migration.import-clients');
+
+
+    // ========================================================================
+    // H. INTERNAL API (Helpers for AJAX/Dropdowns)
+    // ========================================================================
+    
+    // Client & Sales Helper
+    Route::get('/bulk-sales-payments/get-unpaid-invoices/{client}', [BulkSalesPaymentController::class, 'getUnpaidInvoicesApi'])->name('api.clients.unpaid-invoices');
     Route::get('/api/clients/{client}/details', function (\App\Models\Client $client) {
         return response()->json([
             'client_id' => $client->client_id,
@@ -292,9 +321,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'pending_balance' => $client->pending_balance,
         ]);
     })->name('api.clients.details');
-
-    Route::get('/api/suppliers/{supplier}/unpaid-purchase-orders', [BulkPurchasePaymentController::class, 'getUnpaidPurchaseOrdersApi'])->name('api.suppliers.unpaid-pos');
     
+    Route::get('/api/invoices/{invoice}/items', function (Illuminate\Http\Request $request, \App\Models\SalesInvoice $invoice) {
+        if ($request->user()->cannot('view', $invoice)) { return response()->json(['message' => 'Unauthorized'], 403); }
+        $invoice->load('items.product');
+        return response()->json(['invoice' => $invoice, 'items' => $invoice->items]);
+    });
+
+    // Supplier & Purchase Helper
+    Route::get('/api/suppliers/{supplier}/unpaid-purchase-orders', [BulkPurchasePaymentController::class, 'getUnpaidPurchaseOrdersApi'])->name('api.suppliers.unpaid-pos');
     Route::get('/api/suppliers/{supplier}/details', function (\App\Models\Supplier $supplier) {
         return response()->json([
             'supplier_id' => $supplier->supplier_id,
@@ -304,32 +339,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('api.suppliers.details');
 
-    Route::get('/api/invoices/{invoice}/items', function (Illuminate\Http\Request $request, \App\Models\SalesInvoice $invoice) {
-        if ($request->user()->cannot('view', $invoice)) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-        $invoice->load('items.product');
-        return response()->json([
-            'invoice' => $invoice,
-            'items' => $invoice->items
-        ]);
-    });
-
     Route::get('/api/purchase-orders/{purchaseOrder}/items', function (Illuminate\Http\Request $request, \App\Models\PurchaseOrder $purchaseOrder) {
-        if ($request->user()->cannot('view', $purchaseOrder)) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        if ($request->user()->cannot('view', $purchaseOrder)) { return response()->json(['message' => 'Unauthorized'], 403); }
         $purchaseOrder->load('items.product.unit');
         return response()->json(['items' => $purchaseOrder->items]);
     });
 
-    // ========================================================================
-    // H. UTILITIES
-    // ========================================================================
-    Route::get('/migration', [DataMigrationController::class, 'index'])->name('migration.index');
-    Route::post('/migration/products', [DataMigrationController::class, 'importProducts'])->name('migration.import-products');
-    Route::post('/migration/clients', [DataMigrationController::class, 'importClients'])->name('migration.import-clients');
-
 });
 
-// TIDAK ADA REQUIRE DUPLIKAT DI SINI
+// Route ini harus bisa diakses publik oleh server Midtrans
+Route::post('/payment/callback', [MidtransController::class, 'callback'])->name('midtrans.callback');
+
+Route::fallback(function () {
+    return redirect()->back(302, [], route('admin.dashboard'));
+});

@@ -10,11 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class BulkPurchasePayment extends Model
 {
     use HasFactory;
-
-    // ✅ TAMBAHAN: Definisi tabel eksplisit
     protected $table = 'bulk_purchase_payments';
-
-    // ✅ PERBAIKAN FATAL: Primary key harus sesuai migrasi
     protected $primaryKey = 'bulk_purchase_payment_id'; 
 
     protected $fillable = [
@@ -25,9 +21,6 @@ class BulkPurchasePayment extends Model
         'payment_method_id',
         'company_bank_account_id',
         'notes',
-        // 'status', // Tambahkan ini jika di migrasi ada kolom status
-        // 'reference_number', // Tambahkan ini jika ada di migrasi
-        // 'proof_of_payment_path', // Tambahkan ini jika ada di migrasi
     ];
 
     protected $casts = [
@@ -47,8 +40,6 @@ class BulkPurchasePayment extends Model
 
     public function payments(): HasMany
     {
-        // Parameter 2: Foreign Key di tabel anak (purchase_order_payments)
-        // Parameter 3: Local Key di tabel induk (bulk_purchase_payments)
         return $this->hasMany(PurchaseOrderPayment::class, 'bulk_purchase_payment_id', 'bulk_purchase_payment_id');
     }
 

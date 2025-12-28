@@ -31,33 +31,21 @@ class BankReconciliation extends Model
         'difference' => 'float',
     ];
 
-    /**
-     * Relasi ke Akun COA yang direkonsiliasi
-     */
     public function account(): BelongsTo
     {
         return $this->belongsTo(ChartOfAccount::class, 'chart_of_account_id', 'account_id');
     }
 
-    /**
-     * Relasi ke Akun Bank Perusahaan
-     */
     public function companyBankAccount(): BelongsTo
     {
         return $this->belongsTo(CompanyBankAccount::class, 'company_bank_account_id', 'company_bank_account_id');
     }
 
-    /**
-     * Relasi ke user yang memproses
-     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
 
-    /**
-     * Relasi ke semua entri Jurnal Umum yang "dicentang" dalam rekonsiliasi ini
-     */
     public function journalEntries(): HasMany
     {
         return $this->hasMany(GeneralLedger::class, 'bank_reconciliation_id', 'reconciliation_id');

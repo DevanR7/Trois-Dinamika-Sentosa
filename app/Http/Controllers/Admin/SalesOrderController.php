@@ -88,7 +88,6 @@ class SalesOrderController extends Controller
             'notes' => 'nullable|string',
             'products' => 'required|array|min:1', 
             'products.*.product_id' => 'required|exists:products,product_id',
-            // ✅ Gunakan numeric agar support desimal & integer
             'products.*.quantity' => 'required|numeric|min:0.01', 
         ]);
 
@@ -163,7 +162,10 @@ class SalesOrderController extends Controller
             abort(403, 'Pesanan yang sudah diproses tidak dapat diedit.');
         }
 
-        $order->load('items.product');
+        $order->load(['items.product' => function ($query) {
+            $query->withTrashed();
+        }]);
+        
         $clients = Client::all();
         $products = Product::all();
         $salesUsers = User::role('sales')->get();
@@ -186,7 +188,6 @@ class SalesOrderController extends Controller
             'notes' => 'nullable|string',
             'products' => 'required|array|min:1', 
             'products.*.product_id' => 'required|exists:products,product_id',
-            // ✅ Gunakan numeric di sini juga
             'products.*.quantity' => 'required|numeric|min:0.01',
         ]);
 
@@ -204,13 +205,9 @@ class SalesOrderController extends Controller
             }
 
             $order->update($updateData);
-
-            // Hapus item lama (reset)
             $order->items()->delete();
-
             $totalAmount = 0;
             
-            // ✅ PERBAIKAN: Gunakan $validated['products'] (sebelumnya $validated['items'])
             foreach ($validated['products'] as $itemData) {
                 $product = Product::find($itemData['product_id']);
                 $price = $product->selling_price; 

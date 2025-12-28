@@ -5,8 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\SalesInvoice;
-use App\Models\BulkSalesPayment;
-use App\Models\Payment;
+use App\Models\BulkSalesPayment; 
 use App\Models\ClientLedger;
 use App\Models\PaymentMethod;
 use App\Models\User;
@@ -18,7 +17,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Validation\Rule;
 use App\Services\AccountingService;
 use App\Services\AccountingSettingService;
 
@@ -33,18 +31,8 @@ class BulkSalesPaymentController extends Controller
     ) {
         $this->accountingService = $accountingService;
         $this->accountingSettings = $accountingSettingService;
-
         $this->middleware('permission:create-batch-payments')->only(['create', 'store', 'getUnpaidInvoicesApi']);
         $this->middleware('permission:review-batch-payments')->only(['pending', 'showPending', 'approve', 'reject']);
-    }
-
-    public function index(): View
-    {
-        $bulkSalesPayments = BulkSalesPayment::with(['client', 'paymentMethod', 'processedByUser'])
-            ->orderByDesc('created_at')
-            ->paginate(15);
-
-        return view('admin.bulk_sales_payments.index', compact('bulkSalesPayments'));
     }
 
     public function create(): View
@@ -291,35 +279,14 @@ class BulkSalesPaymentController extends Controller
 
             DB::commit();
 
-            return redirect()->route('admin.clients.show', $client->client_id)
-                             ->with('success', 'Pembayaran bulk berhasil. ' . implode('. ', $alokasiLog));
+            return redirect()->route('admin.bulk-sales-payments.show', $bulkPayment->bulk_sales_payment_id)
+                ->with('success', 'Pembayaran massal berhasil disimpan! ' . implode('. ', $alokasiLog));
 
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Gagal menyimpan bulk: ' . $e->getMessage() . " on line " . $e->getLine());
             return back()->with('error', 'Gagal menyimpan pembayaran bulk: ' . $e->getMessage())->withInput();
         }
-    }
-
-    public function show(BulkSalesPayment $bulkSalesPayment): View
-    {
-        // Load relasi lengkap untuk history
-        $bulkSalesPayment->load([
-            'client', 
-            'paymentMethod', 
-            'processedByUser', // Pembuat
-            'approvedByUser',  // Penyetuju
-            'rejectedByUser',  // Penolak
-            'payments.salesInvoice' // Detail pembayaran per invoice (jika completed)
-        ]);
-
-        $details = $bulkSalesPayment->details ?? [];
-        $invoiceIds = $details['invoice_ids'] ?? [];
-
-        // Ambil data invoice yang terkait (baik lunas maupun yang dulu diajukan)
-        $invoices = SalesInvoice::whereIn('invoice_id', $invoiceIds)->get();
-
-        return view('admin.bulk_sales_payments.show', compact('bulkSalesPayment', 'invoices', 'details'));
     }
 
     public function pending(): View
@@ -405,22 +372,22 @@ class BulkSalesPaymentController extends Controller
                 if ($method) $paymentMethodId = $method->payment_method_id;
             }
 
+            $paymentMethodType = $method->type ?? 'direct';
+            $newPaymentStatus = 'completed'; 
             $arAccountId = $this->accountingSettings->getAccountsReceivableId();
             $clientDepositAccountId = $this->accountingSettings->getClientDepositId();
+
             if (!$arAccountId || !$clientDepositAccountId) {
                 throw new \Exception("Akun AR atau Deposit Klien belum diatur.");
             }
-            
             $cashBankAccount = CompanyBankAccount::find($bankAccountId);
             if (!$cashBankAccount || !$cashBankAccount->chart_of_account_id) {
                 throw new \Exception("Akun Bank tidak valid.");
             }
             $cashBankAccountId = $cashBankAccount->chart_of_account_id;
-
             if ($kreditAkanDigunakan > 0) {
                 $alokasiLog[] = "Menggunakan kredit Rp " . number_format($kreditAkanDigunakan);
             }
-
             if ($danaDariInput > 0) {
                 $alokasiLog[] = "Menggunakan dana input Rp " . number_format($danaDariInput);
             }
@@ -443,7 +410,7 @@ class BulkSalesPaymentController extends Controller
                     'amount' => $jumlahBayar,
                     'payment_method_id' => $paymentMethodId,
                     'company_bank_account_id' => $bankAccountId,
-                    'status' => 'completed',
+                    'status' => 'completed', 
                     'received_by_user_id' => Auth::id(),
                     'notes' => 'Disetujui Bulk #' . $bulkSalesPayment->bulk_sales_payment_id,
                     'proof_of_payment_path' => $proofPathFromDetails,
@@ -481,28 +448,21 @@ class BulkSalesPaymentController extends Controller
 
             $journalGroupId = "BULK-" . $bulkSalesPayment->bulk_sales_payment_id;
             $description = "Persetujuan Bulk #" . $bulkSalesPayment->bulk_sales_payment_id . " dari " . $client->client_name;
-            
             $totalDanaAlokasi = $danaDariInput + $kreditAkanDigunakan;
             
             $debitEntries = [];
             $creditEntries = [];
 
-            // (D) Kas/Bank
             if ($danaDariInput > 0 && $cashBankAccountId) {
                 $debitEntries[] = [$cashBankAccountId, $danaDariInput, "Penerimaan Bulk (Verified)"];
             }
-            // (D) Deposit Klien
             if ($kreditAkanDigunakan > 0) {
                 $debitEntries[] = [$clientDepositAccountId, $kreditAkanDigunakan, "Deposit Klien"];
             }
-            
-            // (K) Piutang Usaha
             $totalTerpakai = $totalDanaAlokasi - $sisaDana;
             if ($totalTerpakai > 0) {
                 $creditEntries[] = [$arAccountId, $totalTerpakai, "Pelunasan Piutang Bulk (Verified)"];
             }
-
-            // (K) Deposit Klien (Kelebihan bayar)
             if ($sisaDana > 0) {
                 $creditEntries[] = [$clientDepositAccountId, $sisaDana, "Kelebihan bayar Bulk (Verified)"];
             }
@@ -592,5 +552,54 @@ class BulkSalesPaymentController extends Controller
             Log::error('Gagal menolak bulk payment: ' . $e->getMessage());
             return back()->with('error', 'Gagal menolak bulk payment: ' . $e->getMessage());
         }
+    }
+
+    public function index(Request $request): View
+    {
+        $query = BulkSalesPayment::with(['client', 'paymentMethod', 'processedByUser']);
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('reference_number', 'like', "%{$search}%")
+                  ->orWhere('bulk_sales_payment_id', $search)
+                  ->orWhereHas('client', function($c) use ($search) {
+                      $c->where('client_name', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        if ($request->filled('start_date')) {
+            $query->whereDate('payment_date', '>=', $request->start_date);
+        }
+        if ($request->filled('end_date')) {
+            $query->whereDate('payment_date', '<=', $request->end_date);
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+        $bulkSalesPayments = $query->orderByDesc('created_at')
+            ->paginate(15)
+            ->appends($request->query());
+
+        return view('admin.bulk_sales_payments.index', compact('bulkSalesPayments'));
+    }
+
+    public function show(BulkSalesPayment $bulkSalesPayment): View
+    {
+        $bulkSalesPayment->load([
+            'client', 
+            'paymentMethod', 
+            'processedByUser', 
+            'approvedByUser', 
+            'rejectedByUser', 
+            'payments.salesInvoice',
+            'companyBankAccount'
+        ]);
+
+        $details = $bulkSalesPayment->details ?? [];
+        $invoiceIds = $details['invoice_ids'] ?? [];
+        $invoices = SalesInvoice::whereIn('invoice_id', $invoiceIds)->get();
+    
+        return view('admin.bulk_sales_payments.show', compact('bulkSalesPayment', 'invoices', 'details'));
     }
 }

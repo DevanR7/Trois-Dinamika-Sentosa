@@ -14,9 +14,6 @@ class Product extends Model
     use HasFactory, SoftDeletes;
     protected $primaryKey = 'product_id';
 
-    /**
-     * The attributes that are mass assignable.
-     */
     protected $fillable = [
         'product_code',
         'product_name',

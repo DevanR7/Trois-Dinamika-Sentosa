@@ -13,7 +13,6 @@ use App\Models\PurchaseOrder;
 class SupplierLedger extends Model
 {
     use HasFactory;
-
     protected $primaryKey = 'ledger_id';
 
     protected $fillable = [
@@ -34,25 +33,16 @@ class SupplierLedger extends Model
         'amount' => 'float',
     ];
 
-    /**
-     * Dapatkan model induk (PurchaseReturn, PurchaseOrderPayment, dll).
-     */
     public function reference(): MorphTo
     {
         return $this->morphTo();
     }
 
-    /**
-     * Dapatkan supplier pemilik ledger.
-     */
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class, 'supplier_id', 'supplier_id');
     }
 
-    /**
-     * Dapatkan user yang memproses.
-     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');

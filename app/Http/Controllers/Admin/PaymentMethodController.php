@@ -11,43 +11,33 @@ use Illuminate\Validation\Rule;
 
 class PaymentMethodController extends Controller
 {
-    /**
-     * Terapkan middleware permission agar hanya user tertentu bisa mengakses.
-     */
     public function __construct()
     {
         $this->middleware('permission:manage-payment-methods');
     }
 
-    /**
-     * Menampilkan daftar metode pembayaran aktif (tidak diarsip).
-     */
     public function index(): View
     {
-        // Model otomatis hanya mengambil yang belum di-soft delete
         $paymentMethods = PaymentMethod::orderBy('name')->get();
 
         return view('admin.payment_methods.index', compact('paymentMethods'));
     }
 
-    /**
-     * Menampilkan form untuk membuat metode pembayaran baru.
-     */
     public function create(): View
     {
         return view('admin.payment_methods.create');
     }
 
-    /**
-     * Menyimpan metode pembayaran baru ke database.
-     */
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:payment_methods,name',
             'type' => 'required|in:direct,pending,gateway',
-            'required_fields_config' => 'required|in:none,proof_only,reference_only,proof_and_reference',
             'is_active' => 'required|boolean',
+            'client_input_config' => 'required|in:none,proof_only,reference_only,proof_and_reference',
+            'client_status_default' => 'required|in:completed,pending_verification',
+            'internal_input_config' => 'required|in:none,proof_only,reference_only,proof_and_reference',
+            'internal_status_default' => 'required|in:completed,pending_verification',
         ]);
 
         PaymentMethod::create($validated);
@@ -57,17 +47,11 @@ class PaymentMethodController extends Controller
             ->with('success', 'Metode pembayaran baru berhasil dibuat.');
     }
 
-    /**
-     * Menampilkan form untuk mengedit metode pembayaran yang ada.
-     */
     public function edit(PaymentMethod $paymentMethod): View
     {
         return view('admin.payment_methods.edit', compact('paymentMethod'));
     }
 
-    /**
-     * Memperbarui data metode pembayaran yang ada di database.
-     */
     public function update(Request $request, PaymentMethod $paymentMethod): RedirectResponse
     {
         $validated = $request->validate([
@@ -75,14 +59,14 @@ class PaymentMethodController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('payment_methods')->ignore(
-                    $paymentMethod->payment_method_id,
-                    'payment_method_id'
-                ),
+                Rule::unique('payment_methods')->ignore($paymentMethod->payment_method_id, 'payment_method_id'),
             ],
             'type' => 'required|in:direct,pending,gateway',
-            'required_fields_config' => 'required|in:none,proof_only,reference_only,proof_and_reference',
             'is_active' => 'required|boolean',
+            'client_input_config' => 'required|in:none,proof_only,reference_only,proof_and_reference',
+            'client_status_default' => 'required|in:completed,pending_verification',
+            'internal_input_config' => 'required|in:none,proof_only,reference_only,proof_and_reference',
+            'internal_status_default' => 'required|in:completed,pending_verification',
         ]);
 
         $paymentMethod->update($validated);
@@ -92,13 +76,10 @@ class PaymentMethodController extends Controller
             ->with('success', 'Metode pembayaran berhasil diperbarui.');
     }
 
-    /**
-     * Mengarsip (soft delete) metode pembayaran.
-     */
     public function destroy(PaymentMethod $paymentMethod): RedirectResponse
     {
         try {
-            $paymentMethod->delete(); // Soft delete
+            $paymentMethod->delete(); 
             return redirect()
                 ->route('admin.payment-methods.index')
                 ->with('success', 'Metode pembayaran berhasil diarsip.');
@@ -109,9 +90,6 @@ class PaymentMethodController extends Controller
         }
     }
 
-    /**
-     * Menampilkan daftar metode pembayaran yang sudah diarsip (soft deleted).
-     */
     public function archivedIndex(): View
     {
         $archivedMethods = PaymentMethod::onlyTrashed()
@@ -121,9 +99,6 @@ class PaymentMethodController extends Controller
         return view('admin.payment_methods.archive', compact('archivedMethods'));
     }
 
-    /**
-     * Memulihkan metode pembayaran yang diarsip.
-     */
     public function restore($id): RedirectResponse
     {
         try {
@@ -140,9 +115,6 @@ class PaymentMethodController extends Controller
         }
     }
 
-    /**
-     * Menghapus permanen metode pembayaran dari database.
-     */
     public function forceDelete($id): RedirectResponse
     {
         try {

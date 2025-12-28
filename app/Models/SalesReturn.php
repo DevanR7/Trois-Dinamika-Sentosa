@@ -15,7 +15,6 @@ use App\Models\SalesReturnItem;
 class SalesReturn extends Model
 {
     use HasFactory;
-
     protected $primaryKey = 'return_id';
 
     protected $fillable = [
@@ -36,12 +35,11 @@ class SalesReturn extends Model
         'total_hpp_amount' => 'float',
     ];
 
-     public static function generateReturnNumber(): string
+    public static function generateReturnNumber(): string
     {
         $yearMonth = now()->format('Ym');
         $year = now()->format('Y');
         $month = now()->format('m');
-
         $counter = DB::table('sales_return_counters')->where('ym', $yearMonth)->lockForUpdate()->first();
 
         if ($counter) {
@@ -53,29 +51,24 @@ class SalesReturn extends Model
         }
 
         $sequencePadded = str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
-
         return "SR/{$year}/{$month}/{$sequencePadded}";
     }
 
-    // Relasi ke tabel SalesInvoice (induk)
     public function salesInvoice(): BelongsTo
     {
         return $this->belongsTo(SalesInvoice::class, 'sales_invoice_id', 'invoice_id');
     }
 
-    // Relasi ke tabel Client
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class, 'client_id', 'client_id');
     }
     
-    // Relasi ke tabel User yang memproses
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
 
-    // Relasi ke item-item retur (anak)
     public function items(): HasMany
     {
         return $this->hasMany(SalesReturnItem::class, 'return_id', 'return_id');

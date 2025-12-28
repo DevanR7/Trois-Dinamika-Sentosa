@@ -9,14 +9,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('announcement_client', function (Blueprint $table) {
-            // Foreign key ke tabel announcements (ini sudah benar karena PK-nya 'id')
-            $table->foreignId('announcement_id')->constrained('announcements')->onDelete('cascade');
-            
-            // ✅ UBAH BARIS INI:
-            // Tambahkan parameter kedua untuk constrained() yang berisi nama kolom PK
-            $table->foreignId('client_id')->constrained('clients', 'client_id')->onDelete('cascade');
-            
-            // Primary key gabungan
+            $table->foreignId('announcement_id')
+                ->constrained('announcements')
+                ->onDelete('cascade');
+            $table->foreignId('client_id')
+                ->constrained('clients', 'client_id')
+                ->onDelete('cascade');
             $table->primary(['announcement_id', 'client_id']);
         });
     }

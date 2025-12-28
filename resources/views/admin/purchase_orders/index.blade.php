@@ -1,237 +1,280 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Daftar Purchase Order')
+@section('title', 'Pesanan Pembelian (PO)')
 
 @section('content')
-<div class="max-w-7xl mx-auto pb-20 animate-enter">
-
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-6">
-        <div>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Pesanan Pembelian (PO)</h1>
-            <p class="text-slate-500 text-sm mt-1">Kelola pengadaan barang ke supplier.</p>
-        </div>
-        <a href="{{ route('admin.purchase-orders.create') }}" class="w-full sm:w-auto h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5">
-            <i class="material-icons text-[20px] group-hover:rotate-90 transition-transform">add</i> 
-            <span>Buat Pesanan</span>
-        </a>
-    </div>
-
-    {{-- FILTER CARD --}}
-    <div class="dashboard-card p-6 mb-6 shadow-sm">
-        <form action="{{ route('admin.purchase-orders.index') }}" method="GET">
-            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                
-                {{-- Pencarian --}}
-                <div class="md:col-span-4">
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Pencarian</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="material-icons text-slate-400 text-[20px]">search</i>
-                        </div>
-                        <input type="text" name="search" value="{{ request('search') }}" 
-                            class="form-input pl-10" 
-                            placeholder="No. PO / Supplier...">
-                    </div>
-                </div>
-
-                {{-- Tanggal --}}
-                <div class="md:col-span-3">
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Tanggal Order</label>
-                    <input type="date" name="date" value="{{ request('date') }}" class="form-input">
-                </div>
-
-                {{-- Status --}}
-                <div class="md:col-span-3">
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Status</label>
-                    <select name="status" class="form-select select2-basic">
-                        <option value="">-- Semua Status --</option>
-                        <option value="draft" @selected(request('status') == 'draft')>Draft</option>
-                        <option value="ordered" @selected(request('status') == 'ordered')>Dipesan (Ordered)</option>
-                        <option value="received" @selected(request('status') == 'received')>Diterima (Received)</option>
-                        <option value="completed" @selected(request('status') == 'completed')>Selesai</option>
-                        <option value="cancelled" @selected(request('status') == 'cancelled')>Dibatalkan</option>
-                    </select>
-                </div>
-
-                {{-- Tombol --}}
-                <div class="md:col-span-2 flex gap-2">
-                    <button type="submit" class="flex-1 h-[48px] bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg shadow-sm transition-all flex items-center justify-center gap-2">
-                        <i class="material-icons text-[18px]">filter_list</i> Filter
-                    </button>
-                    <a href="{{ route('admin.purchase-orders.index') }}" class="h-[48px] w-[48px] flex items-center justify-center bg-white border border-slate-300 text-slate-500 hover:text-indigo-600 font-medium rounded-lg shadow-sm transition" title="Reset">
-                        <i class="material-icons text-[20px]">refresh</i>
-                    </a>
-                </div>
+    <div class="flex flex-col gap-6">
+        
+        {{-- Header & Tools --}}
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h2 class="page-title">Pesanan Pembelian</h2>
+                <p class="page-subtitle">Kelola pengadaan stok, status order, dan hutang supplier.</p>
             </div>
-        </form>
-    </div>
+            <a href="{{ route('admin.purchase-orders.create') }}" class="btn btn-primary">
+                <i class="material-icons text-lg">add</i>
+                Buat PO Baru
+            </a>
+        </div>
 
-    {{-- LIST PO (ACCORDION STYLE) --}}
-    <div class="space-y-4">
-        @forelse ($purchaseOrders as $po)
-            @php
-                $sisaUtang = $po->total_amount - ($po->total_returned ?? 0) - ($po->amount_paid ?? 0);
-                // Status Badge Logic
-                $statusClass = match($po->status) {
-                    'draft' => 'status-draft',
-                    'ordered' => 'status-pending',
-                    'received' => 'status-approved',
-                    'completed' => 'status-completed',
-                    'cancelled' => 'status-rejected',
-                    default => 'bg-gray-100 text-gray-600'
-                };
-                $statusLabel = match($po->status) {
-                    'ordered' => 'Dipesan',
-                    'received' => 'Diterima',
-                    'completed' => 'Selesai',
-                    'cancelled' => 'Batal',
-                    default => ucfirst($po->status)
-                };
-                $statusIcon = match($po->status) {
-                    'draft' => 'edit_note',
-                    'ordered' => 'local_shipping',
-                    'received' => 'inventory_2',
-                    'completed' => 'check_circle',
-                    'cancelled' => 'cancel',
-                    default => 'help'
-                };
-            @endphp
-
-            <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden transition-shadow hover:shadow-md">
-                
-                {{-- HEADER CARD (Click to Expand) --}}
-                <div class="p-4 sm:p-5 cursor-pointer hover:bg-slate-50 transition-colors" onclick="toggleAccordion('{{ $po->po_id }}')">
-                    <div class="flex flex-col sm:flex-row sm:items-center gap-4">
-                        
-                        {{-- Icon & Info Utama --}}
-                        <div class="flex items-center gap-4 flex-1">
-                            <div class="w-12 h-12 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0 border border-indigo-100">
-                                <i class="material-icons text-xl">shopping_cart</i>
-                            </div>
-                            <div class="min-w-0">
-                                <h3 class="text-base font-bold text-slate-800 truncate">{{ $po->po_number }}</h3>
-                                <div class="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                                    <i class="material-icons text-[14px]">store</i> {{ $po->supplier->supplier_name ?? 'Supplier Dihapus' }}
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Info Nilai & Status --}}
-                        <div class="flex items-center justify-between sm:justify-end gap-6 sm:w-auto w-full pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                            <div class="text-right">
-                                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Total</span>
-                                <span class="text-sm font-bold font-mono text-slate-800">Rp {{ number_format($po->total_amount, 0, ',', '.') }}</span>
-                            </div>
-                            
-                            {{-- Status Badge --}}
-                            <div>
-                                <span class="{{ $statusClass }} inline-flex items-center justify-center px-2.5 py-1 rounded-md text-[11px] font-bold uppercase w-fit gap-1">
-                                    <i class="material-icons text-[12px]">{{ $statusIcon }}</i> {{ $statusLabel }}
-                                </span>
-                            </div>
-
-                            {{-- Chevron Icon --}}
-                            <div class="hidden sm:block text-slate-400 transition-transform duration-200" id="icon-{{ $po->po_id }}">
-                                <i class="material-icons">expand_more</i>
-                            </div>
-                        </div>
+        {{-- Filter Section --}}
+        <div class="card p-4">
+            <form method="GET" action="{{ route('admin.purchase-orders.index') }}" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {{-- Search --}}
+                <div class="col-span-1 md:col-span-2">
+                    <label class="form-label text-xs">Cari Data</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                            <i class="material-icons text-lg">search</i>
+                        </span>
+                        <input type="text" name="search" value="{{ request('search') }}" 
+                               class="form-input pl-10" 
+                               placeholder="No. PO, Invoice Supplier, atau Nama Supplier...">
                     </div>
                 </div>
 
-                {{-- COLLAPSE CONTENT --}}
-                <div id="wrapper-{{ $po->po_id }}" class="grid grid-rows-[0fr] transition-all duration-300 ease-in-out">
-                    <div class="overflow-hidden">
-                        <div class="p-5 border-t border-slate-100 bg-slate-50/50">
-                            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 text-sm">
-                                
-                                {{-- Kolom Kiri: Detail Tanggal --}}
-                                <div class="lg:col-span-4 space-y-3">
-                                    <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Informasi Tanggal</h4>
-                                    <div class="flex justify-between border-b border-dashed border-slate-200 pb-2">
-                                        <span class="text-slate-500">Tanggal Order</span>
-                                        <span class="font-medium text-slate-800">{{ optional($po->order_date)->format('d M Y') }}</span>
-                                    </div>
-                                    <div class="flex justify-between border-b border-dashed border-slate-200 pb-2">
-                                        <span class="text-slate-500">Jatuh Tempo</span>
-                                        <span class="font-medium text-slate-800">{{ $po->due_date ? $po->due_date->format('d M Y') : '-' }}</span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span class="text-slate-500">Request Oleh</span>
-                                        <span class="font-medium text-slate-800">{{ $po->requester->full_name ?? '-' }}</span>
-                                    </div>
-                                </div>
+                {{-- Status Filter --}}
+                <div>
+                    <label class="form-label text-xs">Status Pembayaran</label>
+                    <div wire:ignore>
+                        <select name="payment_status" class="tom-select w-full">
+                            <option value="">Semua Status</option>
+                            <option value="unpaid" {{ request('payment_status') == 'unpaid' ? 'selected' : '' }}>Belum Lunas</option>
+                            <option value="partially_paid" {{ request('payment_status') == 'partially_paid' ? 'selected' : '' }}>Sebagian</option>
+                            <option value="paid" {{ request('payment_status') == 'paid' ? 'selected' : '' }}>Lunas</option>
+                        </select>
+                    </div>
+                </div>
 
-                                {{-- Kolom Tengah: Keuangan --}}
-                                <div class="lg:col-span-4 space-y-3 lg:border-l lg:border-r border-slate-200 lg:px-6">
-                                    <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Status Pembayaran</h4>
-                                    <div class="flex justify-between">
-                                        <span class="text-slate-500">Total Tagihan</span>
-                                        <span class="font-bold text-slate-800">Rp {{ number_format($po->total_amount, 0, ',', '.') }}</span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span class="text-slate-500">Sudah Dibayar</span>
-                                        <span class="font-bold text-emerald-600">Rp {{ number_format($po->amount_paid, 0, ',', '.') }}</span>
-                                    </div>
-                                    <div class="flex justify-between pt-2 border-t border-slate-200 mt-1">
-                                        <span class="text-slate-500 font-bold">Sisa Utang</span>
-                                        <span class="font-bold {{ $sisaUtang > 0 ? 'text-red-500' : 'text-slate-400' }}">
-                                            Rp {{ number_format($sisaUtang, 0, ',', '.') }}
-                                        </span>
-                                    </div>
-                                </div>
+                {{-- Action Buttons --}}
+                <div class="flex items-end gap-2">
+                    <button type="submit" class="btn btn-secondary flex-1">
+                        <i class="material-icons text-lg">filter_list</i>
+                        Filter
+                    </button>
+                    @if(request()->anyFilled(['search', 'payment_status']))
+                        <a href="{{ route('admin.purchase-orders.index') }}" class="btn btn-danger-solid px-3" title="Reset Filter">
+                            <i class="material-icons">close</i>
+                        </a>
+                    @endif
+                </div>
+            </form>
+        </div>
 
-                                {{-- Kolom Kanan: Aksi --}}
-                                <div class="lg:col-span-4 flex flex-col gap-2 justify-center">
-                                    <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tindakan</h4>
+        {{-- PO List (Accordion Style) --}}
+        <div class="flex flex-col gap-3">
+            @forelse($purchaseOrders as $po)
+                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden transition-all duration-200 hover:shadow-md hover:border-indigo-200 dark:hover:border-slate-600" 
+                     x-data="{ expanded: false }">
+                    
+                    {{-- ACCORDION HEADER --}}
+                    <div @click="expanded = !expanded" class="p-4 flex flex-col sm:flex-row sm:items-center justify-between cursor-pointer group gap-4 sm:gap-0">
+                        <div class="flex items-center gap-4">
+                            {{-- Icon Status --}}
+                            <div class="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-sm
+                                {{ $po->status == 'completed' ? 'bg-emerald-500' : ($po->status == 'cancelled' ? 'bg-rose-500' : ($po->status == 'ordered' ? 'bg-blue-500' : 'bg-slate-400')) }}">
+                                <i class="material-icons text-lg">
+                                    {{ $po->status == 'completed' ? 'inventory' : ($po->status == 'cancelled' ? 'block' : ($po->status == 'ordered' ? 'local_shipping' : 'edit_note')) }}
+                                </i>
+                            </div>
+
+                            {{-- Info Utama --}}
+                            <div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <h3 class="font-bold text-slate-700 dark:text-white text-sm sm:text-base group-hover:text-indigo-600 transition-colors">
+                                        {{ $po->po_number }}
+                                    </h3>
                                     
-                                    <div class="flex gap-2">
-                                        <a href="{{ route('admin.purchase-orders.show', $po->po_id) }}" class="flex-1 px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition text-center flex items-center justify-center gap-1">
-                                            <i class="material-icons text-[16px]">visibility</i> Detail
-                                        </a>
-                                        <a href="{{ route('admin.purchase-orders.pdf', $po->po_id) }}" target="_blank" class="flex-1 px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition text-center flex items-center justify-center gap-1">
-                                            <i class="material-icons text-[16px]">picture_as_pdf</i> PDF
-                                        </a>
-                                    </div>
-
-                                    @if(in_array($po->status, ['draft', 'ordered']))
-                                        <div class="flex gap-2 mt-1">
-                                            <a href="{{ route('admin.purchase-orders.edit', $po->po_id) }}" class="flex-1 px-3 py-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-xs font-bold hover:bg-amber-100 transition text-center flex items-center justify-center gap-1">
-                                                <i class="material-icons text-[16px]">edit</i> Edit
-                                            </a>
-                                            
-                                            <form action="{{ route('admin.purchase-orders.cancel', $po->po_id) }}" method="POST" class="delete-form flex-1">
-                                                @csrf
-                                                <button type="submit" 
-                                                    data-title="Batalkan Pesanan?" 
-                                                    data-text="Pesanan ini akan ditandai sebagai batal." 
-                                                    data-btn-text="Ya, Batalkan" 
-                                                    data-btn-color="#ef4444"
-                                                    class="w-full h-full px-3 py-2 bg-red-50 border border-red-200 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition flex items-center justify-center gap-1">
-                                                    <i class="material-icons text-[16px]">cancel</i> Batal
-                                                </button>
-                                            </form>
-                                        </div>
+                                    {{-- BADGE STATUS ORDER --}}
+                                    @if($po->status == 'draft')
+                                        <span class="bg-slate-100 text-slate-600 border border-slate-200 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Draft</span>
+                                    @elseif($po->status == 'ordered')
+                                        <span class="bg-blue-100 text-blue-600 border border-blue-200 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Dipesan</span>
+                                    @elseif($po->status == 'completed')
+                                        <span class="bg-emerald-100 text-emerald-600 border border-emerald-200 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Selesai</span>
+                                    @else
+                                        <span class="bg-rose-100 text-rose-600 border border-rose-200 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Batal</span>
                                     @endif
                                 </div>
+                                <div class="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                                    <span class="font-medium text-slate-600 dark:text-slate-300 truncate max-w-[150px] sm:max-w-xs">{{ $po->supplier->supplier_name }}</span>
+                                    <span>•</span>
+                                    <span>{{ $po->order_date->format('d M Y') }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 w-full sm:w-auto pl-14 sm:pl-0">
+                            {{-- Info Tagihan (Desktop) --}}
+                            <div class="hidden sm:flex flex-col items-end">
+                                <span class="text-[10px] text-slate-400 uppercase font-bold">Total Tagihan</span>
+                                <span class="text-sm font-bold text-slate-700 dark:text-white">Rp {{ number_format($po->grand_total, 0, ',', '.') }}</span>
+                            </div>
+
+                            {{-- Payment Badge --}}
+                            <div>
+                                @if($po->payment_status == 'paid')
+                                    <span class="badge badge-success">Lunas</span>
+                                @elseif($po->payment_status == 'partially_paid')
+                                    <span class="badge badge-warning">Sebagian</span>
+                                @else
+                                    <span class="badge badge-danger">Belum Lunas</span>
+                                @endif
+                            </div>
+
+                            {{-- Arrow --}}
+                            <div class="text-slate-400 transition-transform duration-300" :class="expanded ? 'rotate-180' : ''">
+                                <i class="material-icons text-xl">expand_more</i>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ACCORDION BODY --}}
+                    <div x-show="expanded" x-collapse class="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700">
+                        
+                        {{-- 1. RINCIAN ITEM (Preview 3 Item Pertama) --}}
+                        <div class="px-4 py-3 border-b border-slate-200/60 dark:border-slate-700/60">
+                            <p class="text-xs font-bold text-slate-400 uppercase mb-2">Ringkasan Item</p>
+                            <div class="space-y-2">
+                                @foreach($po->items->take(3) as $item)
+                                    <div class="flex justify-between text-sm text-slate-600 dark:text-slate-300">
+                                        <span>{{ $item->product->product_name }}</span>
+                                        <div class="flex gap-4">
+                                            <span class="text-slate-400">{{ number_format($item->quantity, 0, ',', '.') }} {{ $item->product->unit->name ?? 'Unit' }}</span>
+                                            <span class="font-medium">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</span>
+                                        </div>
+                                    </div>
+                                @endforeach
+                                @if($po->items->count() > 3)
+                                    <div class="text-xs text-slate-400 italic pt-1">+ {{ $po->items->count() - 3 }} item lainnya...</div>
+                                @endif
+                            </div>
+                        </div>
+
+                        {{-- 2. INFO KEUANGAN & BUTTONS --}}
+                        <div class="px-4 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                            
+                            {{-- Info Ringkas --}}
+                            <div class="flex flex-wrap gap-x-8 gap-y-2 text-sm w-full sm:w-auto">
+                                <div>
+                                    <p class="text-slate-400 text-xs font-bold uppercase mb-1">Sisa Hutang</p>
+                                    <p class="font-bold {{ $po->remaining_balance > 0 ? 'text-rose-600' : 'text-emerald-600' }} text-lg">
+                                        Rp {{ number_format($po->remaining_balance, 0, ',', '.') }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="text-slate-400 text-xs font-bold uppercase mb-1">Jatuh Tempo</p>
+                                    <p class="font-medium text-slate-700 dark:text-slate-200">
+                                        {{ $po->due_date ? $po->due_date->format('d M Y') : '-' }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="text-slate-400 text-xs font-bold uppercase mb-1">Dibuat Oleh</p>
+                                    <p class="font-medium text-slate-700 dark:text-slate-200">
+                                        {{ $po->requester->full_name ?? 'Admin' }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {{-- Tombol Aksi --}}
+                            <div class="flex flex-wrap gap-2 w-full sm:w-auto justify-end sm:justify-start border-t sm:border-t-0 border-slate-200 pt-4 sm:pt-0">
+                                
+                                <a href="{{ route('admin.purchase-orders.show', $po->po_id) }}" 
+                                   class="btn btn-sm btn-secondary">
+                                    <i class="material-icons text-sm">visibility</i> Detail
+                                </a>
+
+                                @if(in_array($po->status, ['draft', 'ordered']))
+                                    <a href="{{ route('admin.purchase-orders.edit', $po->po_id) }}" 
+                                       class="btn btn-sm btn-primary">
+                                        <i class="material-icons text-sm">edit</i> Edit
+                                    </a>
+                                @endif
+
+                                {{-- UPDATE: Button Terima Barang (Draft & Ordered) --}}
+                                @if(in_array($po->status, ['draft', 'ordered']))
+                                    <button type="button" onclick="confirmReceiveIndex('{{ $po->po_id }}')" class="btn btn-sm btn-success shadow-sm shadow-emerald-200">
+                                        <i class="material-icons text-sm">check_circle</i> Terima Barang
+                                    </button>
+                                    <form id="receive-form-{{ $po->po_id }}" action="{{ route('admin.purchase-orders.receive', $po->po_id) }}" method="POST" class="hidden">@csrf</form>
+                                @endif
+
+                                {{-- Button Cancel (Ordered Only) --}}
+                                @if($po->status == 'ordered')
+                                    <button type="button" onclick="confirmCancelIndex('{{ $po->po_id }}')" class="btn btn-sm btn-warning text-white">
+                                        <i class="material-icons text-sm">cancel</i> Batalkan
+                                    </button>
+                                    <form id="cancel-form-{{ $po->po_id }}" action="{{ route('admin.purchase-orders.cancel', $po->po_id) }}" method="POST" class="hidden">@csrf</form>
+                                @endif
+
+                                {{-- Button Delete (Draft or Cancelled Only) --}}
+                                @if(in_array($po->status, ['draft', 'cancelled']))
+                                    <button type="button" onclick="confirmDeleteIndex('{{ $po->po_id }}')" class="btn btn-sm btn-danger-solid" title="Hapus Permanen">
+                                        <i class="material-icons text-sm">delete</i>
+                                    </button>
+                                    <form id="delete-form-{{ $po->po_id }}" action="{{ route('admin.purchase-orders.destroy', $po->po_id) }}" method="POST" class="hidden">
+                                        @csrf @method('DELETE')
+                                    </form>
+                                @endif
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        @empty
-            <div class="py-16 text-center bg-white rounded-xl border border-dashed border-slate-300">
-                <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 mx-auto">
-                    <i class="material-icons text-slate-300 text-4xl">shopping_cart_off</i>
+            @empty
+                <div class="card p-12 flex flex-col items-center justify-center text-slate-400 border-dashed border-2 border-slate-200">
+                    <i class="material-icons text-6xl mb-4 text-slate-200">shopping_cart_off</i>
+                    <p class="text-lg font-medium text-slate-500">Belum ada pesanan pembelian.</p>
+                    <p class="text-sm">Silakan buat PO baru untuk memulai.</p>
                 </div>
-                <h3 class="text-lg font-bold text-slate-700">Belum ada pesanan</h3>
-                <p class="text-slate-500 text-sm mt-1">Buat pesanan pembelian baru untuk memulai.</p>
+            @endforelse
+        </div>
+
+        {{-- Pagination --}}
+        @if($purchaseOrders->hasPages())
+            <div class="mt-4">
+                {{ $purchaseOrders->links('vendor.pagination.admin') }}
             </div>
-        @endforelse
+        @endif
     </div>
 
-    <div class="mt-6">
-        {{ $purchaseOrders->appends(request()->query())->links() }}
-    </div>
-</div>
+    {{-- SCRIPTS KONFIRMASI --}}
+    @push('scripts')
+    <script>
+        function confirmReceiveIndex(id) {
+            confirmDialog({
+                title: 'Konfirmasi Terima Barang?',
+                text: 'Stok barang akan bertambah dan jurnal hutang akan dicatat otomatis. Pastikan barang fisik sudah diterima.',
+                icon: 'info',
+                confirmText: 'Ya, Terima Barang',
+                confirmColor: 'success'
+            }).then((result) => {
+                if (result.isConfirmed) document.getElementById('receive-form-' + id).submit();
+            });
+        }
+
+        function confirmCancelIndex(id) {
+            confirmDialog({
+                title: 'Batalkan Pesanan?',
+                text: 'Pesanan akan dibatalkan. Aksi ini tidak dapat dikembalikan.',
+                icon: 'warning',
+                confirmText: 'Ya, Batalkan',
+                confirmColor: 'warning'
+            }).then((result) => {
+                if (result.isConfirmed) document.getElementById('cancel-form-' + id).submit();
+            });
+        }
+
+        function confirmDeleteIndex(id) {
+            confirmDialog({
+                title: 'Hapus Permanen?',
+                text: 'Data PO ini akan dihapus permanen dari sistem.',
+                icon: 'warning',
+                confirmText: 'Ya, Hapus',
+                confirmColor: 'danger'
+            }).then((result) => {
+                if (result.isConfirmed) document.getElementById('delete-form-' + id).submit();
+            });
+        }
+    </script>
+    @endpush
 @endsection

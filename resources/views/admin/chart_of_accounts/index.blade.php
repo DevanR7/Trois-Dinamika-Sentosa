@@ -1,134 +1,136 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Chart of Accounts')
+@section('title', 'Bagan Akun (COA)')
 
 @section('content')
-<div class="max-w-7xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-end gap-4 mb-8">
+
+    {{-- HEADER & ACTIONS --}}
+    <div class="page-header">
         <div>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Daftar Akun (COA)</h1>
-            <p class="text-slate-500 text-sm mt-1">Kelola struktur akun buku besar perusahaan.</p>
+            <h1 class="page-title">Bagan Akun (COA)</h1>
+            <p class="page-subtitle">Daftar akun akuntansi untuk pengelompokan transaksi jurnal.</p>
         </div>
-        <a href="{{ route('admin.chart-of-accounts.create') }}" class="h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5">
-            <i class="material-icons text-[20px] group-hover:rotate-90 transition-transform">add</i> 
-            <span>Tambah Akun</span>
-        </a>
+        <div class="flex items-center gap-3">
+            <a href="{{ route('admin.chart-of-accounts.create') }}" class="btn btn-primary">
+                <i class="material-icons text-sm mr-1">post_add</i> Tambah Akun
+            </a>
+        </div>
     </div>
 
-    {{-- TABEL DATA --}}
-    <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
-        <div class="overflow-x-auto">
-            <table class="dashboard-table min-w-full">
-                <thead class="bg-slate-50 border-b border-slate-200">
+    {{-- TABLE DATA --}}
+    <div class="card">
+        <div class="table-container">
+            <table class="table-modern">
+                <thead>
                     <tr>
-                        <th class="pl-6 w-48">No. Akun</th>
+                        <th class="w-32">Kode Akun</th>
                         <th>Nama Akun</th>
-                        <th>Tipe</th>
-                        <th class="text-center">Saldo Normal</th>
+                        <th>Kategori</th>
+                        <th>Saldo Normal</th>
                         <th class="text-center">Status</th>
-                        <th class="text-center w-32 pr-6">Aksi</th>
+                        <th class="text-center w-36">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-slate-100">
-                    @forelse ($parentAccounts as $parent)
-                        
-                        {{-- Baris Akun Induk --}}
-                        <tr class="bg-slate-50/80 hover:bg-indigo-50/30 transition-colors group border-l-4 border-l-transparent hover:border-l-indigo-500">
-                            <td class="pl-6 py-4 align-top">
-                                <span class="text-sm font-bold text-indigo-700 font-mono bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                                    {{ $parent->account_number }}
+                <tbody>
+                    @forelse($parentAccounts as $parent)
+                        {{-- PARENT ROW --}}
+                        <tr class="bg-slate-50 dark:bg-slate-800/50">
+                            <td class="font-mono font-bold text-slate-700 dark:text-slate-200">
+                                {{ $parent->account_number }}
+                            </td>
+                            <td>
+                                <div class="font-bold text-slate-800 dark:text-white uppercase tracking-wide">
+                                    {{ $parent->account_name }}
+                                </div>
+                                @if($parent->description)
+                                    <div class="text-[10px] text-slate-500">{{ Str::limit($parent->description, 40) }}</div>
+                                @endif
+                            </td>
+                            <td>
+                                <span class="badge badge-primary">{{ $parent->account_type }}</span>
+                            </td>
+                            <td>
+                                <span class="text-xs font-semibold text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-600 px-2 py-0.5 rounded">
+                                    {{ $parent->normal_balance }}
                                 </span>
                             </td>
-                            <td class="py-4 align-top">
-                                <span class="text-sm font-bold text-slate-800">{{ $parent->account_name }}</span>
-                                @if($parent->description)
-                                    <p class="text-[10px] text-slate-400 mt-0.5 italic">{{ Str::limit($parent->description, 50) }}</p>
-                                @endif
-                            </td>
-                            <td class="py-4 align-top">
-                                <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">{{ $parent->account_type }}</span>
-                            </td>
-                            <td class="py-4 align-top text-center text-xs font-medium text-slate-500">
-                                {{ $parent->normal_balance }}
-                            </td>
-                            <td class="py-4 align-top text-center">
-                                @if ($parent->is_active)
-                                    <span class="status-completed px-2 py-0.5 text-[10px]">Aktif</span>
+                            <td class="text-center">
+                                @if($parent->is_active)
+                                    <span class="badge badge-success">Aktif</span>
                                 @else
-                                    <span class="status-draft px-2 py-0.5 text-[10px]">Non-Aktif</span>
+                                    <span class="badge badge-secondary">Non-Aktif</span>
                                 @endif
                             </td>
-                            <td class="pr-6 py-4 align-top text-center">
-                                <div class="flex justify-center gap-2">
-                                    <a href="{{ route('admin.chart-of-accounts.edit', $parent) }}" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-amber-600 hover:bg-amber-50 hover:border-amber-200 transition shadow-sm" title="Edit">
-                                        <i class="material-icons text-[16px]">edit</i>
+                            <td class="text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <a href="{{ route('admin.chart-of-accounts.edit', $parent->account_id) }}" 
+                                       class="w-8 h-8 rounded-full flex items-center justify-center bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 transition-colors shadow-sm dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400"
+                                       title="Edit">
+                                        <i class="material-icons text-[18px] leading-none">edit</i>
                                     </a>
-                                    <form action="{{ route('admin.chart-of-accounts.destroy', $parent) }}" method="POST" 
-                                          class="form-delete-account inline-block" 
-                                          data-account-name="{{ $parent->account_name }}" 
-                                          data-is-parent="true">
-                                        @csrf @method('DELETE')
-                                        <button type="submit" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-red-600 hover:bg-red-50 hover:border-red-200 transition shadow-sm" title="Hapus">
-                                            <i class="material-icons text-[16px]">delete</i>
-                                        </button>
-                                    </form>
                                 </div>
                             </td>
                         </tr>
-                        
-                        {{-- Baris Akun Anak --}}
-                        @foreach ($parent->children as $child)
-                        <tr class="hover:bg-slate-50 transition-colors group">
-                            <td class="pl-6 py-3 whitespace-nowrap text-sm text-slate-500 font-mono flex items-center">
-                                <span class="w-6 text-right mr-2 opacity-30">L</span> 
-                                {{ $child->account_number }}
-                            </td>
-                            <td class="py-3 text-sm text-slate-600 pl-8 border-l-2 border-l-slate-100 group-hover:border-l-indigo-300 transition-colors">
-                                {{ $child->account_name }}
-                            </td>
-                            <td class="py-3 text-xs text-slate-500">
-                                {{ $child->account_type }}
-                            </td>
-                            <td class="py-3 text-center text-xs text-slate-400">
-                                {{ $child->normal_balance }}
-                            </td>
-                            <td class="py-3 text-center">
-                                @if ($child->is_active)
-                                    <span class="text-emerald-600 text-[10px] font-bold uppercase">Aktif</span>
-                                @else
-                                    <span class="text-slate-400 text-[10px] font-bold uppercase">Non-Aktif</span>
-                                @endif
-                            </td>
-                            <td class="pr-6 py-3 text-center">
-                                <div class="flex justify-center gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
-                                    <a href="{{ route('admin.chart-of-accounts.edit', $child) }}" class="text-amber-600 hover:text-amber-800 p-1" title="Edit">
-                                        <i class="material-icons text-[16px]">edit</i>
-                                    </a>
-                                    <form action="{{ route('admin.chart-of-accounts.destroy', $child) }}" method="POST" 
-                                          class="form-delete-account inline-block" 
-                                          data-account-name="{{ $child->account_name }}" 
-                                          data-is-parent="false">
-                                        @csrf @method('DELETE')
-                                        <button type="submit" class="text-red-600 hover:text-red-800 p-1" title="Hapus">
-                                            <i class="material-icons text-[16px]">delete</i>
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                        @endforeach
 
+                        {{-- CHILDREN ROWS --}}
+                        @foreach($parent->children as $child)
+                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition">
+                                <td class="font-mono text-slate-600 dark:text-slate-400 pl-6">
+                                    <span class="text-slate-300 mr-1">↳</span> {{ $child->account_number }}
+                                </td>
+                                <td class="pl-8">
+                                    <div class="font-medium text-slate-700 dark:text-slate-300">
+                                        {{ $child->account_name }}
+                                    </div>
+                                    @if($child->description)
+                                        <div class="text-[10px] text-slate-400 italic">{{ Str::limit($child->description, 40) }}</div>
+                                    @endif
+                                </td>
+                                <td>
+                                    <span class="text-xs text-slate-500">{{ $child->account_type }}</span>
+                                </td>
+                                <td>
+                                    <span class="text-xs text-slate-500">{{ $child->normal_balance }}</span>
+                                </td>
+                                <td class="text-center">
+                                    @if($child->is_active)
+                                        <i class="material-icons text-emerald-500 text-sm" title="Aktif">check_circle</i>
+                                    @else
+                                        <i class="material-icons text-slate-300 text-sm" title="Non-Aktif">cancel</i>
+                                    @endif
+                                </td>
+                                <td class="text-center">
+                                    <div class="flex items-center justify-center gap-2">
+                                        {{-- Edit --}}
+                                        <a href="{{ route('admin.chart-of-accounts.edit', $child->account_id) }}" 
+                                           class="w-8 h-8 rounded-full flex items-center justify-center bg-indigo-50 border border-transparent text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors shadow-sm dark:bg-indigo-900/30 dark:text-indigo-400"
+                                           title="Edit">
+                                            <i class="material-icons text-[18px] leading-none">edit</i>
+                                        </a>
+
+                                        {{-- Delete (Hanya Child) --}}
+                                        <button type="button" onclick="confirmDelete('{{ $child->account_id }}', '{{ $child->account_name }}')" 
+                                                class="w-8 h-8 rounded-full flex items-center justify-center bg-rose-50 border border-transparent text-rose-600 hover:bg-rose-600 hover:text-white transition-colors shadow-sm dark:bg-rose-900/30 dark:text-rose-400"
+                                                title="Hapus">
+                                            <i class="material-icons text-[18px] leading-none">delete</i>
+                                        </button>
+                                        
+                                        <form id="delete-form-{{ $child->account_id }}" 
+                                              action="{{ route('admin.chart-of-accounts.destroy', $child->account_id) }}" 
+                                              method="POST" class="hidden">
+                                            @csrf
+                                            @method('DELETE')
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-16 text-center">
+                            <td colspan="6" class="text-center p-8">
                                 <div class="flex flex-col items-center justify-center text-slate-400">
-                                    <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                                        <i class="material-icons text-4xl opacity-30">account_tree</i>
-                                    </div>
-                                    <h3 class="text-base font-bold text-slate-700">Belum ada data akun</h3>
-                                    <p class="text-sm mt-1">Silakan buat struktur akun baru.</p>
+                                    <i class="material-icons text-5xl mb-2">account_tree</i>
+                                    <span>Belum ada akun yang terdaftar.</span>
                                 </div>
                             </td>
                         </tr>
@@ -137,58 +139,26 @@
             </table>
         </div>
     </div>
-</div>
+
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        
-        // Konfirmasi Hapus Khusus COA
-        // Kita tidak pakai global handler biasa karena butuh logic "isParent" warning
-        const deleteForms = document.querySelectorAll('.form-delete-account');
-        deleteForms.forEach(form => {
-            form.addEventListener('submit', function (event) {
-                event.preventDefault(); 
-                
-                const accountName = event.target.dataset.accountName;
-                const isParent = event.target.dataset.isParent === 'true';
-                
-                let title = 'Hapus Akun?';
-                let html = `Anda yakin ingin menghapus akun <b>"${accountName}"</b>?`;
-                let confirmBtnColor = '#ef4444'; // Red
-
-                if (isParent) {
-                    title = '⚠️ Hapus Akun Induk?';
-                    html = `Anda akan menghapus <b>AKUN INDUK "${accountName}"</b>.<br><br><span class="text-red-600 font-bold text-xs bg-red-50 p-2 rounded border border-red-200 block">PERHATIAN: Tindakan ini juga akan menghapus semua sub-akun di bawahnya!</span>`;
-                    confirmBtnColor = '#b91c1c'; // Darker Red
-                }
-                
-                Swal.fire({
-                    title: title,
-                    html: html,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: confirmBtnColor,
-                    cancelButtonColor: '#6b7280',
-                    confirmButtonText: 'Ya, Hapus!',
-                    cancelButtonText: 'Batal',
-                    customClass: {
-                        popup: 'bg-white rounded-xl border border-slate-100 shadow-2xl p-6',
-                        title: 'text-xl font-bold text-slate-800',
-                        htmlContainer: 'text-sm text-slate-600 mt-2',
-                        confirmButton: 'px-5 py-2.5 rounded-lg font-bold shadow-md',
-                        cancelButton: 'px-5 py-2.5 rounded-lg font-bold hover:bg-slate-100 text-slate-600'
-                    }
-                }).then((result) => {
-                    if (result.isConfirmed) event.target.submit();
-                });
-            });
+    function confirmDelete(id, name) {
+        window.confirmDialog({
+            title: 'Hapus Akun?',
+            text: "Akun '" + name + "' akan dihapus. Pastikan akun ini belum digunakan dalam jurnal transaksi.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('delete-form-' + id).submit();
+            }
         });
-
-        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
-        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
-    });
+    }
 </script>
 @endpush

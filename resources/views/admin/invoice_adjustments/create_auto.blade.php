@@ -2,546 +2,417 @@
 
 @section('title', 'Revisi Otomatis Invoice')
 
-@push('styles')
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <style>
-        /* Style tambahan untuk highlight selisih */
-        .diff-box { transition: all 0.3s ease; }
-        .diff-credit { @apply bg-emerald-50 border-emerald-200 text-emerald-700; }
-        .diff-debit { @apply bg-amber-50 border-amber-200 text-amber-700; }
-        .diff-neutral { @apply bg-slate-50 border-slate-200 text-slate-500; }
-    </style>
-@endpush
-
 @section('content')
-<div class="max-w-full mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <div>
-            <div class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                <a href="{{ route('admin.invoices.index') }}" class="hover:text-indigo-600 transition">Invoice</a>
-                <i class="material-icons text-[12px]">chevron_right</i>
-                <span class="text-slate-600">Koreksi Otomatis</span>
-            </div>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
-                Revisi Invoice <span class="font-mono bg-indigo-50 text-indigo-600 px-2 py-1 rounded text-lg border border-indigo-100">{{ $invoice->invoice_number }}</span>
-            </h1>
-            <p class="text-sm text-slate-500 mt-1">Ubah item di bawah ini. Sistem akan otomatis menghitung selisih untuk Nota Debet/Kredit.</p>
-        </div>
-        <a href="{{ route('admin.invoice-adjustments.create') }}" 
-           class="inline-flex items-center px-4 py-2 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all shadow-sm">
-            <i class="material-icons text-sm mr-2">arrow_back</i> Kembali
-        </a>
-    </div>
 
-    @if ($errors->any())
-        <div class="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-            <i class="material-icons text-red-500 text-xl">error</i>
-            <div>
-                <h3 class="text-sm font-bold text-red-800">Terdapat kesalahan input:</h3>
-                <ul class="mt-1 list-disc list-inside text-sm text-red-700">
-                    @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
-                </ul>
-            </div>
-        </div>
-    @endif
-
-    <form action="{{ route('admin.invoice-adjustments.store.auto', $invoice->invoice_id) }}" method="POST" id="adjustment-form">
-        @csrf
+    <div class="max-w-6xl mx-auto">
         
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <form action="{{ route('admin.invoice-adjustments.store.auto', $invoice->invoice_id) }}" method="POST" id="adjustmentForm">
+            @csrf
 
-            {{-- KOLOM KIRI: FORM EDITOR --}}
-            <div class="xl:col-span-2 space-y-6">
-                
-                {{-- 1. INFO INVOICE ASLI (READ ONLY) --}}
-                <div class="dashboard-card p-0 overflow-hidden shadow-sm">
-                    <div class="bg-slate-50/50 px-6 py-3 border-b border-slate-100 flex items-center gap-2">
-                        <i class="material-icons text-slate-400 text-sm">info</i>
-                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Info Invoice Asli</h3>
-                    </div>
-                    <div class="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                            <span class="block text-[10px] uppercase text-slate-400 font-bold">Klien</span>
-                            <span class="font-semibold text-slate-700">{{ $invoice->client->client_name }}</span>
-                        </div>
-                        <div>
-                            <span class="block text-[10px] uppercase text-slate-400 font-bold">Tanggal</span>
-                            <span class="font-semibold text-slate-700">{{ $invoice->order_date->format('d M Y') }}</span>
-                        </div>
-                        <div>
-                            <span class="block text-[10px] uppercase text-slate-400 font-bold">Sales</span>
-                            <span class="font-semibold text-slate-700">{{ $invoice->sales->full_name ?? '-' }}</span>
-                        </div>
-                        <div>
-                            <span class="block text-[10px] uppercase text-slate-400 font-bold">Total Asli</span>
-                            <span class="font-mono font-bold text-slate-800">Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span>
-                            {{-- Hidden input untuk JS comparison --}}
-                            <input type="hidden" id="original-grand-total" value="{{ $invoice->total_amount }}">
-                        </div>
-                    </div>
+            {{-- HEADER --}}
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                    <h1 class="page-title">Revisi Otomatis: {{ $invoice->invoice_number }}</h1>
+                    <p class="page-subtitle">Ubah rincian di bawah. Sistem akan menghitung selisih (adjustment) secara otomatis.</p>
                 </div>
+                <div class="flex gap-3">
+                    <a href="{{ route('admin.invoice-adjustments.create', ['invoice_id' => $invoice->invoice_id]) }}" class="btn btn-secondary">Kembali</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="material-icons text-sm mr-2">save</i> Simpan Revisi
+                    </button>
+                </div>
+            </div>
 
-                {{-- 2. EDITOR ITEM PRODUK --}}
-                <div class="dashboard-card p-0 overflow-hidden shadow-sm">
-                    <div class="px-6 py-4 border-b border-slate-100 bg-white flex justify-between items-center">
-                        <div class="flex items-center gap-2">
-                            <i class="material-icons text-indigo-600 text-[20px]">edit_note</i> 
-                            <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Revisi Item Produk</h3>
-                        </div>
-                        <div class="text-xs text-slate-400 italic">*Silakan edit qty/harga atau hapus item</div>
+            {{-- ALERT INFO --}}
+            <div class="alert alert-info bg-indigo-50 border-indigo-100 text-indigo-900 mb-6 flex items-start gap-3 p-4 rounded-xl">
+                <i class="material-icons text-indigo-500 mt-0.5">auto_fix_high</i>
+                <div class="text-sm">
+                    <strong>Cara Kerja:</strong> Edit daftar barang, biaya, atau pajak di bawah ini sesuai kondisi seharusnya. <br>
+                    Sistem akan membandingkan <strong>Grand Total Baru</strong> dengan <strong>Total Lama (Rp {{ number_format($invoice->total_amount,0,',','.') }})</strong> 
+                    dan membuat Nota Kredit/Debit atas selisihnya.
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                
+                {{-- 1. ITEM PRODUK --}}
+                <div class="card">
+                    <div class="card-header flex justify-between items-center bg-slate-50 dark:bg-slate-800">
+                        <h3 class="card-header-title">1. Item Produk (Baru)</h3>
+                        <button type="button" id="btnAddRow" class="btn btn-sm btn-secondary text-indigo-600 bg-indigo-50 border-indigo-200 hover:bg-indigo-100 transition-colors">
+                            <i class="material-icons text-sm mr-1">add</i> Tambah Barang
+                        </button>
                     </div>
                     
-                    <div class="overflow-x-auto">
-                        <table class="dashboard-table w-full">
-                            <thead class="bg-slate-50 border-b border-slate-200">
+                    <div class="overflow-x-auto w-full rounded-b-xl">
+                        <table class="table-modern w-full min-w-[900px]" id="itemsTable">
+                            <thead>
                                 <tr>
-                                    <th class="pl-6 w-5/12">Produk</th>
-                                    <th class="text-center w-2/12">Qty Baru</th>
-                                    <th class="text-right w-2/12">Harga Baru (@)</th>
-                                    <th class="text-right w-2/12">Subtotal</th>
-                                    <th class="w-10 pr-6"></th>
+                                    <th class="w-[40%] min-w-[250px]">Produk</th>
+                                    <th class="w-[20%] min-w-[150px] text-right">Harga Satuan</th>
+                                    <th class="w-[15%] min-w-[100px] text-center">Qty</th>
+                                    <th class="w-[20%] min-w-[150px] text-right">Subtotal</th>
+                                    <th class="w-[5%] min-w-[50px] text-center"></th>
                                 </tr>
                             </thead>
-                            <tbody id="product-items" class="divide-y divide-slate-100 bg-white">
-                                {{-- JS Inject Rows --}}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="p-4 bg-slate-50/50 border-t border-slate-100 text-center">
-                        <button type="button" id="add-product-btn" 
-                                class="inline-flex items-center px-4 py-2 bg-white border border-dashed border-indigo-300 text-indigo-600 text-xs font-bold rounded-lg hover:bg-indigo-50 transition shadow-sm uppercase tracking-wide">
-                            <i class="material-icons text-base mr-1">add</i> Tambah Produk
-                        </button>
-                    </div>
-                </div>
-                
-                {{-- 3. REVISI BIAYA TAMBAHAN (Opsional) --}}
-                <div class="dashboard-card p-0 overflow-hidden shadow-sm">
-                    <div class="px-6 py-3 border-b border-slate-100 bg-white flex justify-between items-center">
-                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-2">
-                            <i class="material-icons text-green-600 text-sm">attach_money</i> Revisi Biaya Tambahan
-                        </h3>
-                        <button type="button" id="add-cost-btn" class="text-xs font-bold text-green-600 hover:text-green-700 underline">
-                            + Tambah
-                        </button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="dashboard-table w-full">
-                             <tbody id="additional-cost-items" class="divide-y divide-slate-100 bg-white">
-                                {{-- JS Inject Cost Rows --}}
+                            <tbody id="itemsBody">
+                                {{-- Rows populated via JS --}}
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                {{-- 4. ALASAN KOREKSI --}}
-                <div class="dashboard-card p-6">
-                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Alasan Koreksi <span class="text-red-500">*</span></label>
-                    <textarea name="notes" id="notes" rows="3" class="form-textarea w-full bg-white border-slate-200 focus:border-indigo-500 focus:ring-indigo-200" placeholder="Jelaskan kenapa invoice ini direvisi (Wajib diisi untuk audit)..." required>{{ old('notes') }}</textarea>
-                </div>
-
-            </div>
-
-            {{-- KOLOM KANAN: KALKULASI SELISIH --}}
-            <div class="xl:col-span-1">
-                <div class="dashboard-card p-0 sticky top-6 border-t-4 border-indigo-500">
-                    <div class="p-6 space-y-6">
-                        <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 pb-2 mb-2">Kalkulasi Baru</h4>
-
-                        {{-- Form Input Diskon & Pajak --}}
-                        <div class="space-y-4">
-                            <div class="flex items-center justify-between gap-4">
-                                <label for="discount_percentage" class="text-xs font-bold text-slate-500 uppercase">Diskon (%)</label>
-                                <input type="number" name="discount_percentage" id="discount_percentage" value="{{ old('discount_percentage', $invoice->discount_percentage) }}" class="w-20 text-right text-xs border-slate-300 rounded form-input h-8" min="0" max="100">
-                            </div>
-                            
-                            <div>
-                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Pajak</label>
-                                <div id="tax-options" class="space-y-1 bg-slate-50 p-2 rounded border border-slate-100">
-                                    @php 
-                                        $appliedTaxIds = $invoice->taxes->pluck('id')->toArray();
-                                        $allTaxes = \App\Models\Tax::where('is_active', true)->get();
-                                    @endphp
-                                    @foreach ($allTaxes as $tax)
-                                        <label class="flex items-center space-x-2 cursor-pointer">
-                                            <input type="checkbox" name="taxes[]" value="{{ $tax->id }}" data-rate="{{ $tax->rate }}" class="tax-checkbox rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5" @checked(in_array($tax->id, old('taxes', $appliedTaxIds)))>
-                                            <span class="text-xs text-slate-600">{{ $tax->name }} ({{ $tax->rate }}%)</span>
-                                        </label>
-                                    @endforeach
-                                </div>
-                            </div>
+                {{-- 2. BIAYA TAMBAHAN --}}
+                <div class="card">
+                    <div class="card-header flex justify-between items-center bg-slate-50 dark:bg-slate-800">
+                        <h3 class="card-header-title">2. Biaya Tambahan</h3>
+                        <button type="button" id="btnAddCost" class="btn btn-sm btn-secondary text-emerald-600 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 transition-colors">
+                            <i class="material-icons text-sm mr-1">add</i> Tambah Biaya
+                        </button>
+                    </div>
+                    <div class="card-body bg-slate-50/50 dark:bg-slate-800/20">
+                        <div id="additionalCostsContainer" class="space-y-3">
+                            {{-- Cost rows added via JS --}}
                         </div>
-
-                        {{-- Ringkasan Angka Baru --}}
-                        <div class="bg-slate-50 p-4 rounded-lg space-y-2 border border-slate-100">
-                            <div class="flex justify-between text-xs text-slate-500">
-                                <span>Subtotal Baru</span>
-                                <span class="font-bold text-slate-700" id="subtotal-display">Rp 0</span>
-                            </div>
-                            <div class="flex justify-between text-xs text-slate-500">
-                                <span>Diskon & Pajak</span>
-                                <span class="font-bold text-slate-700" id="tax-disc-display">Rp 0</span>
-                            </div>
-                            <div class="flex justify-between text-xs text-slate-500">
-                                <span>Biaya Tambahan</span>
-                                <span class="font-bold text-slate-700" id="total-additional-display">Rp 0</span>
-                            </div>
-                            <div class="border-t border-slate-200 my-2 pt-2 flex justify-between items-center">
-                                <span class="text-xs font-bold text-slate-800 uppercase">Total Tagihan Baru</span>
-                                <span class="text-lg font-bold text-indigo-600 font-mono" id="grand-total">Rp 0</span>
-                            </div>
+                        <div id="noCostPlaceholder" class="text-center text-sm text-slate-400 py-2 italic" style="display: none;">
+                            Belum ada biaya tambahan.
                         </div>
-
-                        {{-- BOX SELISIH (THE CORE FEATURE) --}}
-                        <div id="diff-container" class="diff-box p-5 rounded-xl border-2 border-dashed text-center">
-                            <span class="block text-xs font-bold uppercase tracking-widest opacity-70 mb-1">Estimasi Penyesuaian</span>
-                            <h3 class="text-2xl font-bold font-mono my-1" id="diff-amount">Rp 0</h3>
-                            <span class="inline-block px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide mt-1" id="diff-label">Tidak Ada Perubahan</span>
-                            
-                            <input type="hidden" name="adjustment_type" id="adjustment_type">
-                            <input type="hidden" name="adjustment_amount" id="adjustment_amount_input">
-                        </div>
-
-                        {{-- Opsi Kelebihan Bayar (Jika Nota Kredit) --}}
-                        <div id="overpayment-options" class="hidden bg-amber-50 rounded-lg p-3 border border-amber-100">
-                            <label class="block text-[10px] font-bold text-amber-700 uppercase mb-2">Aksi Kelebihan Bayar:</label>
-                            <div class="space-y-1">
-                                <div class="flex items-center">
-                                    <input type="radio" name="overpayment_action" id="act_deposit" value="deposit" checked class="h-3.5 w-3.5 text-amber-600 border-amber-300 focus:ring-amber-500">
-                                    <label for="act_deposit" class="ml-2 text-xs text-amber-800 font-medium">Simpan ke Deposit Klien</label>
-                                </div>
-                                <div class="flex items-center">
-                                    <input type="radio" name="overpayment_action" id="act_refund" value="refund" class="h-3.5 w-3.5 text-amber-600 border-amber-300 focus:ring-amber-500">
-                                    <label for="act_refund" class="ml-2 text-xs text-amber-800 font-medium">Refund Manual Nanti</label>
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Action Buttons --}}
-                        <div class="grid grid-cols-1 gap-3 pt-2">
-                            <button type="submit" id="submit-btn" class="w-full py-3 px-4 rounded-lg shadow-md text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex justify-center items-center transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                                <i class="material-icons text-sm mr-2">save</i> Simpan Koreksi
-                            </button>
-                            <a href="{{ route('admin.invoices.show', $invoice->invoice_id) }}" class="w-full py-3 px-4 border border-slate-300 rounded-lg text-sm font-bold text-slate-600 bg-white hover:bg-slate-50 focus:outline-none text-center transition-all">
-                                Batal
-                            </a>
-                        </div>
-
                     </div>
                 </div>
-            </div>
 
-        </div>
-    </form>
-</div>
+                {{-- 3. SPLIT LAYOUT: ALASAN & RINGKASAN --}}
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    {{-- KIRI: Alasan & Opsi Overpayment --}}
+                    <div class="space-y-6">
+                        <div class="card h-full flex flex-col">
+                            <div class="card-header">
+                                <h3 class="card-header-title">Alasan Revisi</h3>
+                            </div>
+                            <div class="card-body flex flex-col gap-4 flex-1">
+                                
+                                {{-- Textarea mengisi sisa ruang --}}
+                                <div class="flex-1">
+                                    <textarea name="notes" class="form-textarea w-full h-full min-h-[120px] resize-none" 
+                                              placeholder="Wajib diisi: Contoh: Salah input jumlah barang, perubahan harga dari pusat..." required></textarea>
+                                </div>
+                                
+                                {{-- PERBAIKAN TAMPILAN CREDIT NOTE --}}
+                                <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                                    <div class="flex gap-3">
+                                        <div class="shrink-0">
+                                            <i class="material-icons text-amber-600">info</i>
+                                        </div>
+                                        <div class="w-full">
+                                            <p class="text-xs font-bold text-amber-800 mb-2 uppercase tracking-wide">
+                                                Jika Total Baru Lebih Kecil (Credit Note):
+                                            </p>
+                                            
+                                            <div class="space-y-2">
+                                                <label class="flex items-center p-2 rounded-lg border border-amber-200 bg-white cursor-pointer hover:bg-amber-100/50 transition-colors">
+                                                    <input type="radio" name="overpayment_action" value="deposit" 
+                                                           class="form-radio text-amber-600 w-4 h-4 focus:ring-amber-500" checked>
+                                                    <span class="ml-3 text-sm text-slate-700 font-medium">
+                                                        Simpan selisih ke <b>Deposit Pelanggan</b>
+                                                    </span>
+                                                </label>
+                                                
+                                                <label class="flex items-center p-2 rounded-lg border border-transparent hover:bg-amber-100/50 cursor-pointer transition-colors">
+                                                    <input type="radio" name="overpayment_action" value="refund" 
+                                                           class="form-radio text-amber-600 w-4 h-4 focus:ring-amber-500">
+                                                    <span class="ml-3 text-sm text-slate-600">
+                                                        Akan di-Refund Manual (Tidak masuk deposit)
+                                                    </span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {{-- END PERBAIKAN --}}
 
-{{-- TEMPLATE ROW PRODUK --}}
-<template id="product-row-template">
-    <tr class="hover:bg-slate-50 transition-colors border-b border-gray-50 last:border-0 group">
-        <td class="pl-6 py-2 align-top">
-            <select class="product-select text-sm" style="width: 100%;" required>
-                <option value="" data-price="0" disabled selected>-- Pilih Produk --</option>
-                @foreach ($products as $product)
-                    <option value="{{ $product->product_id }}" data-price="{{ $product->selling_price ?? 0 }}">
-                        {{ $product->product_name }}
-                    </option>
-                @endforeach
-            </select>
-        </td>
-        <td class="py-2 align-top">
-            <input type="number" class="form-input quantity text-center w-full font-bold text-gray-700 h-9" value="1" min="0.01" step="0.01" required>
-        </td>
-        {{-- KOLOM HARGA (DIREVISI) --}}
-        <td class="py-2 align-top">
-            <div class="relative flex items-center">
-                {{-- Label Rp Absolut (Z-index tinggi agar di atas input) --}}
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 z-10">
-                    <span class="text-slate-500 text-xs font-bold">Rp</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- KANAN: Ringkasan & Kalkulasi --}}
+                    <div class="card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm h-full">
+                        <div class="card-header bg-slate-50 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-700">
+                            <h3 class="card-header-title text-slate-800 dark:text-white">Ringkasan (Kalkulasi Baru)</h3>
+                        </div>
+                        <div class="card-body space-y-4">
+                            
+                            {{-- Subtotal --}}
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-slate-600 dark:text-slate-400">Subtotal Item</span>
+                                <span class="font-bold font-mono text-slate-800 dark:text-slate-200" id="subtotalDisplay">Rp 0</span>
+                            </div>
+
+                            {{-- Total Biaya --}}
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-slate-600 dark:text-slate-400">Total Biaya Tambahan</span>
+                                <span class="font-bold font-mono text-slate-800 dark:text-slate-200" id="totalCostDisplay">Rp 0</span>
+                            </div>
+
+                            {{-- Diskon --}}
+                            <div class="flex justify-between items-center text-sm">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-slate-600 dark:text-slate-400">Diskon Global</span>
+                                    <div class="input-group w-20">
+                                        <input type="number" name="discount_percentage" id="discountInput" 
+                                               class="form-input text-right py-1 px-2 text-xs h-7" 
+                                               min="0" max="100" step="0.01" value="{{ old('discount_percentage', $invoice->discount_percentage) }}">
+                                        <span class="input-group-text px-1 text-[10px]">%</span>
+                                    </div>
+                                </div>
+                                <span class="font-bold font-mono text-rose-500" id="discountAmountDisplay">- Rp 0</span>
+                            </div>
+
+                            {{-- Pajak --}}
+                            <div class="flex justify-between items-start text-sm pt-1">
+                                <span class="text-slate-600 dark:text-slate-400 mt-2">Pajak (PPN/PPh)</span>
+                                <div class="w-1/2 text-right">
+                                    <select name="taxes[]" id="taxInput" class="tom-select" multiple placeholder="Pilih Pajak...">
+                                        @php $selectedTaxes = $invoice->taxes->pluck('id')->toArray(); @endphp
+                                        @foreach($taxes as $tax)
+                                            <option value="{{ $tax->id }}" data-rate="{{ $tax->rate }}" {{ in_array($tax->id, $selectedTaxes) ? 'selected' : '' }}>
+                                                {{ $tax->name }} ({{ $tax->rate }}%)
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <div class="text-xs text-emerald-600 font-mono mt-1" id="taxAmountDisplay">+ Rp 0</div>
+                                </div>
+                            </div>
+
+                            <hr class="border-slate-200 dark:border-slate-700 my-2">
+
+                            {{-- Grand Total Baru --}}
+                            <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg">
+                                <span class="text-sm font-extrabold text-slate-800 dark:text-white uppercase">Grand Total Baru</span>
+                                <span class="text-xl font-extrabold text-indigo-600 dark:text-indigo-400" id="grandTotalDisplay">Rp 0</span>
+                            </div>
+
+                            {{-- Selisih (Diff) --}}
+                            <div class="flex justify-between items-center p-3 rounded-lg border border-dashed border-slate-300 dark:border-slate-600">
+                                <span class="text-xs font-bold text-slate-500 uppercase">Selisih (Adjustment)</span>
+                                <span class="text-base font-mono font-bold" id="diffDisplay">Rp 0</span>
+                            </div>
+                            <div class="text-[10px] text-center text-slate-400">
+                                Total Lama: Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}
+                            </div>
+
+                        </div>
+                    </div>
                 </div>
-                {{-- Input Tanpa class 'input-currency' untuk menghindari konflik --}}
-                <input type="text" class="price-display form-input block w-full pl-9 pr-2 text-right text-sm font-medium h-9 focus:ring-1 focus:ring-indigo-500" required placeholder="0">
-                <input type="hidden" class="price-raw" value="0">
-            </div>
-        </td>
-        <td class="py-2 align-top text-right font-bold text-gray-900 text-xs align-middle font-mono">
-            <span class="subtotal">Rp 0</span>
-        </td>
-        <td class="pr-6 py-2 align-top text-center align-middle">
-            <button type="button" class="remove-product-btn text-slate-400 hover:text-red-500 hover:bg-red-50 rounded p-1 transition">
-                <i class="material-icons text-[18px]">close</i>
-            </button>
-        </td>
-    </tr>
-</template>
 
-{{-- TEMPLATE ROW BIAYA TAMBAHAN --}}
-<template id="additional-cost-template">
-    <tr class="hover:bg-slate-50 transition-colors border-b border-gray-50 last:border-0">
-        <td class="pl-6 py-2">
-            <input type="text" class="cost-desc form-input w-full text-xs" placeholder="Keterangan Biaya (Mis: Packing)" required>
-        </td>
-        {{-- KOLOM HARGA BIAYA (DIREVISI) --}}
-        <td class="py-2 w-40">
-            <div class="relative flex items-center">
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 z-10">
-                    <span class="text-slate-500 text-[10px] font-bold">Rp</span>
-                </div>
-                <input type="text" class="cost-display form-input w-full pl-8 text-xs text-right" placeholder="0" required>
-                <input type="hidden" class="cost-raw" value="0">
             </div>
-        </td>
-        <td class="pr-6 py-2 text-center w-10">
-            <button type="button" class="remove-cost-btn text-slate-400 hover:text-red-500 transition p-1 rounded-full hover:bg-red-50">
-                <i class="material-icons text-[18px]">close</i>
-            </button>
-        </td>
-    </tr>
-</template>
+        </form>
+    </div>
+
 @endsection
 
-@push("scripts")
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script> 
-
+@push('scripts')
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    // --- 1. DATA & VARIABEL ---
-    const originalGrandTotal = parseFloat(document.getElementById('original-grand-total').value) || 0;
-    
-    const existingItems = @json($invoice->items);
-    const existingCosts = @json($invoice->additionalCosts);
+    document.addEventListener('DOMContentLoaded', function() {
+        const itemsBody = document.getElementById('itemsBody');
+        const costsContainer = document.getElementById('additionalCostsContainer');
+        const noCostPlaceholder = document.getElementById('noCostPlaceholder');
+        const grandTotalDisplay = document.getElementById('grandTotalDisplay');
+        const diffDisplay = document.getElementById('diffDisplay');
+        
+        const productsData = @json($products);
+        const existingItems = @json($invoice->items);
+        const existingCosts = @json($invoice->additionalCosts);
+        const oldTotal = {{ $invoice->total_amount }};
+        
+        let rowCount = 0;
+        let costCount = 0;
 
-    const productItemsContainer = document.getElementById('product-items');
-    const additionalCostItemsContainer = document.getElementById('additional-cost-items');
-    const productRowTemplate = document.getElementById('product-row-template');
-    const costRowTemplate = document.getElementById('additional-cost-template');
-    const taxOptionsContainer = document.getElementById('tax-options');
-    const discountInput = document.getElementById('discount_percentage');
-    
-    // Elemen Kalkulasi Selisih
-    const diffContainer = document.getElementById('diff-container');
-    const diffAmountEl = document.getElementById('diff-amount');
-    const diffLabelEl = document.getElementById('diff-label');
-    const overpaymentOptions = document.getElementById('overpayment-options');
-    const submitBtn = document.getElementById('submit-btn');
-
-    let productIndex = 0;
-    let costIndex = 0;
-
-    // --- 2. HELPER FUNCTIONS ---
-    function formatRupiah(number) {
-        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
-    }
-
-    function initAutoNumeric(element, hiddenElement) {
-        // Cek apakah elemen sudah punya instance autonumeric
-        if(AutoNumeric.getAutoNumericElement(element) === null) {
-            const an = new AutoNumeric(element, { 
-                decimalCharacter: ',', 
-                digitGroupSeparator: '.', 
-                decimalPlaces: 0, 
-                minimumValue: '0',
-                currencySymbol: '', // Pastikan kosong agar tidak double dengan label Rp
-                unformatOnSubmit: true 
-            });
+        function addRow(data = null) {
+            rowCount++;
+            const selectedProductId = data ? data.product_id : '';
+            const qtyValue = data ? parseFloat(data.quantity) : 1;
+            const priceValue = data ? parseFloat(data.price_per_unit) : 0;
             
-            element.addEventListener('autoNumeric:rawValueModified', e => {
-                hiddenElement.value = e.detail.newRawValue;
-                calculateTotals();
+            let optionsHtml = '<option value="">Pilih Produk...</option>';
+            productsData.forEach(prod => {
+                const selected = prod.product_id == selectedProductId ? 'selected' : '';
+                optionsHtml += `<option value="${prod.product_id}" data-price="${prod.selling_price}" ${selected}>${prod.product_name}</option>`;
             });
-            return an;
-        }
-        return null;
-    }
 
-    // --- 3. KALKULASI UTAMA (CORE LOGIC) ---
-    function calculateTotals() {
-        let subtotalProducts = 0;
-        
-        // Hitung Subtotal Produk
-        productItemsContainer.querySelectorAll('tr').forEach((row) => {
-            const price = parseFloat(row.querySelector('.price-raw').value) || 0;
-            const quantity = parseFloat(row.querySelector('.quantity').value) || 0;
-            const subtotal = price * quantity;
-            row.querySelector('.subtotal').textContent = formatRupiah(subtotal);
-            subtotalProducts += subtotal;
-        });
-
-        // Hitung Biaya Tambahan
-        let totalAdditionalCosts = 0;
-        additionalCostItemsContainer.querySelectorAll('tr').forEach((row) => {
-            const amount = parseFloat(row.querySelector('.cost-raw').value) || 0;
-            totalAdditionalCosts += amount;
-        });
-
-        // Diskon & Pajak
-        const discountRate = parseFloat(discountInput.value) || 0;
-        const discountAmount = subtotalProducts * (discountRate / 100);
-        const subtotalAfterDiscount = subtotalProducts - discountAmount;
-
-        let totalTaxAmount = 0;
-        taxOptionsContainer.querySelectorAll('.tax-checkbox:checked').forEach((checkbox) => {
-            const rate = parseFloat(checkbox.dataset.rate) || 0;
-            totalTaxAmount += subtotalAfterDiscount * (rate / 100);
-        });
-        
-        // Total Baru
-        const newGrandTotal = subtotalAfterDiscount + totalTaxAmount + totalAdditionalCosts;
-
-        // Update Display Ringkasan
-        document.getElementById('subtotal-display').textContent = formatRupiah(subtotalProducts);
-        document.getElementById('tax-disc-display').textContent = formatRupiah(totalTaxAmount - discountAmount);
-        document.getElementById('total-additional-display').textContent = formatRupiah(totalAdditionalCosts);
-        document.getElementById('grand-total').textContent = formatRupiah(newGrandTotal);
-
-        // --- 4. HITUNG SELISIH (ADJUSTMENT) ---
-        const diff = originalGrandTotal - newGrandTotal;
-        const absDiff = Math.abs(diff);
-
-        // Reset Style
-        diffContainer.className = "diff-box p-5 rounded-xl border-2 border-dashed text-center mt-4";
-        overpaymentOptions.classList.add('hidden');
-        submitBtn.disabled = false;
-
-        if (absDiff <= 10) { // Toleransi floating point kecil
-            // Tidak ada perubahan
-            diffContainer.classList.add('diff-neutral');
-            diffAmountEl.textContent = "Rp 0";
-            diffLabelEl.textContent = "TIDAK ADA PERUBAHAN";
-            diffLabelEl.className = "inline-block px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide mt-1 bg-slate-200 text-slate-600";
-            submitBtn.disabled = true; // Disable tombol simpan jika tidak ada perubahan
-        } 
-        else if (diff > 0) {
-            // NOTA KREDIT (Total Baru < Total Lama -> Kita hutang ke klien)
-            diffContainer.classList.add('diff-credit');
-            diffAmountEl.textContent = formatRupiah(absDiff);
-            diffLabelEl.textContent = "NOTA KREDIT (POTONGAN)";
-            diffLabelEl.className = "inline-block px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide mt-1 bg-emerald-200 text-emerald-800";
+            const tr = document.createElement('tr');
+            tr.className = 'border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition';
+            tr.innerHTML = `
+                <td class="p-3 align-top">
+                    <select name="products[${rowCount}][product_id]" class="tom-select-dynamic product-select" required>
+                        ${optionsHtml}
+                    </select>
+                </td>
+                <td class="p-3 align-top text-right">
+                    <div class="input-group">
+                        <span class="input-group-text px-2 text-xs">Rp</span>
+                        <input type="text" name="products[${rowCount}][price_per_unit]" 
+                               class="form-input text-right autonumeric price-input" value="${priceValue}" required>
+                    </div>
+                </td>
+                <td class="p-3 align-top">
+                    <input type="number" step="0.01" min="0.01" name="products[${rowCount}][quantity]" 
+                           class="form-input text-center qty-input" value="${qtyValue}" required>
+                </td>
+                <td class="p-3 align-top text-right">
+                    <div class="text-sm font-bold text-slate-800 dark:text-white pt-2 subtotal-display">Rp 0</div>
+                </td>
+                <td class="p-3 align-top text-center">
+                    <button type="button" class="text-slate-400 hover:text-rose-500 transition-colors btn-remove-row pt-1">
+                        <i class="material-icons text-lg">close</i>
+                    </button>
+                </td>
+            `;
             
-            // Tampilkan opsi kelebihan bayar
-            overpaymentOptions.classList.remove('hidden');
-        } 
-        else {
-            // NOTA DEBET (Total Baru > Total Lama -> Klien kurang bayar)
-            diffContainer.classList.add('diff-debit');
-            diffAmountEl.textContent = formatRupiah(absDiff);
-            diffLabelEl.textContent = "NOTA DEBET (TAGIHAN TAMBAHAN)";
-            diffLabelEl.className = "inline-block px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide mt-1 bg-amber-200 text-amber-800";
+            itemsBody.appendChild(tr);
+
+            new TomSelect(tr.querySelector('.tom-select-dynamic'), {
+                sortField: { field: "text", direction: "asc" },
+                plugins: ['clear_button'],
+                dropdownParent: 'body',
+                onChange: function(value) {
+                    if(!data) updateRowPrice(tr, value);
+                }
+            });
+
+            new AutoNumeric(tr.querySelector('.price-input'), window.defaultAutoNumericOptions);
+            
+            tr.querySelector('.price-input').addEventListener('keyup', () => calculateRow(tr));
+            tr.querySelector('.price-input').addEventListener('autoNumeric:rawValueModified', () => calculateRow(tr));
+            calculateRow(tr);
         }
-    }
 
-    // --- 5. FUNGSI MANAJEMEN BARIS ---
+        function addCostRow(data = null) {
+            costCount++;
+            noCostPlaceholder.style.display = 'none';
 
-    function addProductRow(item = null) {
-        const newRow = productRowTemplate.content.cloneNode(true).querySelector('tr');
-        const productSelect = newRow.querySelector('.product-select');
-        const quantityInput = newRow.querySelector('.quantity');
-        const priceDisplayInput = newRow.querySelector('.price-display');
-        const priceRawInput = newRow.querySelector('.price-raw');
-        
-        // Set Name Attributes
-        productSelect.name = `products[${productIndex}][product_id]`;
-        quantityInput.name = `products[${productIndex}][quantity]`;
-        priceRawInput.name = `products[${productIndex}][price_per_unit]`;
-        
-        productItemsContainer.appendChild(newRow);
+            const desc = data ? data.description : '';
+            const amount = data ? data.amount : 0;
 
-        // Init JS Plugins untuk baris ini
-        const select2 = $(productSelect).select2({ 
-            placeholder: '-- Pilih Produk --', 
-            width: '100%', 
-            dropdownCssClass: 'select2-dropdown-clean' 
-        });
-        const anPrice = initAutoNumeric(priceDisplayInput, priceRawInput);
+            const div = document.createElement('div');
+            div.className = 'flex items-center gap-2 cost-row bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-200 dark:border-slate-700';
+            div.innerHTML = `
+                <div class="flex-1">
+                    <input type="text" name="additional_costs[${costCount}][description]" class="form-input text-xs w-full" value="${desc}" placeholder="Keterangan (Cth: Ongkir)" required>
+                </div>
+                <div class="input-group w-40">
+                    <span class="input-group-text px-2 text-xs">Rp</span>
+                    <input type="text" name="additional_costs[${costCount}][amount]" class="form-input text-right text-xs autonumeric cost-input" value="${amount}" placeholder="0" required>
+                </div>
+                <button type="button" class="text-slate-400 hover:text-rose-500 btn-remove-cost">
+                    <i class="material-icons text-sm">close</i>
+                </button>
+            `;
+            costsContainer.appendChild(div);
+            
+            new AutoNumeric(div.querySelector('.cost-input'), window.defaultAutoNumericOptions);
+            div.querySelector('.cost-input').addEventListener('autoNumeric:rawValueModified', calculateTotals);
+        }
 
-        // Event Listeners Row
-        select2.on('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            const basePrice = parseFloat(selectedOption.dataset.price) || 0;
-            // Auto fill price only if raw is 0 and we are NOT loading existing item data
-            if(priceRawInput.value == 0 && !item) { 
-                anPrice.set(basePrice);
-                priceRawInput.value = basePrice;
+        function updateRowPrice(row, productId) {
+            const product = productsData.find(p => p.product_id == productId);
+            const priceInput = row.querySelector('.price-input');
+            if (product) {
+                AutoNumeric.getAutoNumericElement(priceInput).set(product.selling_price);
+            } else {
+                AutoNumeric.getAutoNumericElement(priceInput).set(0);
             }
-            calculateTotals();
-        });
+            calculateRow(row);
+        }
 
-        quantityInput.addEventListener('input', calculateTotals);
-        
-        newRow.querySelector('.remove-product-btn').addEventListener('click', () => {
-            select2.select2('destroy');
-            newRow.remove();
+        function calculateRow(row) {
+            const price = parseFloat(AutoNumeric.getAutoNumericElement(row.querySelector('.price-input')).getNumericString() || 0);
+            const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+            const subtotal = price * qty;
+            row.querySelector('.subtotal-display').innerText = formatRupiah(subtotal);
             calculateTotals();
-        });
+        }
+
+        function calculateTotals() {
+            let subtotal = 0;
+            document.querySelectorAll('#itemsBody tr').forEach(row => {
+                const price = parseFloat(AutoNumeric.getAutoNumericElement(row.querySelector('.price-input')).getNumericString() || 0);
+                const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+                subtotal += price * qty;
+            });
+
+            let totalCosts = 0;
+            document.querySelectorAll('.cost-input').forEach(input => {
+                totalCosts += parseFloat(AutoNumeric.getAutoNumericElement(input).getNumericString() || 0);
+            });
+
+            const discPercent = parseFloat(document.getElementById('discountInput').value) || 0;
+            const discAmount = subtotal * (discPercent / 100);
+            const afterDisc = subtotal - discAmount;
+
+            let totalTax = 0;
+            const taxSelect = document.getElementById('taxInput');
+            if(taxSelect.tomselect) {
+                const selectedIds = taxSelect.tomselect.getValue();
+                selectedIds.forEach(id => {
+                     const option = taxSelect.querySelector(`option[value="${id}"]`);
+                     if(option) {
+                         const rate = parseFloat(option.dataset.rate);
+                         totalTax += afterDisc * (rate / 100);
+                     }
+                });
+            }
+
+            const grandTotal = afterDisc + totalTax + totalCosts;
+            const diff = grandTotal - oldTotal;
+
+            document.getElementById('subtotalDisplay').innerText = formatRupiah(subtotal);
+            document.getElementById('totalCostDisplay').innerText = formatRupiah(totalCosts);
+            document.getElementById('discountAmountDisplay').innerText = '- ' + formatRupiah(discAmount);
+            document.getElementById('taxAmountDisplay').innerText = '+ ' + formatRupiah(totalTax);
+            document.getElementById('grandTotalDisplay').innerText = formatRupiah(grandTotal);
+
+            if (diff > 0) {
+                diffDisplay.innerHTML = `<span class="text-rose-600">+ ${formatRupiah(Math.abs(diff))} (Kurang Bayar)</span>`;
+            } else if (diff < 0) {
+                diffDisplay.innerHTML = `<span class="text-emerald-600">- ${formatRupiah(Math.abs(diff))} (Lebih Bayar)</span>`;
+            } else {
+                diffDisplay.innerHTML = `<span class="text-slate-400">0 (Tidak ada perubahan)</span>`;
+            }
+        }
+
+        function formatRupiah(amount) {
+            return 'Rp ' + amount.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        }
+
+        itemsBody.addEventListener('click', function(e) { if (e.target.closest('.btn-remove-row')) { e.target.closest('tr').remove(); calculateTotals(); } });
+        itemsBody.addEventListener('input', function(e) { if (e.target.classList.contains('qty-input')) { calculateRow(e.target.closest('tr')); } });
         
-        // Pre-fill Data (Jika mode edit/load existing)
-        if (item) {
-            $(productSelect).val(item.product_id).trigger('change.select2');
-            
-            setTimeout(() => {
-                quantityInput.value = item.quantity;
-                anPrice.set(item.price_per_unit); 
-                priceRawInput.value = item.price_per_unit;
+        costsContainer.addEventListener('click', function(e) {
+             if (e.target.closest('.btn-remove-cost')) {
+                e.target.closest('.cost-row').remove();
                 calculateTotals();
-            }, 50);
-        }
-        
-        productIndex++;
-    }
-
-    function addCostRow(cost = null) {
-        const newRow = costRowTemplate.content.cloneNode(true).querySelector('tr');
-        const descInput = newRow.querySelector('.cost-desc');
-        const costDisplayInput = newRow.querySelector('.cost-display');
-        const costRawInput = newRow.querySelector('.cost-raw');
-
-        descInput.name = `additional_costs[${costIndex}][description]`;
-        costRawInput.name = `additional_costs[${costIndex}][amount]`;
-
-        additionalCostItemsContainer.appendChild(newRow);
-        const anCost = initAutoNumeric(costDisplayInput, costRawInput);
-
-        newRow.querySelector('.remove-cost-btn').addEventListener('click', () => {
-            newRow.remove();
-            calculateTotals();
+                if(costsContainer.children.length === 0) noCostPlaceholder.style.display = 'block';
+            }
         });
-        
-        costDisplayInput.addEventListener('autoNumeric:rawValueModified', calculateTotals);
 
-        if (cost) {
-            descInput.value = cost.description;
-            anCost.set(cost.amount);
-            costRawInput.value = cost.amount;
+        document.getElementById('btnAddRow').addEventListener('click', () => addRow());
+        document.getElementById('btnAddCost').addEventListener('click', () => addCostRow());
+        document.getElementById('discountInput').addEventListener('input', calculateTotals);
+        document.getElementById('taxInput').addEventListener('change', calculateTotals);
+
+        if (existingItems && existingItems.length > 0) {
+            existingItems.forEach(item => addRow(item));
+        } else {
+            addRow();
         }
-
-        costIndex++;
-    }
-
-    // --- 6. INITIALIZATION & EVENTS GLOBAL ---
-    
-    document.getElementById('add-product-btn').addEventListener('click', () => addProductRow());
-    document.getElementById('add-cost-btn').addEventListener('click', () => addCostRow());
-    
-    taxOptionsContainer.addEventListener('change', calculateTotals);
-    discountInput.addEventListener('input', calculateTotals);
-
-    // Load Existing Items from Invoice
-    if (existingItems && existingItems.length > 0) {
-        existingItems.forEach(item => addProductRow(item));
-    } else {
-        addProductRow(); 
-    }
-
-    // Load Existing Costs from Invoice
-    if (existingCosts && existingCosts.length > 0) {
-        existingCosts.forEach(cost => addCostRow(cost));
-    }
-    
-    // Initial Calculation
-    setTimeout(calculateTotals, 500);
-});
+        
+        if (existingCosts && existingCosts.length > 0) {
+            existingCosts.forEach(cost => addCostRow(cost));
+        } else {
+            noCostPlaceholder.style.display = 'block';
+        }
+        
+        setTimeout(calculateTotals, 500); 
+    });
 </script>
 @endpush

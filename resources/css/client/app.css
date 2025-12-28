@@ -1,53 +1,38 @@
-/* 1. IMPORT DULU (WAJIB DI ATAS) */
+/* resources/css/client/app.css */
+
+/* PERBAIKAN: Cukup gunakan "../" karena folder components sejajar dengan folder client */
 @import '../components/utilities.css';
 @import '../components/sidebar.css';
 @import '../components/forms.css';
+@import '../components/layout.css'; 
 @import '../components/alerts.css';
+@import '../components/tomselect-custom.css';
 
-/* 2. TAILWIND */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 3. CONFIG TEMA (EMERALD) */
-@layer base {
-    :root {
-        /* Emerald-500 RGB */
-        --color-primary: 16 185 129; 
+@layer components {
+    /* Custom style client jika ada */
+    .table-container {
+        @apply w-full overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700;
     }
-
-    #nprogress .bar {
-        @apply text-emerald-500;
+    .table-modern {
+        @apply w-full text-sm text-left text-slate-600 dark:text-slate-400;
     }
-
-    .nav_image {
-        @apply bg-emerald-600 !important;
+    .table-modern thead {
+        @apply text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/50 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700;
     }
-
-    .sidebar .link.active {
-        @apply border-l-emerald-500 !important;
+    .table-modern th {
+        @apply px-6 py-4 font-bold tracking-wider whitespace-nowrap;
     }
-    .sidebar .link.active i {
-        @apply text-emerald-400 !important;
+    .table-modern td {
+        @apply px-6 py-4 border-b border-slate-100 dark:border-slate-800/50 whitespace-nowrap align-middle;
     }
-    .sidebar .link:hover {
-        @apply bg-slate-800 text-emerald-50 !important;
+    .table-modern tr:last-child td {
+        @apply border-b-0;
     }
-
-    /* Helper Focus Ring */
-    .focus\:ring-primary-500:focus {
-        --tw-ring-color: rgb(var(--color-primary));
+    .table-modern tr:hover {
+        @apply bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors;
     }
-    .focus\:border-primary-500:focus {
-        border-color: rgb(var(--color-primary));
-    }
-
-    /* Helper Colors */
-    .bg-primary-50 { background-color: rgb(236 253 245); }
-    .bg-primary-100 { background-color: rgb(209 250 229); }
-    .text-primary-600 { color: rgb(5 150 105); }
-    .text-primary-700 { color: rgb(4 120 87); }
-
-    .ring-primary-500 { --tw-ring-color: rgb(16 185 129); }
-    .border-primary-500 { border-color: rgb(16 185 129); }
 }

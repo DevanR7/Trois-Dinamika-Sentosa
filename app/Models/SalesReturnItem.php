@@ -11,7 +11,6 @@ use App\Models\Product;
 class SalesReturnItem extends Model
 {
     use HasFactory;
-
     protected $primaryKey = 'item_id';
 
     protected $fillable = [
@@ -22,13 +21,11 @@ class SalesReturnItem extends Model
         'subtotal',
     ];
 
-    // Relasi ke tabel SalesReturn (induk)
     public function salesReturn(): BelongsTo
     {
         return $this->belongsTo(SalesReturn::class, 'return_id', 'return_id');
     }
 
-    // Relasi ke tabel Product
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class, 'product_id', 'product_id');

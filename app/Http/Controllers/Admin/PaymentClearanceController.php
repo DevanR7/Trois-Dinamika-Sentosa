@@ -29,17 +29,24 @@ class PaymentClearanceController extends Controller
         $this->accountingSettings = $accountingSettingService;
     }
 
-    /**
-     * Menampilkan daftar pembayaran yang menunggu kliring
-     */
-    public function index(): View
+    public function index(Request $request): View
     {
-        $salesPayments = Payment::where('status', 'pending_clearance')
+        $viewMode = $request->input('view', 'pending');
+
+        if ($viewMode === 'history') {
+            $statuses = ['completed', 'failed'];
+        } else {
+            $statuses = ['pending_clearance', 'pending_verification'];
+        }
+
+        $salesPayments = Payment::whereIn('status', $statuses)
             ->with(['salesInvoice.client', 'paymentMethod', 'companyBankAccount'])
+            ->orderBy('payment_date', 'desc')
             ->get();
 
-        $purchasePayments = PurchaseOrderPayment::where('status', 'pending_clearance')
+        $purchasePayments = PurchaseOrderPayment::whereIn('status', $statuses)
             ->with(['purchaseOrder.supplier', 'paymentMethod', 'companyBankAccount'])
+            ->orderBy('payment_date', 'desc')
             ->get();
 
         $combined = $salesPayments->map(function ($item) {
@@ -50,66 +57,86 @@ class PaymentClearanceController extends Controller
             return $item;
         }));
 
-        $pendingPayments = $combined->sortBy('payment_date');
+        $pendingPayments = $combined->sortByDesc('payment_date');
 
-        return view('admin.payment_clearance.index', compact('pendingPayments'));
+        return view('admin.payment_clearance.index', compact('pendingPayments', 'viewMode'));
     }
 
-    /**
-     * Menyetujui Kliring Piutang
-     */
     public function approveSalesPayment(Payment $payment): RedirectResponse
     {
-        if ($payment->status !== 'pending_clearance') {
-            return back()->with('error', 'Status pembayaran ini bukan pending kliring.');
+        if (!in_array($payment->status, ['pending_clearance', 'pending_verification'])) {
+            return back()->with('error', 'Status pembayaran ini bukan pending kliring atau verifikasi.');
         }
 
         try {
             DB::beginTransaction();
 
             $payment->update(['status' => 'completed']);
-            $payment->salesInvoice->updatePaymentStatus();
+            
+            $invoice = $payment->salesInvoice;
+            if ($invoice) {
+                $invoice->updatePaymentStatus();
+                if ($invoice->payment_status === 'paid' || $invoice->status === 'paid') {
+                    $duplicatePayments = Payment::where('invoice_id', $invoice->invoice_id)
+                        ->where('payment_id', '!=', $payment->payment_id) // Kecuali yang sedang diproses ini
+                        ->whereIn('status', ['pending_clearance', 'pending_verification'])
+                        ->get();
+
+                    foreach ($duplicatePayments as $dup) {
+                        $dup->update([
+                            'status' => 'failed',
+                            'notes' => $dup->notes . ' | Auto-rejected: Invoice sudah dilunasi oleh pembayaran lain.',
+                            'received_by_user_id' => auth()->id()
+                        ]);
+
+                        ClientLedger::where('reference_type', Payment::class)
+                            ->where('reference_id', $dup->payment_id)
+                            ->delete();
+                    }
+                }
+            }
 
             $arAccountId = $this->accountingSettings->getAccountsReceivableId();
             $clientDepositAccountId = $this->accountingSettings->getClientDepositId();
             $cashBankAccountId = $payment->companyBankAccount?->chart_of_account_id;
 
+            if (!$cashBankAccountId) {
+                $cashBankAccountId = $this->accountingSettings->getGatewayAccountId();
+            }
             if (!$arAccountId || !$clientDepositAccountId) {
-                throw new \Exception("Akun AR atau Deposit Klien belum diatur.");
+                throw new \Exception("Akun AR atau Deposit Klien belum diatur di Pengaturan Akuntansi.");
             }
             if (!$cashBankAccountId) {
-                 throw new \Exception("Akun Bank tidak terhubung ke Chart of Account.");
+                 throw new \Exception("Akun Bank Penerima tidak valid/kosong. Pastikan 'Akun Gateway Default' diatur di menu Pengaturan.");
             }
 
             $ledgerEntries = ClientLedger::where('reference_type', Payment::class)
-                                ->where('reference_id', $payment->payment_id)
-                                ->get();
+                                        ->where('reference_id', $payment->payment_id)
+                                        ->get();
 
             $kreditAkanDigunakan = abs($ledgerEntries->where('type', 'debit')->sum('amount'));
             $sisaDanaInput = $ledgerEntries->where('type', 'credit')->sum('amount');
-            $totalPembayaran = $payment->amount;
-            $danaDariInput = ($totalPembayaran - $kreditAkanDigunakan) + $sisaDanaInput;
+            $totalPembayaranAllocated = $payment->amount; 
+            $danaDariInput = ($totalPembayaranAllocated - $kreditAkanDigunakan) + $sisaDanaInput;
 
             $journalGroupId = "PAY-" . $payment->payment_id;
-            $description = "Kliring Pembayaran Inv #" . $payment->salesInvoice->invoice_number;
+            $description = "Penerimaan Pembayaran Inv #" . ($invoice->invoice_number ?? '-');
 
             $debitEntries = [];
             $creditEntries = [];
 
             if ($danaDariInput > 0) {
-                $debitEntries[] = [$cashBankAccountId, $danaDariInput, "Kliring ke bank"];
+                $bankName = $payment->companyBankAccount->account_name ?? 'Kas/Gateway';
+                $debitEntries[] = [$cashBankAccountId, $danaDariInput, "Penerimaan ke " . $bankName];
             }
-
             if ($kreditAkanDigunakan > 0) {
-                $debitEntries[] = [$clientDepositAccountId, $kreditAkanDigunakan, "Penggunaan deposit klien"];
+                $debitEntries[] = [$clientDepositAccountId, $kreditAkanDigunakan, "Potong Deposit Klien"];
             }
-
-            if ($totalPembayaran > 0) {
-                $creditEntries[] = [$arAccountId, $totalPembayaran, "Pelunasan Piutang"];
+            if ($totalPembayaranAllocated > 0) {
+                $creditEntries[] = [$arAccountId, $totalPembayaranAllocated, "Pelunasan Piutang"];
             }
-
             if ($sisaDanaInput > 0) {
-                $creditEntries[] = [$clientDepositAccountId, $sisaDanaInput, "Kelebihan bayar"];
+                $creditEntries[] = [$clientDepositAccountId, $sisaDanaInput, "Kelebihan bayar (Deposit)"];
             }
 
             $this->accountingService->postJournal(
@@ -122,7 +149,7 @@ class PaymentClearanceController extends Controller
             );
 
             DB::commit();
-            return back()->with('success', 'Kliring piutang berhasil disetujui.');
+            return back()->with('success', 'Pembayaran berhasil disetujui. Pengajuan pending lainnya untuk invoice ini (jika ada) telah ditolak otomatis.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -131,28 +158,27 @@ class PaymentClearanceController extends Controller
         }
     }
 
-    /**
-     * Menolak Kliring Piutang
-     * Perbaikan: Kembalikan saldo deposit klien
-     */
     public function rejectSalesPayment(Payment $payment): RedirectResponse
     {
-        if ($payment->status !== 'pending_clearance') {
-            return back()->with('error', 'Status pembayaran ini bukan pending kliring.');
+        if (!in_array($payment->status, ['pending_clearance', 'pending_verification'])) {
+            return back()->with('error', 'Status pembayaran ini tidak valid untuk ditolak.');
         }
 
         try {
             DB::beginTransaction();
 
             $payment->update(['status' => 'failed']);
-            $payment->salesInvoice->updatePaymentStatus();
+            
+            if ($payment->salesInvoice) {
+                $payment->salesInvoice->updatePaymentStatus();
+            }
 
             ClientLedger::where('reference_type', Payment::class)
                 ->where('reference_id', $payment->payment_id)
                 ->delete();
 
             DB::commit();
-            return back()->with('success', 'Kliring piutang ditolak. Deposit klien sudah dikembalikan.');
+            return back()->with('success', 'Pembayaran ditolak. Deposit (jika ada) telah dibatalkan.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -161,12 +187,9 @@ class PaymentClearanceController extends Controller
         }
     }
 
-    /**
-     * Menyetujui Kliring Hutang
-     */
     public function approvePurchasePayment(PurchaseOrderPayment $purchaseOrderPayment): RedirectResponse
     {
-        if ($purchaseOrderPayment->status !== 'pending_clearance') {
+        if (!in_array($purchaseOrderPayment->status, ['pending_clearance', 'pending_verification'])) {
             return back()->with('error', 'Status pembayaran ini bukan pending kliring.');
         }
 
@@ -175,18 +198,19 @@ class PaymentClearanceController extends Controller
 
             $purchaseOrderPayment->update(['status' => 'completed']);
             $purchaseOrderPayment->purchaseOrder->updatePaymentStatus();
-
             $payment = $purchaseOrderPayment;
-
             $apAccountId = $this->accountingSettings->getAccountsPayableId();
             $supplierDepositAccountId = $this->accountingSettings->getSupplierDepositId();
             $cashBankAccountId = $payment->companyBankAccount?->chart_of_account_id;
-
+            
+            if (!$cashBankAccountId) {
+                $cashBankAccountId = $this->accountingSettings->getGatewayAccountId();
+            }
             if (!$apAccountId || !$supplierDepositAccountId) {
                 throw new \Exception("Akun AP atau Deposit Supplier belum diatur.");
             }
             if (!$cashBankAccountId) {
-                 throw new \Exception("Akun Bank tidak terhubung ke Chart of Account.");
+                 throw new \Exception("Akun Bank Sumber Dana tidak valid/kosong.");
             }
 
             $ledgerEntries = SupplierLedger::where(function($q) use ($payment) {
@@ -199,32 +223,28 @@ class PaymentClearanceController extends Controller
 
             $pakaiDepositNominal = abs($ledgerEntries->where('type', 'debit')->sum('amount'));
             $sisaDana = $ledgerEntries->where('type', 'credit')->sum('amount');
-            $totalAlokasi = $payment->amount;
-            $danaInput = ($totalAlokasi - $pakaiDepositNominal) + $sisaDana;
+            $totalAlokasi = $payment->amount; 
+            $danaInput = ($totalAlokasi - $pakaiDepositNominal) + $sisaDana; 
 
             $journalGroupId = $payment->bulk_purchase_payment_id 
                 ? "BPO-PAY-" . $payment->bulk_purchase_payment_id
                 : "PO-PAY-" . $payment->id;
 
-            $description = "Kliring Pembayaran PO #" . $payment->purchaseOrder->po_number;
-
+            $description = "Pembayaran PO #" . ($payment->purchaseOrder->po_number ?? '-');
             $debitEntries = [];
             $creditEntries = [];
 
             if ($totalAlokasi > 0) {
                 $debitEntries[] = [$apAccountId, $totalAlokasi, "Pelunasan hutang"];
             }
-
             if ($sisaDana > 0) {
                 $debitEntries[] = [$supplierDepositAccountId, $sisaDana, "Kelebihan bayar"];
             }
-
             if ($danaInput > 0) {
-                $creditEntries[] = [$cashBankAccountId, $danaInput, "Pembayaran bank"];
+                $creditEntries[] = [$cashBankAccountId, $danaInput, "Pembayaran Bank"];
             }
-
             if ($pakaiDepositNominal > 0) {
-                $creditEntries[] = [$supplierDepositAccountId, $pakaiDepositNominal, "Penggunaan deposit"];
+                $creditEntries[] = [$supplierDepositAccountId, $pakaiDepositNominal, "Potong deposit"];
             }
 
             $this->accountingService->postJournal(
@@ -246,14 +266,10 @@ class PaymentClearanceController extends Controller
         }
     }
 
-    /**
-     * Menolak Kliring Hutang
-     * Perbaikan: Kembalikan deposit supplier
-     */
     public function rejectPurchasePayment(PurchaseOrderPayment $purchaseOrderPayment): RedirectResponse
     {
-        if ($purchaseOrderPayment->status !== 'pending_clearance') {
-            return back()->with('error', 'Status pembayaran ini bukan pending kliring.');
+        if (!in_array($purchaseOrderPayment->status, ['pending_clearance', 'pending_verification'])) {
+            return back()->with('error', 'Status pembayaran ini tidak valid untuk ditolak.');
         }
 
         try {
@@ -267,7 +283,8 @@ class PaymentClearanceController extends Controller
                 ->delete();
 
             DB::commit();
-            return back()->with('success', 'Kliring hutang ditolak. Deposit supplier telah dikembalikan.');
+            
+            return back()->with('success', 'Kliring hutang ditolak.');
 
         } catch (\Exception $e) {
             DB::rollBack();

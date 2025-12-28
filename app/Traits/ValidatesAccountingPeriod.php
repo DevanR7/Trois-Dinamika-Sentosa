@@ -18,12 +18,10 @@ trait ValidatesAccountingPeriod
      */
     public function checkTransactionLock(string|object $date, ?string $journalNumber = null, ?string $description = null): ?string
     {
-        // 1. Cek Jurnal Sistem (Auto-generated)
         if ($description && str_contains($description, 'Jurnal Penutup Tahun')) {
             return 'Transaksi ini adalah Jurnal Penutup otomatis sistem dan tidak boleh diedit manual.';
         }
 
-        // 2. Cek Periode Tutup Buku (Closing Book)
         $year = Carbon::parse($date)->year;
         
         $isClosed = ManualJournal::where('description', 'LIKE', "Jurnal Penutup Tahun $year")
@@ -33,7 +31,6 @@ trait ValidatesAccountingPeriod
             return "Periode tahun buku $year sudah ditutup (Closing Book). Transaksi tidak dapat diubah/dihapus.";
         }
 
-        // 3. Cek Bank Reconciliation (Jika nomor jurnal ada)
         if ($journalNumber) {
             $isReconciled = GeneralLedger::where('journal_group_id', $journalNumber)
                 ->whereNotNull('bank_reconciliation_id')
@@ -44,12 +41,9 @@ trait ValidatesAccountingPeriod
             }
         }
 
-        return null; // Aman
+        return null;
     }
     
-    /**
-     * Helper untuk cek apakah TANGGAL BARU (saat update) masuk ke periode tertutup.
-     */
     public function isDateClosed(string|object $date): bool
     {
         $year = Carbon::parse($date)->year;

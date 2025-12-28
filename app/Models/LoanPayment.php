@@ -32,33 +32,21 @@ class LoanPayment extends Model
         'total_paid' => 'float',
     ];
 
-    /**
-     * Relasi ke pinjaman induk.
-     */
     public function loan(): BelongsTo
     {
         return $this->belongsTo(Loan::class, 'loan_id', 'loan_id');
     }
 
-    /**
-     * Relasi ke user yang mencatat.
-     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
 
-    /**
-     * Relasi ke Akun Beban Bunga (COA).
-     */
     public function interestExpenseAccount(): BelongsTo
     {
         return $this->belongsTo(ChartOfAccount::class, 'interest_expense_account_id', 'account_id');
     }
 
-    /**
-     * Relasi ke Akun Kas/Bank (COA) sebagai sumber dana.
-     */
     public function cashBankAccount(): BelongsTo
     {
         return $this->belongsTo(ChartOfAccount::class, 'cash_bank_account_id', 'account_id');

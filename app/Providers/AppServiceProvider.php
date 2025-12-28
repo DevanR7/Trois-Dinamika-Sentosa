@@ -21,7 +21,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        Paginator::useBootstrapFive();
+        Paginator::defaultView('vendor.pagination.admin');
+        Paginator::defaultSimpleView('vendor.pagination.admin');
 
         if (!Type::hasType('enum')) {
             Type::addType('enum', 'Doctrine\DBAL\Types\StringType');

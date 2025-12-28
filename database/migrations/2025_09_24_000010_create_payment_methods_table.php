@@ -6,33 +6,34 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('payment_methods', function (Blueprint $table) {
-            $table->id('payment_method_id'); // Primary key
-            $table->string('name'); // Contoh: Cash, BCA Transfer, Giro
+            $table->id('payment_method_id');
+            $table->string('name');
             $table->enum('type', ['direct', 'pending', 'gateway'])->default('direct');
-
-            // DITAMBAHKAN dari add_required_fields_to_payment_methods_table
-            $table->enum('required_fields_config', [
-                'none',              // Untuk Cash
-                'proof_only',        // Untuk Transfer Bank
-                'reference_only',    // Untuk No. Voucher Internal, dsb
-                'proof_and_reference'// Untuk Giro (Foto & Nomor)
+            $table->enum('client_input_config', [
+                'none',                 
+                'proof_only',           
+                'reference_only',       
+                'proof_and_reference'   
+            ])->default('proof_and_reference');
+            $table->enum('client_status_default', ['completed', 'pending_verification'])
+                ->default('pending_verification');
+            $table->enum('internal_input_config', [
+                'none',                 
+                'proof_only',           
+                'reference_only',       
+                'proof_and_reference'   
             ])->default('none');
-
+            $table->enum('internal_status_default', ['completed', 'pending_verification'])
+                ->default('completed');
             $table->boolean('is_active')->default(true);
             $table->softDeletes();
             $table->timestamps();
         });
     }
-
-    /**
-     * Reverse the migrations.
-     */
+    
     public function down(): void
     {
         Schema::dropIfExists('payment_methods');

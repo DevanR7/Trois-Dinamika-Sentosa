@@ -3,129 +3,133 @@
 @section('title', 'Rekonsiliasi Bank')
 
 @section('content')
-<div class="max-w-7xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-end gap-4 mb-8">
-        <div>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Rekonsiliasi Bank</h1>
-            <p class="text-slate-500 text-sm mt-1">Riwayat pencocokan saldo bank dan sistem.</p>
-        </div>
-        <a href="{{ route('admin.bank-reconciliations.create') }}" class="h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5">
-            <i class="material-icons text-[20px] group-hover:rotate-90 transition-transform">add</i> 
-            <span>Mulai Baru</span>
-        </a>
-    </div>
 
-    {{-- TABEL --}}
-    <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
-        <div class="overflow-x-auto">
-            <table class="dashboard-table min-w-full">
-                <thead class="bg-slate-50 border-b border-slate-200">
-                    <tr>
-                        <th class="pl-6">Tgl. Statement</th>
-                        <th>Akun Bank</th>
-                        <th class="text-right">Saldo Bank</th>
-                        <th class="text-right">Saldo Sistem</th>
-                        <th class="text-right">Selisih</th>
-                        <th class="text-center">Status</th>
-                        <th class="text-center pr-6">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100 bg-white">
-                    @forelse ($reconciliations as $recon)
-                        <tr class="hover:bg-slate-50/50 transition-colors group">
-                            <td class="pl-6 py-4">
-                                <div class="flex items-center gap-2 text-slate-600 text-sm">
-                                    <i class="material-icons text-slate-400 text-[16px]">event</i>
-                                    {{ $recon->statement_date->format('d M Y') }}
-                                </div>
-                            </td>
-                            <td class="py-4">
-                                <div class="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition">{{ $recon->account->account_name ?? 'N/A' }}</div>
-                                <div class="text-xs text-slate-500 font-mono mt-0.5">{{ $recon->account->account_number ?? '' }}</div>
-                            </td>
-                            <td class="py-4 text-right font-mono text-sm font-bold text-slate-800">
-                                Rp {{ number_format($recon->statement_balance, 0, ',', '.') }}
-                            </td>
-                            <td class="py-4 text-right font-mono text-sm text-slate-600">
-                                Rp {{ number_format($recon->closing_balance, 0, ',', '.') }}
-                            </td>
-                            <td class="py-4 text-right text-sm font-bold font-mono">
-                                @php $diff = $recon->difference; @endphp
-                                @if($diff == 0)
-                                    <span class="text-emerald-600 flex justify-end items-center gap-1"><i class="material-icons text-[14px]">check</i> 0</span>
-                                @else
-                                    <span class="text-red-600">Rp {{ number_format(abs($diff), 0, ',', '.') }}</span>
-                                @endif
-                            </td>
-                            <td class="py-4 text-center">
-                                @if ($recon->status == 'reconciled')
-                                    <span class="status-completed flex items-center justify-center gap-1 w-fit mx-auto">
-                                        <i class="material-icons text-[12px]">lock</i> Selesai
-                                    </span>
-                                @else
-                                    <span class="status-draft flex items-center justify-center gap-1 w-fit mx-auto">
-                                        <i class="material-icons text-[12px]">edit</i> Draft
-                                    </span>
-                                @endif
-                            </td>
-                            <td class="pr-6 py-4 text-center">
-                                <div class="flex justify-center gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <a href="{{ route('admin.bank-reconciliations.show', $recon) }}" 
-                                       class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition shadow-sm" 
-                                       title="{{ $recon->status == 'draft' ? 'Lanjutkan' : 'Lihat' }}">
-                                        <i class="material-icons text-[18px]">{{ $recon->status == 'draft' ? 'play_arrow' : 'visibility' }}</i>
-                                    </a>
-                                    
-                                    @if($recon->status == 'draft')
-                                    {{-- Global Delete Handler --}}
-                                    <form action="{{ route('admin.bank-reconciliations.destroy', $recon) }}" method="POST" class="delete-form">
-                                        @csrf @method('DELETE')
-                                        <button type="submit" 
-                                                data-title="Hapus Draft?"
-                                                data-text="Progress rekonsiliasi ini akan hilang."
-                                                data-btn-text="Ya, Hapus Draft"
-                                                class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-red-600 hover:bg-red-50 hover:border-red-200 transition shadow-sm" 
-                                                title="Hapus">
-                                            <i class="material-icons text-[18px]">delete</i>
-                                        </button>
-                                    </form>
-                                    @endif
-                                </div>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="7" class="px-6 py-16 text-center">
-                                <div class="flex flex-col items-center justify-center text-slate-400">
-                                    <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                                        <i class="material-icons text-4xl opacity-30">account_balance_wallet</i>
-                                    </div>
-                                    <h3 class="text-base font-bold text-slate-700">Belum ada riwayat</h3>
-                                    <p class="text-sm mt-1">Silakan mulai rekonsiliasi baru.</p>
-                                </div>
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        
-        @if($reconciliations->hasPages())
-            <div class="px-6 py-4 border-t border-slate-200 bg-slate-50/50">
-                {{ $reconciliations->links() }}
+    <div class="max-w-7xl mx-auto">
+        <div class="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+                <h1 class="page-title">Rekonsiliasi Bank</h1>
+                <p class="page-subtitle">Cocokkan catatan buku besar dengan rekening koran bank.</p>
             </div>
-        @endif
-    </div>
-</div>
-@endsection
+            <a href="{{ route('admin.bank-reconciliations.create') }}" class="btn btn-primary">
+                <i class="material-icons text-sm mr-2">add</i> Mulai Rekonsiliasi
+            </a>
+        </div>
 
-@push('scripts')
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
-        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
-    });
-</script>
-@endpush
+        <div class="card">
+            <div class="table-container">
+                <table class="table-modern">
+                    <thead>
+                        <tr>
+                            <th>Tanggal Laporan</th>
+                            <th>Akun Bank</th>
+                            <th class="text-right">Saldo Laporan (Bank)</th>
+                            <th class="text-right">Saldo Buku (Sistem)</th>
+                            <th class="text-right">Selisih</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-center w-24">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($reconciliations as $recon)
+                            <tr>
+                                <td>
+                                    <div class="font-bold text-slate-700 dark:text-slate-200">
+                                        {{ $recon->statement_date->format('d M Y') }}
+                                    </div>
+                                    <div class="text-xs text-slate-500">
+                                        ID: #{{ $recon->reconciliation_id }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="font-medium text-indigo-600 dark:text-indigo-400">
+                                        {{ $recon->account->account_name }}
+                                    </div>
+                                    <div class="text-xs text-slate-500">
+                                        {{ $recon->account->account_number }}
+                                    </div>
+                                </td>
+                                <td class="text-right font-medium">
+                                    Rp {{ number_format($recon->statement_balance, 0, ',', '.') }}
+                                </td>
+                                <td class="text-right font-medium">
+                                    Rp {{ number_format($recon->closing_balance, 0, ',', '.') }}
+                                </td>
+                                <td class="text-right">
+                                    @if(abs($recon->difference) < 1)
+                                        <span class="text-emerald-600 font-bold flex items-center justify-end gap-1">
+                                            <i class="material-icons text-xs">check_circle</i> 0
+                                        </span>
+                                    @else
+                                        <span class="text-rose-600 font-bold">
+                                            {{ number_format($recon->difference, 0, ',', '.') }}
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="text-center">
+                                    @if($recon->status == 'reconciled')
+                                        <span class="badge badge-success">Selesai</span>
+                                    @else
+                                        <span class="badge badge-warning">Draft</span>
+                                    @endif
+                                </td>
+                                <td class="text-center">
+                                    <div class="flex items-center justify-center gap-1">
+                                        {{-- ✅ PERBAIKAN: Tambahkan 'flex items-center justify-center' dan 'leading-none' --}}
+                                        <a href="{{ route('admin.bank-reconciliations.show', $recon->reconciliation_id) }}" 
+                                           class="btn-icon btn-sm btn-secondary text-indigo-600 flex items-center justify-center" 
+                                           title="{{ $recon->status == 'draft' ? 'Lanjutkan' : 'Lihat Detail' }}">
+                                            <i class="material-icons text-sm leading-none">{{ $recon->status == 'draft' ? 'edit' : 'visibility' }}</i>
+                                        </a>
+
+                                        @if($recon->status == 'draft')
+                                            {{-- ✅ PERBAIKAN: Terapkan juga pada tombol hapus agar konsisten --}}
+                                            <button onclick="confirmDelete('{{ $recon->reconciliation_id }}')" 
+                                                    class="btn-icon btn-sm btn-danger flex items-center justify-center" title="Hapus Draft">
+                                                <i class="material-icons text-sm leading-none">delete</i>
+                                            </button>
+                                            <form id="delete-form-{{ $recon->reconciliation_id }}" 
+                                                  action="{{ route('admin.bank-reconciliations.destroy', $recon->reconciliation_id) }}" 
+                                                  method="POST" class="hidden">
+                                                @csrf @method('DELETE')
+                                            </form>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="7" class="text-center py-8 text-slate-500 italic">Belum ada data rekonsiliasi.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+            
+            {{-- Pagination --}}
+            <div class="p-4 border-t border-slate-200 dark:border-slate-700">
+                {{ $reconciliations->links('vendor.pagination.admin') }}
+            </div>
+        </div>
+    </div>
+
+    @push('scripts')
+    <script>
+        function confirmDelete(id) {
+            window.confirmDialog({
+                title: 'Hapus Draft?',
+                text: 'Data draft rekonsiliasi akan dihapus. Transaksi jurnal tidak akan terhapus.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                confirmButtonText: 'Ya, Hapus',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('delete-form-' + id).submit();
+                }
+            });
+        }
+    </script>
+    @endpush
+
+@endsection

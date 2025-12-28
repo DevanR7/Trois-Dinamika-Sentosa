@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 class ClientLedger extends Model
 {
     use HasFactory;
-
     protected $primaryKey = 'ledger_id';
 
     protected $fillable = [
@@ -31,25 +30,16 @@ class ClientLedger extends Model
         'amount' => 'float',
     ];
 
-    /**
-     * Dapatkan model induk (SalesReturn, Payment, dll).
-     */
     public function reference(): MorphTo
     {
         return $this->morphTo();
     }
 
-    /**
-     * Dapatkan klien pemilik ledger.
-     */
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class, 'client_id', 'client_id');
     }
 
-    /**
-     * Dapatkan user yang memproses.
-     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');

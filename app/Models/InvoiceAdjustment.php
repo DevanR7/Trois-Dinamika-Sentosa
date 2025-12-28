@@ -13,7 +13,6 @@ use App\Models\ClientLedger;
 class InvoiceAdjustment extends Model
 {
     use HasFactory;
-
     protected $primaryKey = 'adjustment_id';
 
     protected $fillable = [
@@ -30,25 +29,16 @@ class InvoiceAdjustment extends Model
         'amount' => 'float',
     ];
 
-    /**
-     * Dapatkan invoice yang disesuaikan.
-     */
     public function salesInvoice(): BelongsTo
     {
         return $this->belongsTo(SalesInvoice::class, 'sales_invoice_id', 'invoice_id');
     }
 
-    /**
-     * Dapatkan user yang membuat penyesuaian.
-     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
 
-    /**
-     * Dapatkan entri ledger yang terkait dengan penyesuaian ini.
-     */
     public function ledgerEntry(): MorphOne
     {
         return $this->morphOne(ClientLedger::class, 'reference');

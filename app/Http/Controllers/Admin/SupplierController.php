@@ -11,9 +11,6 @@ use Illuminate\Validation\Rule;
 
 class SupplierController extends Controller
 {
-    /**
-     * Menampilkan daftar supplier dengan opsi pencarian dan filter arsip.
-     */
     public function index(Request $request): View
     {
         $this->authorize('viewAny', Supplier::class);
@@ -37,18 +34,12 @@ class SupplierController extends Controller
         return view('admin.suppliers.index', compact('suppliers'));
     }
 
-    /**
-     * Menampilkan formulir untuk membuat supplier baru.
-     */
     public function create(): View
     {
         $this->authorize('create', Supplier::class);
         return view('admin.suppliers.create');
     }
 
-    /**
-     * Menyimpan supplier baru ke database.
-     */
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', Supplier::class);
@@ -68,9 +59,6 @@ class SupplierController extends Controller
         return redirect()->route('admin.suppliers.index')->with('success', 'Supplier baru berhasil ditambahkan.');
     }
 
-    /**
-     * Menampilkan detail supplier beserta riwayat ledger-nya.
-     */
     public function show(Supplier $supplier): View
     {
         $this->authorize('view', $supplier);
@@ -83,18 +71,12 @@ class SupplierController extends Controller
         return view('admin.suppliers.show', compact('supplier', 'ledgers'));
     }
 
-    /**
-     * Menampilkan formulir edit untuk supplier yang ada.
-     */
     public function edit(Supplier $supplier): View
     {
         $this->authorize('update', $supplier);
         return view('admin.suppliers.edit', compact('supplier'));
     }
 
-    /**
-     * Memperbarui data supplier yang ada.
-     */
     public function update(Request $request, Supplier $supplier): RedirectResponse
     {
         $this->authorize('update', $supplier);
@@ -114,9 +96,6 @@ class SupplierController extends Controller
         return redirect()->route('admin.suppliers.index')->with('success', 'Supplier berhasil diupdate.');
     }
 
-    /**
-     * Mengarsipkan (soft delete) supplier dengan validasi integritas data.
-     */
     public function destroy(Supplier $supplier): RedirectResponse
     {
         $this->authorize('delete', $supplier);
@@ -130,9 +109,6 @@ class SupplierController extends Controller
         return redirect()->route('admin.suppliers.index')->with('success', 'Supplier berhasil diarsipkan.');
     }
 
-    /**
-     * Memulihkan supplier yang sebelumnya diarsipkan.
-     */
     public function restore(Supplier $supplier): RedirectResponse
     {
         $this->authorize('restore', $supplier);

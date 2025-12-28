@@ -9,14 +9,10 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules;
 use Illuminate\Validation\Rules\Password;
 
 class ClientController extends Controller
 {
-    /**
-     * Konstruktor: Menerapkan middleware otorisasi berbasis kemampuan (abilities).
-     */
     public function __construct()
     {
         $this->middleware('can:view-clients')->only(['index', 'show']);
@@ -25,9 +21,6 @@ class ClientController extends Controller
         $this->middleware('can:delete-clients')->only(['destroy', 'restore']);
     }
 
-    /**
-     * Menampilkan daftar klien dengan opsi filter pencarian dan status soft-delete.
-     */
     public function index(Request $request): View
     {
         $query = Client::query();
@@ -48,17 +41,11 @@ class ClientController extends Controller
         return view('admin.clients.index', compact('clients'));
     }
 
-    /**
-     * Menampilkan formulir untuk membuat klien baru.
-     */
     public function create(): View
     {
         return view('admin.clients.create');
     }
 
-    /**
-     * Menyimpan data klien baru ke database.
-     */
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -78,9 +65,6 @@ class ClientController extends Controller
         return redirect()->route('admin.clients.index')->with('success', 'Klien baru berhasil ditambahkan.');
     }
 
-    /**
-     * Menampilkan detail klien beserta riwayat ledger-nya.
-     */
     public function show(Client $client): View
     {
         $ledgers = $client->ledgers()
@@ -91,17 +75,11 @@ class ClientController extends Controller
         return view('admin.clients.show', compact('client', 'ledgers'));
     }
 
-    /**
-     * Menampilkan formulir edit data klien.
-     */
     public function edit(Client $client): View
     {
         return view('admin.clients.edit', compact('client'));
     }
 
-    /**
-     * Memperbarui data klien, termasuk opsi perubahan password.
-     */
     public function update(Request $request, Client $client): RedirectResponse
     {
         $validated = $request->validate([
@@ -124,27 +102,18 @@ class ClientController extends Controller
         return redirect()->route('admin.clients.index')->with('success', 'Data klien berhasil diperbarui.');
     }
 
-    /**
-     * Melakukan soft delete terhadap klien.
-     */
     public function destroy(Client $client): RedirectResponse
     {
         $client->delete();
         return redirect()->route('admin.clients.index')->with('success', 'Klien berhasil dihapus.');
     }
 
-    /**
-     * Menyetujui akun klien (mengaktifkan status persetujuan).
-     */
     public function approve(Client $client): RedirectResponse
     {
         $client->update(['is_approved' => true]);
         return back()->with('success', 'Akun klien ' . $client->client_name . ' telah disetujui.');
     }
 
-    /**
-     * Memulihkan klien yang sebelumnya dihapus secara lunak.
-     */
     public function restore(Client $client): RedirectResponse
     {
         if ($client->trashed()) {
@@ -155,9 +124,6 @@ class ClientController extends Controller
         return back()->with('error', 'Klien tidak terhapus.');
     }
 
-    /**
-     * Mengunci akun klien (hanya untuk akun aktif).
-     */
     public function lock(Client $client): RedirectResponse
     {
         if (!$client->trashed()) {
@@ -168,9 +134,6 @@ class ClientController extends Controller
         return back()->with('error', 'Tidak dapat mengunci akun yang sudah diarsipkan.');
     }
 
-    /**
-     * Membuka kunci akun klien (hanya untuk akun aktif).
-     */
     public function unlock(Client $client): RedirectResponse
     {
         if (!$client->trashed()) {

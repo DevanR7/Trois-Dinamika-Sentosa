@@ -18,11 +18,9 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Menjalankan penyusutan BUPAN LALU (--month tidak diset)
-        // pada jam 1:00 pagi, di hari pertama setiap bulan.
         $schedule->command('accounting:run-depreciation')
                  ->monthlyOn(1, '01:00')
-                 ->withoutOverlapping(); // Mencegah tumpang tindih
+                 ->withoutOverlapping(); 
     }
 
     /**

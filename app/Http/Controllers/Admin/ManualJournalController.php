@@ -16,8 +16,7 @@ use Illuminate\Support\Facades\Log;
 
 class ManualJournalController extends Controller
 {
-    use ValidatesAccountingPeriod; // 2. GUNAKAN TRAIT
-
+    use ValidatesAccountingPeriod; 
     protected AccountingService $accountingService;
 
     public function __construct(AccountingService $accountingService)
@@ -52,8 +51,6 @@ class ManualJournalController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        // --- VALIDASI TANGGAL (PAKAI TRAIT) ---
-        // Cek apakah user mencoba membuat jurnal di tahun yang sudah ditutup
         if ($this->isDateClosed($request->entry_date)) {
             $year = \Carbon\Carbon::parse($request->entry_date)->year;
             return back()->with('error', "Gagal: Tahun buku $year sudah ditutup. Tidak bisa menambah transaksi mundur.")->withInput();
@@ -69,7 +66,6 @@ class ManualJournalController extends Controller
             'entries.*.description' => 'nullable|string|max:255',
         ]);
 
-        // Logika hitung Debit/Kredit (sama seperti sebelumnya)
         $totalDebit = 0; $totalCredit = 0; $journalEntries = [];
 
         foreach ($validated['entries'] as $entry) {
@@ -146,20 +142,15 @@ class ManualJournalController extends Controller
 
     public function update(Request $request, ManualJournal $manualJournal): RedirectResponse
     {
-        // 1. VALIDASI TRANSAKSI LAMA (Menggunakan Trait)
-        // Cek apakah jurnal yg mau diedit ini aman (tidak terkunci)
         if ($error = $this->checkTransactionLock($manualJournal->entry_date, $manualJournal->journal_number, $manualJournal->description)) {
             return back()->with('error', $error);
         }
 
-        // 2. VALIDASI TANGGAL BARU (Menggunakan Trait)
-        // Cek apakah user mengganti tanggal ke tahun yg sudah ditutup
         if ($request->filled('entry_date') && $this->isDateClosed($request->entry_date)) {
             $year = \Carbon\Carbon::parse($request->entry_date)->year;
             return back()->with('error', "Gagal Update: Tanggal baru berada di tahun $year yang sudah ditutup.")->withInput();
         }
 
-        // --- Logic Update Standar ---
         $validated = $request->validate([
             'entry_date' => 'required|date',
             'description' => 'required|string|max:1000',
@@ -170,7 +161,6 @@ class ManualJournalController extends Controller
             'entries.*.description' => 'nullable|string|max:255',
         ]);
         
-        // Hitung ulang total (Sama seperti Store)
         $totalDebit = 0; $totalCredit = 0; $journalEntries = [];
         foreach ($validated['entries'] as $entry) {
             $debit = (float)($entry['debit'] ?? 0);
@@ -193,9 +183,7 @@ class ManualJournalController extends Controller
                 'user_id' => Auth::id(),
             ]);
 
-            // Reset detail
             $manualJournal->entries()->delete();
-
             $debitEntriesForGL = [];
             $creditEntriesForGL = [];
 
@@ -213,7 +201,6 @@ class ManualJournalController extends Controller
                 if ($credit > 0) $creditEntriesForGL[] = [$entry['account_id'], $credit, $desc];
             }
 
-            // Repost GL
             $this->accountingService->postJournal(
                 $manualJournal->journal_number, $manualJournal->entry_date, $manualJournal->description,
                 $debitEntriesForGL, $creditEntriesForGL, $manualJournal
@@ -231,17 +218,15 @@ class ManualJournalController extends Controller
 
     public function destroy(ManualJournal $manualJournal): RedirectResponse
     {
-        // 1. VALIDASI KEAMANAN (Menggunakan Trait)
         if ($error = $this->checkTransactionLock($manualJournal->entry_date, $manualJournal->journal_number, $manualJournal->description)) {
             return back()->with('error', "Gagal Hapus: " . $error);
         }
 
         DB::beginTransaction();
         try {
-            // 2. Hapus dari GL
+            
             DB::table('general_ledgers')->where('journal_group_id', $manualJournal->journal_number)->delete();
 
-            // 3. Hapus Jurnal (Entries cascade)
             $manualJournal->delete();
             
             DB::commit();

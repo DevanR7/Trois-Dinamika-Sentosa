@@ -11,9 +11,13 @@ return new class extends Migration
         Schema::create('sales_invoices', function (Blueprint $table) {
             $table->id('invoice_id');
             $table->string('invoice_number', 50)->unique();
-            $table->foreignId('client_id')->constrained('clients', 'client_id');
-            $table->foreignId('user_id_sales')->nullable()->constrained('users', 'user_id')->onDelete('set null');
-            $table->date('order_date'); // Sebelumnya invoice_date
+            $table->foreignId('client_id')
+                ->constrained('clients', 'client_id');
+            $table->foreignId('user_id_sales')
+                ->nullable()
+                ->constrained('users', 'user_id')
+                ->onDelete('set null');
+            $table->date('order_date');
             $table->date('due_date');
             $table->decimal('subtotal', 15, 2)->default(0);
             $table->decimal('discount_percentage', 5, 2)->default(0);
@@ -29,7 +33,7 @@ return new class extends Migration
             $table->timestamps();
         });
     }
-
+    
     public function down(): void
     {
         Schema::dropIfExists('sales_invoices');

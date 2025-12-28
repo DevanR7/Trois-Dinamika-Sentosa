@@ -6,17 +6,19 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-     public function up(): void {
+    public function up(): void 
+    {
         Schema::create('invoice_counters', function (Blueprint $table) {
-            $table->string('ym', 6)->primary(); // Format YYYYMM, contoh: 202510
+            $table->string('ym', 6); 
+            $table->string('counter_group', 20)->default('GENERAL'); 
             $table->unsignedInteger('last_sequence')->default(0);
             $table->timestamps();
+            $table->primary(['ym', 'counter_group']);
         });
     }
-    public function down(): void {
+    
+    public function down(): void 
+    {
         Schema::dropIfExists('invoice_counters');
     }
 };

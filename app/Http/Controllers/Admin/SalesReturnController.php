@@ -19,11 +19,6 @@ use App\Services\AccountingSettingService;
 
 class SalesReturnController extends Controller
 {
-    /**
-     * ===========================================================
-     *  INJECT SERVICE AKUNTANSI
-     * ===========================================================
-     */
     protected $accountingService;
     protected $accountingSettings;
 
@@ -35,20 +30,12 @@ class SalesReturnController extends Controller
         $this->accountingSettings = $accountingSettingService;
     }
 
-    /**
-     * ===========================================================
-     *  MENAMPILKAN DAFTAR RETUR PENJUALAN
-     * ===========================================================
-     * - Menampilkan daftar retur dengan filter pencarian & tanggal
-     * - Dapat diakses sesuai izin policy pengguna
-     */
     public function index(Request $request): View
     {
         $this->authorize('viewAny', SalesReturn::class);
 
         $query = SalesReturn::with(['client', 'salesInvoice']);
 
-        // Filter pencarian berdasarkan nomor retur, nama klien, atau nomor invoice
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -62,7 +49,6 @@ class SalesReturnController extends Controller
             });
         }
 
-        // Filter berdasarkan tanggal retur
         if ($request->filled('return_date')) {
             $query->whereDate('return_date', $request->return_date);
         }
@@ -74,12 +60,6 @@ class SalesReturnController extends Controller
         return view('admin.sales_returns.index', compact('salesReturns'));
     }
 
-    /**
-     * ===========================================================
-     *  FORM PEMBUATAN RETUR PENJUALAN BARU
-     * ===========================================================
-     * - Menampilkan daftar invoice yang valid untuk diretur
-     */
     public function create(): View
     {
         $this->authorize('create', SalesReturn::class);
@@ -91,15 +71,6 @@ class SalesReturnController extends Controller
         return view('admin.sales_returns.create', compact('invoices'));
     }
 
-    /**
-     * ===========================================================
-     *  MENYIMPAN RETUR PENJUALAN BARU
-     * ===========================================================
-     * - Validasi data retur
-     * - Hitung nilai retur dan stok
-     * - Hitung HPP dan posting jurnal akuntansi
-     * - Simpan data secara transaksional
-     */
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', SalesReturn::class);
@@ -114,7 +85,6 @@ class SalesReturnController extends Controller
             'items.*.quantity' => 'nullable|integer|min:1',
         ]);
 
-        // Validasi Akun Akuntansi
         $arAccountId = $this->accountingSettings->getAccountsReceivableId();
         $clientDepositAccountId = $this->accountingSettings->getClientDepositId();
         $salesReturnAccountId = $this->accountingSettings->getSalesReturnId();
@@ -131,15 +101,10 @@ class SalesReturnController extends Controller
             $invoice = SalesInvoice::with('client')->findOrFail($validated['sales_invoice_id']);
             $discountRate = $invoice->discount_percentage / 100;
             $totalReturnValue = 0;
-            $totalHppValue = 0; // ✅ BARU: Variabel untuk total HPP
+            $totalHppValue = 0; 
             $hasReturnedItems = false;
             $handlingType = $validated['return_handling_type'];
 
-            /**
-             * -----------------------------------------------------------
-             * Tahap 1: Validasi item dan hitung total nilai retur & HPP
-             * -----------------------------------------------------------
-             */
             foreach ($validated['items'] as $itemData) {
                 if (!empty($itemData['quantity']) && $itemData['quantity'] > 0) {
                     $hasReturnedItems = true;
@@ -150,12 +115,9 @@ class SalesReturnController extends Controller
                         throw new \Exception("Jumlah retur melebihi batas untuk produk " . $originalItem->product->product_name);
                     }
 
-                    // Hitung nilai retur (jual)
                     $priceAfterDiscount = $originalItem->price_per_unit * (1 - $discountRate);
                     $subtotal = $itemData['quantity'] * $priceAfterDiscount;
                     $totalReturnValue += $subtotal;
-
-                    // ✅ BARU: Hitung nilai HPP retur
                     $itemHpp = $originalItem->hpp ?? 0;
                     $totalHppValue += $itemData['quantity'] * $itemHpp;
                 }
@@ -165,24 +127,6 @@ class SalesReturnController extends Controller
                 throw new \Exception("Tidak ada item yang dipilih untuk diretur.");
             }
 
-            /**
-             * -----------------------------------------------------------
-             * Tahap 2: Koreksi tipe handling jika nilai retur melebihi sisa tagihan
-             * -----------------------------------------------------------
-             */
-            /*
-            $sisaTagihanInvoice = $invoice->remaining_balance;
-            if ($handlingType == 'deduct_invoice' && $totalReturnValue > $sisaTagihanInvoice) {
-                $handlingType = 'store_as_credit';
-            }
-            */
-
-            /**
-             * -----------------------------------------------------------
-             * Tahap 3: Simpan data retur utama
-             * -----------------------------------------------------------
-             * ✅ DIPERBARUI: Menyimpan total_hpp_amount
-             */
             $salesReturn = SalesReturn::create([
                 'return_number' => SalesReturn::generateReturnNumber(),
                 'client_id' => $invoice->client_id,
@@ -192,14 +136,9 @@ class SalesReturnController extends Controller
                 'return_handling_type' => $handlingType,
                 'notes' => $validated['notes'],
                 'total_amount' => $totalReturnValue,
-                'total_hpp_amount' => $totalHppValue, // ✅ SIMPAN HPP
+                'total_hpp_amount' => $totalHppValue, 
             ]);
 
-            /**
-             * -----------------------------------------------------------
-             * Tahap 4: Simpan item retur dan update stok
-             * -----------------------------------------------------------
-             */
             foreach ($validated['items'] as $itemData) {
                 if (!empty($itemData['quantity']) && $itemData['quantity'] > 0) {
                     $originalItem = InvoiceItem::find($itemData['item_id']);
@@ -213,9 +152,7 @@ class SalesReturnController extends Controller
                         'subtotal' => $subtotal,
                     ]);
 
-                    // Update jumlah retur dan stok produk
                     $originalItem->increment('quantity_returned', $itemData['quantity']);
-
                     $product = Product::find($originalItem->product_id);
                     if ($product) {
                         $product->increment('stock_quantity', $itemData['quantity']);
@@ -223,11 +160,6 @@ class SalesReturnController extends Controller
                 }
             }
 
-            /**
-             * -----------------------------------------------------------
-             * Tahap 5: Catat kredit jika handling = "store_as_credit"
-             * -----------------------------------------------------------
-             */
             if ($handlingType == 'store_as_credit') {
                 $ledgerStatus = ($invoice->status == 'paid') ? 'available' : 'pending';
                 ClientLedger::create([
@@ -245,39 +177,22 @@ class SalesReturnController extends Controller
                 ]);
             }
 
-            /**
-             * -----------------------------------------------------------
-             * Tahap 6: Perbarui status invoice
-             * -----------------------------------------------------------
-             */
             $invoice->updatePaymentStatus();
-
-            /**
-             * -----------------------------------------------------------
-             * ✅ Tahap 7: Post Jurnal Akuntansi (BARU)
-             * -----------------------------------------------------------
-             * Jurnal 4-langkah untuk membalik jurnal penjualan
-             */
             $journalGroupId = "SRET-" . $salesReturn->return_number;
             $description = "Retur Penjualan Inv #" . $invoice->invoice_number;
 
             $debitEntries = [];
             $creditEntries = [];
 
-            // 1. (Debit) Retur Penjualan (sebesar nilai jual)
             $debitEntries[] = [$salesReturnAccountId, $totalReturnValue, "Retur atas Inv #" . $invoice->invoice_number];
-            
-            // 2. (Debit) Persediaan (sebesar nilai HPP)
             $debitEntries[] = [$inventoryAccountId, $totalHppValue, "Pengembalian barang HPP"];
 
-            // 3. (Kredit) Piutang ATAU Deposit
             if ($handlingType == 'store_as_credit') {
                 $creditEntries[] = [$clientDepositAccountId, $totalReturnValue, "Pengembalian ke deposit klien"];
-            } else { // deduct_invoice
+            } else { 
                 $creditEntries[] = [$arAccountId, $totalReturnValue, "Pengurangan piutang Inv #" . $invoice->invoice_number];
             }
             
-            // 4. (Kredit) HPP (membalikkan beban HPP)
             $creditEntries[] = [$cogsAccountId, $totalHppValue, "Reversal HPP atas retur"];
             
             $this->accountingService->postJournal(
@@ -287,7 +202,7 @@ class SalesReturnController extends Controller
                 $debitEntries,
                 $creditEntries,
                 $salesReturn,
-                Auth::id() // Model referensi
+                Auth::id() 
             );
 
             DB::commit();
@@ -304,12 +219,6 @@ class SalesReturnController extends Controller
         }
     }
 
-    /**
-     * ===========================================================
-     *  DETAIL RETUR PENJUALAN
-     * ===========================================================
-     * - Menampilkan informasi lengkap retur dan relasinya
-     */
     public function show(SalesReturn $salesReturn): View
     {
         $this->authorize('view', $salesReturn);
@@ -319,15 +228,6 @@ class SalesReturnController extends Controller
         return view('admin.sales_returns.show', compact('salesReturn'));
     }
 
-    /**
-     * ===========================================================
-     *  MENGHAPUS RETUR PENJUALAN
-     * ===========================================================
-     * - Mengembalikan stok dan kuantitas item
-     * - Menghapus ledger (jika ada)
-     * - Posting jurnal reversal dan hapus jurnal asli
-     * - Memperbarui status invoice
-     */
     public function destroy(SalesReturn $salesReturn): RedirectResponse
     {
         $this->authorize('delete', $salesReturn);
@@ -337,22 +237,12 @@ class SalesReturnController extends Controller
         try {
             $invoice_id = $salesReturn->sales_invoice_id;
 
-            /**
-             * -----------------------------------------------------------
-             * Tahap 1: Hapus entri ledger jika tipe handling adalah kredit
-             * -----------------------------------------------------------
-             */
             if ($salesReturn->return_handling_type == 'store_as_credit') {
                 ClientLedger::where('reference_type', SalesReturn::class)
                     ->where('reference_id', $salesReturn->return_id)
                     ->delete();
             }
 
-            /**
-             * -----------------------------------------------------------
-             * Tahap 2: Kembalikan stok dan kuantitas yang diretur
-             * -----------------------------------------------------------
-             */
             foreach ($salesReturn->items as $item) {
                 $product = Product::find($item->product_id);
                 if ($product) {
@@ -368,15 +258,9 @@ class SalesReturnController extends Controller
                 }
             }
 
-            /**
-             * -----------------------------------------------------------
-             * ✅ Tahap 3: Post Jurnal Reversal (BARU)
-             * -----------------------------------------------------------
-             */
             $journalGroupId = "SRET-REV-" . $salesReturn->return_number;
             $description = "Reversal Retur Penjualan #" . $salesReturn->return_number;
             
-            // Ambil data dari jurnal asli
             $originalJournalEntries = DB::table('general_ledgers')
                                         ->where('journal_group_id', "SRET-" . $salesReturn->return_number)
                                         ->get();
@@ -384,7 +268,6 @@ class SalesReturnController extends Controller
             $creditEntries = [];
             
             foreach ($originalJournalEntries as $entry) {
-                /** @var \App\Models\GeneralLedger $entry */
                 if ($entry->debit > 0) {
                     $creditEntries[] = [$entry->chart_of_account_id, $entry->debit, "Reversal: " . $entry->description];
                 }
@@ -396,7 +279,7 @@ class SalesReturnController extends Controller
             if (!empty($debitEntries) || !empty($creditEntries)) {
                 $this->accountingService->postJournal(
                     $journalGroupId,
-                    now(), // Tanggal reversal
+                    now(), 
                     $description,
                     $debitEntries,
                     $creditEntries,
@@ -405,25 +288,9 @@ class SalesReturnController extends Controller
                 );
             }
             
-            /**
-             * -----------------------------------------------------------
-             * ✅ Tahap 4: Hapus Jurnal Asli (BARU)
-             * -----------------------------------------------------------
-             */
             DB::table('general_ledgers')->where('journal_group_id', "SRET-" . $salesReturn->return_number)->delete();
 
-            /**
-             * -----------------------------------------------------------
-             * Tahap 5: Hapus data retur
-             * -----------------------------------------------------------
-             */
             $salesReturn->delete();
-
-            /**
-             * -----------------------------------------------------------
-             * Tahap 6: Perbarui status invoice setelah retur dihapus
-             * -----------------------------------------------------------
-             */
             $invoice = SalesInvoice::find($invoice_id);
             if ($invoice) {
                 $invoice->updatePaymentStatus();

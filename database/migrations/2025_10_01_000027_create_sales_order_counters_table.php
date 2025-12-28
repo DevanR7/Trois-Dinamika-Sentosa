@@ -9,12 +9,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('sales_order_counters', function (Blueprint $table) {
-            $table->string('ym', 6)->primary(); // Format YYYYMM, contoh: 202510
+            $table->string('ym', 6)->primary();
             $table->unsignedInteger('last_sequence')->default(0);
             $table->timestamps();
         });
     }
-
+    
     public function down(): void
     {
         Schema::dropIfExists('sales_order_counters');

@@ -16,16 +16,12 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Validation\Rule;
 use App\Services\AccountingService;
 use App\Services\AccountingSettingService;
 use Illuminate\Support\Facades\Log;
 
 class BulkPurchasePaymentController extends Controller
 {
-    /**
-     * ✅ Inject Service Akuntansi
-     */
     protected $accountingService;
     protected $accountingSettings;
 
@@ -35,17 +31,11 @@ class BulkPurchasePaymentController extends Controller
     ) {
         $this->accountingService = $accountingService;
         $this->accountingSettings = $accountingSettingService;
+        // $this->middleware('permission:create-batch-purchase-payments'); 
     }
 
-    /**
-     * =========================================================
-     * FORM PEMBUATAN PEMBAYARAN HUTANG (BATCH)
-     * =========================================================
-     */
     public function create(): View
     {
-        // $this->authorize('create-batch-purchase-payments');
-
         $suppliers = Supplier::orderBy('supplier_name')->get();
         $paymentMethods = PaymentMethod::where('is_active', true)
             ->whereIn('type', ['direct', 'pending'])
@@ -59,11 +49,6 @@ class BulkPurchasePaymentController extends Controller
         return view('admin.bulk_purchase_payments.create', compact('suppliers', 'paymentMethods', 'companyBankAccounts'));
     }
 
-    /**
-     * =========================================================
-     * API: AMBIL DAFTAR PURCHASE ORDER YANG BELUM LUNAS
-     * =========================================================
-     */
     public function getUnpaidPurchaseOrdersApi(Supplier $supplier): JsonResponse
     {
         $purchaseOrders = $supplier->purchaseOrders()
@@ -82,19 +67,11 @@ class BulkPurchasePaymentController extends Controller
             ];
         })->filter(fn($po) => $po['sisa_tagihan'] > 0.01);
 
-        return response()->json($posWithBalance);
+        return response()->json($posWithBalance->values());
     }
 
-    /**
-     * =========================================================
-     * SIMPAN PEMBAYARAN BATCH (PROSES UTAMA)
-     * ✅ DIPERBARUI: Menambahkan Jurnal Akuntansi Agregat
-     * =========================================================
-     */
     public function store(Request $request): RedirectResponse
     {
-        // $this->authorize('create-batch-purchase-payments');
-
         $rules = [
             'supplier_id' => 'required|exists:suppliers,supplier_id',
             'payment_date' => 'required|date',
@@ -112,10 +89,9 @@ class BulkPurchasePaymentController extends Controller
             'notes' => 'nullable|string|max:1000',
             'po_ids' => 'required|array|min:1',
             'po_ids.*' => 'required|exists:purchase_orders,po_id',
-            'use_debit_balance' => 'nullable|boolean',
+            'use_debit_balance' => 'nullable|boolean', 
         ];
 
-        // Validasi tambahan berdasarkan konfigurasi metode pembayaran
         $paymentMethod = $request->filled('payment_method_id')
             ? PaymentMethod::find($request->payment_method_id)
             : null;
@@ -167,22 +143,21 @@ class BulkPurchasePaymentController extends Controller
             $totalAlokasi = $pakaiDepositNominal + $pakaiInputNominal;
             $sisaDana = max(0, $danaInput - $pakaiInputNominal);
 
-            if ($totalAlokasi <= 0.01) {
+            if ($totalAlokasi <= 0.01 && $sisaDana <= 0.01) {
                 throw new \Exception("Dana tidak cukup untuk dialokasikan.");
             }
 
-            // --- ✅ Validasi Akun Akuntansi ---
             $apAccountId = $this->accountingSettings->getAccountsPayableId();
             $supplierDepositAccountId = $this->accountingSettings->getSupplierDepositId();
             if (!$apAccountId || !$supplierDepositAccountId) {
-                throw new \Exception("Akun Hutang Dagang (AP) atau Akun Deposit Supplier belum diatur di Pengaturan Akuntansi.");
+                throw new \Exception("Akun AP atau Deposit Supplier belum diatur.");
             }
             
             $cashBankAccount = null;
             if ($danaInput > 0) {
                 $cashBankAccount = CompanyBankAccount::find($validated['company_bank_account_id']);
                 if (!$cashBankAccount || !$cashBankAccount->chart_of_account_id) {
-                    throw new \Exception("Akun Bank Perusahaan yang dipilih belum terhubung ke Chart of Account.");
+                    throw new \Exception("Akun Bank belum terhubung ke COA.");
                 }
             }
 
@@ -193,12 +168,11 @@ class BulkPurchasePaymentController extends Controller
                 ? $request->file('proof_of_payment')->store('payment_proofs', 'public')
                 : null;
 
-            // Buat entri induk BatchPayment
-            $batchPayment = BulkPurchasePayment::create([
+            $bulkPayment = BulkPurchasePayment::create([
                 'supplier_id' => $supplier->supplier_id,
                 'processed_by_user_id' => Auth::id(),
                 'payment_date' => $validated['payment_date'],
-                'total_amount' => $totalAlokasi,
+                'total_amount' => $totalAlokasi, 
                 'payment_method_id' => $validated['payment_method_id'] ?? null,
                 'company_bank_account_id' => $validated['company_bank_account_id'] ?? null,
                 'status' => $newStatus,
@@ -209,23 +183,21 @@ class BulkPurchasePaymentController extends Controller
 
             $alokasiLog = [];
 
-            // Catat penggunaan deposit supplier
             if ($pakaiDepositNominal > 0) {
                 SupplierLedger::create([
                     'supplier_id' => $supplier->supplier_id,
                     'reference_type' => BulkPurchasePayment::class,
-                    'reference_id' => $batchPayment->batch_payment_id,
+                    'reference_id' => $bulkPayment->bulk_purchase_payment_id, 
                     'transaction_date' => $validated['payment_date'],
                     'type' => 'debit',
                     'amount' => -$pakaiDepositNominal,
                     'status' => 'available',
-                    'description' => 'Digunakan untuk pembayaran hutang batch #' . $batchPayment->batch_payment_id,
+                    'description' => 'Digunakan untuk Bulk PO #' . $bulkPayment->bulk_purchase_payment_id,
                     'user_id' => Auth::id(),
                 ]);
                 $alokasiLog[] = "Deposit digunakan Rp " . number_format($pakaiDepositNominal);
             }
 
-            // Proses alokasi dana ke setiap PO
             $sisaDeposit = $pakaiDepositNominal;
             $sisaInput = $pakaiInputNominal;
 
@@ -243,7 +215,7 @@ class BulkPurchasePaymentController extends Controller
                 if ($dibayar <= 0.01) continue;
 
                 $po->payments()->create([
-                    'batch_purchase_payment_id' => $batchPayment->batch_payment_id,
+                    'bulk_purchase_payment_id' => $bulkPayment->bulk_purchase_payment_id, 
                     'payment_date' => $validated['payment_date'],
                     'amount' => $dibayar,
                     'payment_method_id' => $validated['payment_method_id'] ?? null,
@@ -252,65 +224,52 @@ class BulkPurchasePaymentController extends Controller
                     'received_by_user_id' => Auth::id(),
                     'reference_number' => $validated['reference_number'] ?? null,
                     'proof_of_payment_path' => $proofPath,
+                    'notes' => 'Auto-allocated Bulk #' . $bulkPayment->bulk_purchase_payment_id,
                 ]);
 
-                // Update status PO hanya jika status completed
                 if ($newStatus == 'completed') {
                     $po->updatePaymentStatus();
                 }
 
-                $alokasiLog[] = "Rp " . number_format($dibayar) . " dialokasikan ke " . $po->po_number;
+                $alokasiLog[] = "Rp " . number_format($dibayar) . " -> " . $po->po_number;
 
                 $sisaDeposit -= $dariDeposit;
                 $sisaInput -= $dariInput;
             }
 
-            // Simpan kelebihan dana input
             if ($sisaDana > 0.01) {
                 SupplierLedger::create([
                     'supplier_id' => $supplier->supplier_id,
                     'reference_type' => BulkPurchasePayment::class,
-                    'reference_id' => $batchPayment->batch_payment_id,
+                    'reference_id' => $bulkPayment->bulk_purchase_payment_id,
                     'transaction_date' => $validated['payment_date'],
                     'type' => 'credit',
                     'amount' => $sisaDana,
                     'status' => 'available',
-                    'description' => 'Kelebihan dana dari pembayaran hutang batch #' . $batchPayment->batch_payment_id,
+                    'description' => 'Kelebihan dana Bulk PO #' . $bulkPayment->bulk_purchase_payment_id,
                     'user_id' => Auth::id(),
                 ]);
-                $alokasiLog[] = "Kelebihan dana Rp " . number_format($sisaDana) . " disimpan sebagai deposit supplier.";
+                $alokasiLog[] = "Sisa Rp " . number_format($sisaDana) . " jadi deposit.";
             }
 
-            // --- ✅ Post Jurnal Akuntansi (Agregat) ---
             if ($newStatus == 'completed') {
-                $journalGroupId = "BPO-PAY-" . $batchPayment->batch_payment_id;
-                $description = "Pembayaran Hutang Batch #" . $batchPayment->batch_payment_id . " ke " . $supplier->supplier_name;
+                $journalGroupId = "BLK-PO-" . $bulkPayment->bulk_purchase_payment_id;
+                $description = "Pembayaran Bulk PO #" . $bulkPayment->bulk_purchase_payment_id . " ke " . $supplier->supplier_name;
 
-                // Jurnal seimbang:
-                // (D) Hutang Dagang      (Total AP Lunas) : $totalAlokasi
-                // (D) Deposit Supplier  (Kelebihan Bayar) : $sisaDana
-                // (K) Kas/Bank         (Total Kas Keluar) : $danaInput
-                // (K) Deposit Supplier (Deposit Terpakai) : $pakaiDepositNominal
-                
                 $debitEntries = [];
                 $creditEntries = [];
 
-                // (D) Hutang Dagang
                 if ($totalAlokasi > 0) {
-                    $debitEntries[] = [$apAccountId, $totalAlokasi, "Pelunasan hutang batch ke " . $supplier->supplier_name];
+                    $debitEntries[] = [$apAccountId, $totalAlokasi, "Pelunasan Hutang Bulk"];
                 }
-                // (D) Deposit Supplier (Kelebihan bayar jadi deposit baru)
                 if ($sisaDana > 0) {
-                    $debitEntries[] = [$supplierDepositAccountId, $sisaDana, "Kelebihan bayar batch"];
+                    $debitEntries[] = [$supplierDepositAccountId, $sisaDana, "Kelebihan Bayar Bulk"];
                 }
-                
-                // (K) Kas/Bank
                 if ($danaInput > 0 && $cashBankAccount) {
-                    $creditEntries[] = [$cashBankAccount->chart_of_account_id, $danaInput, "Pembayaran dari " . $cashBankAccount->account_name];
+                    $creditEntries[] = [$cashBankAccount->chart_of_account_id, $danaInput, "Keluar dari " . $cashBankAccount->account_name];
                 }
-                // (K) Deposit Supplier (Deposit terpakai)
                 if ($pakaiDepositNominal > 0) {
-                    $creditEntries[] = [$supplierDepositAccountId, $pakaiDepositNominal, "Penggunaan deposit untuk batch"];
+                    $creditEntries[] = [$supplierDepositAccountId, $pakaiDepositNominal, "Potong Deposit Lama"];
                 }
 
                 $this->accountingService->postJournal(
@@ -319,108 +278,54 @@ class BulkPurchasePaymentController extends Controller
                     $description,
                     $debitEntries,
                     $creditEntries,
-                    $batchPayment
+                    $bulkPayment,
+                    Auth::id()
                 );
             }
 
             DB::commit();
 
-            $message = 'Batch pembayaran berhasil. ' . implode('. ', $alokasiLog);
-            return redirect()->route('admin.bulk-purchase-payments.create')
-            ->with('success', 'Pembayaran Batch Berhasil Disimpan. ' . count($alokasiLog) . ' alokasi diproses.');
+            return redirect()->route('admin.purchase-orders.index')
+                ->with('success', 'Pembayaran Bulk Berhasil! ' . implode(', ', $alokasiLog));
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Gagal menyimpan batch pembayaran PO: ' . $e->getMessage() . " on line " . $e->getLine());
-            return back()->with('error', 'Gagal menyimpan pembayaran: ' . $e->getMessage())->withInput();
+            Log::error('Gagal Bulk Purchase: ' . $e->getMessage() . " on line " . $e->getLine());
+            return back()->with('error', 'Gagal: ' . $e->getMessage())->withInput();
         }
     }
 
-    /**
-     * =========================================================
-     * ✅ (BARU) MENGHAPUS/MEMBATALKAN BATCH PEMBAYARAN
-     * =========================================================
-     */
-    public function destroy(BulkPurchasePayment $batchPayment): RedirectResponse
+    public function destroy(BulkPurchasePayment $bulkPayment): RedirectResponse
     {
-        // $this->authorize('delete-batch-purchase-payments');
-        
+        $journalGroupId = "BLK-PO-" . $bulkPayment->bulk_purchase_payment_id;
+        if ($error = $this->checkTransactionLock($bulkPayment->payment_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Hapus: " . $error);
+        }
+
         DB::beginTransaction();
         try {
-            $supplier = $batchPayment->supplier;
-            $paymentDate = $batchPayment->payment_date;
-            
-            // 1. Rollback SupplierLedger terkait batch payment ini
             SupplierLedger::where('reference_type', BulkPurchasePayment::class)
-                          ->where('reference_id', $batchPayment->batch_payment_id)
+                          ->where('reference_id', $bulkPayment->bulk_purchase_payment_id)
                           ->delete();
 
-            // 2. Hapus semua payment individual yang terkait
-            $individualPayments = $batchPayment->individualPayments;
-            foreach ($individualPayments as $payment) {
-                // Hapus payment individual
-                $payment->delete();
-                
-                // Update status PO yang terkait
+            foreach ($bulkPayment->payments as $payment) {
                 $po = $payment->purchaseOrder;
+                $payment->delete();
                 if ($po) {
                     $po->updatePaymentStatus();
                 }
             }
 
-            // 3. ✅ Post Jurnal Reversal (Pembalikan)
-            $apAccountId = $this->accountingSettings->getAccountsPayableId();
-            $supplierDepositAccountId = $this->accountingSettings->getSupplierDepositId();
-
-            if (!$apAccountId || !$supplierDepositAccountId) {
-                throw new \Exception("Akun AP atau Deposit Supplier belum diatur.");
-            }
-
-            // Jurnal Reversal adalah kebalikan dari Jurnal Store
-            $journalGroupId = "BPO-PAY-REV-" . $batchPayment->batch_payment_id;
-            $description = "Reversal Pembayaran Batch #" . $batchPayment->batch_payment_id;
-            
-            // Ambil data dari jurnal aslinya
-            $originalJournalEntries = GeneralLedger::where('journal_group_id', "BPO-PAY-" . $batchPayment->batch_payment_id)->get();
-            
-            $debitEntries = [];
-            $creditEntries = [];
-            
-            foreach ($originalJournalEntries as $entry) {
-                // Balikkan Debit jadi Kredit
-                if ($entry->debit > 0) {
-                    $creditEntries[] = [$entry->chart_of_account_id, $entry->debit, "Reversal: " . $entry->description];
-                }
-                // Balikkan Kredit jadi Debit
-                if ($entry->credit > 0) {
-                    $debitEntries[] = [$entry->chart_of_account_id, $entry->credit, "Reversal: " . $entry->description];
-                }
-            }
-            
-            if (!empty($debitEntries) || !empty($creditEntries)) {
-                $this->accountingService->postJournal(
-                    $journalGroupId,
-                    now(),
-                    $description,
-                    $debitEntries,
-                    $creditEntries,
-                    $batchPayment
-                );
-            }
-
-            // 4. Hapus Jurnal Asli
-            GeneralLedger::where('journal_group_id', "BPO-PAY-" . $batchPayment->batch_payment_id)->delete();
-
-            // 5. Hapus data batch payment
-            $batchPayment->delete();
+            GeneralLedger::where('journal_group_id', $journalGroupId)->delete();
+            $bulkPayment->delete();
 
             DB::commit();
-            return redirect()->route('admin.purchase-orders.index')->with('success', 'Batch pembayaran berhasil dibatalkan.');
+            return redirect()->route('admin.purchase-orders.index')
+                ->with('success', 'Bulk pembayaran berhasil dihapus dan jurnal dibersihkan.');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Gagal menghapus batch pembayaran: ' . $e->getMessage() . " on line " . $e->getLine());
-            return back()->with('error', 'Gagal membatalkan batch pembayaran: ' . $e->getMessage());
+            return back()->with('error', 'Gagal membatalkan bulk: ' . $e->getMessage());
         }
     }
 }

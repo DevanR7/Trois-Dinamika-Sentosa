@@ -1,112 +1,119 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Data Aset Tetap')
+@section('title', 'Aset Tetap')
 
 @section('content')
-<div class="max-w-7xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-end gap-4 mb-8">
+
+    {{-- HEADER & ACTIONS --}}
+    <div class="page-header">
         <div>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Data Aset Tetap</h1>
-            <p class="text-slate-500 text-sm mt-1">Kelola daftar aset dan penyusutan otomatis.</p>
+            <h1 class="page-title">Aset Tetap</h1>
+            <p class="page-subtitle">Kelola aset perusahaan dan konfigurasi penyusutan.</p>
         </div>
-        <a href="{{ route('admin.fixed-assets.create') }}" class="h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5">
-            <i class="material-icons text-[20px] group-hover:rotate-90 transition-transform">add</i> 
-            <span>Tambah Aset</span>
-        </a>
+        <div class="flex items-center gap-3">
+            <a href="{{ route('admin.fixed-assets.create') }}" class="btn btn-primary">
+                <i class="material-icons text-sm mr-1">add_business</i> Tambah Aset
+            </a>
+        </div>
     </div>
 
-    {{-- FILTER --}}
-    <div class="dashboard-card p-6 mb-6 shadow-sm">
-        <form action="{{ route('admin.fixed-assets.index') }}" method="GET">
-            <div class="flex flex-col md:flex-row gap-4 items-end">
-                <div class="flex-grow w-full">
-                    <label for="search" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Pencarian</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="material-icons text-slate-400 text-[20px]">search</i>
-                        </div>
-                        <input type="text" name="search" id="search" value="{{ request('search') }}" 
-                            class="form-input pl-10" 
-                            placeholder="Cari Nama Aset...">
+    {{-- FILTER & SEARCH --}}
+    <div class="card mb-6">
+        <div class="card-body">
+            <form action="{{ route('admin.fixed-assets.index') }}" method="GET" class="flex flex-col sm:flex-row gap-4">
+                <div class="w-full sm:w-72">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white dark:bg-slate-800">
+                            <i class="material-icons text-slate-400">search</i>
+                        </span>
+                        <input type="text" name="search" class="form-input border-l-0 pl-0" 
+                               placeholder="Cari nama aset..." 
+                               value="{{ request('search') }}">
                     </div>
                 </div>
-                <div class="w-full md:w-auto">
-                    <button type="submit" class="w-full md:w-auto h-[48px] px-6 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-bold text-sm shadow-sm transition flex items-center justify-center gap-2">
-                        <i class="material-icons text-[18px]">filter_list</i> Filter
-                    </button>
-                </div>
-            </div>
-        </form>
+                <button type="submit" class="btn btn-secondary">
+                    Cari
+                </button>
+            </form>
+        </div>
     </div>
 
-    {{-- TABEL --}}
-    <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
-        <div class="overflow-x-auto">
-            <table class="dashboard-table min-w-full">
-                <thead class="bg-slate-50 border-b border-slate-200">
+    {{-- TABLE DATA --}}
+    <div class="card">
+        <div class="table-container">
+            <table class="table-modern">
+                <thead>
                     <tr>
-                        <th class="pl-6">Nama Aset</th>
-                        <th>Tgl Beli</th>
-                        <th>Masa Manfaat</th>
-                        <th class="text-right">Harga Beli</th>
-                        <th class="text-right">Nilai Buku</th>
-                        <th class="text-center">Akun</th>
-                        <th class="text-center w-32 pr-6">Aksi</th>
+                        <th class="w-16 text-center">#</th>
+                        <th>Nama Aset</th>
+                        <th>Tanggal Beli</th>
+                        <th>Metode Penyusutan</th>
+                        <th class="text-right">Harga Perolehan</th>
+                        <th class="text-right">Nilai Buku Saat Ini</th>
+                        <th class="text-center w-36">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100 bg-white">
-                    @forelse ($fixedAssets as $asset)
-                        <tr class="hover:bg-slate-50/50 transition-colors group">
-                            <td class="pl-6 py-4 text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
-                                {{ $asset->asset_name }}
+                <tbody>
+                    @forelse($fixedAssets as $index => $asset)
+                        <tr>
+                            <td class="text-center text-slate-500">{{ $fixedAssets->firstItem() + $index }}</td>
+                            <td>
+                                <div class="font-bold text-slate-700 dark:text-slate-200">
+                                    {{ $asset->asset_name }}
+                                </div>
+                                <div class="text-xs text-slate-500">
+                                    {{ $asset->useful_life_months }} Bulan Manfaat
+                                </div>
                             </td>
-                            <td class="py-4 text-sm text-slate-600">
+                            <td>
                                 {{ $asset->purchase_date->format('d M Y') }}
                             </td>
-                            <td class="py-4 text-sm text-slate-600">
-                                {{ $asset->useful_life_months ?? 'N/A' }} bln
+                            <td>
+                                @if($asset->depreciation_method == 'straight_line')
+                                    <span class="badge badge-primary">Garis Lurus</span>
+                                @else
+                                    <span class="badge badge-warning">Saldo Menurun</span>
+                                @endif
                             </td>
-                            <td class="py-4 text-right text-sm text-slate-500 font-mono">
+                            <td class="text-right font-mono text-slate-600 dark:text-slate-300">
                                 Rp {{ number_format($asset->purchase_cost, 0, ',', '.') }}
                             </td>
-                            <td class="py-4 text-right text-sm font-bold text-emerald-600 font-mono">
+                            <td class="text-right font-bold text-indigo-600 dark:text-indigo-400">
                                 Rp {{ number_format($asset->current_book_value, 0, ',', '.') }}
                             </td>
-                            <td class="py-4 text-center">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 uppercase tracking-wide">
-                                    {{ $asset->assetAccount->account_name ?? 'N/A' }}
-                                </span>
-                            </td>
-                            <td class="pr-6 py-4 text-center">
-                                <div class="flex justify-center items-center gap-2">
-                                    <a href="{{ route('admin.fixed-assets.edit', $asset) }}" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-amber-600 hover:bg-amber-50 hover:border-amber-200 transition shadow-sm" title="Edit">
-                                        <i class="material-icons text-[16px]">edit</i>
-                                    </a>
+                            <td class="text-center">
+                                <div class="flex items-center justify-center gap-2">
                                     
-                                    <form action="{{ route('admin.fixed-assets.destroy', $asset) }}" method="POST" 
-                                          class="delete-form inline-block" 
-                                          data-name="{{ $asset->asset_name }}"
-                                          {{-- Custom logic jika ingin menambah peringatan depresiasi, tapi delete-form standar sudah cukup aman jika backend handle --}}
-                                          >
-                                        @csrf @method('DELETE')
-                                        <button type="submit" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-red-600 hover:bg-red-50 hover:border-red-200 transition shadow-sm" title="Hapus">
-                                            <i class="material-icons text-[16px]">delete</i>
-                                        </button>
+                                    {{-- Edit Button --}}
+                                    <a href="{{ route('admin.fixed-assets.edit', $asset->asset_id) }}" 
+                                       class="w-9 h-9 rounded-full flex items-center justify-center bg-indigo-50 border border-transparent text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors shadow-sm dark:bg-indigo-900/30 dark:text-indigo-400"
+                                       title="Edit">
+                                        <i class="material-icons text-[18px] leading-none">edit</i>
+                                    </a>
+
+                                    {{-- Delete Button --}}
+                                    <button type="button" onclick="confirmDelete('{{ $asset->asset_id }}', '{{ $asset->asset_name }}')" 
+                                            class="w-9 h-9 rounded-full flex items-center justify-center bg-rose-50 border border-transparent text-rose-600 hover:bg-rose-600 hover:text-white transition-colors shadow-sm dark:bg-rose-900/30 dark:text-rose-400"
+                                            title="Hapus">
+                                        <i class="material-icons text-[18px] leading-none">delete</i>
+                                    </button>
+                                    
+                                    <form id="delete-form-{{ $asset->asset_id }}" 
+                                          action="{{ route('admin.fixed-assets.destroy', $asset->asset_id) }}" 
+                                          method="POST" class="hidden">
+                                        @csrf
+                                        @method('DELETE')
                                     </form>
+
                                 </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-6 py-12 text-center text-slate-500">
-                                <div class="flex flex-col items-center justify-center">
-                                    <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-slate-300">
-                                        <i class="material-icons text-4xl">inventory</i>
-                                    </div>
-                                    <h3 class="text-base font-bold text-slate-800">Belum ada data aset</h3>
-                                    <p class="text-sm mt-1">Silakan tambahkan aset tetap baru.</p>
+                            <td colspan="7" class="text-center p-8">
+                                <div class="flex flex-col items-center justify-center text-slate-400">
+                                    <i class="material-icons text-5xl mb-2">domain</i>
+                                    <span>Belum ada data aset tetap.</span>
                                 </div>
                             </td>
                         </tr>
@@ -115,21 +122,30 @@
             </table>
         </div>
         
-        @if($fixedAssets->hasPages())
-            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/80">
-                {{ $fixedAssets->links() }}
-            </div>
-        @endif
+        <div class="card-footer">
+            {{ $fixedAssets->links() }}
+        </div>
     </div>
-</div>
+
 @endsection
 
 @push('scripts')
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Notifikasi Toast
-    @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
-    @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
-});
+    function confirmDelete(id, name) {
+        window.confirmDialog({
+            title: 'Hapus Aset?',
+            text: "Aset '" + name + "' akan dihapus dan jurnal pembelian akan dibalik (reversal).",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('delete-form-' + id).submit();
+            }
+        });
+    }
 </script>
 @endpush

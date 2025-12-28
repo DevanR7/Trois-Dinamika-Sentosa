@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 class InvoiceAdditionalCost extends Model
 {
     use HasFactory;
-    
     protected $fillable = ['invoice_id', 'description', 'amount'];
     
     protected $casts = [

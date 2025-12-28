@@ -8,14 +8,13 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // KODE INI HANYA MEMBUAT TABEL 'units'
         Schema::create('units', function (Blueprint $table) {
             $table->id('unit_id');
             $table->string('name', 50)->unique();
             $table->timestamps();
         });
     }
-
+    
     public function down(): void
     {
         Schema::dropIfExists('units');

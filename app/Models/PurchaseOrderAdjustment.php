@@ -11,7 +11,6 @@ use App\Models\User;
 class PurchaseOrderAdjustment extends Model
 {
     use HasFactory;
-
     protected $primaryKey = 'adjustment_id';
 
     protected $fillable = [
@@ -28,17 +27,11 @@ class PurchaseOrderAdjustment extends Model
         'amount' => 'float',
     ];
 
-    /**
-     * Dapatkan PO yang disesuaikan.
-     */
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id', 'po_id');
     }
 
-    /**
-     * Dapatkan user yang membuat penyesuaian.
-     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');

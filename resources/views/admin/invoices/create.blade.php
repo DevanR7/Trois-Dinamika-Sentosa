@@ -3,507 +3,427 @@
 @section('title', 'Buat Invoice Baru')
 
 @section('content')
-<div class="max-w-full mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <div>
-            <div class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                <a href="{{ route('admin.invoices.index') }}" class="hover:text-indigo-600 transition">Invoice</a>
-                <i class="material-icons text-[12px]">chevron_right</i>
-                <span class="text-slate-600">Baru</span>
+
+    <div class="max-w-6xl mx-auto">
+
+        <form action="{{ route('admin.invoices.store') }}" method="POST" id="invoiceForm">
+            @csrf
+            
+            @if(isset($order))
+                <input type="hidden" name="sales_order_id" value="{{ $order->order_id }}">
+            @endif
+
+            {{-- TOP NAVIGATION --}}
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                    <h1 class="page-title">Buat Invoice Baru</h1>
+                    <p class="page-subtitle">Isi formulir untuk menerbitkan faktur tagihan.</p>
+                </div>
+                <div class="flex gap-3">
+                    <a href="{{ route('admin.invoices.index') }}" class="btn btn-secondary">Batal</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="material-icons text-sm mr-2">save</i> Simpan Draft
+                    </button>
+                </div>
             </div>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Buat Invoice Baru</h1>
-        </div>
-        <a href="{{ route('admin.invoices.index') }}" 
-           class="inline-flex items-center px-4 py-2 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all shadow-sm">
-            <i class="material-icons text-sm mr-2">arrow_back</i> Kembali
-        </a>
+
+            <div class="space-y-6">
+                
+                {{-- 1. INFORMASI FAKTUR --}}
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-header-title">Informasi Faktur</h3>
+                    </div>
+                    <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {{-- Client --}}
+                        <div>
+                            <label class="form-label label-required">Pelanggan</label>
+                            <select name="client_id" class="tom-select" required placeholder="Pilih Pelanggan...">
+                                <option value="">Pilih Pelanggan...</option>
+                                @foreach($clients as $client)
+                                    <option value="{{ $client->client_id }}" {{ (old('client_id') ?? ($order->client_id ?? '')) == $client->client_id ? 'selected' : '' }}>
+                                        {{ $client->client_name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('client_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+
+                        {{-- Dates --}}
+                        <div class="grid grid-cols-2 gap-4 md:col-span-2">
+                            <div>
+                                <label class="form-label label-required">Tanggal Invoice</label>
+                                <input type="date" name="order_date" class="form-input" 
+                                       value="{{ old('order_date', ($order->order_date ?? now())->format('Y-m-d')) }}" required>
+                            </div>
+                            <div>
+                                <label class="form-label label-required">Jatuh Tempo</label>
+                                <input type="date" name="due_date" class="form-input" 
+                                       value="{{ old('due_date', now()->addDays(30)->format('Y-m-d')) }}" required>
+                            </div>
+                        </div>
+
+                        {{-- Sales Rep --}}
+                        @if(Auth::user()->hasRole(['admin', 'superadmin']))
+                            <div>
+                                <label class="form-label label-optional">Sales Representative</label>
+                                <select name="user_id_sales" class="tom-select">
+                                    <option value="">- Pilih Sales -</option>
+                                    @foreach($salesUsers as $sales)
+                                        <option value="{{ $sales->user_id }}" {{ (old('user_id_sales') ?? ($order->user_id_sales ?? '')) == $sales->user_id ? 'selected' : '' }}>
+                                            {{ $sales->full_name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @else
+                             <input type="hidden" name="user_id_sales" value="{{ Auth::id() }}">
+                        @endif
+                    </div>
+                </div>
+
+                {{-- 2. ITEM PRODUK --}}
+                <div class="card">
+                    <div class="card-header flex justify-between items-center bg-slate-50 dark:bg-slate-800">
+                        <h3 class="card-header-title">Item Produk</h3>
+                        <button type="button" id="btnAddRow" class="btn btn-sm btn-secondary text-indigo-600 bg-indigo-50 border-indigo-200 hover:bg-indigo-100 transition-colors">
+                            <i class="material-icons text-sm mr-1">add</i> Tambah Barang
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto w-full rounded-b-xl">
+                        <table class="table-modern w-full min-w-[800px]" id="itemsTable">
+                            <thead>
+                                <tr>
+                                    <th class="w-[40%] min-w-[250px]">Produk</th>
+                                    <th class="w-[20%] min-w-[150px] text-right">Harga Satuan</th>
+                                    <th class="w-[15%] min-w-[100px] text-center">Qty</th>
+                                    <th class="w-[20%] min-w-[150px] text-right">Subtotal</th>
+                                    <th class="w-[5%] min-w-[50px] text-center"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="itemsBody">
+                                {{-- Rows added via JS --}}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {{-- 3. BIAYA TAMBAHAN --}}
+                <div class="card">
+                    <div class="card-header flex justify-between items-center bg-slate-50 dark:bg-slate-800">
+                        <h3 class="card-header-title">Biaya Tambahan</h3>
+                        <button type="button" id="btnAddCost" class="btn btn-sm btn-secondary text-emerald-600 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 transition-colors">
+                            <i class="material-icons text-sm mr-1">add</i> Tambah Biaya
+                        </button>
+                    </div>
+                    <div class="card-body bg-slate-50/50 dark:bg-slate-800/20">
+                        <div id="additionalCostsContainer" class="space-y-3">
+                            {{-- Cost rows added via JS --}}
+                        </div>
+                        <div id="noCostPlaceholder" class="text-center text-sm text-slate-400 py-2 italic">
+                            Belum ada biaya tambahan (Ongkir, Packing, dll).
+                        </div>
+                    </div>
+                </div>
+
+                {{-- 4. SPLIT LAYOUT: CATATAN & RINGKASAN --}}
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    {{-- KIRI: Catatan --}}
+                    <div class="card h-full">
+                        <div class="card-header">
+                            <h3 class="card-header-title">Catatan Faktur</h3>
+                        </div>
+                        <div class="card-body">
+                            <textarea name="notes" class="form-textarea h-full min-h-[180px]" 
+                                      placeholder="Contoh: No. Rekening BCA 12345678 a.n PT... (Akan muncul di invoice)">{{ old('notes', isset($order) ? $order->notes : '') }}</textarea>
+                        </div>
+                    </div>
+
+                    {{-- KANAN: Ringkasan Pembayaran --}}
+                    <div class="card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm h-full">
+                        <div class="card-header bg-slate-50 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-700">
+                            <h3 class="card-header-title text-slate-800 dark:text-white">Ringkasan Pembayaran</h3>
+                        </div>
+                        <div class="card-body space-y-3">
+                            
+                            {{-- Subtotal --}}
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-slate-600 dark:text-slate-400">Subtotal Item</span>
+                                <span class="font-bold font-mono text-slate-800 dark:text-slate-200" id="subtotalDisplay">Rp 0</span>
+                            </div>
+
+                            {{-- Total Biaya Tambahan --}}
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-slate-600 dark:text-slate-400">Total Biaya Tambahan</span>
+                                <span class="font-bold font-mono text-slate-800 dark:text-slate-200" id="totalCostDisplay">Rp 0</span>
+                            </div>
+
+                            {{-- Diskon --}}
+                            <div class="flex justify-between items-center text-sm">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-slate-600 dark:text-slate-400">Diskon Global</span>
+                                    <div class="input-group w-20">
+                                        <input type="number" name="discount_percentage" id="discountInput" 
+                                               class="form-input text-right py-1 px-2 text-xs h-7" 
+                                               min="0" max="100" step="0.01" value="0">
+                                        <span class="input-group-text px-1 text-[10px]">%</span>
+                                    </div>
+                                </div>
+                                <span class="font-bold font-mono text-rose-500" id="discountAmountDisplay">- Rp 0</span>
+                            </div>
+
+                            {{-- Pajak --}}
+                            <div class="flex justify-between items-start text-sm pt-1">
+                                <span class="text-slate-600 dark:text-slate-400 mt-2">Pajak (PPN/PPh)</span>
+                                <div class="w-1/2 text-right">
+                                    <select name="taxes[]" id="taxInput" class="tom-select" multiple placeholder="Pilih Pajak...">
+                                        @foreach($taxes as $tax)
+                                            <option value="{{ $tax->id }}" data-rate="{{ $tax->rate }}">
+                                                {{ $tax->name }} ({{ $tax->rate }}%)
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <div class="text-xs text-emerald-600 font-mono mt-1" id="taxAmountDisplay">+ Rp 0</div>
+                                </div>
+                            </div>
+
+                            <hr class="border-slate-200 dark:border-slate-700 my-2">
+
+                            {{-- Grand Total --}}
+                            <div class="flex justify-between items-center">
+                                <span class="text-base font-extrabold text-slate-800 dark:text-white uppercase">Grand Total</span>
+                                <span class="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400" id="grandTotalDisplay">Rp 0</span>
+                            </div>
+
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </form>
+
     </div>
 
-    {{-- ERROR ALERT --}}
-    @if ($errors->any())
-        <div class="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-            <i class="material-icons text-red-500 text-xl">error</i>
-            <div>
-                <h3 class="text-sm font-bold text-red-800">Terdapat kesalahan input:</h3>
-                <ul class="mt-1 list-disc list-inside text-sm text-red-700">
-                    @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
-                </ul>
-            </div>
-        </div>
-    @endif
-
-    <form action="{{ route('admin.invoices.store') }}" method="POST" id="invoice-form">
-        @csrf
-        
-        {{-- Jika create dari Sales Order --}}
-        @if (isset($order))
-            <input type="hidden" name="sales_order_id" value="{{ $order->order_id }}">
-        @endif
-
-        <div class="space-y-6">
-            
-            {{-- 1. INFO INVOICE (CARD ATAS) --}}
-            <div class="dashboard-card p-0 overflow-hidden shadow-sm">
-                <div class="bg-slate-50/50 px-6 py-4 border-b border-slate-100 flex items-center gap-2">
-                    <i class="material-icons text-indigo-500 text-sm">receipt</i>
-                    <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider">Data Tagihan & Klien</h3>
-                </div>
-                <div class="p-6 grid grid-cols-1 md:grid-cols-12 gap-6">
-                    
-                    {{-- PILIH KLIEN --}}
-                    <div class="md:col-span-6">
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Pelanggan (Klien) <span class="text-red-500">*</span></label>
-                        <select name="client_id" id="client_id" class="w-full select2-basic" required>
-                            <option value="" disabled selected>-- Pilih Klien --</option>
-                            @foreach ($clients as $client)
-                                <option value="{{ $client->client_id }}" @selected(old('client_id', isset($order) ? $order->client_id : '') == $client->client_id)>
-                                    {{ $client->client_name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    
-                    {{-- TANGGAL INVOICE --}}
-                    <div class="md:col-span-3">
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Tanggal Invoice</label>
-                        <input type="date" name="order_date" id="order_date" value="{{ old('order_date', now()->format('Y-m-d')) }}" class="form-input" required>
-                    </div>
-                    
-                    {{-- JATUH TEMPO --}}
-                    <div class="md:col-span-3">
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Jatuh Tempo</label>
-                        <input type="date" name="due_date" id="due_date" value="{{ old('due_date', now()->addDays(30)->format('Y-m-d')) }}" class="form-input" required>
-                    </div>
-
-                    {{-- SALES PERSON --}}
-                    <div class="md:col-span-12">
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Sales Person</label>
-                        <select name="user_id_sales" id="user_id_sales" class="w-full select2-basic">
-                            <option value="">-- Umum / Tanpa Sales --</option>
-                            @foreach ($salesUsers as $sales)
-                                <option value="{{ $sales->user_id }}" @selected(old('user_id_sales', isset($order) ? $order->user_id_sales : null) == $sales->user_id)>
-                                    {{ $sales->full_name }} ({{ $sales->sales_code }})
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            {{-- 2. ITEM PRODUK (CARD TENGAH) --}}
-            <div class="dashboard-card p-0 overflow-hidden shadow-sm">
-                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                    <div class="flex items-center gap-2">
-                        <i class="material-icons text-indigo-500 text-sm">shopping_cart</i>
-                        <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider">Daftar Produk</h3>
-                    </div>
-                </div>
-                
-                <div class="overflow-x-auto">
-                    <table class="dashboard-table w-full">
-                        <thead>
-                            <tr>
-                                <th class="min-w-[300px] pl-6">Produk</th>
-                                <th class="w-24 text-center">Qty</th>
-                                <th class="w-40 text-right">Harga Satuan (@)</th>
-                                <th class="w-40 text-right">Subtotal</th>
-                                <th class="w-10 pr-6"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="product-items">
-                            {{-- JS Inject Rows Here --}}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="p-4 bg-slate-50 border-t border-slate-100 text-center">
-                    <button type="button" id="add-product-btn" class="inline-flex items-center px-6 py-3 bg-white border border-indigo-200 text-indigo-600 text-sm font-bold rounded-full hover:bg-indigo-50 transition shadow-sm uppercase tracking-wide hover:shadow-md transform hover:-translate-y-0.5">
-                        <i class="material-icons text-lg mr-2">add_circle_outline</i> Tambah Baris Produk
-                    </button>
-                </div>
-            </div>
-            
-            {{-- 3. BIAYA TAMBAHAN --}}
-            <div class="dashboard-card p-0 overflow-hidden shadow-sm">
-                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                        <i class="material-icons text-green-600 text-sm">attach_money</i> Biaya Tambahan
-                    </h3>
-                    <button type="button" id="add-cost-btn" class="inline-flex items-center px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-lg hover:bg-green-100 border border-green-200 transition">
-                        <i class="material-icons text-sm mr-1">add</i> Tambah Biaya
-                    </button>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="dashboard-table w-full">
-                         <tbody id="additional-cost-items">
-                            {{-- JS Inject Cost Rows --}}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {{-- 4. RINGKASAN & TOTAL (CARD BAWAH) --}}
-            <div class="dashboard-card p-6 border-t-4 border-indigo-500">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                    
-                    {{-- Kolom Kiri: Catatan --}}
-                    <div class="space-y-6">
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Catatan Invoice</label>
-                            <textarea name="notes" id="notes" rows="4" class="form-textarea w-full bg-yellow-50/30 border-yellow-100 focus:border-yellow-400 focus:ring-yellow-200" placeholder="Catatan untuk klien...">{{ old('notes') }}</textarea>
-                        </div>
-                    </div>
-
-                    {{-- Kolom Kanan: Kalkulasi --}}
-                    <div class="bg-slate-50/50 rounded-xl p-6 border border-slate-200 space-y-4">
-                        <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 pb-2 mb-2">Kalkulasi Biaya</h4>
-
-                        <div class="flex justify-between text-sm text-slate-600">
-                            <span>Subtotal Produk</span>
-                            <span class="font-medium text-slate-900" id="subtotal-display">Rp 0</span>
-                        </div>
-
-                        {{-- Diskon --}}
-                        <div class="flex items-center justify-between gap-4">
-                            <label for="discount_percentage" class="text-xs font-bold text-slate-500 uppercase">Diskon (%)</label>
-                            <input type="number" name="discount_percentage" id="discount_percentage" value="{{ old('discount_percentage', 60) }}" class="w-20 text-right text-xs border-slate-300 rounded form-input h-8" min="0" max="100">
-                        </div>
-                        
-                        <div class="flex justify-between text-xs text-red-500 font-medium">
-                            <span>Potongan Diskon</span>
-                            <span id="discount-amount-display">- Rp 0</span>
-                        </div>
-
-                        <div class="border-t border-dashed border-slate-200 my-2"></div>
-                        
-                        <div class="flex justify-between text-slate-500 text-xs font-bold">
-                            <span>Subtotal (Net)</span>
-                            <span id="subtotal-after-discount">Rp 0</span>
-                        </div>
-
-                        {{-- Pajak --}}
-                        <div class="mt-2">
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Pajak</label>
-                            <div id="tax-options" class="space-y-2 bg-white p-3 rounded border border-slate-100">
-                                @foreach (\App\Models\Tax::where('is_active', true)->get() as $tax)
-                                    <label class="flex items-center space-x-2 cursor-pointer">
-                                        <input type="checkbox" name="taxes[]" value="{{ $tax->id }}" data-rate="{{ $tax->rate }}" class="tax-checkbox rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4" @checked(in_array($tax->id, old('taxes', [])))>
-                                        <span class="text-xs text-slate-700 font-medium">{{ $tax->name }} ({{ $tax->rate }}%)</span>
-                                    </label>
-                                @endforeach
-                            </div>
-                            <div id="tax-breakdown" class="mt-2 space-y-1 pl-2"></div>
-                        </div>
-
-                        <div class="flex justify-between text-slate-600 mt-2">
-                            <span>Biaya Tambahan</span>
-                            <span class="font-medium text-slate-900" id="total-additional-display">Rp 0</span>
-                        </div>
-
-                        <div class="border-t-2 border-slate-800 my-3"></div>
-
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm font-bold text-slate-900 uppercase">Total Akhir</span>
-                            <span class="text-2xl font-bold text-indigo-600 font-mono tracking-tight" id="grand-total">Rp 0</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex justify-end gap-4 mt-8 pt-6 border-t border-slate-100">
-                    <a href="{{ route('admin.invoices.index') }}" class="px-6 py-3 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition shadow-sm">
-                         Batal
-                    </a>
-                    <button type="submit" id="submit-btn" class="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 flex items-center gap-2">
-                        <i class="material-icons text-lg">save</i> Simpan Invoice
-                    </button>
-                </div>
-            </div>
-        </div>
-    </form>
-</div>
-
-{{-- TEMPLATE ROW PRODUK --}}
-<template id="product-row-template">
-    <tr class="hover:bg-slate-50 transition-colors border-b border-gray-50 last:border-0 group">
-        <td class="pl-6 py-3 align-top">
-            <select class="product-select text-sm" style="width: 100%;" required>
-                <option value="" data-price="0" disabled selected>-- Pilih Produk --</option>
-                @foreach ($products as $product)
-                    <option value="{{ $product->product_id }}" data-price="{{ $product->selling_price ?? 0 }}">
-                        {{ $product->product_name }}
-                    </option>
-                @endforeach
-            </select>
-        </td>
-        <td class="py-3 align-top">
-            <input type="number" class="form-input quantity text-center w-full font-bold text-gray-700 h-9" value="1" min="0.01" step="0.01" required>
-        </td>
-        
-        {{-- KOLOM HARGA (FIX BUG HOVER) --}}
-        <td class="py-3 align-top">
-            <div class="relative flex items-center">
-                {{-- Label Rp --}}
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 z-10">
-                    <span class="text-slate-500 text-xs font-bold">Rp</span>
-                </div>
-                {{-- Input tanpa class 'input-currency' untuk kontrol manual JS --}}
-                <input type="text" class="price-display form-input block w-full pl-9 pr-2 text-right text-sm font-medium h-9 focus:ring-1 focus:ring-indigo-500" required placeholder="0">
-                <input type="hidden" class="price-raw" value="0">
-            </div>
-            <div class="mt-1 flex items-center pl-1 gap-2">
-                 <label class="flex items-center gap-1 cursor-pointer">
-                    <input type="checkbox" class="update-master-check h-3 w-3 rounded border-slate-300 text-indigo-600" value="1">
-                    <span class="text-[9px] text-slate-500 italic">Update Master</span>
-                 </label>
-            </div>
-        </td>
-        
-        <td class="py-3 align-top text-right font-bold text-gray-900 text-sm align-middle font-mono">
-            <span class="subtotal">Rp 0</span>
-        </td>
-        <td class="pr-6 py-3 align-top text-center align-middle">
-            <button type="button" class="remove-product-btn text-slate-400 hover:text-red-500 hover:bg-red-50 rounded p-1 transition">
-                <i class="material-icons text-[18px]">delete</i>
-            </button>
-        </td>
-    </tr>
-</template>
-
-{{-- TEMPLATE ROW BIAYA TAMBAHAN --}}
-<template id="additional-cost-template">
-    <tr class="hover:bg-slate-50 transition-colors border-b border-gray-50 last:border-0">
-        <td class="pl-6 py-2">
-            <input type="text" class="cost-desc form-input w-full text-sm" placeholder="Keterangan Biaya (Mis: Packing)" required>
-        </td>
-        <td class="py-2 w-40">
-            <div class="relative flex items-center">
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 z-10">
-                    <span class="text-slate-500 text-[10px] font-bold">Rp</span>
-                </div>
-                <input type="text" class="cost-display form-input w-full pl-8 text-xs text-right" placeholder="0" required>
-                <input type="hidden" class="cost-raw" value="0">
-            </div>
-        </td>
-        <td class="pr-6 py-2 text-center w-10">
-            <button type="button" class="remove-cost-btn text-slate-400 hover:text-red-500 transition p-1 rounded-full hover:bg-red-50">
-                <i class="material-icons text-[18px]">close</i>
-            </button>
-        </td>
-    </tr>
-</template>
 @endsection
 
+{{-- JAVASCRIPT --}}
 @push('scripts')
-{{-- Load Library (CDN) --}}
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
-
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    
-    // Init Select2 Global (untuk Header)
-    $('.select2-basic').select2({ 
-        placeholder: '-- Pilih --', 
-        width: '100%', 
-        dropdownCssClass: 'select2-dropdown-clean' 
-    });
+    document.addEventListener('DOMContentLoaded', function() {
+        const itemsBody = document.getElementById('itemsBody');
+        const costsContainer = document.getElementById('additionalCostsContainer');
+        const noCostPlaceholder = document.getElementById('noCostPlaceholder');
+        
+        // Data Produk & Order (Jika ada)
+        const productsData = @json($products);
+        const existingItems = @json(isset($order) ? $order->items : []); 
+        
+        let rowCount = 0;
+        let costCount = 0;
 
-    // Variables
-    const productItemsContainer = document.getElementById('product-items');
-    const additionalCostItemsContainer = document.getElementById('additional-cost-items');
-    const productRowTemplate = document.getElementById('product-row-template');
-    const costRowTemplate = document.getElementById('additional-cost-template');
-    const taxOptionsContainer = document.getElementById('tax-options');
-    const discountInput = document.getElementById('discount_percentage');
-    
-    let productIndex = 0;
-    let costIndex = 0;
-
-    // Helper
-    function formatRupiah(number) {
-        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
-    }
-
-    // Init AutoNumeric Manual (Tanpa symbol global agar tidak bentrok)
-    function initAutoNumeric(element, hiddenElement) {
-        // Cek dulu apakah elemen sudah punya instance autonumeric
-        if(AutoNumeric.getAutoNumericElement(element) === null) {
-            const an = new AutoNumeric(element, { 
-                decimalCharacter: ',', 
-                digitGroupSeparator: '.', 
-                decimalPlaces: 0, 
-                minimumValue: '0',
-                currencySymbol: '', // Kosongkan symbol karena sudah ada di HTML (div absolute)
-                unformatOnSubmit: true
-            });
+        // --- ITEM FUNCTIONS ---
+        function addRow(data = null) {
+            rowCount++;
+            const selectedProductId = data ? data.product_id : '';
+            const qtyValue = data ? parseFloat(data.quantity) : 1;
             
-            element.addEventListener('autoNumeric:rawValueModified', e => {
-                hiddenElement.value = e.detail.newRawValue;
-                calculateTotals();
+            let optionsHtml = '<option value="">Pilih Produk...</option>';
+            productsData.forEach(prod => {
+                const selected = prod.product_id == selectedProductId ? 'selected' : '';
+                optionsHtml += `<option value="${prod.product_id}" data-price="${prod.selling_price}" ${selected}>${prod.product_name} (${prod.product_code})</option>`;
             });
-            return an;
-        }
-        return null;
-    }
 
-    // --- FUNGSI HITUNG TOTAL ---
-    function calculateTotals() {
-        let subtotalProducts = 0;
-        
-        // Loop Row Produk
-        productItemsContainer.querySelectorAll('tr').forEach((row) => {
-            const price = parseFloat(row.querySelector('.price-raw').value) || 0;
-            const quantity = parseFloat(row.querySelector('.quantity').value) || 0;
-            const subtotal = price * quantity;
+            const tr = document.createElement('tr');
+            tr.className = 'border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition';
+            tr.innerHTML = `
+                <td class="p-3 align-top">
+                    <select name="products[${rowCount}][product_id]" class="tom-select-dynamic product-select" required>
+                        ${optionsHtml}
+                    </select>
+                </td>
+                <td class="p-3 align-top text-right">
+                    <div class="input-group">
+                        <span class="input-group-text px-2 text-xs">Rp</span>
+                        <input type="text" name="products[${rowCount}][custom_price]" 
+                               class="form-input text-right autonumeric price-input" value="0" required>
+                    </div>
+                    <label class="inline-flex items-center mt-1 cursor-pointer">
+                        <input type="checkbox" name="products[${rowCount}][update_master_price]" value="1" class="form-checkbox w-3 h-3 text-indigo-600 rounded">
+                        <span class="ml-1 text-[10px] text-slate-500">Update Master</span>
+                    </label>
+                </td>
+                <td class="p-3 align-top">
+                    <input type="number" step="0.01" min="0.01" name="products[${rowCount}][quantity]" 
+                           class="form-input text-center qty-input" value="${qtyValue}" required>
+                </td>
+                <td class="p-3 align-top text-right">
+                    <div class="text-sm font-bold text-slate-800 dark:text-white pt-2 subtotal-display">Rp 0</div>
+                </td>
+                <td class="p-3 align-top text-center">
+                    <button type="button" class="text-slate-400 hover:text-rose-500 transition-colors btn-remove-row pt-1">
+                        <i class="material-icons text-lg">close</i>
+                    </button>
+                </td>
+            `;
             
-            row.querySelector('.subtotal').textContent = formatRupiah(subtotal);
-            subtotalProducts += subtotal;
-        });
+            itemsBody.appendChild(tr);
 
-        // Loop Row Biaya Tambahan
-        let totalAdditionalCosts = 0;
-        additionalCostItemsContainer.querySelectorAll('tr').forEach((row) => {
-            const amount = parseFloat(row.querySelector('.cost-raw').value) || 0;
-            totalAdditionalCosts += amount;
-        });
+            // Init Plugins
+            new TomSelect(tr.querySelector('.tom-select-dynamic'), {
+                sortField: { field: "text", direction: "asc" },
+                plugins: ['clear_button'],
+                dropdownParent: 'body',
+                onChange: function(value) {
+                    if(!this.userModifiedPrice) {
+                         updateRowPrice(tr, value);
+                    }
+                }
+            });
 
-        // Diskon & Pajak
-        const discountRate = parseFloat(discountInput.value) || 0;
-        const discountAmount = subtotalProducts * (discountRate / 100);
-        const subtotalAfterDiscount = subtotalProducts - discountAmount;
+            new AutoNumeric(tr.querySelector('.price-input'), window.defaultAutoNumericOptions);
+            
+            // Logic Kalkulasi
+            tr.querySelector('.price-input').addEventListener('keyup', () => {
+                 tr.querySelector('.tom-select-dynamic').tomselect.userModifiedPrice = true;
+                 calculateRow(tr);
+            });
+            tr.querySelector('.price-input').addEventListener('autoNumeric:rawValueModified', () => calculateRow(tr));
 
-        let totalTaxAmount = 0;
-        let taxHtml = '';
-        taxOptionsContainer.querySelectorAll('.tax-checkbox:checked').forEach((checkbox) => {
-            const rate = parseFloat(checkbox.dataset.rate) || 0;
-            const name = checkbox.nextElementSibling.innerText.trim(); 
-            const taxAmount = subtotalAfterDiscount * (rate / 100);
-            totalTaxAmount += taxAmount;
-            taxHtml += `<div class="flex justify-between text-xs text-slate-500"><span>+ ${name}</span> <span>${formatRupiah(taxAmount)}</span></div>`;
-        });
-        
-        const grandTotal = subtotalAfterDiscount + totalTaxAmount + totalAdditionalCosts;
-
-        // Update UI
-        document.getElementById('subtotal-display').textContent = formatRupiah(subtotalProducts);
-        document.getElementById('discount-amount-display').textContent = `(-) ${formatRupiah(discountAmount)}`;
-        document.getElementById('subtotal-after-discount').textContent = formatRupiah(subtotalAfterDiscount);
-        document.getElementById('tax-breakdown').innerHTML = taxHtml;
-        document.getElementById('total-additional-display').textContent = `(+) ${formatRupiah(totalAdditionalCosts)}`;
-        document.getElementById('grand-total').textContent = formatRupiah(grandTotal);
-    }
-
-    // --- TAMBAH BARIS PRODUK ---
-    function addProductRow(item = null) {
-        const newRow = productRowTemplate.content.cloneNode(true).querySelector('tr');
-        const productSelect = newRow.querySelector('.product-select');
-        const quantityInput = newRow.querySelector('.quantity');
-        const priceDisplayInput = newRow.querySelector('.price-display');
-        const priceRawInput = newRow.querySelector('.price-raw');
-        const updateMasterCheck = newRow.querySelector('.update-master-check');
-        
-        // Set Attributes Name (Array)
-        productSelect.name = `products[${productIndex}][product_id]`;
-        quantityInput.name = `products[${productIndex}][quantity]`;
-        priceRawInput.name = `products[${productIndex}][custom_price]`; 
-        updateMasterCheck.name = `products[${productIndex}][update_master_price]`;
-        
-        productItemsContainer.appendChild(newRow);
-
-        // Init Select2
-        const select2 = $(productSelect).select2({ 
-            placeholder: '-- Pilih --', 
-            width: '100%', 
-            dropdownCssClass: 'select2-dropdown-clean'
-        });
-        
-        // Init AutoNumeric
-        const anPrice = initAutoNumeric(priceDisplayInput, priceRawInput);
-
-        // Listener saat ganti produk
-        select2.on('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            const basePrice = parseFloat(selectedOption.dataset.price) || 0;
-            // Auto fill hanya jika data kosong dan bukan sedang load data existing
-            if(priceRawInput.value == 0 && !item) { 
-                anPrice.set(basePrice);
-                priceRawInput.value = basePrice;
+            if (selectedProductId) {
+                updateRowPrice(tr, selectedProductId);
             }
-            calculateTotals();
-        });
+        }
 
-        quantityInput.addEventListener('input', calculateTotals);
-        
-        newRow.querySelector('.remove-product-btn').addEventListener('click', () => {
-            select2.select2('destroy'); // Bersihkan instance select2
-            newRow.remove();
+        // --- COST FUNCTIONS ---
+        function addCostRow() {
+            costCount++;
+            noCostPlaceholder.style.display = 'none';
+
+            const div = document.createElement('div');
+            div.className = 'flex items-center gap-2 cost-row bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-200 dark:border-slate-700';
+            div.innerHTML = `
+                <div class="flex-1">
+                    <input type="text" name="additional_costs[${costCount}][description]" class="form-input text-xs w-full" placeholder="Keterangan (Cth: Ongkir)" required>
+                </div>
+                <div class="input-group w-40">
+                    <span class="input-group-text px-2 text-xs">Rp</span>
+                    <input type="text" name="additional_costs[${costCount}][amount]" class="form-input text-right text-xs autonumeric cost-input" placeholder="0" required>
+                </div>
+                <button type="button" class="text-slate-400 hover:text-rose-500 btn-remove-cost">
+                    <i class="material-icons text-sm">close</i>
+                </button>
+            `;
+            costsContainer.appendChild(div);
+            
+            new AutoNumeric(div.querySelector('.cost-input'), window.defaultAutoNumericOptions);
+            
+            div.querySelector('.cost-input').addEventListener('autoNumeric:rawValueModified', calculateTotals);
+        }
+
+        // --- CALCULATIONS ---
+        function updateRowPrice(row, productId) {
+            const product = productsData.find(p => p.product_id == productId);
+            const priceInput = row.querySelector('.price-input');
+            
+            if (product) {
+                AutoNumeric.getAutoNumericElement(priceInput).set(product.selling_price);
+            } else {
+                AutoNumeric.getAutoNumericElement(priceInput).set(0);
+            }
+            calculateRow(row);
+        }
+
+        function calculateRow(row) {
+            const price = parseFloat(AutoNumeric.getAutoNumericElement(row.querySelector('.price-input')).getNumericString() || 0);
+            const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+            const subtotal = price * qty;
+            row.querySelector('.subtotal-display').innerText = formatRupiah(subtotal);
             calculateTotals();
-        });
-        
-        // Pre-fill Data (Jika dari Order atau Edit mode)
-        if (item) {
-            $(productSelect).val(item.product_id).trigger('change.select2'); 
-            // Gunakan timeout agar trigger change tidak mereset harga ke default master
-            setTimeout(() => {
-                quantityInput.value = item.quantity;
-                anPrice.set(item.price_per_unit); 
-                priceRawInput.value = item.price_per_unit;
+        }
+
+        function calculateTotals() {
+            // 1. Subtotal Items
+            let subtotal = 0;
+            document.querySelectorAll('#itemsBody tr').forEach(row => {
+                const price = parseFloat(AutoNumeric.getAutoNumericElement(row.querySelector('.price-input')).getNumericString() || 0);
+                const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+                subtotal += price * qty;
+            });
+
+            // 2. Costs
+            let totalCosts = 0;
+            document.querySelectorAll('.cost-input').forEach(input => {
+                totalCosts += parseFloat(AutoNumeric.getAutoNumericElement(input).getNumericString() || 0);
+            });
+
+            // 3. Discount
+            const discPercent = parseFloat(document.getElementById('discountInput').value) || 0;
+            const discAmount = subtotal * (discPercent / 100);
+            const afterDisc = subtotal - discAmount;
+
+            // 4. Tax
+            let totalTax = 0;
+            const taxSelect = document.getElementById('taxInput');
+            if(taxSelect.tomselect) {
+                const selectedIds = taxSelect.tomselect.getValue();
+                selectedIds.forEach(id => {
+                     const option = taxSelect.querySelector(`option[value="${id}"]`);
+                     if(option) {
+                         const rate = parseFloat(option.dataset.rate);
+                         totalTax += afterDisc * (rate / 100);
+                     }
+                });
+            }
+
+            const grandTotal = afterDisc + totalTax + totalCosts;
+
+            // Update UI
+            document.getElementById('subtotalDisplay').innerText = formatRupiah(subtotal);
+            document.getElementById('totalCostDisplay').innerText = formatRupiah(totalCosts);
+            document.getElementById('discountAmountDisplay').innerText = '- ' + formatRupiah(discAmount);
+            document.getElementById('taxAmountDisplay').innerText = '+ ' + formatRupiah(totalTax);
+            document.getElementById('grandTotalDisplay').innerText = formatRupiah(grandTotal);
+        }
+
+        function formatRupiah(amount) {
+            return 'Rp ' + amount.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        }
+
+        // --- EVENT LISTENERS ---
+        itemsBody.addEventListener('click', function(e) {
+            if (e.target.closest('.btn-remove-row')) {
+                e.target.closest('tr').remove();
                 calculateTotals();
-            }, 50);
-        }
-        
-        productIndex++;
-    }
-
-    // --- TAMBAH BARIS BIAYA ---
-    function addCostRow(cost = null) {
-        const newRow = costRowTemplate.content.cloneNode(true).querySelector('tr');
-        const descInput = newRow.querySelector('.cost-desc');
-        const costDisplayInput = newRow.querySelector('.cost-display');
-        const costRawInput = newRow.querySelector('.cost-raw');
-
-        descInput.name = `additional_costs[${costIndex}][description]`;
-        costRawInput.name = `additional_costs[${costIndex}][amount]`;
-
-        additionalCostItemsContainer.appendChild(newRow);
-        const anCost = initAutoNumeric(costDisplayInput, costRawInput);
-
-        newRow.querySelector('.remove-cost-btn').addEventListener('click', () => {
-            newRow.remove();
-            calculateTotals();
+            }
         });
         
-        costDisplayInput.addEventListener('autoNumeric:rawValueModified', calculateTotals);
+        itemsBody.addEventListener('input', function(e) {
+            if (e.target.classList.contains('qty-input')) {
+                calculateRow(e.target.closest('tr'));
+            }
+        });
 
-        if (cost) {
-            descInput.value = cost.description;
-            anCost.set(cost.amount);
-            costRawInput.value = cost.amount;
+        costsContainer.addEventListener('click', function(e) {
+             if (e.target.closest('.btn-remove-cost')) {
+                e.target.closest('.cost-row').remove();
+                calculateTotals();
+                if(costsContainer.children.length === 0) noCostPlaceholder.style.display = 'block';
+            }
+        });
+
+        document.getElementById('btnAddRow').addEventListener('click', () => addRow());
+        document.getElementById('btnAddCost').addEventListener('click', () => addCostRow());
+        document.getElementById('discountInput').addEventListener('input', calculateTotals);
+        document.getElementById('taxInput').addEventListener('change', calculateTotals);
+
+        // --- INIT ---
+        if (existingItems && existingItems.length > 0) {
+            existingItems.forEach(item => addRow(item));
+        } else {
+            addRow();
         }
-
-        costIndex++;
-    }
-
-    // --- EVENT LISTENERS GLOBAL ---
-    document.getElementById('add-product-btn').addEventListener('click', () => addProductRow());
-    document.getElementById('add-cost-btn').addEventListener('click', () => addCostRow());
-    taxOptionsContainer.addEventListener('change', calculateTotals);
-    discountInput.addEventListener('input', calculateTotals);
-
-    // --- LOAD DATA EXISTING ---
-    // Check if creating from order ($order passed from controller)
-    @if(isset($order) && $order->items->count() > 0)
-        const orderItems = @json($order->items);
-        orderItems.forEach(item => addProductRow(item));
-    @else
-        addProductRow(); // Default 1 row kosong
-    @endif
-    
-    // Initial Calc
-    setTimeout(calculateTotals, 500);
-});
+    });
 </script>
 @endpush

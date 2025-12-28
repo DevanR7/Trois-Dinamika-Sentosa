@@ -1,176 +1,209 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Detail Retur Penjualan')
+@section('title', 'Detail Retur #' . $salesReturn->return_number)
 
 @section('content')
-<div class="max-w-6xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-            <nav class="flex text-sm text-slate-500 mb-1">
-                <a href="{{ route('admin.sales-returns.index') }}" class="hover:text-indigo-600 transition-colors font-medium">Retur Penjualan</a>
-                <span class="mx-2 text-slate-300">/</span>
-                <span class="text-slate-800 font-semibold">Detail</span>
-            </nav>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-3">
-                No. Retur: <span class="font-mono text-indigo-600 bg-indigo-50 px-2 rounded">{{ $salesReturn->return_number }}</span>
-            </h1>
-        </div>
-        <a href="{{ route('admin.sales-returns.index') }}" class="h-[48px] px-6 bg-white border border-slate-300 rounded-lg text-slate-700 text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
-            <i class="material-icons text-[18px]">arrow_back</i> Kembali
-        </a>
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <div class="flex flex-col gap-6">
         
-        {{-- KOLOM KIRI (Span 8) --}}
-        <div class="lg:col-span-8 space-y-8">
-            
-            {{-- CARD 1: INFO TRANSAKSI --}}
-            <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
-                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
-                        <i class="material-icons text-[20px]">info</i>
-                    </div>
-                    <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Informasi Transaksi</h3>
+        {{-- Header --}}
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h2 class="page-title">Detail Retur Penjualan</h2>
+                <div class="flex items-center gap-2 text-sm text-slate-500 mt-1">
+                    <span>{{ $salesReturn->return_number }}</span>
+                    <span class="w-1 h-1 bg-slate-300 rounded-full"></span>
+                    <span>{{ \Carbon\Carbon::parse($salesReturn->return_date)->isoFormat('D MMMM Y') }}</span>
                 </div>
+            </div>
+            <div class="flex gap-3">
+                <a href="{{ route('admin.sales-returns.index') }}" class="btn btn-secondary">
+                    <i class="material-icons text-lg">arrow_back</i>
+                    Kembali
+                </a>
                 
-                <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {{-- Klien --}}
-                    <div class="flex items-start gap-4">
-                        <div class="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0 border border-indigo-100">
-                            <i class="material-icons text-xl">business</i>
+                {{-- Tombol Hapus (Hanya jika belum dihapus) --}}
+                <button onclick="deleteReturn()" class="btn btn-danger">
+                    <i class="material-icons text-lg">delete</i>
+                    Batalkan Retur
+                </button>
+                <form id="delete-form" action="{{ route('admin.sales-returns.destroy', $salesReturn->return_id) }}" method="POST" class="hidden">
+                    @csrf @method('DELETE')
+                </form>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {{-- Info Utama --}}
+            <div class="lg:col-span-2 flex flex-col gap-6">
+                
+                {{-- Status Card --}}
+                <div class="card p-5 flex items-center justify-between bg-gradient-to-r from-slate-800 to-slate-900 text-white border-none">
+                    <div class="flex flex-col">
+                        <span class="text-slate-400 text-xs uppercase font-bold tracking-wider mb-1">Total Pengembalian</span>
+                        <span class="text-3xl font-bold">Rp {{ number_format($salesReturn->total_amount, 0, ',', '.') }}</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-slate-400 text-xs uppercase font-bold tracking-wider mb-1">Jenis Penanganan</span>
+                        <div class="mt-1">
+                            @if($salesReturn->return_handling_type == 'deduct_invoice')
+                                <span class="bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full text-xs font-bold border border-amber-500/50">
+                                    Potong Tagihan
+                                </span>
+                            @else
+                                <span class="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full text-xs font-bold border border-blue-500/50">
+                                    Simpan Deposit
+                                </span>
+                            @endif
                         </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1 tracking-wide">Klien</label>
-                            <h4 class="text-base font-bold text-slate-900">{{ $salesReturn->client->client_name }}</h4>
-                            <div class="mt-2 flex flex-wrap items-center gap-2">
-                                <span class="text-xs text-slate-500">Invoice Asal:</span>
-                                <a href="{{ route('admin.invoices.show', $salesReturn->sales_invoice_id) }}" class="text-xs font-bold text-indigo-600 hover:underline font-mono bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
+                    </div>
+                </div>
+
+                {{-- Tabel Item --}}
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-header-title">Item yang Dikembalikan</h3>
+                    </div>
+                    <div class="table-container">
+                        <table class="table-modern">
+                            <thead>
+                                <tr>
+                                    <th>Produk</th>
+                                    <th class="text-right">Harga (Net)</th>
+                                    <th class="text-center">Qty Retur</th>
+                                    <th class="text-right">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($salesReturn->items as $item)
+                                    <tr>
+                                        <td>
+                                            <div class="font-medium text-slate-700 dark:text-slate-200">
+                                                {{ $item->product->product_name ?? 'Produk Dihapus' }}
+                                            </div>
+                                            <div class="text-xs text-slate-500">
+                                                {{ $item->product->product_code ?? '-' }}
+                                            </div>
+                                        </td>
+                                        <td class="text-right">
+                                            Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}
+                                        </td>
+                                        <td class="text-center font-bold">
+                                            {{ number_format($item->quantity, 0, ',', '.') }}
+                                            <span class="text-xs font-normal text-slate-400 ml-1">{{ $item->product->unit->name ?? 'Unit' }}</span>
+                                        </td>
+                                        <td class="text-right font-bold text-slate-700 dark:text-slate-200">
+                                            Rp {{ number_format($item->subtotal, 0, ',', '.') }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot>
+                                <tr class="bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
+                                    <td colspan="3" class="text-right py-4 font-bold text-slate-600 dark:text-slate-300">TOTAL</td>
+                                    <td class="text-right py-4 px-6 font-bold text-indigo-600 dark:text-indigo-400 text-lg">
+                                        Rp {{ number_format($salesReturn->total_amount, 0, ',', '.') }}
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Sidebar Info --}}
+            <div class="lg:col-span-1 flex flex-col gap-6">
+                
+                {{-- Info Referensi --}}
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-header-title">Referensi</h3>
+                    </div>
+                    <div class="card-body flex flex-col gap-4">
+                        {{-- Klien --}}
+                        <div class="flex items-start gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500">
+                                <i class="material-icons">person</i>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-500 uppercase font-bold">Pelanggan</p>
+                                <p class="font-bold text-slate-700 dark:text-slate-200">
+                                    {{ $salesReturn->client->client_name }}
+                                </p>
+                                <p class="text-sm text-slate-500">
+                                    {{ $salesReturn->client->phone_number ?? '-' }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <hr class="border-slate-100 dark:border-slate-700">
+
+                        {{-- Invoice --}}
+                        <div class="flex items-start gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600">
+                                <i class="material-icons">receipt</i>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-500 uppercase font-bold">Asal Invoice</p>
+                                <a href="{{ route('admin.invoices.show', $salesReturn->sales_invoice_id) }}" class="font-bold text-indigo-600 hover:underline">
                                     {{ $salesReturn->salesInvoice->invoice_number }}
                                 </a>
+                                <p class="text-xs text-slate-500 mt-0.5">
+                                    Tgl Order: {{ \Carbon\Carbon::parse($salesReturn->salesInvoice->order_date)->format('d/m/Y') }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <hr class="border-slate-100 dark:border-slate-700">
+
+                        {{-- Staff --}}
+                        <div class="flex items-start gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600">
+                                <i class="material-icons">badge</i>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-500 uppercase font-bold">Diproses Oleh</p>
+                                <p class="font-medium text-slate-700 dark:text-slate-200">
+                                    {{ $salesReturn->user->full_name ?? 'Sistem' }}
+                                </p>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    {{-- Lainnya --}}
-                    <div class="space-y-4 border-l border-slate-100 pl-0 md:pl-8">
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs font-bold text-slate-500 uppercase">Tanggal Retur</span>
-                            <span class="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                <i class="material-icons text-slate-400 text-[16px]">event</i>
-                                {{ optional($salesReturn->return_date)->format('d F Y') }}
-                            </span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs font-bold text-slate-500 uppercase">Diproses Oleh</span>
-                            <span class="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                <i class="material-icons text-slate-400 text-[16px]">person</i>
-                                {{ $salesReturn->user->full_name ?? 'System' }}
-                            </span>
-                        </div>
+                {{-- Catatan --}}
+                @if($salesReturn->notes)
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-header-title">Catatan</h3>
                     </div>
-                </div>
-            </div>
-
-            {{-- CARD 2: ITEM --}}
-            <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
-                <div class="px-6 py-4 border-b border-red-100 flex items-center gap-2 bg-red-50/50">
-                    <i class="material-icons text-red-500 text-lg">assignment_return</i>
-                    <h3 class="text-xs font-bold text-red-700 uppercase tracking-wider">Item Dikembalikan</h3>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="dashboard-table min-w-full">
-                        <thead class="bg-slate-50 border-b border-slate-200">
-                            <tr>
-                                <th class="pl-6 text-center w-12">#</th>
-                                <th>Produk</th>
-                                <th class="text-center">Qty</th>
-                                <th class="text-right">Harga (@)</th>
-                                <th class="text-right pr-6">Subtotal</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            @forelse($salesReturn->items as $item)
-                            <tr class="hover:bg-slate-50 transition-colors">
-                                <td class="pl-6 py-4 text-center text-sm text-slate-500">{{ $loop->iteration }}</td>
-                                <td class="py-4">
-                                    <div class="text-sm font-bold text-slate-800">{{ $item->product->product_name ?? 'Produk Dihapus' }}</div>
-                                </td>
-                                <td class="py-4 text-center">
-                                    <span class="inline-block px-2.5 py-1 rounded-md bg-red-50 text-xs font-bold text-red-700 border border-red-100 shadow-sm">
-                                        {{ $item->quantity }} {{ $item->product->unit->name ?? '' }}
-                                    </span>
-                                </td>
-                                <td class="py-4 text-right text-sm text-slate-600 font-mono">
-                                    Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}
-                                </td>
-                                <td class="pr-6 py-4 text-right text-sm font-bold text-slate-900 font-mono">
-                                    Rp {{ number_format($item->subtotal, 0, ',', '.') }}
-                                </td>
-                            </tr>
-                            @empty
-                            <tr><td colspan="5" class="text-center py-8 text-slate-500 italic">Tidak ada item.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {{-- CARD 3: ALASAN --}}
-            @if($salesReturn->notes)
-            <div class="bg-amber-50 rounded-xl border border-amber-100 p-5 flex gap-4 items-start shadow-sm">
-                <div class="bg-amber-100 p-2 rounded-full text-amber-600">
-                    <i class="material-icons text-xl">sticky_note_2</i>
-                </div>
-                <div>
-                    <h4 class="text-xs font-bold text-amber-800 uppercase mb-1 tracking-wide">Alasan Retur</h4>
-                    <p class="text-sm text-amber-900 italic leading-relaxed">"{{ $salesReturn->notes }}"</p>
-                </div>
-            </div>
-            @endif
-
-        </div>
-
-        {{-- KOLOM KANAN: SUMMARY & AKSI (Span 4) --}}
-        <div class="lg:col-span-4 space-y-6">
-            
-            <div class="dashboard-card p-6 shadow-xl sticky top-6 border-t-4 border-indigo-500">
-                <h3 class="card-title mb-6 border-b border-slate-100 pb-3 flex items-center gap-2">
-                    <i class="material-icons text-indigo-600">calculate</i> Ringkasan Nilai
-                </h3>
-
-                <div class="flex flex-col items-center justify-center mb-8 bg-slate-50 p-6 rounded-xl border border-slate-100">
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Total Retur</span>
-                    <span class="text-3xl font-bold text-red-600 font-mono tracking-tight">Rp {{ number_format($salesReturn->total_amount, 0, ',', '.') }}</span>
-                </div>
-
-                <div class="border-t border-dashed border-slate-200 pt-6">
-                    {{-- GLOBAL DELETE HANDLER --}}
-                    <form action="{{ route('admin.sales-returns.destroy', $salesReturn->return_id) }}" method="POST" class="delete-form">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" 
-                                data-title="Batalkan Retur?" 
-                                data-text="Stok akan dikembalikan dan nilai retur dihapus. <b>Data tidak dapat dikembalikan!</b>" 
-                                data-btn-text="Ya, Hapus Permanen"
-                                class="w-full h-[48px] bg-white border border-red-200 text-red-600 rounded-lg text-sm font-bold hover:bg-red-50 transition shadow-sm flex items-center justify-center gap-2 group">
-                            <i class="material-icons text-[20px] group-hover:scale-110 transition-transform">delete_forever</i> Batalkan Retur
-                        </button>
-                    </form>
-                    
-                    <div class="mt-4 flex items-start gap-2 text-[11px] text-slate-400 bg-slate-50 p-3 rounded border border-slate-100">
-                        <i class="material-icons text-[14px] mt-0.5">info</i>
-                        <p class="leading-tight">
-                            Membatalkan retur akan mengurangi stok barang kembali (jika stok sudah bertambah) dan membatalkan penyesuaian saldo piutang/kredit.
+                    <div class="card-body">
+                        <p class="text-sm text-slate-600 dark:text-slate-300 italic">
+                            "{{ $salesReturn->notes }}"
                         </p>
                     </div>
                 </div>
+                @endif
+
             </div>
-
         </div>
-
     </div>
-</div>
+
+    @push('scripts')
+    <script>
+        function deleteReturn() {
+            confirmDialog({
+                title: 'Batalkan Retur?',
+                text: 'Tindakan ini akan <b>mengembalikan stok</b> ke gudang, <b>menghapus deposit/potongan</b> terkait, dan membuat jurnal pembalik. Data tidak dapat dipulihkan.',
+                icon: 'warning',
+                confirmText: 'Ya, Batalkan',
+                confirmColor: 'danger'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('delete-form').submit();
+                }
+            });
+        }
+    </script>
+    @endpush
 @endsection

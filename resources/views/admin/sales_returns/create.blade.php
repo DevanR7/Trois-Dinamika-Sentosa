@@ -2,361 +2,347 @@
 
 @section('title', 'Buat Retur Penjualan')
 
-@push('styles')
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-@endpush
-
 @section('content')
-<div class="max-w-7xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-            <nav class="flex text-sm text-slate-500 mb-1">
-                <a href="{{ route('admin.sales-returns.index') }}" class="hover:text-indigo-600 transition-colors">Retur Penjualan</a>
-                <span class="mx-2 text-slate-300">/</span>
-                <span class="text-slate-800 font-semibold">Buat Baru</span>
-            </nav>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Buat Retur Penjualan</h1>
-        </div>
-        <a href="{{ route('admin.sales-returns.index') }}" 
-           class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
-            <i class="material-icons text-[18px]">arrow_back</i> Kembali
-        </a>
-    </div>
-
-    {{-- ERROR ALERT --}}
-    @if ($errors->any())
-        <div class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 animate-enter">
-            <div class="flex items-start gap-3">
-                <i class="material-icons text-red-500 mt-0.5">error_outline</i>
-                <div>
-                    <h3 class="text-sm font-bold text-red-800">Terdapat kesalahan input</h3>
-                    <ul class="mt-1 list-disc list-inside text-xs text-red-600">
-                        @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
-                    </ul>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    <form action="{{ route('admin.sales-returns.store') }}" method="POST" id="return-form">
+    <form action="{{ route('admin.sales-returns.store') }}" method="POST" id="create-return-form">
         @csrf
-        
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div class="flex flex-col gap-6">
             
-            {{-- KOLOM KIRI (FORM UTAMA) --}}
-            <div class="lg:col-span-8 space-y-8">
-                
-                {{-- CARD 1: INFO RETUR --}}
-                <div class="dashboard-card p-0 overflow-hidden shadow-sm">
-                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                        <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                            <i class="material-icons text-[20px]">assignment_return</i>
-                        </div>
-                        <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Informasi Retur</h3>
-                    </div>
-                    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="md:col-span-2">
-                            <label for="sales_invoice_id">Pilih Invoice Asal <span class="text-red-500">*</span></label>
-                            <select name="sales_invoice_id" id="sales_invoice_id" class="form-input select2-basic" required>
-                                <option value="" disabled selected>-- Cari Nomor Invoice --</option>
-                                @foreach($invoices as $invoice)
-                                    <option value="{{ $invoice->invoice_id }}">{{ $invoice->invoice_number }} - {{ $invoice->client->client_name }}</option>
-                                @endforeach
-                            </select>
-                            <p class="text-xs text-slate-500 mt-1.5 flex items-center gap-1">
-                                <i class="material-icons text-[14px]">info</i> Pilih Invoice untuk memuat daftar barang.
-                            </p>
-                        </div>
-
-                        <div>
-                            <label for="return_date">Tanggal Retur <span class="text-red-500">*</span></label>
-                            <input type="date" class="form-input" id="return_date" name="return_date" value="{{ now()->format('Y-m-d') }}" required>
-                        </div>
-                    </div>
+            {{-- Header --}}
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h2 class="page-title">Buat Retur Baru</h2>
+                    <a href="{{ route('admin.sales-returns.index') }}" class="flex items-center gap-1 text-sm text-slate-500 hover:text-indigo-600 transition-colors mt-1">
+                        <i class="material-icons text-base">arrow_back</i> Kembali ke Daftar
+                    </a>
                 </div>
-
-                {{-- CARD 2: PILIH ITEM --}}
-                <div class="dashboard-card p-0 overflow-hidden shadow-sm min-h-[300px]">
-                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                                <i class="material-icons text-[20px]">list_alt</i>
-                            </div>
-                            <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Item yang Diretur</h3>
-                        </div>
-                        <span class="text-xs font-bold bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-md border border-indigo-200 hidden" id="item-count-badge">0 Item</span>
-                    </div>
-                    
-                    <div class="p-0">
-                        {{-- Placeholder --}}
-                        <div id="instruction-text" class="flex flex-col items-center justify-center py-16 text-slate-400 bg-slate-50/30">
-                            <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-3">
-                                <i class="material-icons text-3xl opacity-30">search</i>
-                            </div>
-                            <p class="text-sm font-medium">Silakan pilih Nomor Invoice di atas.</p>
-                        </div>
-
-                        {{-- Table Container --}}
-                        <div id="items-table-container" class="hidden overflow-x-auto">
-                            <table class="dashboard-table min-w-full">
-                                <thead class="bg-slate-50 border-b border-slate-200">
-                                    <tr>
-                                        <th class="pl-6 w-5/12">Produk</th>
-                                        <th class="text-center w-2/12">Qty Beli</th>
-                                        <th class="text-right w-2/12">Harga (@)</th>
-                                        <th class="text-center w-3/12 bg-indigo-50 border-b border-indigo-200 text-indigo-700">Qty Retur</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="return-items-body" class="divide-y divide-slate-100 bg-white">
-                                    {{-- JS will inject rows here --}}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    {{-- Alasan Retur --}}
-                    <div class="p-6 border-t border-slate-100 bg-slate-50/30">
-                        <label for="notes">Alasan Retur (Catatan) <span class="text-red-500">*</span></label>
-                        <textarea class="form-textarea bg-white" name="notes" id="notes" rows="2" placeholder="Contoh: Salah kirim, barang cacat, rusak di jalan..." required></textarea>
-                    </div>
+                <div class="flex gap-3">
+                    <button type="submit" class="btn btn-primary" id="btn-save">
+                        <i class="material-icons text-lg">save</i>
+                        Simpan Retur
+                    </button>
                 </div>
-
             </div>
 
-            {{-- KOLOM KANAN: AKSI (Span 4) --}}
-            <div class="lg:col-span-4 space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
-                <div class="dashboard-card p-6 shadow-lg sticky top-6 border-t-4 border-indigo-500">
-                    <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide mb-4 border-b border-slate-100 pb-3 flex items-center gap-2">
-                        <i class="material-icons text-indigo-600 text-lg">settings</i> Opsi Pengembalian
-                    </h3>
-
-                    <div class="space-y-4">
-                        {{-- Opsi 1 --}}
-                        <label class="relative flex items-start p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition-all has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 has-[:checked]:ring-1 has-[:checked]:ring-indigo-500">
-                            <div class="flex h-5 items-center mt-0.5">
-                                <input type="radio" name="return_handling_type" value="deduct_invoice" checked class="h-4 w-4 border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                {{-- Left Column: Form Info --}}
+                <div class="lg:col-span-1 flex flex-col gap-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-header-title">Informasi Retur</h3>
+                        </div>
+                        <div class="card-body flex flex-col gap-4">
+                            
+                            {{-- Pilih Invoice --}}
+                            <div>
+                                <label class="form-label">Pilih Invoice <span class="text-red-500">*</span></label>
+                                <select name="sales_invoice_id" id="sales_invoice_id" class="tom-select" required>
+                                    <option value="">Cari No. Invoice...</option>
+                                    @foreach($invoices as $inv)
+                                        <option value="{{ $inv->invoice_id }}" 
+                                                {{ old('sales_invoice_id') == $inv->invoice_id ? 'selected' : '' }}>
+                                            {{ $inv->invoice_number }} - {{ $inv->client->client_name }} 
+                                            ({{ \Carbon\Carbon::parse($inv->order_date)->format('d/m/Y') }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="text-xs text-slate-400 mt-1">Hanya menampilkan invoice aktif (bukan draft/batal).</p>
                             </div>
-                            <div class="ml-3">
-                                <span class="block text-sm font-bold text-slate-900">Potong Tagihan Invoice</span>
-                                <span class="block text-xs text-slate-500 mt-0.5 leading-relaxed">Mengurangi total tagihan pada Invoice terkait jika statusnya belum lunas.</span>
-                            </div>
-                        </label>
 
-                        {{-- Opsi 2 --}}
-                        <label class="relative flex items-start p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition-all has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 has-[:checked]:ring-1 has-[:checked]:ring-indigo-500">
-                            <div class="flex h-5 items-center mt-0.5">
-                                <input type="radio" name="return_handling_type" value="store_as_credit" class="h-4 w-4 border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                            {{-- Tanggal Retur --}}
+                            <div>
+                                <label class="form-label">Tanggal Retur <span class="text-red-500">*</span></label>
+                                <input type="date" name="return_date" 
+                                       value="{{ old('return_date', date('Y-m-d')) }}" 
+                                       class="form-input" required>
                             </div>
-                            <div class="ml-3">
-                                <span class="block text-sm font-bold text-slate-900">Simpan ke Saldo Kredit</span>
-                                <span class="block text-xs text-slate-500 mt-0.5 leading-relaxed">Menambah saldo deposit (kredit) klien untuk digunakan pada pesanan berikutnya.</span>
+
+                            {{-- Tipe Penanganan --}}
+                            <div>
+                                <label class="form-label">Tindakan <span class="text-red-500">*</span></label>
+                                <div class="grid grid-cols-1 gap-2">
+                                    <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800 transition-colors">
+                                        <input type="radio" name="return_handling_type" value="deduct_invoice" 
+                                               class="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" 
+                                               {{ old('return_handling_type', 'deduct_invoice') == 'deduct_invoice' ? 'checked' : '' }}>
+                                        <div class="ml-3">
+                                            <span class="block text-sm font-medium text-slate-700 dark:text-slate-200">Potong Tagihan</span>
+                                            <span class="block text-xs text-slate-500">Mengurangi sisa hutang invoice.</span>
+                                        </div>
+                                    </label>
+                                    
+                                    <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800 transition-colors">
+                                        <input type="radio" name="return_handling_type" value="store_as_credit" 
+                                               class="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                                               {{ old('return_handling_type') == 'store_as_credit' ? 'checked' : '' }}>
+                                        <div class="ml-3">
+                                            <span class="block text-sm font-medium text-slate-700 dark:text-slate-200">Simpan sebagai Deposit</span>
+                                            <span class="block text-xs text-slate-500">Masuk ke saldo kredit klien.</span>
+                                        </div>
+                                    </label>
+                                </div>
                             </div>
-                        </label>
 
-                        <hr class="border-dashed border-slate-200 my-4">
+                            {{-- Catatan --}}
+                            <div>
+                                <label class="form-label">Catatan / Alasan</label>
+                                <textarea name="notes" rows="3" class="form-input" placeholder="Contoh: Barang rusak, salah kirim, dll...">{{ old('notes') }}</textarea>
+                            </div>
 
-                        <button type="submit" class="w-full h-[48px] bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition-all flex justify-center items-center gap-2 group hover:-translate-y-0.5">
-                            <i class="material-icons text-[18px] group-hover:scale-110 transition-transform">save</i> Simpan Retur
-                        </button>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Right Column: Items Table --}}
+                <div class="lg:col-span-2">
+                    <div class="card h-full flex flex-col">
+                        <div class="card-header flex justify-between items-center">
+                            <h3 class="card-header-title">Item Barang</h3>
+                            <div id="loading-items" class="hidden text-sm text-indigo-600 flex items-center gap-2">
+                                <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                Memuat item...
+                            </div>
+                        </div>
                         
-                        <a href="{{ route('admin.sales-returns.index') }}" class="w-full h-[48px] bg-white border border-slate-300 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-50 transition text-center shadow-sm flex items-center justify-center">
-                            Batal
-                        </a>
+                        <div class="card-body p-0 flex-1 overflow-hidden flex flex-col">
+                            {{-- Placeholder jika belum pilih invoice --}}
+                            <div id="empty-state" class="flex flex-col items-center justify-center py-12 text-slate-400">
+                                <i class="material-icons text-5xl mb-3">playlist_add</i>
+                                <p class="text-sm">Silakan pilih Invoice terlebih dahulu.</p>
+                            </div>
+
+                            {{-- Tabel Item --}}
+                            <div id="items-container" class="hidden w-full overflow-x-auto">
+                                <table class="table-modern w-full">
+                                    <thead>
+                                        <tr>
+                                            <th>Produk</th>
+                                            <th class="text-right">Harga Satuan</th>
+                                            <th class="text-center w-24">Qty Terjual</th>
+                                            <th class="text-center w-24">Sdh Retur</th>
+                                            <th class="text-center w-32">Qty Retur</th>
+                                            <th class="text-right">Subtotal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="items-table-body">
+                                        {{-- Rows populated via JS --}}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="bg-slate-50 dark:bg-slate-800 font-bold border-t border-slate-200 dark:border-slate-700">
+                                            <td colspan="5" class="text-right py-4 text-slate-600 dark:text-slate-300 uppercase text-xs tracking-wider">
+                                                Total Nilai Retur
+                                            </td>
+                                            <td class="text-right py-4 px-6 text-indigo-600 dark:text-indigo-400 text-lg">
+                                                <span id="grand-total-display">0</span>
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
-
             </div>
-
         </div>
     </form>
-</div>
-@endsection
 
-@push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const invoiceSelect = $('#sales_invoice_id');
-    const itemsContainer = $('#return-items-body');
-    const tableContainer = $('#items-table-container');
-    const instructionText = $('#instruction-text');
-    const itemCountBadge = $('#item-count-badge');
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const invoiceSelect = document.getElementById('sales_invoice_id');
+            const itemsContainer = document.getElementById('items-container');
+            const emptyState = document.getElementById('empty-state');
+            const tableBody = document.getElementById('items-table-body');
+            const loadingIndicator = document.getElementById('loading-items');
+            const grandTotalDisplay = document.getElementById('grand-total-display');
 
-    // Init Select2
-    invoiceSelect.select2({
-        placeholder: '-- Cari Nomor Invoice --',
-        width: '100%',
-        dropdownCssClass: 'select2-dropdown-clean'
-    });
+            // Tom Select Instance (karena class .tom-select di init di app.js)
+            // Kita perlu akses instance untuk event listener
+            // Namun karena app.js global init, kita pakai event 'change' standar pada elemen asli
+            // Tom Select akan memicu event change pada elemen select asli.
 
-    function formatRupiah(number) {
-        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
-    }
-
-    // Logic Load Items
-    invoiceSelect.on('change', function() {
-        const invoiceId = $(this).val();
-        
-        if (!invoiceId) {
-            tableContainer.addClass('hidden');
-            instructionText.show();
-            itemsContainer.empty();
-            itemCountBadge.addClass('hidden');
-            return;
-        }
-        
-        // Loading State
-        instructionText.html(`
-            <div class="flex flex-col items-center justify-center py-8">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-3"></div>
-                <span class="text-sm text-slate-500 font-medium">Memuat data item...</span>
-            </div>
-        `).show();
-        
-        tableContainer.addClass('hidden');
-
-        // Fetch API
-        fetch(`/api/invoices/${invoiceId}/items`)
-            .then(response => response.json())
-            .then(data => {
-                itemsContainer.empty();
+            invoiceSelect.addEventListener('change', function() {
+                const invoiceId = this.value;
                 
-                if (data.items && data.items.length > 0) {
-                    let returnableCount = 0;
-                    const discountRate = (data.invoice.discount_percentage || 0) / 100;
-
-                    data.items.forEach((item, index) => {
-                        // Hitung sisa qty yang bisa diretur
-                        const maxQty = item.quantity - (item.quantity_returned || 0);
-                        
-                        if (maxQty > 0) {
-                            returnableCount++;
-                            const priceAfterDiscount = item.price_per_unit * (1 - discountRate);
-                            
-                            // HTML Row
-                            const rowHTML = `
-                                <tr class="hover:bg-slate-50 transition-colors group">
-                                    <td class="px-6 py-4">
-                                        <div class="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition">${item.product.product_name}</div>
-                                        <div class="text-xs text-slate-500 mt-1 flex items-center gap-2">
-                                            <span class="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200 text-slate-600">
-                                                Sudah Retur: ${item.quantity_returned || 0}
-                                            </span>
-                                            <span class="text-slate-300">|</span>
-                                            <span>Total Beli: ${item.quantity}</span>
-                                        </div>
-                                        <input type="hidden" name="items[${index}][item_id]" value="${item.item_id}">
-                                    </td>
-                                    <td class="px-6 py-4 text-center align-middle">
-                                        <span class="inline-block px-2.5 py-1 bg-white text-slate-700 text-xs font-bold rounded border border-slate-300 shadow-sm">
-                                            ${item.quantity}
-                                        </span>
-                                    </td>
-                                    <td class="px-6 py-4 text-right align-middle text-sm text-slate-600 font-mono">
-                                        ${formatRupiah(priceAfterDiscount)}
-                                    </td>
-                                    <td class="px-6 py-4 bg-indigo-50/30">
-                                        <div class="flex flex-col items-center">
-                                            <div class="relative w-24">
-                                                <input type="number" 
-                                                       name="items[${index}][quantity]" 
-                                                       class="return-qty-input form-input text-center font-bold text-slate-800 h-10 w-full border-indigo-200 focus:border-indigo-500 focus:ring-indigo-500"
-                                                       min="0" max="${maxQty}" placeholder="0">
-                                            </div>
-                                            <div class="text-[10px] text-slate-400 mt-1 font-medium">Maks: ${maxQty}</div>
-                                            <div class="text-red-500 text-[10px] mt-0.5 hidden qty-error-message font-bold">Melebihi batas!</div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            `;
-                            
-                            const newRow = $(rowHTML);
-
-                            // Validasi Real-time
-                            newRow.find('.return-qty-input').on('input', function() {
-                                const input = $(this);
-                                const errorMessage = newRow.find('.qty-error-message');
-                                const val = parseInt(input.val() || 0, 10);
-                                const max = parseInt(input.attr('max'), 10);
-
-                                if (val > max) {
-                                    errorMessage.removeClass('hidden');
-                                    input.addClass('!border-red-500 !bg-red-50 text-red-600');
-                                } else {
-                                    errorMessage.addClass('hidden');
-                                    input.removeClass('!border-red-500 !bg-red-50 text-red-600');
-                                }
-                            });
-
-                            itemsContainer.append(newRow);
-                        }
-                    });
-
-                    if(returnableCount > 0){
-                        instructionText.hide();
-                        tableContainer.removeClass('hidden');
-                        itemCountBadge.text(`${returnableCount} Item Tersedia`).removeClass('hidden');
-                    } else {
-                        instructionText.html(`
-                            <div class="text-center py-8">
-                                <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 mb-3 text-green-600">
-                                    <i class="material-icons text-xl">check_circle</i>
-                                </div>
-                                <h4 class="text-slate-900 font-bold mb-1">Semua Beres!</h4>
-                                <p class="text-sm text-slate-500">Semua item pada Invoice ini sudah diretur sepenuhnya.</p>
-                            </div>
-                        `).show();
-                        itemCountBadge.addClass('hidden');
-                    }
-                } else {
-                    instructionText.html('<div class="text-slate-500 py-8 text-sm">Tidak ada item ditemukan pada invoice ini.</div>').show();
+                if (!invoiceId) {
+                    resetTable();
+                    return;
                 }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                instructionText.html('<div class="text-red-500 py-8 text-sm font-bold flex items-center gap-2 justify-center"><i class="material-icons">error</i> Gagal memuat data.</div>').show();
+
+                fetchInvoiceItems(invoiceId);
             });
-    });
 
-    // Client-side Validation Submit
-    const form = document.getElementById('return-form');
-    form.addEventListener('submit', function(e) {
-        let hasInput = false;
-        let hasError = false;
+            function resetTable() {
+                itemsContainer.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                tableBody.innerHTML = '';
+                updateGrandTotal();
+            }
 
-        document.querySelectorAll('.return-qty-input').forEach(input => {
-            const val = parseInt(input.value || 0, 10);
-            const max = parseInt(input.getAttribute('max'), 10);
+            async function fetchInvoiceItems(invoiceId) {
+                // UI States
+                emptyState.classList.add('hidden');
+                itemsContainer.classList.remove('hidden');
+                loadingIndicator.classList.remove('hidden');
+                tableBody.innerHTML = ''; // Clear old
 
-            if (val > 0) hasInput = true;
-            if (val > max) hasError = true;
+                try {
+                    const response = await fetch(`/admin/api/invoices/${invoiceId}/items`);
+                    if (!response.ok) throw new Error('Gagal mengambil data item.');
+                    
+                    const data = await response.json();
+                    const items = data.items;
+                    
+                    // Invoice level discount (percentage) can be accessed via data.invoice.discount_percentage
+                    const invoiceDiscountPercent = parseFloat(data.invoice.discount_percentage) || 0;
+
+                    if (items.length === 0) {
+                        tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-slate-500 italic">Tidak ada item dalam invoice ini.</td></tr>`;
+                    } else {
+                        items.forEach((item, index) => {
+                            // Hitung max qty yang bisa diretur (Qty Awal - Qty Sudah Diretur)
+                            const maxQty = parseFloat(item.quantity) - parseFloat(item.quantity_returned);
+                            
+                            // Hitung harga satuan bersih setelah diskon invoice (pro-rate logic)
+                            // Jika diskon per item ada (tidak ada di skema invoice_items standar Anda, tapi ada discount_percentage global)
+                            // Logic Controller: $priceAfterDiscount = $originalItem->price_per_unit * (1 - $discountRate);
+                            const rawPrice = parseFloat(item.price_per_unit);
+                            const netPrice = rawPrice * (1 - (invoiceDiscountPercent / 100));
+
+                            // Skip jika sudah diretur semua
+                            if (maxQty <= 0) return;
+
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>
+                                    <div class="font-medium text-slate-700 dark:text-slate-200 text-sm">
+                                        ${item.product.product_name}
+                                    </div>
+                                    <div class="text-xs text-slate-500">${item.product.product_code}</div>
+                                    <input type="hidden" name="items[${index}][item_id]" value="${item.item_id}">
+                                </td>
+                                <td class="text-right">
+                                    <div class="text-sm font-medium">Rp ${new Intl.NumberFormat('id-ID').format(netPrice)}</div>
+                                    ${invoiceDiscountPercent > 0 ? `<div class="text-[10px] text-green-600">Disc ${invoiceDiscountPercent}% Applied</div>` : ''}
+                                    <input type="hidden" class="input-price" value="${netPrice}">
+                                </td>
+                                <td class="text-center text-sm text-slate-600">
+                                    ${parseFloat(item.quantity)}
+                                </td>
+                                <td class="text-center text-sm text-slate-600">
+                                    ${parseFloat(item.quantity_returned)}
+                                </td>
+                                <td>
+                                    <input type="number" 
+                                           name="items[${index}][quantity]" 
+                                           class="form-input input-qty text-center h-9" 
+                                           min="0" 
+                                           max="${maxQty}" 
+                                           step="1"
+                                           placeholder="0"
+                                           data-max="${maxQty}">
+                                    <div class="text-[10px] text-red-500 mt-1 hidden error-msg">Maks ${maxQty}</div>
+                                </td>
+                                <td class="text-right font-medium text-slate-700 dark:text-white">
+                                    <span class="row-subtotal">0</span>
+                                </td>
+                            `;
+                            tableBody.appendChild(row);
+                        });
+
+                        if (tableBody.children.length === 0) {
+                             tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-slate-500 italic">Semua item pada invoice ini sudah diretur sepenuhnya.</td></tr>`;
+                        }
+                    }
+
+                    // Attach Listeners for Calculation
+                    attachCalculationListeners();
+
+                } catch (error) {
+                    console.error(error);
+                    showToast('Gagal memuat data invoice: ' + error.message, 'error');
+                    resetTable();
+                } finally {
+                    loadingIndicator.classList.add('hidden');
+                }
+            }
+
+            function attachCalculationListeners() {
+                const qtyInputs = document.querySelectorAll('.input-qty');
+                
+                qtyInputs.forEach(input => {
+                    input.addEventListener('input', function() {
+                        const row = this.closest('tr');
+                        const price = parseFloat(row.querySelector('.input-price').value);
+                        const max = parseFloat(this.dataset.max);
+                        let qty = parseFloat(this.value);
+                        const errorMsg = row.querySelector('.error-msg');
+
+                        if (isNaN(qty)) qty = 0;
+
+                        // Validasi Max
+                        if (qty > max) {
+                            this.classList.add('border-red-500', 'focus:ring-red-500');
+                            errorMsg.classList.remove('hidden');
+                            // Optional: Reset to max or keep user input but invalidate form
+                        } else {
+                            this.classList.remove('border-red-500', 'focus:ring-red-500');
+                            errorMsg.classList.add('hidden');
+                        }
+
+                        // Calculate Subtotal
+                        const subtotal = qty * price;
+                        
+                        // Format Currency
+                        row.querySelector('.row-subtotal').textContent = new Intl.NumberFormat('id-ID').format(subtotal);
+
+                        updateGrandTotal();
+                    });
+                });
+            }
+
+            function updateGrandTotal() {
+                let total = 0;
+                document.querySelectorAll('.input-qty').forEach(input => {
+                    const row = input.closest('tr');
+                    const price = parseFloat(row.querySelector('.input-price').value);
+                    let qty = parseFloat(input.value);
+                    if (isNaN(qty)) qty = 0;
+                    total += (qty * price);
+                });
+
+                grandTotalDisplay.textContent = new Intl.NumberFormat('id-ID').format(total);
+            }
+
+            // Validasi sebelum submit
+            document.getElementById('create-return-form').addEventListener('submit', function(e) {
+                let hasItems = false;
+                let hasError = false;
+
+                document.querySelectorAll('.input-qty').forEach(input => {
+                    const qty = parseFloat(input.value);
+                    const max = parseFloat(input.dataset.max);
+                    
+                    if (qty > 0) hasItems = true;
+                    if (qty > max) hasError = true;
+                });
+
+                if (hasError) {
+                    e.preventDefault();
+                    showToast('Harap perbaiki jumlah retur yang melebihi batas.', 'error');
+                    return;
+                }
+
+                if (!hasItems) {
+                    e.preventDefault();
+                    showToast('Harap isi minimal satu item untuk diretur.', 'warning');
+                    return;
+                }
+                
+                // Button Loading State (handled by app.js default listener, but just in case)
+                // logic 'is-loading' is centralized in app.js
+            });
         });
-        
-        if (!hasInput) {
-            e.preventDefault();
-            Swal.fire({
-                icon: 'warning',
-                title: 'Belum ada item',
-                text: 'Harap isi jumlah retur setidaknya pada satu item.',
-                confirmButtonColor: '#f59e0b',
-                customClass: { popup: 'colored-toast rounded-xl' }
-            });
-        }
-        
-        if (hasError) {
-            e.preventDefault();
-            Swal.fire({
-                icon: 'error',
-                title: 'Jumlah Invalid',
-                text: 'Ada jumlah retur yang melebihi batas maksimal. Silakan periksa kembali.',
-                confirmButtonColor: '#ef4444',
-                customClass: { popup: 'colored-toast rounded-xl' }
-            });
-        }
-    });
-});
-</script>
-@endpush
+    </script>
+    @endpush
+@endsection

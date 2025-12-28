@@ -1,222 +1,319 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Tambah Produk Baru')
+@section('title', 'Tambah Produk')
 
 @section('content')
-<div class="max-w-7xl mx-auto pb-20 animate-enter">
-    
-    <form action="{{ route('admin.products.store') }}" method="POST" enctype="multipart/form-data" id="productForm">
-        @csrf
-
-        {{-- HEADER --}}
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+    <div class="max-w-5xl mx-auto flex flex-col gap-8">
+        
+        {{-- Header Navigation --}}
+        <div class="flex items-center gap-4">
+            <a href="{{ route('admin.products.index') }}" 
+               class="w-10 h-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm">
+                <i class="material-icons text-[20px]">arrow_back</i>
+            </a>
             <div>
-                <nav class="flex text-sm text-slate-500 mb-1">
-                    <a href="{{ route('admin.products.index') }}" class="hover:text-indigo-600 transition-colors">Produk</a>
-                    <span class="mx-2 text-slate-300">/</span>
-                    <span class="text-slate-800 font-semibold">Baru</span>
-                </nav>
-                <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Tambah Produk Baru</h1>
-            </div>
-            
-            <div class="flex gap-3 w-full sm:w-auto">
-                <a href="{{ route('admin.products.index') }}" 
-                   class="flex-1 sm:flex-none h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
-                    <i class="material-icons text-[18px]">close</i> Batal
-                </a>
-                <button type="submit" 
-                        class="flex-1 sm:flex-none h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2">
-                    <i class="material-icons text-[18px]">save</i> Simpan
-                </button>
+                <h1 class="text-xl font-bold text-slate-900 dark:text-white">Tambah Produk Baru</h1>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Lengkapi formulir di bawah untuk menambahkan inventaris baru.</p>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            {{-- KOLOM KIRI: FORM INPUT --}}
-            <div class="lg:col-span-8 space-y-6">
-                <div class="dashboard-card p-0 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                        <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                            <i class="material-icons text-[20px]">inventory_2</i>
-                        </div>
-                        <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Detail Produk</h3>
-                    </div>
+        <form action="{{ route('admin.products.store') }}" method="POST" enctype="multipart/form-data">
+            @csrf
 
-                    <div class="p-6 space-y-6">
-                        {{-- Nama Produk --}}
-                        <div>
-                            <label for="product_name">Nama Produk <span class="text-red-500">*</span></label>
-                            <input type="text" name="product_name" id="product_name" value="{{ old('product_name') }}" class="form-input" placeholder="Contoh: Sepatu Sneakers Nike" required>
-                            @error('product_name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                        </div>
+            <div class="flex flex-col gap-6">
+                
+                {{-- Card 1: Informasi Utama & Gambar --}}
+                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 sm:p-8 border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+                        <i class="material-icons text-indigo-500">info</i> Informasi Dasar
+                    </h3>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {{-- SKU --}}
-                            <div>
-                                <label for="product_code">SKU / Kode <span class="text-red-500">*</span></label>
-                                <input type="text" name="product_code" id="product_code" value="{{ old('product_code') }}" class="form-input font-mono uppercase" placeholder="AUTO-GEN" required>
-                                @error('product_code') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                            </div>
-                            {{-- Satuan --}}
-                            <div>
-                                <label for="unit_id">Satuan (Unit) <span class="text-red-500">*</span></label>
-                                <select name="unit_id" id="unit_id" class="select2-basic" required>
-                                    <option value="" selected disabled>Pilih Satuan...</option>
-                                    @foreach ($units as $unit)
-                                        <option value="{{ $unit->unit_id }}" @selected(old('unit_id') == $unit->unit_id)>{{ $unit->name }}</option>
-                                    @endforeach
-                                </select>
-                                @error('unit_id') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                            </div>
-                        </div>
-
-                        {{-- Supplier --}}
-                        <div>
-                            <label for="supplier_id">Supplier Utama <span class="text-red-500">*</span></label>
-                            <select name="supplier_id" id="supplier_id" class="select2-basic" required>
-                                <option value="" selected disabled>Pilih Supplier...</option>
-                                @foreach($suppliers as $supplier)
-                                    <option value="{{ $supplier->supplier_id }}" @selected(old('supplier_id') == $supplier->supplier_id)>{{ $supplier->supplier_name }}</option>
-                                @endforeach
-                            </select>
-                            @error('supplier_id') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                        </div>
-
-                        <hr class="border-slate-100">
-
-                        {{-- Harga & Stok --}}
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div>
-                                <label for="purchase_price">Harga Beli (HPP)</label>
-                                <input type="text" id="purchase_price_display" class="form-input input-currency font-mono" placeholder="0">
-                                <input type="hidden" name="purchase_price" id="purchase_price" value="{{ old('purchase_price', 0) }}">
-                                @error('purchase_price') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                            </div>
-                            <div>
-                                <label for="selling_price">Harga Jual <span class="text-red-500">*</span></label>
-                                <input type="text" id="selling_price_display" class="form-input input-currency font-mono font-bold text-indigo-600" placeholder="0">
-                                <input type="hidden" name="selling_price" id="selling_price" value="{{ old('selling_price', 0) }}">
-                                @error('selling_price') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                            </div>
-                            <div>
-                                <label for="stock_quantity">Stok Awal</label>
-                                <input type="number" name="stock_quantity" id="stock_quantity" value="{{ old('stock_quantity', 0) }}" class="form-input" min="0" step="0.01" placeholder="0">
-                                @error('stock_quantity') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                            </div>
-                        </div>
-
-                        {{-- Deskripsi --}}
-                        <div>
-                            <label for="description">Deskripsi / Catatan</label>
-                            <textarea name="description" id="description" class="form-textarea" placeholder="Spesifikasi produk...">{{ old('description') }}</textarea>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- KOLOM KANAN: GAMBAR --}}
-            <div class="lg:col-span-4 space-y-6">
-                <div class="dashboard-card">
-                    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                        <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Gambar Produk</h3>
-                    </div>
-                    
-                    <div class="p-6">
-                        <div class="relative w-full aspect-square bg-slate-50 rounded-xl border-2 border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50/10 transition-all group cursor-pointer overflow-hidden flex flex-col items-center justify-center text-center" id="upload-area">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {{-- Image Upload (Left Side) --}}
+                        <div class="lg:col-span-1">
+                            <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Foto Produk</label>
                             
-                            <div id="upload-placeholder" class="p-6">
-                                <div class="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center mx-auto mb-3 text-indigo-500">
-                                    <i class="material-icons text-2xl">cloud_upload</i>
+                            <div class="relative w-full aspect-square bg-slate-50 dark:bg-slate-900 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-indigo-400 transition-colors group cursor-pointer overflow-hidden flex flex-col items-center justify-center text-center">
+                                <input type="file" id="image_input" name="image" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" accept="image/*" onchange="previewImage(event)">
+                                
+                                {{-- Placeholder State --}}
+                                <div id="placeholder-content" class="flex flex-col items-center p-4 transition-opacity duration-300">
+                                    <div class="w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                        <i class="material-icons text-indigo-500">add_a_photo</i>
+                                    </div>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                                        <span class="font-bold text-indigo-600">Klik</span> atau drop file
+                                    </p>
+                                    <p class="text-[10px] text-slate-400 mt-1">JPG/PNG, Max 2MB</p>
                                 </div>
-                                <p class="text-sm font-bold text-slate-700">Upload Gambar</p>
-                                <p class="text-xs text-slate-400 mt-1">Max 2MB (JPG/PNG)</p>
+
+                                {{-- Loading Indicator --}}
+                                <div id="image-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-white/90 dark:bg-slate-800/90 z-20 hidden">
+                                    <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span class="text-xs text-indigo-600 font-medium mt-2">Memproses...</span>
+                                </div>
+
+                                {{-- Preview Image --}}
+                                <img id="image-preview" src="#" alt="Preview" class="absolute inset-0 w-full h-full object-cover hidden">
                             </div>
-                            
-                            <img id="image-preview" src="#" class="hidden absolute inset-0 w-full h-full object-cover rounded-xl">
-                            <input type="file" name="image" id="image" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" accept=".png, .jpg, .jpeg">
-                            
-                            {{-- Tombol Hapus Gambar --}}
-                            <button type="button" id="remove-image" class="hidden absolute top-3 right-3 w-8 h-8 bg-white text-red-500 rounded-lg shadow-md hover:bg-red-50 z-20 flex items-center justify-center">
-                                <i class="material-icons text-[18px]">delete</i>
-                            </button>
+                            @error('image') <p class="text-xs text-red-500 mt-2 flex items-center gap-1"><i class="material-icons text-[14px]">error</i> {{ $message }}</p> @enderror
                         </div>
-                        @error('image') <p class="text-red-500 text-xs mt-2 text-center">{{ $message }}</p> @enderror
+
+                        {{-- Main Inputs (Right Side) --}}
+                        <div class="lg:col-span-2 flex flex-col gap-6">
+                            
+                            {{-- Nama Produk (Penting untuk generate kode) --}}
+                            <div>
+                                <label for="product_name" class="form-label">Nama Produk <span class="text-red-500">*</span></label>
+                                <input type="text" id="product_name" name="product_name" 
+                                       class="form-input @error('product_name') border-red-500 @enderror" 
+                                       value="{{ old('product_name') }}" 
+                                       placeholder="Contoh: Mesin Bor 13mm BULL" required>
+                                @error('product_name') <p class="form-error">{{ $message }}</p> @enderror
+                            </div>
+
+                            {{-- Kode Produk dengan Smart Generator --}}
+                            <div>
+                                <label for="product_code" class="form-label flex justify-between">
+                                    <span>Kode Produk <span class="text-red-500">*</span></span>
+                                    <span class="text-[10px] text-indigo-500 cursor-pointer hover:underline" onclick="generateSmartCode()">Generate Otomatis</span>
+                                </label>
+                                <div class="relative flex items-center">
+                                    <input type="text" id="product_code" name="product_code" 
+                                           class="form-input pr-12 font-mono uppercase @error('product_code') border-red-500 @enderror" 
+                                           value="{{ old('product_code') }}" 
+                                           required 
+                                           placeholder="BL-BOR-13MM-001">
+                                    
+                                    {{-- Tombol Magic Wand --}}
+                                    <button type="button" 
+                                            onclick="generateSmartCode()"
+                                            class="absolute right-1.5 w-9 h-8 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-800 text-indigo-600 dark:text-indigo-400 rounded-lg transition-colors flex items-center justify-center shadow-sm border border-indigo-100 dark:border-indigo-700/50"
+                                            title="Generate Kode Pintar dari Nama">
+                                        <i class="material-icons text-[18px]">auto_fix_high</i>
+                                    </button>
+                                </div>
+                                <p class="text-[10px] text-slate-400 mt-1">Klik ikon tongkat sihir untuk membuat kode otomatis berdasarkan nama produk.</p>
+                                @error('product_code') <p class="form-error">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                <div>
+                                    <label class="form-label">Pemasok <span class="text-red-500">*</span></label>
+                                    <select name="supplier_id" class="tom-select" required>
+                                        <option value="" selected disabled>Pilih Pemasok</option>
+                                        @foreach($suppliers as $supplier)
+                                            <option value="{{ $supplier->supplier_id }}" {{ old('supplier_id') == $supplier->supplier_id ? 'selected' : '' }}>
+                                                {{ $supplier->supplier_name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @error('supplier_id') <p class="form-error">{{ $message }}</p> @enderror
+                                </div>
+                                <div>
+                                    <label class="form-label">Satuan <span class="text-red-500">*</span></label>
+                                    <select name="unit_id" class="tom-select" required>
+                                        <option value="" selected disabled>Pilih Satuan</option>
+                                        @foreach($units as $unit)
+                                            <option value="{{ $unit->unit_id }}" {{ old('unit_id') == $unit->unit_id ? 'selected' : '' }}>
+                                                {{ $unit->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @error('unit_id') <p class="form-error">{{ $message }}</p> @enderror
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="form-label">Deskripsi</label>
+                                <textarea name="description" rows="3" class="form-textarea" placeholder="Spesifikasi atau detail produk...">{{ old('description') }}</textarea>
+                            </div>
+                        </div>
                     </div>
                 </div>
+
+                {{-- Card 2: Harga & Stok --}}
+                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 sm:p-8 border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+                        <i class="material-icons text-emerald-500">payments</i> Harga & Stok
+                    </h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {{-- Harga Beli --}}
+                        <div>
+                            <label class="form-label">Harga Beli <span class="text-red-500">*</span></label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 w-10 flex items-center justify-center pointer-events-none z-10 border-r border-slate-200 dark:border-slate-700 h-full bg-slate-50 dark:bg-slate-900 rounded-l-lg">
+                                    <span class="text-slate-500 font-medium text-xs">Rp</span>
+                                </div>
+                                <input type="text" name="purchase_price" 
+                                       class="form-input pl-12 text-right font-medium autonumeric" 
+                                       value="{{ old('purchase_price') }}" required placeholder="0">
+                            </div>
+                            @error('purchase_price') <p class="form-error">{{ $message }}</p> @enderror
+                        </div>
+
+                        {{-- Harga Jual --}}
+                        <div>
+                            <label class="form-label">Harga Jual <span class="text-red-500">*</span></label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 w-10 flex items-center justify-center pointer-events-none z-10 border-r border-slate-200 dark:border-slate-700 h-full bg-slate-50 dark:bg-slate-900 rounded-l-lg">
+                                    <span class="text-slate-500 font-medium text-xs">Rp</span>
+                                </div>
+                                <input type="text" name="selling_price" 
+                                       class="form-input pl-12 text-right font-bold text-emerald-600 dark:text-emerald-400 autonumeric" 
+                                       value="{{ old('selling_price') }}" required placeholder="0">
+                            </div>
+                            @error('selling_price') <p class="form-error">{{ $message }}</p> @enderror
+                        </div>
+
+                        {{-- Stok Awal --}}
+                        <div>
+                            <label class="form-label">Stok Awal</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 w-10 flex items-center justify-center pointer-events-none z-10 border-r border-slate-200 dark:border-slate-700 h-full bg-slate-50 dark:bg-slate-900 rounded-l-lg">
+                                    <i class="material-icons text-slate-400 text-[18px]">layers</i>
+                                </div>
+                                <input type="text" name="stock_quantity" 
+                                       class="form-input pl-12 text-right autonumeric" 
+                                       value="{{ old('stock_quantity', 0) }}" placeholder="0">
+                            </div>
+                            @error('stock_quantity') <p class="form-error">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Action Buttons --}}
+                <div class="flex items-center justify-end gap-4 pt-4">
+                    <a href="{{ route('admin.products.index') }}" class="btn btn-secondary h-11 px-6">Batal</a>
+                    <button type="submit" class="btn btn-primary h-11 px-8 shadow-lg shadow-indigo-500/30">
+                        <span class="flex items-center gap-2">
+                            <i class="material-icons text-[20px]">save</i> Simpan Produk
+                        </span>
+                    </button>
+                </div>
+
             </div>
+        </form>
+    </div>
 
-        </div>
-    </form>
-</div>
-@endsection
-
-@push('scripts')
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Select2 Init
-        $('.select2-basic').select2({ placeholder: 'Pilih...', allowClear: true, width: '100%', dropdownCssClass: 'select2-dropdown-clean' });
-
-        // AutoNumeric Manual Init (jika ingin lebih spesifik selain class .input-currency)
-        // Tapi karena di app.js sudah ada global .input-currency, ini opsional
-        // Cukup pastikan input hidden terisi saat submit
-        
-        const purchaseInput = document.getElementById('purchase_price_display');
-        const sellingInput = document.getElementById('selling_price_display');
-        
-        // Logic Gambar
-        const input = document.getElementById('image');
-        const preview = document.getElementById('image-preview');
-        const ph = document.getElementById('upload-placeholder');
-        const rm = document.getElementById('remove-image');
-        const area = document.getElementById('upload-area');
-
-        input.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if(file) {
-                if(file.size > 2*1024*1024) {
-                    window.showToast('Ukuran file terlalu besar (Max 2MB)', 'error');
-                    this.value = '';
-                    return;
-                }
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    preview.src = ev.target.result;
-                    preview.classList.remove('hidden');
-                    ph.classList.add('hidden');
-                    rm.classList.remove('hidden');
-                    area.classList.remove('border-dashed', 'border-slate-300');
-                    area.classList.add('border-solid', 'border-indigo-200');
-                }
-                reader.readAsDataURL(file);
-            }
-        });
-
-        rm.addEventListener('click', function(e) {
-            e.preventDefault();
-            input.value = '';
-            preview.src = '#';
+    @push('scripts')
+    <script>
+        // === 1. Image Preview with Loading ===
+        function previewImage(event) {
+            const loading = document.getElementById('image-loading');
+            const preview = document.getElementById('image-preview');
+            const placeholder = document.getElementById('placeholder-content');
+            
+            // Reset state & Show loader
             preview.classList.add('hidden');
-            ph.classList.remove('hidden');
-            rm.classList.add('hidden');
-            area.classList.add('border-dashed', 'border-slate-300');
-            area.classList.remove('border-solid', 'border-indigo-200');
-        });
+            if(placeholder) placeholder.style.opacity = '0';
+            loading.classList.remove('hidden');
 
-        // Submit Handler: Pindahkan nilai AutoNumeric ke Hidden Input
-        document.getElementById('productForm').addEventListener('submit', function() {
-            // Ambil instance AutoNumeric
-            if(AutoNumeric.getAutoNumericElement(purchaseInput)) {
-                document.getElementById('purchase_price').value = AutoNumeric.getAutoNumericElement(purchaseInput).getNumber();
+            const reader = new FileReader();
+            reader.onload = function(){
+                // Delay sedikit agar animasi loading terlihat (UX)
+                setTimeout(() => {
+                    preview.src = reader.result;
+                    preview.classList.remove('hidden');
+                    loading.classList.add('hidden'); // Hide loader
+                    if(placeholder) placeholder.classList.add('hidden');
+                }, 400);
+            };
+            if(event.target.files[0]) {
+                reader.readAsDataURL(event.target.files[0]);
             }
-            if(AutoNumeric.getAutoNumericElement(sellingInput)) {
-                document.getElementById('selling_price').value = AutoNumeric.getAutoNumericElement(sellingInput).getNumber();
-            }
-        });
+        }
 
-        // Notifikasi Session
-        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
-        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
-    });
-</script>
-@endpush
+        // === 2. Smart Code Generator (Kamus Alias) ===
+        function generateSmartCode() {
+            const nameInput = document.getElementById('product_name');
+            const codeInput = document.getElementById('product_code');
+            const rawName = nameInput.value.trim().toUpperCase();
+
+            if (!rawName) {
+                // Asumsi fungsi showToast ada di app.js global Anda
+                if(typeof window.showToast === 'function') {
+                    window.showToast('Harap isi Nama Produk terlebih dahulu!', 'warning');
+                } else {
+                    alert('Harap isi Nama Produk terlebih dahulu!');
+                }
+                nameInput.focus();
+                return;
+            }
+
+            // KAMUS ALIAS (Bisa ditambah sesuai kebutuhan bisnis)
+            const aliases = {
+                'BULL': 'BL',
+                'TEKIRO': 'TKR',
+                'MAKITA': 'MKT',
+                'BOSCH': 'BSH',
+                'HONDA': 'HND',
+                'YAMAHA': 'YMH',
+                'MESIN': 'MSN',
+                'OBENG': 'OBG',
+                'PALU': 'PLU',
+                'PAKU': 'PKU',
+                'SEMEN': 'SMN',
+                'CAT': 'PT',
+                'BESI': 'FE',
+                'KAYU': 'WD',
+                'BATU': 'STN',
+                'GERINDA': 'GRN',
+                'KUNCI': 'KEY',
+                'LISTRIK': 'ELC',
+                'BOR': 'BR'
+            };
+
+            // Bersihkan karakter spesial, pisahkan jadi array kata
+            const words = rawName.replace(/[^A-Z0-9\s]/g, '').split(/\s+/);
+
+            let codeParts = [];
+            let numbers = [];
+
+            words.forEach(word => {
+                // Prioritas 1: Cek Alias
+                if (aliases[word]) {
+                    codeParts.push(aliases[word]);
+                } 
+                // Prioritas 2: Cek Angka (Ukuran/Dimensi)
+                else if (/\d/.test(word)) {
+                    numbers.push(word);
+                } 
+                // Prioritas 3: Kata Biasa (Ambil Konsonan)
+                else {
+                    if (word.length > 2) {
+                        // Hapus huruf vokal (AIUEO) -> Sisa konsonan
+                        const consonants = word.replace(/[AIUEO]/g, '');
+                        // Ambil 3 karakter pertama (konsonan atau huruf asli jika pendek)
+                        const code = consonants.length > 0 ? consonants.substring(0, 3) : word.substring(0, 3);
+                        codeParts.push(code);
+                    }
+                }
+            });
+
+            // Susun Kode: [ALIAS/KATA] - [ANGKA]
+            // Kita gabungkan maksimal 3 elemen pertama dari kata, lalu angka
+            let finalParts = [...codeParts.slice(0, 3), ...numbers];
+            let baseCode = finalParts.join('-').toUpperCase();
+            
+            // Fallback jika hasil kosong
+            if(!baseCode) baseCode = rawName.substring(0, 3);
+
+            // Tambahkan Random Suffix (3 digit) agar unik
+            const randomSuffix = Math.floor(Math.random() * 900) + 100; // 100-999
+
+            // Set Value ke Input dengan animasi flash
+            codeInput.value = `${baseCode}-${randomSuffix}`;
+            
+            // Efek visual (Focus & Highlight)
+            codeInput.focus();
+            codeInput.classList.add('ring-2', 'ring-indigo-500');
+            setTimeout(() => codeInput.classList.remove('ring-2', 'ring-indigo-500'), 500);
+        }
+    </script>
+    @endpush
+@endsection

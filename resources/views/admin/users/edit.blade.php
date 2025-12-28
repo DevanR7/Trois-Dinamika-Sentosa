@@ -3,114 +3,176 @@
 @section('title', 'Edit User')
 
 @section('content')
-<div class="max-w-4xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER NAVIGATION --}}
-    <div class="flex items-center justify-between mb-6">
-        <div>
-            <nav class="flex text-sm text-slate-500 mb-1">
-                <a href="{{ route('admin.users.index') }}" class="hover:text-indigo-600 transition-colors">Users</a>
-                <span class="mx-2 text-slate-300">/</span>
-                <span class="text-slate-800 font-semibold">Edit</span>
-            </nav>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Edit User</h1>
-        </div>
-        <a href="{{ route('admin.users.index') }}" 
-           class="hidden sm:flex items-center justify-center px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 text-sm font-medium hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm">
-            <i class="material-icons text-[18px] mr-1">arrow_back</i> Kembali
-        </a>
-    </div>
 
-    <form action="{{ route('admin.users.update', $user->user_id) }}" method="POST">
-        @csrf
-        @method('PUT')
+    <div class="max-w-5xl mx-auto">
         
-        <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
-            {{-- Banner User Info --}}
-            <div class="px-6 py-4 bg-indigo-50 border-b border-indigo-100 flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-indigo-200 text-indigo-700 flex items-center justify-center font-bold text-lg">
-                    {{ substr($user->full_name, 0, 1) }}
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-indigo-900">Mengedit Akun: {{ $user->full_name }}</h3>
-                    <p class="text-xs text-indigo-600">Terakhir diperbarui: {{ $user->updated_at->diffForHumans() }}</p>
-                </div>
+        {{-- Navigation --}}
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h1 class="page-title">Edit User: {{ $user->full_name }}</h1>
+                <p class="page-subtitle">Perbarui informasi dan hak akses pengguna.</p>
             </div>
-
-            {{-- Content Form --}}
-            <div class="p-6 md:p-8 bg-white">
-                @include('admin.users._form')
-            </div>
-
-            {{-- Footer Action --}}
-            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
-                <a href="{{ route('admin.users.index') }}" 
-                   class="px-5 py-2.5 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all shadow-sm">
-                    Batal
+            <div class="flex gap-3">
+                @if(Auth::id() !== $user->user_id)
+                    <button type="button" onclick="confirmDelete()" class="btn btn-danger">
+                        <i class="material-icons text-sm mr-1">delete</i> Hapus
+                    </button>
+                @endif
+                <a href="{{ route('admin.users.index') }}" class="btn btn-secondary">
+                    <i class="material-icons text-sm mr-1">arrow_back</i> Kembali
                 </a>
-                <button type="submit" 
-                        class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-md shadow-indigo-200 transition-all flex items-center gap-2">
-                    <i class="material-icons text-[18px]">check_circle</i> Simpan Perubahan
+            </div>
+        </div>
+
+        <form action="{{ route('admin.users.update', $user->user_id) }}" method="POST">
+            @csrf
+            @method('PUT')
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                
+                {{-- LEFT COLUMN: Akun & Login --}}
+                <div class="card h-fit">
+                    <div class="card-header">
+                        <h3 class="card-header-title">Informasi Akun</h3>
+                    </div>
+                    <div class="card-body space-y-5">
+                        
+                        {{-- Nama Lengkap --}}
+                        <div>
+                            <label class="form-label label-required">Nama Lengkap</label>
+                            <input type="text" name="full_name" class="form-input @error('full_name') is-invalid @enderror" 
+                                   value="{{ old('full_name', $user->full_name) }}" required>
+                            @error('full_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+
+                        {{-- Username & Email --}}
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
+                                <label class="form-label label-required">Username</label>
+                                <input type="text" name="username" class="form-input @error('username') is-invalid @enderror" 
+                                       value="{{ old('username', $user->username) }}" required>
+                                @error('username') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+                            <div>
+                                <label class="form-label label-required">Email</label>
+                                <input type="email" name="email" class="form-input @error('email') is-invalid @enderror" 
+                                       value="{{ old('email', $user->email) }}" required>
+                                @error('email') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+                        </div>
+
+                        {{-- Role --}}
+                        <div>
+                            <label class="form-label label-required">Role (Hak Akses)</label>
+                            <select name="role" class="tom-select" required>
+                                @foreach($roles as $role)
+                                    <option value="{{ $role->name }}" 
+                                        {{ (old('role', $user->getRoleNames()->first()) == $role->name) ? 'selected' : '' }}>
+                                        {{ ucfirst($role->name) }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('role') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+
+                        {{-- Password Change --}}
+                        <div class="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700 mt-4">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase mb-3">Ubah Password (Opsional)</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div>
+                                    <label class="form-label text-[10px]">Password Baru</label>
+                                    <input type="password" name="password" class="form-input @error('password') is-invalid @enderror">
+                                    @error('password') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                </div>
+                                <div>
+                                    <label class="form-label text-[10px]">Konfirmasi Password</label>
+                                    <input type="password" name="password_confirmation" class="form-input">
+                                </div>
+                            </div>
+                            <p class="text-[10px] text-slate-400 mt-2 italic">* Kosongkan jika tidak ingin mengubah password.</p>
+                        </div>
+
+                    </div>
+                </div>
+
+                {{-- RIGHT COLUMN: Detail Personal --}}
+                <div class="card h-fit">
+                    <div class="card-header">
+                        <h3 class="card-header-title">Detail Personal</h3>
+                    </div>
+                    <div class="card-body space-y-5">
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
+                                <label class="form-label label-optional">No. Telepon / WA</label>
+                                <input type="text" name="phone_number" class="form-input @error('phone_number') is-invalid @enderror" 
+                                       value="{{ old('phone_number', $user->phone_number) }}">
+                                @error('phone_number') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+                            <div>
+                                <label class="form-label label-optional">NIK Karyawan</label>
+                                <input type="text" name="nik" class="form-input @error('nik') is-invalid @enderror" 
+                                       value="{{ old('nik', $user->nik) }}">
+                                @error('nik') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="form-label label-optional">Kode Sales</label>
+                            <input type="text" name="sales_code" class="form-input uppercase @error('sales_code') is-invalid @enderror" 
+                                   value="{{ old('sales_code', $user->sales_code) }}">
+                            <div class="form-hint">Kode unik untuk Sales (opsional).</div>
+                            @error('sales_code') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+
+                        <div>
+                            <label class="form-label label-optional">Alamat Lengkap</label>
+                            <textarea name="address" class="form-textarea" rows="4">{{ old('address', $user->address) }}</textarea>
+                            @error('address') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+
+            {{-- Submit --}}
+            <div class="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3">
+                <a href="{{ route('admin.users.index') }}" class="btn btn-secondary">Batal</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="material-icons text-sm mr-2">save</i> Simpan Perubahan
                 </button>
             </div>
-        </div>
-    </form>
-</div>
+
+        </form>
+
+        {{-- Hidden Delete Form --}}
+        @if(Auth::id() !== $user->user_id)
+            <form id="deleteForm" action="{{ route('admin.users.destroy', $user->user_id) }}" method="POST" class="hidden">
+                @csrf
+                @method('DELETE')
+            </form>
+        @endif
+    </div>
+
 @endsection
 
 @push('scripts')
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        $('#role').select2({ placeholder: 'Pilih Role...', width: '100%', dropdownCssClass: 'select2-dropdown-clean' });
-
-        const roleSelect = $('#role');
-        const salesContainer = document.getElementById('sales-code-container');
-        
-        function checkSalesRole() {
-            if(roleSelect.val() === 'sales') {
-                salesContainer.classList.remove('hidden');
-            } else {
-                salesContainer.classList.add('hidden');
+    function confirmDelete() {
+        window.confirmDialog({
+            title: 'Hapus User?',
+            text: "Akun ini akan dipindahkan ke sampah (soft delete).",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('deleteForm').submit();
             }
-        }
-        roleSelect.on('change', checkSalesRole);
-        checkSalesRole();
-
-        // Password logic sama seperti create
-        function setupToggle(id, btnId) {
-            const input = document.getElementById(id);
-            const btn = document.getElementById(btnId);
-            if(!input || !btn) return;
-            btn.addEventListener('click', () => {
-                const type = input.type === 'password' ? 'text' : 'password';
-                input.type = type;
-                btn.querySelector('i').innerText = type === 'password' ? 'visibility_off' : 'visibility';
-            });
-        }
-        setupToggle('password', 'toggle-password');
-        setupToggle('password_confirmation', 'toggle-password-confirmation');
-
-        // Check Match
-        const pass = document.getElementById('password');
-        const confirm = document.getElementById('password_confirmation');
-        const indicator = document.getElementById('password-match-indicator');
-        const indicatorText = indicator?.querySelector('.match-text');
-
-        function checkMatch() {
-            // Edit: Hanya cek jika salah satu diisi
-            if(!pass.value && !confirm.value) { indicator.classList.add('hidden'); return; }
-            indicator.classList.remove('hidden');
-            
-            if(pass.value === confirm.value) {
-                indicatorText.innerHTML = '<i class="material-icons text-emerald-500 text-[14px]">check_circle</i> Password Cocok';
-                indicatorText.className = 'match-text text-emerald-600 flex items-center gap-1';
-            } else {
-                indicatorText.innerHTML = '<i class="material-icons text-red-500 text-[14px]">cancel</i> Password Tidak Sama';
-                indicatorText.className = 'match-text text-red-600 flex items-center gap-1';
-            }
-        }
-        pass.addEventListener('input', checkMatch);
-        confirm.addEventListener('input', checkMatch);
-    });
+        });
+    }
 </script>
 @endpush

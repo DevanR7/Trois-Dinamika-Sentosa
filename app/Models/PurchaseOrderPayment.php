@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\PurchaseOrder;
 use App\Models\User;
-use App\Models\BatchPurchasePayment;
 use App\Models\PaymentMethod;
 use App\Models\CompanyBankAccount;
 
@@ -15,42 +14,40 @@ class PurchaseOrderPayment extends Model
 {
     use HasFactory;
 
-    // ✅ PERBAIKAN: Sesuaikan dengan skema database baru
     protected $fillable = [
         'po_id', 
-        'batch_purchase_payment_id',
+        'bulk_purchase_payment_id',
         'received_by_user_id', 
         'payment_date', 
         'amount', 
         'payment_method_id',
         'company_bank_account_id',
         'reference_number', 
+        'proof_of_payment_path',
         'status',             
         'notes'
     ];
 
     protected $casts = [
         'payment_date' => 'date',
-        'amount' => 'float', // <-- Saya tambahkan untuk konsistensi
+        'amount' => 'float', 
     ];
 
-    public function purchaseOrder(): BelongsTo // <-- Tambahkan return type
+    public function purchaseOrder(): BelongsTo 
     {
         return $this->belongsTo(PurchaseOrder::class, 'po_id', 'po_id');
     }
 
-    public function receivedBy(): BelongsTo // <-- Tambahkan return type
+    public function receivedBy(): BelongsTo 
     {
         return $this->belongsTo(User::class, 'received_by_user_id', 'user_id');
     }
     
-    public function bulkPurchasePayment(): BelongsTo
+    public function bulkPurchasePayment()
     {
-    // Parameter ke-3 (owner key) harus sesuai dengan PK di tabel parent (bulk_purchase_payments)
-    return $this->belongsTo(BulkPurchasePayment::class, 'bulk_purchase_payment_id', 'bulk_purchase_payment_id');
+        return $this->belongsTo(BulkPurchasePayment::class, 'bulk_purchase_payment_id', 'bulk_purchase_payment_id');
     }
 
-    // ✅ PERBAIKAN: Tambahkan relasi ke PaymentMethod
     public function paymentMethod(): BelongsTo
     {
         return $this->belongsTo(PaymentMethod::class, 'payment_method_id', 'payment_method_id');

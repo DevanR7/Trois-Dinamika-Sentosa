@@ -6,12 +6,10 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use App\Services\AccountingService;
 use App\Services\AccountingSettingService;
-
-// Models
 use App\Models\SalesInvoice;
 use App\Models\PurchaseOrder;
 use App\Models\Expense;
-use App\Models\Payment; // Sales Payment
+use App\Models\Payment;
 use App\Models\PurchaseOrderPayment;
 use App\Models\Loan;
 use App\Models\LoanPayment;
@@ -24,16 +22,8 @@ use App\Models\PurchaseOrderAdjustment;
 
 class RepostJournals extends Command
 {
-    /**
-     * Signature command untuk dijalankan di terminal.
-     */
     protected $signature = 'accounting:repost-all {--force : Lewati konfirmasi}';
-
-    /**
-     * Deskripsi command.
-     */
     protected $description = 'Menghapus dan membuat ulang seluruh Jurnal Umum berdasarkan data transaksi operasional.';
-
     protected $accService;
     protected $settings;
 
@@ -46,11 +36,11 @@ class RepostJournals extends Command
 
     public function handle()
     {
-        // 1. Konfirmasi Keamanan
         if (!$this->option('force')) {
             $this->warn('PERINGATAN: Command ini akan MENGHAPUS SELURUH DATA di tabel:');
             $this->warn('- general_ledgers (Buku Besar)');
             $this->warn('- bank_reconciliations (Rekonsiliasi Bank)');
+            $this->warn('Pastikan Anda sudah membackup database sebelum melanjutkan.');
             
             if (!$this->confirm('Apakah Anda yakin ingin melanjutkan?')) {
                 $this->info('Proses dibatalkan.');
@@ -60,124 +50,89 @@ class RepostJournals extends Command
 
         $this->info('Memulai proses Reposting Jurnal...');
         $startTime = microtime(true);
-
-        // =================================================================
-        // [PERBAIKAN] 1. BERSIHKAN TABEL DI LUAR TRANSACTION
-        // Truncate di MySQL menyebabkan auto-commit, jadi harus di luar.
-        // =================================================================
         $this->info('1. Membersihkan tabel akuntansi...');
         
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         GeneralLedger::truncate();
         DB::table('bank_reconciliations')->truncate();
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
-
-        // =================================================================
-        // [PERBAIKAN] 2. BARU MULAI TRANSACTION SETELAH TRUNCATE SELESAI
-        // =================================================================
         DB::beginTransaction();
         
         try {
-            
-            // 3. Proses Module - Manual Journal
-            $this->info('2. Memproses Jurnal Manual...');
-            $manualJournals = ManualJournal::with('entries')->get();
-            $this->withProgressBar($manualJournals, function ($journal) {
+            $processChunked = function($query, $callback, $label) {
+                $count = $query->count();
+                if ($count === 0) {
+                    $this->info("$label: Tidak ada data.");
+                    return;
+                }
+                $this->info("$label ($count records)...");
+                $bar = $this->output->createProgressBar($count);
+                
+                $query->chunk(100, function($items) use ($bar, $callback) {
+                    foreach($items as $item) {
+                        $callback($item);
+                        $bar->advance();
+                    }
+                });
+                
+                $bar->finish();
+                $this->newLine();
+            };
+
+            $processChunked(ManualJournal::with('entries'), function($journal) {
                 $this->postManualJournal($journal);
-            });
-            $this->newLine();
+            }, '2. Memproses Jurnal Manual');
 
-            // 4. Proses Module - Sales Invoice (Penjualan)
-            $this->info('3. Memproses Sales Invoices (Penjualan & HPP)...');
-            $invoices = SalesInvoice::whereNotIn('status', ['draft', 'cancelled'])->get();
-            $this->withProgressBar($invoices, function ($inv) {
+            $processChunked(SalesInvoice::whereNotIn('status', ['draft', 'cancelled']), function($inv) {
                 $this->postSalesInvoice($inv);
-            });
-            $this->newLine();
+            }, '3. Memproses Sales Invoices');
 
-            // 5. Proses Module - Sales Payments (Penerimaan Pembayaran)
-            $this->info('4. Memproses Pembayaran Penjualan...');
-            $payments = Payment::whereIn('status', ['completed'])->get();
-            $this->withProgressBar($payments, function ($pay) {
+            $processChunked(Payment::whereIn('status', ['completed']), function($pay) {
                 $this->postSalesPayment($pay);
-            });
-            $this->newLine();
+            }, '4. Memproses Pembayaran Penjualan');
 
-            // 6. Proses Module - Purchase Order (Penerimaan Barang)
-            $this->info('5. Memproses Purchase Orders (Penerimaan Barang)...');
-            $pos = PurchaseOrder::where('status', 'completed')->get();
-            $this->withProgressBar($pos, function ($po) {
+            $processChunked(PurchaseOrder::where('status', 'completed'), function($po) {
                 $this->postPurchaseOrderReceive($po);
-            });
-            $this->newLine();
+            }, '5. Memproses Penerimaan Barang PO');
 
-            // 7. Proses Module - Purchase Payments (Pembayaran Hutang)
-            $this->info('6. Memproses Pembayaran Pembelian...');
-            $poPayments = PurchaseOrderPayment::where('status', 'completed')->get();
-            $this->withProgressBar($poPayments, function ($pop) {
+            $processChunked(PurchaseOrderPayment::where('status', 'completed'), function($pop) {
                 $this->postPurchasePayment($pop);
-            });
-            $this->newLine();
+            }, '6. Memproses Pembayaran Pembelian');
 
-            // 8. Proses Module - Expenses (Beban)
-            $this->info('7. Memproses Pengeluaran Biaya (Expenses)...');
-            $expenses = Expense::all();
-            $this->withProgressBar($expenses, function ($exp) {
+            $processChunked(Expense::query(), function($exp) {
                 $this->postExpense($exp);
-            });
-            $this->newLine();
+            }, '7. Memproses Pengeluaran Biaya');
 
-            // 9. Proses Module - Fixed Assets (Aset Tetap)
-            $this->info('8. Memproses Pembelian Aset Tetap...');
-            $assets = FixedAsset::all();
-            $this->withProgressBar($assets, function ($asset) {
+            $processChunked(FixedAsset::query(), function($asset) {
                 $this->postFixedAsset($asset);
-            });
-            $this->newLine();
+            }, '8. Memproses Pembelian Aset Tetap');
 
-            // 10. Proses Module - Equity (Modal)
-            $this->info('9. Memproses Transaksi Modal...');
-            $equities = EquityTransaction::all();
-            $this->withProgressBar($equities, function ($eq) {
+            $processChunked(EquityTransaction::query(), function($eq) {
                 $this->postEquity($eq);
-            });
-            $this->newLine();
+            }, '9. Memproses Transaksi Modal');
 
-            // 11. Proses Module - Loans (Pinjaman)
-            $this->info('10. Memproses Pinjaman & Pembayaran...');
-            $loans = Loan::all();
-            foreach($loans as $loan) {
-                $this->postLoan($loan); 
-            }
-            $loanPayments = LoanPayment::all();
-            $this->withProgressBar($loanPayments, function ($lp) {
+            $processChunked(Loan::query(), function($loan) {
+                $this->postLoan($loan);
+            }, '10. Memproses Pinjaman Awal');
+            
+            $processChunked(LoanPayment::query(), function($lp) {
                 $this->postLoanPayment($lp);
-            });
-            $this->newLine();
+            }, '11. Memproses Pembayaran Pinjaman');
 
-            // 12. Invoice Adjustments
-            $this->info('11. Memproses Penyesuaian Invoice...');
-            $invAdjs = InvoiceAdjustment::all();
-            foreach($invAdjs as $adj) {
+            $processChunked(InvoiceAdjustment::with('salesInvoice.client'), function($adj) {
                 $this->postInvoiceAdjustment($adj);
-            }
-            $this->newLine();
+            }, '12. Memproses Penyesuaian Invoice');
 
-            // 13. PO Adjustments
-            $this->info('12. Memproses Penyesuaian PO...');
-            $poAdjs = PurchaseOrderAdjustment::all();
-            foreach($poAdjs as $adj) {
+            $processChunked(PurchaseOrderAdjustment::with('purchaseOrder.supplier'), function($adj) {
                 $this->postPoAdjustment($adj);
-            }
-            $this->newLine();
+            }, '13. Memproses Penyesuaian PO');
 
-            DB::commit(); // <--- Transaction ditutup disini
+            DB::commit(); 
             
             $duration = round(microtime(true) - $startTime, 2);
             $this->info("SUKSES! Jurnal Umum berhasil diperbarui dalam {$duration} detik.");
 
         } catch (\Exception $e) {
-            // Pastikan rollback aman (cek jika ada transaksi aktif)
             if (DB::transactionLevel() > 0) {
                 DB::rollBack();
             }
@@ -187,10 +142,6 @@ class RepostJournals extends Command
             $this->error("File: " . $e->getFile());
         }
     }
-
-    // =========================================================================
-    // HELPER FUNCTIONS (Mencerminkan Logika di Controller masing-masing)
-    // =========================================================================
 
     private function postManualJournal($journal)
     {
@@ -227,19 +178,29 @@ class RepostJournals extends Command
         if (!$arId || !$revId || !$cogsId || !$invId) return;
 
         $totalHpp = $invoice->items()->sum(DB::raw('quantity * hpp'));
+        $totalAdditionalCosts = $invoice->additionalCosts()->sum('amount');
+        $revenueProducts = $invoice->total_amount - $totalAdditionalCosts;
+
+        $debitEntries = [
+            [$arId, $invoice->total_amount, "Piutang atas " . ($invoice->client->client_name ?? '')],
+            [$cogsId, $totalHpp, "HPP atas Invoice #" . $invoice->invoice_number]
+        ];
+
+        $creditEntries = [
+            [$revId, $revenueProducts, "Pendapatan atas Invoice #" . $invoice->invoice_number],
+            [$invId, $totalHpp, "Pengurangan Persediaan"]
+        ];
+
+        if ($totalAdditionalCosts > 0) {
+             $creditEntries[] = [$revId, $totalAdditionalCosts, "Pendapatan Biaya Tambahan #" . $invoice->invoice_number];
+        }
 
         $this->accService->postJournal(
             "INV-" . $invoice->invoice_number,
             $invoice->order_date,
             "Penjualan Invoice #" . $invoice->invoice_number,
-            [ // Debit
-                [$arId, $invoice->total_amount, "Piutang atas " . ($invoice->client->client_name ?? '')],
-                [$cogsId, $totalHpp, "HPP atas Invoice #" . $invoice->invoice_number]
-            ],
-            [ // Kredit
-                [$revId, $invoice->total_amount, "Pendapatan atas Invoice #" . $invoice->invoice_number],
-                [$invId, $totalHpp, "Pengurangan Persediaan"]
-            ],
+            $debitEntries,
+            $creditEntries,
             $invoice,
             $invoice->user_id_sales
         );
@@ -249,21 +210,18 @@ class RepostJournals extends Command
     {
         $arId = $this->settings->getAccountsReceivableId();
         $cashBankId = $payment->companyBankAccount?->chart_of_account_id;
-        
-        // Logika sederhana: Asumsi payment direct (tanpa deposit untuk backfill ini)
-        // Jika Anda menggunakan fitur deposit kompleks, logika harus disesuaikan.
-        // Ini versi aman (Cash vs AR)
-        
+        $clientDepositId = $this->settings->getClientDepositId();
+
         if (!$arId || !$cashBankId) return;
 
         $this->accService->postJournal(
             "PAY-" . $payment->payment_id,
             $payment->payment_date,
             "Penerimaan Pembayaran Inv #" . ($payment->salesInvoice->invoice_number ?? 'N/A'),
-            [ // Debit Cash
+            [
                 [$cashBankId, $payment->amount, "Penerimaan ke " . ($payment->companyBankAccount->account_name ?? 'Bank')]
             ],
-            [ // Kredit AR
+            [ 
                 [$arId, $payment->amount, "Pelunasan Piutang"]
             ],
             $payment,
@@ -282,8 +240,8 @@ class RepostJournals extends Command
             "PO-" . $po->po_number,
             $po->order_date,
             "Penerimaan barang PO #" . $po->po_number,
-            [ [$invId, $po->grand_total] ], // Debit Persediaan
-            [ [$apId, $po->grand_total] ], // Kredit Hutang
+            [ [$invId, $po->grand_total] ], 
+            [ [$apId, $po->grand_total] ], 
             $po,
             $po->user_id_admin
         );
@@ -300,8 +258,8 @@ class RepostJournals extends Command
             "PO-PAY-" . $payment->id,
             $payment->payment_date,
             "Pembayaran PO #" . ($payment->purchaseOrder->po_number ?? 'N/A'),
-            [ [$apId, $payment->amount] ], // Debit Hutang
-            [ [$cashBankId, $payment->amount] ], // Kredit Kas
+            [ [$apId, $payment->amount] ], 
+            [ [$cashBankId, $payment->amount] ], 
             $payment,
             $payment->received_by_user_id
         );
@@ -313,8 +271,8 @@ class RepostJournals extends Command
             "EXP-" . $expense->expense_id,
             $expense->expense_date,
             "Beban: " . $expense->description,
-            [ [$expense->chart_of_account_id, $expense->amount] ], // Debit Beban
-            [ [$expense->cash_bank_account_id, $expense->amount] ], // Kredit Kas
+            [ [$expense->chart_of_account_id, $expense->amount] ], 
+            [ [$expense->cash_bank_account_id, $expense->amount] ], 
             $expense,
             $expense->user_id
         );
@@ -326,8 +284,8 @@ class RepostJournals extends Command
             "FASSET-" . $asset->asset_id,
             $asset->purchase_date,
             "Pembelian Aset Tetap: " . $asset->asset_name,
-            [ [$asset->fixed_asset_account_id, $asset->purchase_cost] ], // Debit Aset
-            [ [$asset->cash_bank_account_id, $asset->purchase_cost] ], // Kredit Kas
+            [ [$asset->fixed_asset_account_id, $asset->purchase_cost] ],
+            [ [$asset->cash_bank_account_id, $asset->purchase_cost] ],
             $asset,
             $asset->user_id
         );
@@ -339,11 +297,9 @@ class RepostJournals extends Command
         $credit = [];
 
         if ($equity->type == 'investment') {
-            // D: Kas, K: Modal
             $debit[] = [$equity->cash_bank_account_id, $equity->amount];
             $credit[] = [$equity->equity_account_id, $equity->amount];
         } else {
-            // D: Prive, K: Kas
             $debit[] = [$equity->equity_account_id, $equity->amount];
             $credit[] = [$equity->cash_bank_account_id, $equity->amount];
         }
@@ -361,7 +317,6 @@ class RepostJournals extends Command
 
     private function postLoan($loan)
     {
-        // Penerimaan Pinjaman: D Kas, K Utang
         $this->accService->postJournal(
             "LOAN-" . $loan->loan_id,
             $loan->loan_date,
@@ -377,10 +332,10 @@ class RepostJournals extends Command
     {
         $loan = $payment->loan;
         $debit = [];
-        $debit[] = [$loan->loan_account_id, $payment->principal_paid]; // D Utang
+        $debit[] = [$loan->loan_account_id, $payment->principal_paid]; 
         
         if ($payment->interest_paid > 0 && $payment->interest_expense_account_id) {
-            $debit[] = [$payment->interest_expense_account_id, $payment->interest_paid]; // D Bunga
+            $debit[] = [$payment->interest_expense_account_id, $payment->interest_paid]; 
         }
 
         $this->accService->postJournal(
@@ -388,7 +343,7 @@ class RepostJournals extends Command
             $payment->payment_date,
             "Bayar Cicilan Pinjaman: " . $loan->lender_name,
             $debit,
-            [ [$payment->cash_bank_account_id, $payment->total_paid] ], // K Kas
+            [ [$payment->cash_bank_account_id, $payment->total_paid] ], 
             $payment,
             $payment->user_id
         );
@@ -406,11 +361,9 @@ class RepostJournals extends Command
         $credit = [];
 
         if ($adj->type === 'credit_note') {
-            // D: Retur, K: Piutang
             $debit[] = [$retId, $adj->amount];
             $credit[] = [$arId, $adj->amount];
         } else {
-            // D: Piutang, K: Pendapatan
             $debit[] = [$arId, $adj->amount];
             $credit[] = [$revId, $adj->amount];
         }
@@ -418,7 +371,7 @@ class RepostJournals extends Command
         $this->accService->postJournal(
             "INV-ADJ-" . $adj->adjustment_id,
             $adj->adjustment_date,
-            "Penjualan Adj #" . $adj->salesInvoice->invoice_number,
+            "Penjualan Adj #" . ($adj->salesInvoice->invoice_number ?? 'N/A'),
             $debit,
             $credit,
             $adj,
@@ -429,7 +382,7 @@ class RepostJournals extends Command
     private function postPoAdjustment($adj)
     {
         $apId = $this->settings->getAccountsPayableId();
-        $retId = $this->settings->getPurchaseReturnId(); // Asumsi retur ke persediaan
+        $retId = $this->settings->getPurchaseReturnId();
         $invId = $this->settings->getInventoryId();
 
         if (!$apId || !$retId || !$invId) return;
@@ -438,11 +391,9 @@ class RepostJournals extends Command
         $credit = [];
 
         if ($adj->type === 'credit_note') {
-            // D: Hutang, K: Persediaan (Retur)
             $debit[] = [$apId, $adj->amount];
             $credit[] = [$retId, $adj->amount];
         } else {
-            // D: Persediaan, K: Hutang
             $debit[] = [$invId, $adj->amount];
             $credit[] = [$apId, $adj->amount];
         }
@@ -450,7 +401,7 @@ class RepostJournals extends Command
         $this->accService->postJournal(
             "PO-ADJ-" . $adj->adjustment_id,
             $adj->adjustment_date,
-            "Pembelian Adj #" . $adj->purchaseOrder->po_number,
+            "Pembelian Adj #" . ($adj->purchaseOrder->po_number ?? 'N/A'),
             $debit,
             $credit,
             $adj,

@@ -27,25 +27,16 @@ class ChartOfAccount extends Model
         'is_active' => 'boolean',
     ];
 
-    /**
-     * Relasi ke akun induk (jika ada).
-     */
     public function parent(): BelongsTo
     {
         return $this->belongsTo(ChartOfAccount::class, 'parent_account_id', 'account_id');
     }
 
-    /**
-     * Relasi ke akun anak (jika ada).
-     */
     public function children(): HasMany
     {
         return $this->hasMany(ChartOfAccount::class, 'parent_account_id', 'account_id');
     }
 
-    /**
-     * (Nanti) Relasi ke semua entri jurnal umum yang memakai akun ini.
-     */
     // public function journalEntries(): HasMany
     // {
     //     return $this->hasMany(GeneralLedger::class, 'chart_of_account_id', 'account_id');

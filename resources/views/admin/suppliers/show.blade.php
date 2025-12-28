@@ -1,134 +1,344 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Detail Supplier')
+@section('title', 'Detail Supplier: ' . $supplier->supplier_name)
 
 @section('content')
-<div class="max-w-6xl mx-auto pb-20 animate-enter">
+<div x-data="{ activeTab: 'overview' }" class="flex flex-col gap-6">
 
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+    {{-- HEADER & ACTIONS --}}
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-            <nav class="flex text-sm text-slate-500 mb-1">
-                <a href="{{ route('admin.suppliers.index') }}" class="hover:text-indigo-600 transition-colors">Supplier</a>
-                <span class="mx-2 text-slate-300">/</span>
-                <span class="text-slate-800 font-semibold">Detail</span>
-            </nav>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">{{ $supplier->supplier_name }}</h1>
+            <div class="flex items-center gap-3">
+                <h2 class="page-title text-3xl">{{ $supplier->supplier_name }}</h2>
+                @if($supplier->trashed())
+                    <span class="badge badge-danger">Diarsipkan</span>
+                @else
+                    <span class="badge badge-success">Aktif</span>
+                @endif
+            </div>
+            <p class="text-slate-500 text-sm mt-1">Ditambahkan sejak {{ $supplier->created_at->format('d M Y') }}</p>
         </div>
-        
-        <div class="flex gap-2 w-full sm:w-auto">
-            <a href="{{ route('admin.suppliers.index') }}" class="px-4 py-2 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all shadow-sm flex items-center justify-center gap-2">
-                <i class="material-icons text-[18px]">arrow_back</i> Kembali
-            </a>
-            
+
+        <div class="flex flex-wrap gap-3">
             @if(!$supplier->trashed())
-                <a href="{{ route('admin.suppliers.edit', $supplier->supplier_id) }}" class="px-4 py-2 bg-white border border-slate-300 text-indigo-600 rounded-lg text-sm font-bold hover:bg-indigo-50 hover:border-indigo-200 transition-all shadow-sm flex items-center justify-center gap-2">
-                    <i class="material-icons text-[18px]">edit</i> Edit
+                <a href="{{ route('admin.suppliers.edit', $supplier->supplier_id) }}" class="btn btn-primary">
+                    <i class="material-icons text-lg">edit</i> Edit Data
                 </a>
-                
-                {{-- Global Delete Handler --}}
-                <form action="{{ route('admin.suppliers.destroy', $supplier->supplier_id) }}" method="POST" class="delete-form inline-block">
-                    @csrf @method('DELETE')
-                    <button type="submit" data-name="{{ $supplier->supplier_name }}" class="px-4 py-2 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm font-bold hover:bg-red-100 transition-all shadow-sm flex items-center justify-center gap-2">
-                        <i class="material-icons text-[18px]">archive</i> Arsipkan
-                    </button>
-                </form>
-            @else
-                <form action="{{ route('admin.suppliers.restore', $supplier->supplier_id) }}" method="POST" class="inline-block" onsubmit="return confirm('Pulihkan supplier ini?')">
-                    @csrf @method('PATCH')
-                    <button type="submit" class="px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-sm font-bold hover:bg-emerald-100 transition-all shadow-sm flex items-center justify-center gap-2">
-                        <i class="material-icons text-[18px]">restore</i> Pulihkan
-                    </button>
-                </form>
             @endif
+            <a href="{{ route('admin.suppliers.index') }}" class="btn btn-secondary">
+                <i class="material-icons text-lg">arrow_back</i>
+            </a>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    {{-- STATISTIK CARD --}}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         
-        {{-- KIRI: INFO DETAIL --}}
-        <div class="lg:col-span-2 space-y-6">
-            <div class="dashboard-card p-0 overflow-hidden shadow-sm">
-                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600">
-                        <i class="material-icons text-[20px]">badge</i>
-                    </div>
-                    <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Profil Lengkap</h3>
+        {{-- Saldo Deposit --}}
+        <div class="card p-5 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white border-none shadow-lg">
+            <p class="text-indigo-200 text-xs font-bold uppercase tracking-wider mb-1">Saldo Deposit Kita (Debit)</p>
+            <h3 class="text-2xl font-bold">Rp {{ number_format($supplier->balance, 0, ',', '.') }}</h3>
+            @if($supplier->pending_balance > 0)
+                <div class="mt-2 text-xs bg-white/20 px-2 py-1 rounded inline-block">
+                    Pending: Rp {{ number_format($supplier->pending_balance, 0, ',', '.') }}
                 </div>
-                
-                <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-8">
-                    <div>
-                        <span class="block text-xs font-bold text-slate-400 uppercase mb-1.5 tracking-wide">Narahubung (PIC)</span>
-                        <p class="text-sm font-semibold text-slate-800">{{ $supplier->person_in_charge ?? '-' }}</p>
-                    </div>
-                    <div>
-                        <span class="block text-xs font-bold text-slate-400 uppercase mb-1.5 tracking-wide">Nomor Telepon</span>
-                        <p class="text-sm font-semibold text-slate-800">{{ $supplier->phone_number ?? '-' }}</p>
-                    </div>
-                    <div class="sm:col-span-2">
-                        <span class="block text-xs font-bold text-slate-400 uppercase mb-1.5 tracking-wide">Alamat</span>
-                        <p class="text-sm text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-100 leading-relaxed">
-                            {{ $supplier->address ?? 'Tidak ada alamat tercatat.' }}
-                        </p>
-                    </div>
+            @endif
+        </div>
+
+        {{-- Total PO --}}
+        <div class="card p-5">
+            <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Total Pesanan (PO)</p>
+            <h3 class="text-2xl font-bold text-slate-700 dark:text-white">
+                {{ $supplier->purchaseOrders()->count() }}
+            </h3>
+        </div>
+
+        {{-- Total Hutang (Opsional - Jika mau menampilkan sisa hutang kita ke supplier) --}}
+        <div class="card p-5">
+            <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Sisa Hutang ke Supplier</p>
+            {{-- Logic view sederhana untuk sisa hutang --}}
+            @php
+                $unpaidPOs = $supplier->purchaseOrders()->whereIn('payment_status', ['unpaid', 'partially_paid'])->get();
+                $totalDebt = $unpaidPOs->sum(fn($po) => $po->remaining_balance);
+            @endphp
+            <h3 class="text-2xl font-bold text-rose-600">
+                Rp {{ number_format($totalDebt, 0, ',', '.') }}
+            </h3>
+        </div>
+    </div>
+
+    {{-- LAYOUT UTAMA --}}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {{-- KOLOM KIRI: Profil --}}
+        <div class="lg:col-span-1">
+            <div class="card h-fit sticky top-24">
+                <div class="card-header">
+                    <h3 class="card-header-title">Informasi Supplier</h3>
+                </div>
+                <div class="card-body flex flex-col gap-5">
                     
-                    <div class="sm:col-span-2 pt-4 border-t border-dashed border-slate-200 mt-2">
-                        <h4 class="text-xs font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <i class="material-icons text-slate-400 text-base">account_balance</i> Data Perbankan
-                        </h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                            <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                <span class="block text-[10px] font-bold text-slate-400 uppercase">NPWP</span>
-                                <span class="text-sm text-slate-800 font-mono block mt-1">{{ $supplier->npwp ?? '-' }}</span>
-                            </div>
-                            <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                <span class="block text-[10px] font-bold text-slate-400 uppercase">Bank</span>
-                                <span class="text-sm text-slate-800 block mt-1">{{ $supplier->bank_name ?? '-' }}</span>
-                            </div>
-                            <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                <span class="block text-[10px] font-bold text-slate-400 uppercase">No. Rekening</span>
-                                <span class="text-sm text-slate-800 font-mono font-bold block mt-1">{{ $supplier->account_number ?? '-' }}</span>
-                            </div>
+                    {{-- PIC --}}
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500">
+                            <i class="material-icons text-lg">person</i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400 uppercase font-bold">PIC</p>
+                            <p class="font-medium text-slate-700 dark:text-slate-200">{{ $supplier->person_in_charge ?? '-' }}</p>
                         </div>
                     </div>
+
+                    {{-- Telepon --}}
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500">
+                            <i class="material-icons text-lg">phone</i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400 uppercase font-bold">No. Telepon</p>
+                            <p class="font-medium text-slate-700 dark:text-slate-200">{{ $supplier->phone_number ?? '-' }}</p>
+                        </div>
+                    </div>
+
+                    {{-- Alamat --}}
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500">
+                            <i class="material-icons text-lg">location_on</i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400 uppercase font-bold">Alamat</p>
+                            <p class="font-medium text-slate-700 dark:text-slate-200 leading-relaxed">{{ $supplier->address ?? '-' }}</p>
+                        </div>
+                    </div>
+
+                    <hr class="border-slate-100 dark:border-slate-700">
+
+                    {{-- Bank --}}
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500">
+                            <i class="material-icons text-lg">account_balance</i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400 uppercase font-bold">Rekening Bank</p>
+                            <p class="font-medium text-slate-700 dark:text-slate-200">{{ $supplier->bank_name ?? '-' }}</p>
+                            <p class="text-sm text-slate-500">{{ $supplier->account_number ?? '-' }}</p>
+                        </div>
+                    </div>
+                    
+                    {{-- NPWP --}}
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500">
+                            <i class="material-icons text-lg">badge</i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400 uppercase font-bold">NPWP</p>
+                            <p class="font-medium text-slate-700 dark:text-slate-200">{{ $supplier->npwp ?? '-' }}</p>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
 
-        {{-- KANAN: SALDO & META --}}
-        <div class="lg:col-span-1 space-y-6">
-            {{-- Card Saldo --}}
-            <div class="dashboard-card p-6 text-center shadow-sm relative overflow-hidden">
-                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Saldo Deposit</span>
-                <div class="text-3xl font-bold {{ $supplier->balance > 0 ? 'text-indigo-600' : 'text-slate-800' }} my-3 tracking-tight">
-                    Rp {{ number_format($supplier->balance ?? 0, 0, ',', '.') }}
-                </div>
-                <p class="text-xs text-slate-400">Saldo mengendap saat ini.</p>
+        {{-- KOLOM KANAN: Tabs --}}
+        <div class="lg:col-span-2">
+            <div class="card min-h-[500px]">
                 
-                <div class="mt-6 pt-4 border-t border-slate-100">
-                    <span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold border {{ $supplier->trashed() ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200' }}">
-                        <i class="material-icons text-[14px] mr-1.5">{{ $supplier->trashed() ? 'archive' : 'check_circle' }}</i> 
-                        {{ $supplier->trashed() ? 'DIARSIPKAN' : 'AKTIF' }}
-                    </span>
+                {{-- TAB NAVIGATION --}}
+                <div class="border-b border-slate-200 dark:border-slate-700">
+                    <ul class="flex flex-wrap -mb-px text-sm font-medium text-center text-slate-500">
+                        <li class="mr-2">
+                            <button @click="activeTab = 'overview'" 
+                                    class="inline-flex items-center gap-2 p-4 border-b-2 rounded-t-lg transition-colors duration-200"
+                                    :class="activeTab === 'overview' ? 'text-indigo-600 border-indigo-600 dark:text-indigo-400' : 'border-transparent hover:text-slate-600 hover:border-slate-300'">
+                                <i class="material-icons text-lg">account_balance_wallet</i>
+                                Riwayat Deposit
+                            </button>
+                        </li>
+                        <li class="mr-2">
+                            <button @click="activeTab = 'purchase_orders'" 
+                                    class="inline-flex items-center gap-2 p-4 border-b-2 rounded-t-lg transition-colors duration-200"
+                                    :class="activeTab === 'purchase_orders' ? 'text-indigo-600 border-indigo-600 dark:text-indigo-400' : 'border-transparent hover:text-slate-600 hover:border-slate-300'">
+                                <i class="material-icons text-lg">shopping_cart</i>
+                                Purchase Orders
+                            </button>
+                        </li>
+                        <li class="mr-2">
+                            <button @click="activeTab = 'products'" 
+                                    class="inline-flex items-center gap-2 p-4 border-b-2 rounded-t-lg transition-colors duration-200"
+                                    :class="activeTab === 'products' ? 'text-indigo-600 border-indigo-600 dark:text-indigo-400' : 'border-transparent hover:text-slate-600 hover:border-slate-300'">
+                                <i class="material-icons text-lg">inventory_2</i>
+                                Produk Disuplai
+                            </button>
+                        </li>
+                    </ul>
                 </div>
-            </div>
 
-            {{-- Card Meta --}}
-             <div class="dashboard-card p-6 shadow-sm">
-                <h3 class="text-xs font-bold text-slate-800 uppercase mb-4 tracking-wide border-b border-slate-100 pb-2">Informasi Dokumen</h3>
-                <div class="space-y-4 text-xs text-slate-600">
-                    <div class="flex justify-between items-center">
-                        <span class="flex items-center gap-2 text-slate-500"><i class="material-icons text-[16px]">event</i> Dibuat</span>
-                        <span class="font-bold bg-slate-100 px-2 py-1 rounded">{{ optional($supplier->created_at)->format('d M Y') }}</span>
+                {{-- TAB CONTENT --}}
+                <div class="p-0">
+                    
+                    {{-- TAB 1: LEDGER --}}
+                    <div x-show="activeTab === 'overview'" class="animate-enter">
+                        <div class="table-container border-0 shadow-none rounded-none">
+                            <table class="table-modern w-full">
+                                <thead class="bg-slate-50 dark:bg-slate-800/50">
+                                    <tr>
+                                        <th>Tanggal</th>
+                                        <th>Keterangan</th>
+                                        <th class="text-center">Tipe</th>
+                                        <th class="text-right">Jumlah</th>
+                                        <th class="text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($ledgers as $ledger)
+                                        <tr>
+                                            <td class="whitespace-nowrap text-slate-600">
+                                                {{ \Carbon\Carbon::parse($ledger->transaction_date)->format('d/m/Y') }}
+                                            </td>
+                                            <td class="max-w-[200px]">
+                                                <div class="truncate font-medium text-slate-700 dark:text-slate-200" title="{{ $ledger->description }}">
+                                                    {{ $ledger->description }}
+                                                </div>
+                                                <div class="text-xs text-slate-400 mt-0.5">
+                                                    Ref: {{ class_basename($ledger->reference_type) }} #{{ $ledger->reference_id }}
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                {{-- 
+                                                    Di SupplierLedger:
+                                                    Credit = Tambah Deposit (Uang Masuk ke saldo supplier)
+                                                    Debit = Kurang Deposit (Dipakai bayar PO)
+                                                --}}
+                                                @if($ledger->type == 'credit')
+                                                    <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded uppercase tracking-wide">TAMBAH</span>
+                                                @else
+                                                    <span class="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded uppercase tracking-wide">PAKAI</span>
+                                                @endif
+                                            </td>
+                                            <td class="text-right font-medium {{ $ledger->type == 'credit' ? 'text-emerald-600' : 'text-rose-600' }}">
+                                                {{ $ledger->type == 'credit' ? '+' : '-' }} 
+                                                Rp {{ number_format($ledger->amount, 0, ',', '.') }}
+                                            </td>
+                                            <td class="text-center">
+                                                @if($ledger->status == 'available')
+                                                    <span class="badge badge-success badge-pill text-[10px]">Selesai</span>
+                                                @elseif($ledger->status == 'pending')
+                                                    <span class="badge badge-warning badge-pill text-[10px]">Pending</span>
+                                                @else
+                                                    <span class="badge badge-danger badge-pill text-[10px]">{{ ucfirst($ledger->status) }}</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="5" class="text-center py-12 text-slate-400">
+                                                <div class="flex flex-col items-center">
+                                                    <i class="material-icons text-4xl mb-2 opacity-50">account_balance_wallet</i>
+                                                    <p class="text-sm">Belum ada riwayat deposit.</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="p-4 border-t border-slate-100 dark:border-slate-700">
+                            {{ $ledgers->links('vendor.pagination.admin') }}
+                        </div>
                     </div>
-                    <div class="flex justify-between items-center">
-                        <span class="flex items-center gap-2 text-slate-500"><i class="material-icons text-[16px]">update</i> Diperbarui</span>
-                        <span class="font-bold bg-slate-100 px-2 py-1 rounded">{{ optional($supplier->updated_at)->format('d M Y') }}</span>
+
+                    {{-- TAB 2: PURCHASE ORDERS --}}
+                    <div x-show="activeTab === 'purchase_orders'" style="display: none;" class="animate-enter">
+                        @php $pos = $supplier->purchaseOrders()->latest('order_date')->limit(20)->get(); @endphp
+                        
+                        <div class="table-container border-0 shadow-none rounded-none">
+                            <table class="table-modern w-full">
+                                <thead class="bg-slate-50 dark:bg-slate-800/50">
+                                    <tr>
+                                        <th>No. PO</th>
+                                        <th>Tanggal</th>
+                                        <th class="text-center">Status Bayar</th>
+                                        <th class="text-right">Total</th>
+                                        <th class="text-right">Sisa Hutang</th>
+                                        <th class="text-center">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($pos as $po)
+                                        <tr>
+                                            <td class="font-bold text-indigo-600">{{ $po->po_number }}</td>
+                                            <td>{{ $po->order_date->format('d/m/Y') }}</td>
+                                            <td class="text-center">
+                                                @if($po->payment_status == 'paid') <span class="badge badge-success">Lunas</span>
+                                                @elseif($po->payment_status == 'unpaid') <span class="badge badge-danger">Belum Lunas</span>
+                                                @else <span class="badge badge-warning">Sebagian</span>
+                                                @endif
+                                            </td>
+                                            <td class="text-right">Rp {{ number_format($po->grand_total, 0, ',', '.') }}</td>
+                                            <td class="text-right font-medium text-rose-600">Rp {{ number_format($po->remaining_balance, 0, ',', '.') }}</td>
+                                            <td class="text-center">
+                                                <a href="{{ route('admin.purchase-orders.show', $po->po_id) }}" class="btn-icon btn-sm btn-secondary flex items-center justify-center">
+                                                    <i class="material-icons text-[16px] leading-none">visibility</i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="6" class="text-center py-12 text-slate-400">
+                                                <div class="flex flex-col items-center">
+                                                    <i class="material-icons text-4xl mb-2 opacity-50">shopping_cart</i>
+                                                    <p class="text-sm">Belum ada riwayat PO.</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
+
+                    {{-- TAB 3: PRODUCTS --}}
+                    <div x-show="activeTab === 'products'" style="display: none;" class="animate-enter">
+                        @php $products = $supplier->products()->orderBy('product_name')->limit(50)->get(); @endphp
+                        
+                        <div class="table-container border-0 shadow-none rounded-none">
+                            <table class="table-modern w-full">
+                                <thead class="bg-slate-50 dark:bg-slate-800/50">
+                                    <tr>
+                                        <th>Kode</th>
+                                        <th>Nama Produk</th>
+                                        <th class="text-right">Harga Beli</th>
+                                        <th class="text-center">Stok Saat Ini</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($products as $product)
+                                        <tr>
+                                            <td class="text-slate-500 text-xs">{{ $product->product_code }}</td>
+                                            <td class="font-medium">{{ $product->product_name }}</td>
+                                            <td class="text-right">Rp {{ number_format($product->purchase_price, 0, ',', '.') }}</td>
+                                            <td class="text-center font-bold">{{ number_format($product->stock_quantity, 0, ',', '.') }}</td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="4" class="text-center py-12 text-slate-400">
+                                                <div class="flex flex-col items-center">
+                                                    <i class="material-icons text-4xl mb-2 opacity-50">inventory_2</i>
+                                                    <p class="text-sm">Supplier ini belum memiliki produk.</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
+
     </div>
 </div>
 @endsection

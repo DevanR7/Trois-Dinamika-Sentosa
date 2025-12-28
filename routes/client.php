@@ -5,16 +5,16 @@ use App\Http\Controllers\Client\Auth\ClientGoogleController;
 use App\Http\Controllers\Client\DashboardController;
 use App\Http\Controllers\Client\InvoiceController;
 use App\Http\Controllers\Client\ProfileController;
-use App\Http\Controllers\Client\SalesPlacedOrderController; // Controller Riwayat Order Sales
-use App\Http\Controllers\Client\ClientOnlineOrderController;  // Controller Order Online Klien
+use App\Http\Controllers\Client\SalesPlacedOrderController; 
+use App\Http\Controllers\Client\ClientOnlineOrderController; 
 use App\Http\Controllers\Client\OrderChangeRequestController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\MidtransController;
-// Controller Lupa Password & Register
 use App\Http\Controllers\Client\Auth\ForgotPasswordController;
 use App\Http\Controllers\Client\Auth\ResetPasswordController;
 use App\Http\Controllers\Client\Auth\RegisteredClientController;
 use App\Http\Middleware\CheckClientLockStatus;
+use App\Http\Controllers\Client\AnnouncementController;
 
 Route::prefix('client')->name('client.')->group(function () {
 
@@ -52,20 +52,19 @@ Route::prefix('client')->name('client.')->group(function () {
             // Invoices
             Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
             Route::get('invoices/bulk-pay', [InvoiceController::class, 'showBulkPay']) 
-                ->name('invoices.bulkPay.create'); // ✅
+                ->name('invoices.bulkPay.create'); 
 
             Route::post('invoices/bulk-pay-midtrans', [MidtransController::class, 'payBatch'])
-                ->name('invoices.bulkPay.storeMidtrans'); // ✅
+                ->name('invoices.bulkPay.storeMidtrans'); 
 
             Route::post('invoices/bulk-pay-manual', [InvoiceController::class, 'storeBatchProof'])
-                ->name('invoices.bulkPay.storeManual'); // ✅
+                ->name('invoices.bulkPay.storeManual'); 
 
             Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
             Route::post('invoices/{invoice}/upload-proof', [InvoiceController::class, 'uploadProof'])->name('invoices.uploadProof');
 
             // === PESANAN ONLINE SAYA (Dibuat oleh Klien) ===
             Route::prefix('client-orders')->name('client-orders.')->group(function() {
-                // ✅ Ganti controller
                 Route::get('/', [ClientOnlineOrderController::class, 'index'])->name('index'); // client.client-orders.index
                 Route::get('/create', [ClientOnlineOrderController::class, 'create'])->name('create'); // client.client-orders.create
                 Route::post('/', [ClientOnlineOrderController::class, 'store'])->name('store'); // client.client-orders.store
@@ -83,5 +82,7 @@ Route::prefix('client')->name('client.')->group(function () {
             });
             // ==========================================================
         });
+
+        Route::get('/api/my-announcements', [AnnouncementController::class, 'index'])->name('api.announcements');
     });
 });

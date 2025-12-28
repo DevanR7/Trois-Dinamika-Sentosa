@@ -19,7 +19,8 @@ class StockOpnameItem extends Model
         'adjustment_value' => 'float'
     ];
 
-    public function product() {
+    public function product() 
+    {
         return $this->belongsTo(Product::class, 'product_id', 'product_id');
     }
     

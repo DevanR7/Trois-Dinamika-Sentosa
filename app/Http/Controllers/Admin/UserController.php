@@ -14,17 +14,11 @@ use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
-    /**
-     * Konstruktor: menerapkan middleware otorisasi untuk seluruh action.
-     */
     public function __construct()
     {
         $this->middleware('can:manage-users');
     }
 
-    /**
-     * Menampilkan daftar pengguna dengan opsi pencarian dan filter status soft-delete.
-     */
     public function index(Request $request)
     {
         $query = User::query();
@@ -46,18 +40,12 @@ class UserController extends Controller
         return view('admin.users.index', compact('users'));
     }
 
-    /**
-     * Menampilkan formulir untuk membuat pengguna baru.
-     */
     public function create()
     {
         $roles = Role::all();
         return view('admin.users.create', compact('roles'));
     }
 
-    /**
-     * Menyimpan pengguna baru ke database.
-     */
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
@@ -89,18 +77,12 @@ class UserController extends Controller
         return redirect()->route('admin.users.index')->with('success', 'User baru berhasil dibuat.');
     }
 
-    /**
-     * Menampilkan formulir edit untuk pengguna yang ada.
-     */
     public function edit(User $user)
     {
         $roles = Role::all();
         return view('admin.users.edit', compact('user', 'roles'));
     }
 
-    /**
-     * Memperbarui data pengguna yang ada.
-     */
     public function update(Request $request, User $user): RedirectResponse
     {
         $request->validate([
@@ -127,9 +109,6 @@ class UserController extends Controller
         return redirect()->route('admin.users.index')->with('success', 'Data user berhasil diupdate.');
     }
 
-    /**
-     * Menyetujui akun pengguna (mengaktifkan akses).
-     */
     public function approve(User $user): RedirectResponse
     {
         if ($user->user_id === Auth::id()) {
@@ -141,9 +120,6 @@ class UserController extends Controller
         return back()->with('success', 'Akun staf ' . $user->full_name . ' telah disetujui.');
     }
 
-    /**
-     * Menghapus pengguna (soft delete) dengan validasi keamanan.
-     */
     public function destroy(User $user): RedirectResponse
     {
         if ($user->user_id === Auth::id()) {
@@ -167,9 +143,6 @@ class UserController extends Controller
         return redirect()->route('admin.users.index')->with('success', 'User berhasil dihapus.');
     }
 
-    /**
-     * Memulihkan pengguna yang sebelumnya dihapus secara lunak.
-     */
     public function restore(User $user): RedirectResponse
     {
         if ($user->trashed()) {

@@ -3,59 +3,163 @@
 @section('title', 'Tambah Klien Baru')
 
 @section('content')
-<div class="max-w-5xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-            <nav class="flex items-center gap-2 text-sm text-slate-500 mb-1">
-                <a href="{{ route('admin.clients.index') }}" class="hover:text-indigo-600 transition-colors">Klien</a>
-                <span class="mx-2 text-slate-300">/</span>
-                <span class="text-slate-800 font-semibold">Baru</span>
-            </nav>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Tambah Klien Baru</h1>
-        </div>
-        <a href="{{ route('admin.clients.index') }}" 
-           class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
-            <i class="material-icons text-[18px]">arrow_back</i> Kembali
-        </a>
-    </div>
-
-    <form action="{{ route('admin.clients.store') }}" method="POST">
-        @csrf
+    <div class="max-w-4xl mx-auto">
         
-        <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
-            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600">
-                    <i class="material-icons text-[20px]">person_add</i>
-                </div>
-                <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Form Data Klien</h3>
-            </div>
-            
-            <div class="p-6 md:p-8 bg-white">
-                @include('admin.clients._form')
-            </div>
-
-            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
-                <a href="{{ route('admin.clients.index') }}" 
-                   class="px-5 py-2.5 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all shadow-sm">
-                    Batal
+        {{-- Header --}}
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h2 class="page-title">Tambah Klien</h2>
+                <a href="{{ route('admin.clients.index') }}" class="flex items-center gap-1 text-sm text-slate-500 hover:text-indigo-600 transition-colors mt-1">
+                    <i class="material-icons text-base">arrow_back</i> Kembali ke Daftar
                 </a>
-                <button type="submit" 
-                        class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-md shadow-indigo-200 transition-all flex items-center gap-2">
-                    <i class="material-icons text-[18px]">save</i> Simpan Data
-                </button>
             </div>
         </div>
-    </form>
-</div>
-@endsection
 
-@push('scripts')
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
-        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
-    });
-</script>
-@endpush
+        {{-- Alert Informasi Akun --}}
+        <div class="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-100 flex items-start gap-3">
+            <i class="material-icons text-blue-500 mt-0.5">info</i>
+            <div class="text-sm text-blue-700 leading-relaxed">
+                <p class="font-bold mb-1">Informasi Akun Login</p>
+                Klien dapat menggunakan email dan password ini untuk login ke sistem (Client Area). Status awal akun adalah <strong>Belum Disetujui</strong> (Perlu approval admin setelah dibuat).
+            </div>
+        </div>
+
+        {{-- Form Card --}}
+        <div class="card" x-data="{ 
+            showPass: false, 
+            password: '', 
+            confirm: '',
+            get match() { return this.password === this.confirm && this.password.length > 0; },
+            get mismatch() { return this.password !== this.confirm && this.confirm.length > 0; }
+        }">
+            <form action="{{ route('admin.clients.store') }}" method="POST" class="p-6">
+                @csrf
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    
+                    {{-- Nama Klien --}}
+                    <div class="col-span-1 md:col-span-2">
+                        <label class="form-label">Nama Klien / Perusahaan <span class="text-red-500">*</span></label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                <i class="material-icons text-lg">business</i>
+                            </span>
+                            <input type="text" name="client_name" value="{{ old('client_name') }}" 
+                                   class="form-input pl-10 @error('client_name') border-red-500 @enderror" 
+                                   placeholder="Nama lengkap atau nama toko..." required>
+                        </div>
+                        @error('client_name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    {{-- Email --}}
+                    <div>
+                        <label class="form-label">Email (Username Login)</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                <i class="material-icons text-lg">email</i>
+                            </span>
+                            <input type="email" name="email" value="{{ old('email') }}" 
+                                   class="form-input pl-10 @error('email') border-red-500 @enderror" 
+                                   placeholder="email@contoh.com">
+                        </div>
+                        @error('email') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    {{-- No Telepon --}}
+                    <div>
+                        <label class="form-label">No. Telepon / WA</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                <i class="material-icons text-lg">phone</i>
+                            </span>
+                            <input type="text" name="phone_number" value="{{ old('phone_number') }}" 
+                                   class="form-input pl-10 @error('phone_number') border-red-500 @enderror" 
+                                   placeholder="0812...">
+                        </div>
+                        @error('phone_number') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    {{-- PIC --}}
+                    <div class="col-span-1 md:col-span-2">
+                        <label class="form-label">Penanggung Jawab (PIC)</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                <i class="material-icons text-lg">person</i>
+                            </span>
+                            <input type="text" name="person_in_charge" value="{{ old('person_in_charge') }}" 
+                                   class="form-input pl-10" placeholder="Nama orang yang bisa dihubungi">
+                        </div>
+                    </div>
+
+                    {{-- Alamat --}}
+                    <div class="col-span-1 md:col-span-2">
+                        <label class="form-label">Alamat Lengkap</label>
+                        <div class="relative">
+                            <span class="absolute top-3 left-0 flex items-start pl-3 text-slate-400">
+                                <i class="material-icons text-lg">location_on</i>
+                            </span>
+                            <textarea name="address" rows="3" class="form-input pl-10" placeholder="Alamat pengiriman / penagihan...">{{ old('address') }}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="col-span-1 md:col-span-2 my-2 border-t border-slate-100 dark:border-slate-700"></div>
+
+                    {{-- Password --}}
+                    <div>
+                        <label class="form-label">Password Login <span class="text-red-500">*</span></label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                <i class="material-icons text-lg">lock</i>
+                            </span>
+                            <input :type="showPass ? 'text' : 'password'" 
+                                   name="password" x-model="password"
+                                   class="form-input pl-10 pr-10 @error('password') border-red-500 @enderror" 
+                                   placeholder="Minimal 8 karakter" required>
+                            
+                            {{-- Toggle Eye --}}
+                            <button type="button" @click="showPass = !showPass" class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-indigo-600 cursor-pointer">
+                                <i class="material-icons text-lg" x-text="showPass ? 'visibility_off' : 'visibility'"></i>
+                            </button>
+                        </div>
+                        @error('password') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    {{-- Konfirmasi Password --}}
+                    <div>
+                        <label class="form-label">Konfirmasi Password <span class="text-red-500">*</span></label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                <i class="material-icons text-lg">lock_reset</i>
+                            </span>
+                            <input :type="showPass ? 'text' : 'password'" 
+                                   name="password_confirmation" x-model="confirm"
+                                   class="form-input pl-10 pr-10" 
+                                   :class="{'border-green-500 focus:ring-green-500': match, 'border-red-500 focus:ring-red-500': mismatch}"
+                                   placeholder="Ulangi password" required>
+                                   
+                            {{-- Icon Check/Error --}}
+                            <template x-if="match">
+                                <span class="absolute inset-y-0 right-0 flex items-center pr-3 text-green-500">
+                                    <i class="material-icons text-lg">check_circle</i>
+                                </span>
+                            </template>
+                        </div>
+                        {{-- Pesan Error JS --}}
+                        <p x-show="mismatch" class="text-red-500 text-xs mt-1 flex items-center gap-1">
+                            <i class="material-icons text-[14px]">error</i> Password tidak cocok!
+                        </p>
+                    </div>
+                </div>
+
+                {{-- Action Buttons --}}
+                <div class="flex justify-end gap-3">
+                    <a href="{{ route('admin.clients.index') }}" class="btn btn-secondary">Batal</a>
+                    <button type="submit" class="btn btn-primary" :disabled="mismatch">
+                        <i class="material-icons text-lg">save</i>
+                        Simpan Klien
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+@endsection

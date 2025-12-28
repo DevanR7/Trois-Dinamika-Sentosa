@@ -1,5 +1,5 @@
 <?php
-// app/Policies/AnnouncementPolicy.php
+
 namespace App\Policies;
 
 use App\Models\Announcement;
@@ -10,13 +10,12 @@ class AnnouncementPolicy
 {
     use HandlesAuthorization;
 
-    // Izinkan admin/superadmin melakukan semuanya
     public function before(User $user, string $ability): bool|null
     {
         if ($user->hasRole(['admin', 'superadmin'])) {
             return true;
         }
-        return null; // Lanjutkan ke method di bawah jika bukan admin
+        return null; 
     }
 
     public function viewAny(User $user): bool { return $user->can('manage-announcements'); }

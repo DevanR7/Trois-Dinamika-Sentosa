@@ -11,7 +11,6 @@ use App\Models\ChartOfAccount;
 class Loan extends Model
 {
     use HasFactory;
-
     protected $primaryKey = 'loan_id';
 
     protected $fillable = [
@@ -42,17 +41,11 @@ class Loan extends Model
         return $this->hasMany(LoanPayment::class, 'loan_id', 'loan_id')->latest('payment_date');
     }
 
-    /**
-     * Relasi ke Akun Utang Pinjaman (COA).
-     */
     public function loanAccount(): BelongsTo
     {
         return $this->belongsTo(ChartOfAccount::class, 'loan_account_id', 'account_id');
     }
-
-    /**
-     * Relasi ke Akun Kas/Bank (COA) tempat menerima dana.
-     */
+    
     public function cashBankAccount(): BelongsTo
     {
         return $this->belongsTo(ChartOfAccount::class, 'cash_bank_account_id', 'account_id');

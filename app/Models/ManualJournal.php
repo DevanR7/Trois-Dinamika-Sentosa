@@ -13,7 +13,6 @@ use App\Models\ManualJournalEntry;
 class ManualJournal extends Model
 {
     use HasFactory;
-
     protected $primaryKey = 'journal_id';
 
     protected $fillable = [
@@ -31,44 +30,31 @@ class ManualJournal extends Model
         'total_credit' => 'float',
     ];
 
-    /**
-     * Relasi ke baris-baris entri (detail)
-     */
     public function entries(): HasMany
     {
         return $this->hasMany(ManualJournalEntry::class, 'journal_id', 'journal_id');
     }
 
-    /**
-     * Relasi ke user yang membuat
-     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
 
-    /**
-     * Generate Nomor Jurnal Manual
-     */
     public static function generateJournalNumber(): string
     {
     return DB::transaction(function () {
         $yearMonth = now()->format('Ym');
         $prefix = "JUM-";
-        
         $latestJournal = self::where('journal_number', 'like', $prefix . $yearMonth . '%')
                              ->orderBy('journal_number', 'desc')
                              ->lockForUpdate() 
                              ->first();
-        
         $nextSequence = 1;
         if ($latestJournal) {
             $lastSequence = (int) substr($latestJournal->journal_number, -4);
             $nextSequence = $lastSequence + 1;
         }
-        
         $sequencePadded = str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
-        
         return $prefix . $yearMonth . '-' . $sequencePadded;
     });
     }

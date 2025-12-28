@@ -1,688 +1,563 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Koreksi Otomatis PO')
-
-@push('styles')
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <style>
-        /* Styling khusus halaman ini agar tidak bentrok */
-        .select2-container .select2-selection--single { height: 38px !important; }
-        .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 38px !important; }
-    </style>
-@endpush
+@section('title', 'Revisi PO #' . $purchaseOrder->po_number)
 
 @section('content')
-<div class="max-w-full mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div>
-            <div class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                <a href="{{ route('admin.purchase-order-adjustments.create') }}" class="hover:text-indigo-600 transition">Penyesuaian</a>
-                <i class="material-icons text-[12px]">chevron_right</i>
-                <span class="text-slate-600">Otomatis</span>
-            </div>
-            <h2 class="text-2xl font-bold text-slate-800 tracking-tight">
-                Koreksi PO: <span class="text-indigo-600 font-mono ml-1">{{ $purchaseOrder->po_number }}</span>
-            </h2>
-        </div>
-        <a href="{{ route('admin.purchase-order-adjustments.create') }}" class="inline-flex items-center px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition shadow-sm text-sm font-bold">
-            <i class="material-icons text-sm mr-2">arrow_back</i> Kembali
-        </a>
-    </div>
+    {{-- 
+        DATA INJECTION: 
+        Kita menyuntikkan data item asli agar Alpine bisa menghitung ulang 
+        dan membandingkan dengan nilai total awal.
+    --}}
+    <div x-data="poAdjustmentAuto({
+        originalTotal: {{ $purchaseOrder->total_amount }},
+        items: {{ json_encode($purchaseOrder->items->map(function($item) {
+            return [
+                'id' => $item->item_id, 
+                'selected' => true, 
+                'product_id' => (string) $item->product_id, 
+                'price' => (float) $item->price_per_unit,
+                'price_visual' => number_format((float) $item->price_per_unit, 0, ',', '.'),
+                'qty' => (float) $item->quantity,
+                'unit_name' => $item->product->unit->name ?? 'Unit',
+                'discounts' => $item->discounts->pluck('percentage')->map(fn($v) => (float)$v)->toArray() ?: [0]
+            ];
+        })) }},
+        config: {
+            apply_disc_fee: {{ $purchaseOrder->apply_disc_fee ? 'true' : 'false' }},
+            disc_fee_percent: {{ $purchaseOrder->disc_fee_percent ?? 0 }},
+            apply_rounding: {{ $purchaseOrder->apply_rounding_discount ? 'true' : 'false' }},
+            rounding_amount: {{ $purchaseOrder->rounding_discount_amount ?? 0 }},
+            use_custom_dpp: {{ $purchaseOrder->use_custom_dpp_factor ? 'true' : 'false' }},
+            custom_dpp_factor: '{{ $purchaseOrder->custom_dpp_factor ?? 1 }}',
+            tax_id: '{{ $purchaseOrder->tax_id }}',
+            shipping_amount: {{ $purchaseOrder->shipping_amount ?? 0 }}
+        }
+    })" class="flex flex-col gap-6 pb-20">
 
-    {{-- INFO BOX --}}
-    <div class="mb-6 bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3 shadow-sm">
-        <i class="material-icons text-blue-600 text-xl mt-0.5">auto_fix_high</i>
-        <div>
-            <h3 class="text-sm font-bold text-blue-900">Mode Revisi Otomatis</h3>
-            <p class="text-sm text-blue-800 mt-1 leading-relaxed">
-                Ubah Qty, Harga, atau Diskon di bawah ini sesuai kondisi nyata. Sistem akan otomatis menghitung selisihnya dan membuat <b>Nota Debit</b> atau <b>Nota Kredit</b> tanpa mengubah data PO asli yang sudah terkunci.
-            </p>
-        </div>
-    </div>
-
-    {{-- ALERT ERROR --}}
-    @if ($errors->any())
-        <div class="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-            <i class="material-icons text-red-500 text-xl">error</i>
+        {{-- Top Bar --}}
+        <div class="flex items-center justify-between">
             <div>
-                <h3 class="text-sm font-bold text-red-800">Terdapat kesalahan input:</h3>
-                <ul class="mt-1 list-disc list-inside text-sm text-red-700">
-                    @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
+                <h2 class="page-title">Revisi Otomatis PO</h2>
+                <div class="flex items-center gap-2 text-sm text-slate-500 mt-1">
+                    <span class="font-bold text-slate-700 dark:text-white">PO #{{ $purchaseOrder->po_number }}</span>
+                    <span>&bull;</span>
+                    <span>Total Awal: <span class="font-mono">{{ number_format($purchaseOrder->total_amount, 0, ',', '.') }}</span></span>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <a href="{{ route('admin.purchase-order-adjustments.create') }}" class="btn btn-secondary">
+                    Batal
+                </a>
+                <button type="submit" form="adjustment-form" class="btn btn-primary" :disabled="diffValue === 0">
+                    <i class="material-icons text-lg">save</i>
+                    Simpan Revisi
+                </button>
+            </div>
+        </div>
+
+        @if ($errors->any())
+            <div class="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg text-sm animate-enter">
+                <p class="font-bold mb-1">Terdapat kesalahan:</p>
+                <ul class="list-disc pl-5">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
                 </ul>
             </div>
-        </div>
-    @endif
+        @endif
 
-    {{-- FORM START --}}
-    <form action="{{ route('admin.purchase-order-adjustments.store.auto', $purchaseOrder->po_id) }}" method="POST" id="po-adj-form">
-        @csrf
+        <form id="adjustment-form" action="{{ route('admin.purchase-order-adjustments.store.auto', $purchaseOrder->po_id) }}" method="POST">
+            @csrf
 
-        <div class="space-y-6">
-            
-            {{-- 1. INFO PO ASLI (READONLY) --}}
-            <div class="dashboard-card p-0 overflow-hidden bg-slate-50/50 border border-slate-200">
-                <div class="px-6 py-4 border-b border-slate-200 flex items-center gap-2">
-                    <i class="material-icons text-slate-400 text-sm">lock</i>
-                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Data PO Asli (Referensi)</h3>
-                </div>
-                <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Supplier</label>
-                        <div class="font-bold text-slate-700">{{ $purchaseOrder->supplier->supplier_name }}</div>
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Tanggal Order</label>
-                        <div class="font-bold text-slate-700">{{ optional($purchaseOrder->order_date)->format('d M Y') }}</div>
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Total Awal</label>
-                        <div class="font-mono font-bold text-slate-700">Rp {{ number_format($purchaseOrder->total_amount, 0, ',', '.') }}</div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- 2. EDIT ITEM (CARD TENGAH - Full Width) --}}
-            <div class="dashboard-card p-0 overflow-hidden">
-                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row justify-between items-center gap-4">
-                    <div class="flex items-center gap-2">
-                        <i class="material-icons text-indigo-500 text-sm">inventory</i>
-                        <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider">Revisi Barang</h3>
-                    </div>
+            {{-- 1. TABEL ITEM (Mode Edit) --}}
+            <div class="card mb-6 overflow-hidden">
+                <div class="card-header bg-slate-50/50 flex justify-between items-center">
+                    <h3 class="card-header-title">Detail Item (Edit untuk Revisi)</h3>
                     
-                    {{-- TOOLBAR DISKON GLOBAL --}}
-                    <div class="flex items-center bg-white border border-slate-300 rounded-lg p-1 shadow-sm">
-                        <div class="px-3 border-r border-slate-200 bg-slate-50 rounded-l flex items-center">
-                            <span class="text-[10px] font-bold text-slate-500 uppercase">Bulk Disc</span>
-                        </div>
-                        <input type="text" id="bulk-chain-discount" 
-                               class="text-xs w-32 px-3 py-1.5 focus:outline-none font-mono text-slate-700" 
-                               placeholder="Cth: 61+10">
-                        
-                        <button type="button" id="btn-apply-selected" 
-                                class="px-3 py-1.5 text-[10px] font-bold text-indigo-600 hover:bg-indigo-50 uppercase tracking-wide border-l border-slate-200 transition">
-                            Selected
-                        </button>
-                        <button type="button" id="btn-apply-all" 
-                                class="px-3 py-1.5 text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-r uppercase tracking-wide transition">
-                            Apply All
+                    {{-- Bulk Discount Tool --}}
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-slate-500 uppercase">Set Diskon:</span>
+                        <input type="text" x-model="bulkDiscValue" class="form-input h-8 text-sm w-24" placeholder="Cth: 10+5">
+                        <button type="button" @click="applyBulkDiscount()" class="btn btn-sm btn-secondary h-8">
+                            Terapkan
                         </button>
                     </div>
                 </div>
 
-                <div class="overflow-x-auto">
-                    <table class="dashboard-table w-full">
-                        <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200">
-                                <th class="w-10 text-center p-2">
-                                    <input type="checkbox" id="check-all-rows" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
-                                </th>
-                                <th class="min-w-[300px] p-2 text-left text-xs font-bold text-slate-500 uppercase pl-4">Produk</th> 
-                                <th class="w-32 text-center p-2 text-xs font-bold text-slate-500 uppercase">Qty</th> 
-                                <th class="w-40 text-right p-2 text-xs font-bold text-slate-500 uppercase">Harga Beli (@)</th> 
-                                <th class="w-48 text-center p-2 text-xs font-bold text-slate-500 uppercase">Diskon Item (%)</th> 
-                                <th class="w-48 text-right p-2 text-xs font-bold text-slate-500 uppercase">Subtotal Revisi</th> 
-                                <th class="w-10 text-center p-2"></th>
+                <div class="table-container border-0 shadow-none rounded-none overflow-x-auto">
+                    <table class="table-modern w-full min-w-[1000px]">
+                        <thead class="bg-slate-100 dark:bg-slate-800">
+                            <tr>
+                                <th class="min-w-[300px]">Produk</th>
+                                <th class="w-[150px] text-right">Harga (Rp)</th>
+                                <th class="w-[160px] text-center">Qty</th>
+                                <th class="w-[180px] text-center">Diskon (%)</th>
+                                <th class="w-[180px] text-right">Subtotal</th>
+                                <th class="w-[50px]"></th>
                             </tr>
                         </thead>
-                        <tbody id="product-items">
-                            {{-- JS Injects Existing Rows Here --}}
+                        <tbody>
+                            <template x-for="(item, index) in items" :key="item.id">
+                                <tr>
+                                    {{-- Product Selection --}}
+                                    <td class="align-top p-2">
+                                        <select :name="`products[${index}][product_id]`" 
+                                                x-model="item.product_id"
+                                                x-init="initTomSelect($el, index)"
+                                                class="tom-select w-full" required>
+                                            <option value="">Pilih Produk...</option>
+                                            @foreach($products as $prod)
+                                                <option value="{{ $prod->product_id }}" 
+                                                        data-price="{{ $prod->purchase_price ?? 0 }}" 
+                                                        data-unit="{{ $prod->unit->name ?? 'Unit' }}">
+                                                    {{ $prod->product_name }} ({{ $prod->product_code }})
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </td>
+
+                                    {{-- Price --}}
+                                    <td class="align-top p-2">
+                                        <input type="text" 
+                                               x-model="item.price_visual"
+                                               @input="formatPriceInput(index, $event.target.value)"
+                                               class="form-input text-right w-full text-sm" placeholder="0">
+                                        <input type="hidden" :name="`products[${index}][price_per_unit]`" :value="item.price">
+                                    </td>
+
+                                    {{-- Qty --}}
+                                    <td class="align-top p-2">
+                                        <div class="flex">
+                                            <input type="number" :name="`products[${index}][quantity]`" 
+                                                   x-model.number="item.qty" class="form-input text-center w-full rounded-r-none border-r-0" step="0.01" required>
+                                            <span class="inline-flex items-center px-2 text-xs bg-slate-100 border border-l-0 border-slate-300 rounded-r text-slate-500" x-text="item.unit_name || 'Unit'"></span>
+                                        </div>
+                                    </td>
+
+                                    {{-- Discount Multi-Level --}}
+                                    <td class="align-top p-2">
+                                        <div class="flex flex-col gap-1">
+                                            <template x-for="(d, dIndex) in item.discounts" :key="dIndex">
+                                                <div class="flex items-center gap-1">
+                                                    <input type="number" x-model="item.discounts[dIndex]" class="form-input text-center text-xs h-7 w-full" placeholder="%" min="0" max="100" step="0.01">
+                                                    <button type="button" @click="removeDiscountLevel(index, dIndex)" x-show="item.discounts.length > 1" class="text-rose-500 hover:text-rose-700">
+                                                        <i class="material-icons text-sm">cancel</i>
+                                                    </button>
+                                                </div>
+                                            </template>
+                                            <button type="button" @click="addDiscountLevel(index)" class="text-[10px] text-indigo-600 hover:underline text-center w-full mt-1">+ Level</button>
+                                            
+                                            {{-- Hidden Inputs for Array Submission --}}
+                                            <template x-for="(d, dIndex) in item.discounts" :key="`h-${dIndex}`">
+                                                <input type="hidden" :name="`products[${index}][discounts][]`" :value="d">
+                                            </template>
+                                        </div>
+                                    </td>
+
+                                    {{-- Subtotal --}}
+                                    <td class="align-top p-2 text-right font-medium pt-3">
+                                        <span x-text="formatRupiah(calculateRowTotal(item))"></span>
+                                    </td>
+
+                                    {{-- Actions --}}
+                                    <td class="align-top p-2 text-center pt-3">
+                                        <button type="button" @click="removeItem(index)" class="text-rose-500 hover:bg-rose-50 p-1 rounded transition-colors" title="Hapus">
+                                            <i class="material-icons text-lg">delete_outline</i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
                         </tbody>
                     </table>
-                </div>
-                
-                <div class="p-4 bg-slate-50 border-t border-slate-100 text-center">
-                     <button type="button" onclick="addProductRow()" class="inline-flex items-center px-6 py-3 bg-white border border-indigo-200 text-indigo-600 text-sm font-bold rounded-full hover:bg-indigo-50 transition shadow-sm uppercase tracking-wide hover:shadow-md transform hover:-translate-y-0.5">
-                        <i class="material-icons text-lg mr-2">add</i> Tambah Item Baru
-                    </button>
+                    
+                    <div class="p-3 bg-slate-50 border-t border-slate-200">
+                        <button type="button" @click="addItem()" class="btn btn-sm btn-secondary border-dashed border-2 border-slate-300 text-slate-500 hover:text-indigo-600 hover:border-indigo-400">
+                            <i class="material-icons text-base mr-1">add</i> Tambah Produk
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {{-- 3. RINGKASAN & ALASAN (CARD BAWAH) --}}
-            <div class="dashboard-card p-6 border-t-4 border-indigo-500">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                    
-                    {{-- Kolom Kiri: Alasan, Pajak, Penanganan Overpayment --}}
-                    <div class="space-y-6">
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-2 ml-1">Alasan Koreksi (Wajib)</label>
-                            <textarea class="form-textarea w-full bg-yellow-50/30 border-yellow-100 focus:border-yellow-400 focus:ring-yellow-200" name="notes" id="notes" rows="4" placeholder="Jelaskan mengapa nilai PO berubah (misal: perubahan harga dari supplier)..." required>{{ old('notes') }}</textarea>
+            {{-- 2. BOTTOM LAYOUT --}}
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {{-- Left: Notes & Overpayment Config --}}
+                <div class="space-y-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-header-title">Alasan Penyesuaian & Catatan</h3>
                         </div>
-
-                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                            <h4 class="text-xs font-bold text-slate-700 uppercase mb-3">Pengaturan Pajak</h4>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Pajak (PPN)</label>
-                                    {{-- Gunakan class po-adjust-select --}}
-                                    <select name="tax_id" id="tax_id" class="po-adjust-select w-full">
-                                        <option value="">-- Tanpa Pajak --</option>
-                                        @foreach(\App\Models\Tax::where('is_active', true)->get() as $tax)
-                                            <option value="{{ $tax->id }}" data-rate="{{ $tax->rate }}" {{ old('tax_id', $purchaseOrder->tax_id) == $tax->id ? 'selected' : '' }}>
-                                                {{ $tax->name }} ({{ $tax->rate }}%)
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div>
-                                     <div class="flex items-center gap-2 mt-6">
-                                        <input type="checkbox" id="use_custom_dpp_factor" name="use_custom_dpp_factor" value="1" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer" {{ old('use_custom_dpp_factor', $purchaseOrder->use_custom_dpp_factor) ? 'checked' : '' }}>
-                                        <label class="text-xs text-slate-600 cursor-pointer select-none" for="use_custom_dpp_factor">Override Faktor DPP</label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {{-- Input DPP Custom --}}
-                            <div id="custom-dpp-container" class="mt-3 {{ old('use_custom_dpp_factor', $purchaseOrder->use_custom_dpp_factor) ? '' : 'hidden' }}">
-                                <label class="block text-[10px] text-slate-500 mb-1">Faktor DPP Manual (Bisa Pecahan: 11/12)</label>
-                                <input type="text" class="form-input text-xs h-8 w-full" name="custom_dpp_factor" id="custom_dpp_factor" value="{{ old('custom_dpp_factor', $purchaseOrder->custom_dpp_factor) }}" placeholder="0.91666666">
-                            </div>
-                        </div>
-
-                        {{-- OPSI OVERPAYMENT --}}
-                        <div class="p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
-                            <label class="block text-[10px] font-bold text-blue-800 uppercase mb-2">Jika Terjadi Kelebihan Bayar (Nota Kredit):</label>
-                            <div class="space-y-2">
-                                <label class="flex items-center cursor-pointer group">
-                                    <input type="radio" name="overpayment_action" value="deposit" checked class="text-indigo-600 focus:ring-indigo-500 border-slate-300 h-4 w-4 mr-2">
-                                    <span class="text-sm text-slate-700 font-medium group-hover:text-indigo-600">Simpan ke Deposit Supplier</span>
-                                </label>
-                                <label class="flex items-center cursor-pointer group">
-                                    <input type="radio" name="overpayment_action" value="refund" class="text-indigo-600 focus:ring-indigo-500 border-slate-300 h-4 w-4 mr-2">
-                                    <span class="text-sm text-slate-700 font-medium group-hover:text-indigo-600">Biarkan Minus (Refund Manual)</span>
-                                </label>
-                            </div>
+                        <div class="card-body">
+                            <textarea name="notes" rows="4" class="form-input w-full" placeholder="Jelaskan kenapa PO ini direvisi..." required></textarea>
+                            <p class="text-xs text-slate-400 mt-2">* Catatan ini akan muncul di Nota Debit/Kredit.</p>
                         </div>
                     </div>
 
-                    {{-- Kolom Kanan: Kalkulasi --}}
-                    <div class="bg-slate-50/50 rounded-xl p-6 border border-slate-200 space-y-4 sticky top-6">
-                        <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 pb-2 mb-2">Kalkulasi Baru</h4>
+                     {{-- Overpayment Logic --}}
+                     <div class="bg-indigo-50 dark:bg-slate-800 p-5 rounded-xl border border-indigo-100 dark:border-slate-700">
+                        <label class="form-label mb-2 flex items-center gap-2 text-indigo-700 dark:text-indigo-300">
+                            <i class="material-icons">account_balance_wallet</i>
+                            Konfigurasi Kelebihan Bayar
+                        </label>
+                        <p class="text-xs text-slate-500 mb-4 leading-relaxed">
+                            Jika revisi menyebabkan total baru menjadi lebih kecil dari jumlah yang sudah Anda bayarkan ke Supplier:
+                        </p>
+                        <div class="flex flex-col gap-3">
+                            <label class="inline-flex items-center cursor-pointer p-2 rounded-lg hover:bg-white/50 border border-transparent hover:border-indigo-200 transition-all">
+                                <input type="radio" name="overpayment_action" value="deposit" class="form-radio text-indigo-600 w-4 h-4" checked>
+                                <span class="ml-3 text-sm font-medium text-slate-700 dark:text-slate-200">Simpan sbg Deposit Supplier (Potongan Pembelian Berikutnya)</span>
+                            </label>
+                            <label class="inline-flex items-center cursor-pointer p-2 rounded-lg hover:bg-white/50 border border-transparent hover:border-indigo-200 transition-all">
+                                <input type="radio" name="overpayment_action" value="refund" class="form-radio text-indigo-600 w-4 h-4">
+                                <span class="ml-3 text-sm font-medium text-slate-700 dark:text-slate-200">Biarkan (Akan diproses Refund Tunai manual)</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
 
+                {{-- Right: Kalkulasi Akhir (Sama dengan Edit PO) --}}
+                <div class="card h-fit border-l-4" :class="adjustmentStatusClass">
+                    <div class="card-header bg-white dark:bg-slate-800">
+                        <h3 class="card-header-title">Kalkulasi Akhir</h3>
+                    </div>
+                    <div class="card-body space-y-4">
+                        
                         {{-- Subtotal --}}
                         <div class="flex justify-between items-center text-sm">
-                            <span class="text-slate-500 font-medium">Subtotal Barang</span>
-                            <span class="font-bold text-slate-800 text-base" id="summary-subtotal">Rp 0</span>
+                            <span class="text-slate-600">Subtotal Item</span>
+                            <span class="font-bold" x-text="formatRupiah(totals.subtotal)"></span>
                         </div>
 
-                        {{-- Diskon Tambahan --}}
-                        <div class="flex justify-between items-center">
-                             <div class="flex items-center gap-2">
-                                <input type="checkbox" id="apply_disc_fee" name="apply_disc_fee" value="1" class="rounded border-slate-300 text-indigo-600 h-4 w-4" {{ old('apply_disc_fee', $purchaseOrder->apply_disc_fee) ? 'checked' : '' }}>
-                                <label for="apply_disc_fee" class="text-xs font-bold text-slate-500 uppercase cursor-pointer">Diskon Faktur / Fee</label>
+                        {{-- Diskon Akhir --}}
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" name="apply_disc_fee" value="1" x-model="applyDisc" class="rounded text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-sm text-slate-600">Diskon Akhir (%)</span>
                             </div>
-                            <div id="disc-fee-inputs" class="flex items-center gap-2 {{ old('apply_disc_fee', $purchaseOrder->apply_disc_fee) ? '' : 'hidden' }}">
-                                <input type="number" step="any" min="0" class="form-input text-xs w-16 text-right h-8" name="disc_fee_percent" id="disc_fee_percent" placeholder="%" value="{{ old('disc_fee_percent', $purchaseOrder->disc_fee_percent) }}">
-                                <span class="text-slate-400">/</span>
-                                
-                                {{-- Display Input --}}
-                                <input type="text" class="form-input text-xs w-28 text-right h-8 po-adjust-autonumeric" id="disc_fee_amount_display" placeholder="Rp">
-                                {{-- Hidden Input --}}
-                                <input type="hidden" name="disc_fee_amount" id="disc_fee_amount" value="{{ $purchaseOrder->disc_fee_amount }}">
+                            <div x-show="applyDisc" class="w-24">
+                                <input type="number" name="disc_fee_percent" x-model.number="discPercent" class="form-input text-right h-8 text-sm" placeholder="0" step="0.01">
                             </div>
-                            <span class="text-red-500 font-medium text-sm" id="summary-disc">- Rp 0</span>
+                        </div>
+                        <div x-show="applyDisc && totals.discAmount > 0" class="flex justify-between text-sm text-emerald-600">
+                            <span>Potongan</span>
+                            <span>- <span x-text="formatRupiah(totals.discAmount)"></span></span>
                         </div>
 
                         {{-- Pembulatan --}}
-                        <div class="flex justify-between items-center">
+                        <div class="flex items-center justify-between gap-2">
                             <div class="flex items-center gap-2">
-                                <input type="checkbox" id="apply_rounding_discount" name="apply_rounding_discount" value="1" class="rounded border-slate-300 text-indigo-600 h-4 w-4" {{ old('apply_rounding_discount', $purchaseOrder->apply_rounding_discount) ? 'checked' : '' }}>
-                                <label for="apply_rounding_discount" class="text-xs font-bold text-slate-500 uppercase cursor-pointer">Pembulatan</label>
+                                <input type="checkbox" name="apply_rounding_discount" value="1" x-model="applyRounding" class="rounded text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-sm text-slate-600">Diskon Pembulatan</span>
+                            </div>
+                            <div x-show="applyRounding" class="w-32">
+                                <input type="number" name="rounding_discount_amount" x-model.number="roundingAmount" class="form-input text-right h-8 text-sm" placeholder="0" step="100">
+                            </div>
+                        </div>
+
+                        <hr class="border-slate-200 dark:border-slate-600">
+
+                        {{-- DPP Custom (Persis Edit PO) --}}
+                        <div class="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-lg border border-indigo-100 dark:border-indigo-800">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="use_custom_dpp_factor" value="1" x-model="useCustomDPP" class="rounded text-indigo-600 focus:ring-indigo-500">
+                                    <span class="text-sm font-bold text-indigo-700 dark:text-indigo-300">Gunakan Faktor DPP</span>
+                                </label>
                             </div>
                             
-                            <input type="text" class="form-input text-xs w-28 text-right h-8 {{ old('apply_rounding_discount', $purchaseOrder->apply_rounding_discount) ? '' : 'hidden' }} po-adjust-autonumeric" id="rounding_discount_amount_display" placeholder="Rp">
-                            <input type="hidden" name="rounding_discount_amount" id="rounding_discount_amount" value="{{ $purchaseOrder->rounding_discount_amount }}">
-                            
-                            <span class="text-red-500 font-medium text-sm" id="summary-rounding">- Rp 0</span>
+                            <div x-show="useCustomDPP" x-transition class="space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs text-slate-500">Nilai Faktor (Pecahan/Desimal)</span>
+                                    <input type="text" x-model="dppInput" class="form-input h-8 text-right text-xs w-24" placeholder="11/12">
+                                </div>
+                                {{-- Hidden Input untuk kirim nilai kalkulasi ke server jika perlu --}}
+                                <input type="hidden" name="custom_dpp_factor" :value="dppFactorValue">
+
+                                <div class="flex justify-between text-xs text-indigo-600 font-medium">
+                                    <span>Nilai DPP</span>
+                                    <span x-text="formatRupiah(totals.dpp)"></span>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="border-t border-dashed border-slate-300 my-2"></div>
-
-                        {{-- Pajak Details --}}
-                        <div class="flex justify-between items-center text-xs text-slate-500">
-                            <span>DPP</span>
-                            <span id="summary-dpp">Rp 0</span>
+                        {{-- Pajak --}}
+                        <div class="flex items-center justify-between gap-4">
+                            <span class="text-sm text-slate-600">PPN / Pajak</span>
+                            <div class="w-48">
+                                <select name="tax_id" x-model="taxId" class="tom-select w-full" x-init="initTaxSelect($el)">
+                                    <option value="">Tanpa Pajak</option>
+                                    @foreach(\App\Models\Tax::where('is_active', true)->get() as $tax)
+                                        <option value="{{ $tax->id }}">{{ $tax->name }} ({{ $tax->rate }}%)</option>
+                                    @endforeach
+                                </select>
+                            </div>
                         </div>
-                        <div class="flex justify-between items-center text-sm text-slate-600">
-                            <span>PPN (<span id="summary-tax-rate">0</span>%)</span>
-                            <span class="font-bold" id="summary-ppn">Rp 0</span>
+                        <div x-show="totals.ppn > 0" class="flex justify-between text-sm text-slate-600">
+                            <span>Nilai Pajak</span>
+                            <span>+ <span x-text="formatRupiah(totals.ppn)"></span></span>
                         </div>
 
                         {{-- Ongkir --}}
-                        <div class="flex justify-between items-center pt-2">
-                            <label class="text-xs font-bold text-slate-500 uppercase">Ongkos Kirim</label>
-                            <div class="w-32">
-                                <input type="text" class="form-input text-right font-bold text-sm h-9 border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 rounded po-adjust-autonumeric" id="shipping_amount_display" placeholder="0">
-                                <input type="hidden" name="shipping_amount" id="shipping_amount" value="{{ $purchaseOrder->shipping_amount }}">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-slate-600">Biaya Kirim / Lainnya</span>
+                            <input type="number" name="shipping_amount" x-model.number="shipping" class="form-input text-right h-9 w-40" placeholder="0" step="1000">
+                        </div>
+
+                        <hr class="border-slate-200 dark:border-slate-600 border-dashed">
+
+                        {{-- RESULT COMPARISON --}}
+                        <div class="space-y-3">
+                            <div class="flex justify-between text-slate-500 text-sm">
+                                <span>Total Lama (Original)</span>
+                                <span class="line-through decoration-slate-400" x-text="formatRupiah(originalTotal)"></span>
+                            </div>
+                            <div class="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                                <span class="font-bold text-slate-800 dark:text-white">Total Baru (Revisi)</span>
+                                <span class="text-xl font-extrabold text-slate-800 dark:text-white" x-text="formatRupiah(totals.grandTotal)"></span>
+                                <input type="hidden" name="total_amount" :value="totals.grandTotal">
                             </div>
                         </div>
 
-                        {{-- GRAND TOTAL --}}
-                        <div class="bg-indigo-50 rounded-lg p-4 flex justify-between items-center mt-4 border border-indigo-100">
-                            <span class="text-sm font-bold text-indigo-900 uppercase tracking-wider">Total Revisi</span>
-                            <span class="text-2xl font-bold text-indigo-600 font-mono tracking-tight" id="summary-grand">Rp 0</span>
+                        {{-- ADJUSTMENT PREVIEW BOX --}}
+                        <div class="p-5 rounded-xl text-center border mt-6 transition-all duration-300 shadow-sm"
+                             :class="adjustmentColorClass">
+                            <span class="text-[10px] uppercase font-bold tracking-widest block mb-2 opacity-70">Status Penyesuaian</span>
+                            
+                            <template x-if="diffValue > 0">
+                                <div>
+                                    <h4 class="text-xl font-black">CREDIT NOTE</h4>
+                                    <p class="text-xs font-medium mt-1 mb-2 opacity-90">Total berkurang (Potongan Hutang)</p>
+                                    <p class="text-3xl font-extrabold" x-text="formatRupiah(diffValue)"></p>
+                                </div>
+                            </template>
+
+                            <template x-if="diffValue < 0">
+                                <div>
+                                    <h4 class="text-xl font-black">DEBIT NOTE</h4>
+                                    <p class="text-xs font-medium mt-1 mb-2 opacity-90">Total bertambah (Tagihan Tambahan)</p>
+                                    <p class="text-3xl font-extrabold" x-text="formatRupiah(Math.abs(diffValue))"></p>
+                                </div>
+                            </template>
+
+                            <template x-if="diffValue === 0">
+                                <div class="text-slate-400 py-2">
+                                    <i class="material-icons text-5xl block mb-2 opacity-50">balance</i>
+                                    <span class="text-sm font-medium">Tidak ada perubahan nilai.</span>
+                                </div>
+                            </template>
                         </div>
 
                     </div>
                 </div>
-
-                {{-- TOMBOL AKSI --}}
-                <div class="flex justify-end gap-4 mt-8 pt-6 border-t border-slate-100">
-                    <a href="{{ route('admin.purchase-order-adjustments.create') }}" class="px-6 py-3 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition shadow-sm">
-                         Batal
-                    </a>
-                    <button type="submit" id="submit-btn" class="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 flex items-center gap-2">
-                        <i class="material-icons text-lg">save</i> Simpan Koreksi
-                    </button>
-                </div>
             </div>
 
-        </div>
-    </form>
-</div>
+        </form>
+    </div>
 
-{{-- TEMPLATE ROW --}}
-<template id="product-row-template">
-    <tr class="group transition-colors hover:bg-slate-50 border-b border-slate-100 last:border-0">
-        <td class="text-center align-middle p-2">
-            <input type="checkbox" class="row-checkbox rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer h-4 w-4">
-        </td>
-        <td class="p-2 align-top pl-4">
-            <select class="product-select text-sm" style="width: 100%;" required>
-                <option value="" data-unit="-" disabled selected>-- Cari Produk --</option>
-                @foreach ($products as $product)
-                    <option value="{{ $product->product_id }}"
-                            data-unit="{{ $product->unit->name ?? '' }}"
-                            data-default-discounts='@json($product->default_discounts ?? [])'
-                            data-default-price="{{ $product->purchase_price ?? 0 }}">
-                        {{ $product->product_name }}
-                    </option>
-                @endforeach
-            </select>
-            <div class="mt-1 flex items-center gap-2">
-                 <span class="text-[10px] text-slate-400 bg-slate-100 px-1.5 rounded unit-display">-</span>
-            </div>
-        </td>
-        <td class="p-2 align-top">
-            <div class="relative">
-                <input type="number" class="form-input quantity w-full text-center text-sm font-bold h-10" value="1" min="0.01" step="0.01" required>
-            </div>
-        </td>
-        <td class="p-2 align-top">
-            {{-- Display Input --}}
-            <input type="text" class="form-input purchase-price-formatted w-full text-right text-sm font-medium h-10" placeholder="0">
-            {{-- Hidden Input (Value Murni) --}}
-            <input type="hidden" class="purchase-price-hidden" value="0">
-        </td>
-        <td class="p-2 align-top text-center">
-            <div class="discount-wrapper space-y-1 flex flex-col items-center">
-                <div class="flex items-center justify-center gap-1 relative w-full">
-                     <input type="number" step="any" min="0" max="100" class="discount-percentage form-input text-xs w-20 text-center h-8 p-1" name="products[INDEX][discounts][]" placeholder="0">
-                     <span class="text-xs text-slate-400 absolute right-6">%</span>
-                </div>
-            </div>
-            <button type="button" class="text-[10px] text-indigo-500 hover:underline mt-1 add-disc-btn font-bold flex items-center justify-center w-full gap-1">
-                <i class="material-icons text-[10px]">add</i> Lapis
-            </button>
-        </td>
-        <td class="p-2 align-middle text-right">
-            <span class="subtotal font-bold text-slate-700 text-sm">Rp 0</span>
-        </td>
-        <td class="p-2 align-middle text-center">
-            <button type="button" class="remove-product-btn text-slate-300 hover:text-red-500 transition p-1 rounded-full hover:bg-red-50">
-                <i class="material-icons text-lg">delete</i>
-            </button>
-        </td>
-    </tr>
-</template>
+    @push('scripts')
+    <script>
+        const taxRates = @json(\App\Models\Tax::where('is_active', true)->pluck('rate', 'id'));
 
-@endsection
-
-@push('scripts')
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // --- 1. DATA EXISTING DARI PO LAMA ---
-        const existingPoItems = @json($purchaseOrder->items->load('discounts') ?? []);
-
-        const form = document.getElementById('po-adj-form');
-        const productItemsContainer = document.getElementById('product-items');
-        const productRowTemplate = document.getElementById('product-row-template');
-
-        // Bulk Discount Elements
-        const inputBulkChain = document.getElementById('bulk-chain-discount');
-        const btnApplySelected = document.getElementById('btn-apply-selected');
-        const btnApplyAll = document.getElementById('btn-apply-all');
-        const checkAllRows = document.getElementById('check-all-rows');
-
-        // Elements Kalkulasi
-        const inputDiscFeePercent = document.getElementById('disc_fee_percent');
-        const inputDiscFeeAmountDisplay = document.getElementById('disc_fee_amount_display');
-        const inputDiscFeeAmountHidden = document.getElementById('disc_fee_amount');
-
-        const inputRoundingAmountDisplay = document.getElementById('rounding_discount_amount_display');
-        const inputRoundingAmountHidden = document.getElementById('rounding_discount_amount');
-
-        const inputShippingDisplay = document.getElementById('shipping_amount_display');
-        const inputShippingHidden = document.getElementById('shipping_amount');
-
-        const inputTaxId = document.getElementById('tax_id');
-        
-        const checkboxDiscFee = document.getElementById('apply_disc_fee');
-        const checkboxRounding = document.getElementById('apply_rounding_discount');
-        const checkboxCustomDpp = document.getElementById('use_custom_dpp_factor');
-        const inputCustomDpp = document.getElementById('custom_dpp_factor');
-
-        // Elements Display
-        const displaySubtotal = document.getElementById('summary-subtotal');
-        const displayDisc = document.getElementById('summary-disc');
-        const displayRounding = document.getElementById('summary-rounding');
-        const displayDpp = document.getElementById('summary-dpp');
-        const displayPpn = document.getElementById('summary-ppn');
-        const displayTaxRate = document.getElementById('summary-tax-rate');
-        const displayGrand = document.getElementById('summary-grand');
-
-        let productIndex = 0;
-
-        // --- 1. HELPER FUNCTIONS ---
-        function formatCurrency(n) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Math.round(n || 0)); }
-        function parseNumericForInput(str) { if (!str) return 0; return parseFloat(String(str).replace(/[^\d\-\.\,]/g, '').replace(/,/g, '.')) || 0; }
-        function getAllRows() { return Array.from(productItemsContainer.querySelectorAll('tr')); }
-        
-        // FUNGSI PINTAR: Konversi "11/12" ke 0.9166...
-        function parseFractionOrNumber(val) {
-            if (!val) return 1;
-            const str = String(val).trim();
-            if (str.includes('/')) {
-                const parts = str.split('/');
-                const num = parseFloat(parts[0]);
-                const den = parseFloat(parts[1]);
-                if (den !== 0 && !isNaN(num) && !isNaN(den)) return num / den;
-            }
-            return parseFloat(str.replace(',', '.')) || 1;
-        }
-
-        // Helper Init AutoNumeric (Display <-> Hidden Binding)
-        function initBoundAutoNumeric(displayElement, hiddenElement) {
-            if (!displayElement) return;
-            const an = new AutoNumeric(displayElement, { 
-                decimalCharacter: ',', 
-                digitGroupSeparator: '.', 
-                decimalPlaces: 0, 
-                minimumValue: '0', 
-                emptyInputBehavior: 'zero',
-                currencySymbol: '', 
-                unformatOnSubmit: false 
-            });
-            
-            // Saat display diketik, update hidden input dengan raw value
-            displayElement.addEventListener('autoNumeric:rawValueModified', e => {
-                hiddenElement.value = e.detail.newRawValue;
-                calculateTotals();
-            });
-
-            // Initial Set value from hidden (jika ada value di hidden saat load)
-            if(hiddenElement.value) {
-                an.set(hiddenElement.value);
-            }
-            return an;
-        }
-
-        // Init AutoNumeric untuk field header
-        const anDiscFee = initBoundAutoNumeric(inputDiscFeeAmountDisplay, inputDiscFeeAmountHidden);
-        const anRounding = initBoundAutoNumeric(inputRoundingAmountDisplay, inputRoundingAmountHidden);
-        const anShipping = initBoundAutoNumeric(inputShippingDisplay, inputShippingHidden);
-
-        // --- 2. INIT SELECT2 (Manual) ---
-        $('.po-adjust-select').select2({ width: '100%', dropdownCssClass: 'select2-dropdown-clean', allowClear: true, placeholder: '-- Pilih --' });
-
-        // --- 3. ROW MANAGEMENT ---
-        window.addProductRow = function(data = null) {
-            const clone = productRowTemplate.content.cloneNode(true);
-            const tr = clone.querySelector('tr');
-            
-            // Naming Inputs
-            tr.querySelector('.product-select').name = `products[${productIndex}][product_id]`;
-            tr.querySelector('.quantity').name = `products[${productIndex}][quantity]`;
-            tr.querySelector('.purchase-price-hidden').name = `products[${productIndex}][price_per_unit]`;
-            
-            // Set Name Initial Discount
-            const initialDiscInput = tr.querySelector('.discount-percentage');
-            initialDiscInput.name = `products[${productIndex}][discounts][]`;
-
-            productItemsContainer.appendChild(tr);
-            
-            // Init Plugins for Row
-            const select = $(tr.querySelector('.product-select'));
-            // Gunakan custom styling, jangan theme bootstrap-5 agar panah custom CSS muncul
-            select.select2({ width: '100%', placeholder: '-- Pilih Produk --', dropdownCssClass: 'select2-dropdown-clean' });
-
-            const priceInput = tr.querySelector('.purchase-price-formatted');
-            const priceHidden = tr.querySelector('.purchase-price-hidden');
-            const qtyInput = tr.querySelector('.quantity');
-            
-            // Init AutoNumeric Row (Binding ke Hidden)
-            const anPrice = new AutoNumeric(priceInput, { 
-                decimalCharacter: ',', 
-                digitGroupSeparator: '.', 
-                decimalPlaces: 0, 
-                minimumValue: '0',
-                unformatOnSubmit: false
-            });
-
-            // Events
-            select.on('select2:select', function(e) {
-                const option = e.params.data.element;
-                const unit = option.dataset.unit || '-';
-                const price = parseFloat(option.dataset.defaultPrice) || 0;
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('poAdjustmentAuto', (initData) => ({
+                items: initData.items,
+                originalTotal: parseFloat(initData.originalTotal),
                 
-                tr.querySelector('.unit-display').textContent = unit;
-                if (priceInput.value == 0 || priceInput.value == '') {
-                    anPrice.set(price);
-                    priceHidden.value = price;
-                }
-                calculateTotals();
-            });
-
-            priceInput.addEventListener('autoNumeric:rawValueModified', e => {
-                priceHidden.value = e.detail.newRawValue;
-                calculateTotals();
-            });
-
-            qtyInput.addEventListener('input', calculateTotals);
-            initialDiscInput.addEventListener('input', calculateTotals);
-            
-            tr.querySelector('.add-disc-btn').addEventListener('click', () => {
-                addDiscountInputToRow(tr);
-            });
-
-            tr.querySelector('.remove-product-btn').addEventListener('click', function() {
-                select.select2('destroy');
-                tr.remove();
-                calculateTotals();
-            });
-
-            // --- POPULATE EXISTING DATA ---
-            if (data) {
-                select.val(data.product_id).trigger('change');
-                qtyInput.value = data.quantity;
-                anPrice.set(data.price_per_unit);
-                priceHidden.value = data.price_per_unit;
+                // Config State
+                applyDisc: initData.config.apply_disc_fee,
+                discPercent: initData.config.disc_fee_percent,
+                applyRounding: initData.config.apply_rounding,
+                roundingAmount: initData.config.rounding_amount,
+                shipping: initData.config.shipping_amount,
+                taxId: initData.config.tax_id || '',
                 
-                // Handle Discounts
-                if (data.discounts && data.discounts.length > 0) {
-                    initialDiscInput.value = data.discounts[0].percentage;
-                    for (let i = 1; i < data.discounts.length; i++) {
-                        addDiscountInputToRow(tr, data.discounts[i].percentage);
+                // DPP Settings
+                useCustomDPP: initData.config.use_custom_dpp,
+                dppInput: initData.config.custom_dpp_factor,
+
+                bulkDiscValue: '',
+
+                init() {
+                    // Watchers or extra init logic if needed
+                },
+
+                // --- Helper Logic ---
+                addItem() {
+                    this.items.push({ 
+                        id: Date.now(), 
+                        product_id: '', 
+                        price: 0, price_visual: '', 
+                        qty: 1, unit_name: '', 
+                        discounts: [0] 
+                    });
+                },
+                removeItem(index) {
+                    if (this.items.length > 1) this.items.splice(index, 1);
+                },
+                
+                // TomSelect Init
+                initTomSelect(el, index) {
+                    if (el.tomselect) el.tomselect.destroy();
+                    const ts = new TomSelect(el, {
+                        ...window.defaultTomSelectConfig,
+                        onChange: (value) => {
+                            this.items[index].product_id = value;
+                            const option = el.querySelector(`option[value="${value}"]`);
+                            if (option) {
+                                // Saat ganti produk, ambil harga master baru
+                                const price = parseFloat(option.dataset.price) || 0;
+                                this.items[index].price = price;
+                                this.items[index].price_visual = this.formatRupiah(price, false);
+                                this.items[index].unit_name = option.dataset.unit || 'Unit';
+                            }
+                        }
+                    });
+                    // Set initial value silently
+                    if (this.items[index].product_id) ts.setValue(this.items[index].product_id, true);
+                },
+
+                // Tax Select Init
+                initTaxSelect(el) {
+                    if (el.tomselect) el.tomselect.destroy();
+                    const ts = new TomSelect(el, {
+                        ...window.defaultTomSelectConfig,
+                        onChange: (value) => { this.taxId = value; }
+                    });
+                    if (this.taxId) ts.setValue(this.taxId, true);
+                },
+
+                // Pricing Logic
+                formatPriceInput(index, value) {
+                    const raw = value.replace(/\D/g, '');
+                    const floatVal = parseFloat(raw) || 0;
+                    this.items[index].price = floatVal;
+                    this.items[index].price_visual = new Intl.NumberFormat('id-ID').format(floatVal);
+                },
+
+                calculateRowTotal(item) {
+                    let price = parseFloat(item.price) || 0;
+                    const qty = parseFloat(item.qty) || 0;
+                    
+                    // Apply discounts
+                    if (item.discounts && item.discounts.length) {
+                        item.discounts.forEach(d => {
+                            let val = parseFloat(d);
+                            if(val > 0) price = price * (1 - (val/100));
+                        });
                     }
+                    return price * qty;
+                },
+
+                addDiscountLevel(index) { this.items[index].discounts.push(0); },
+                removeDiscountLevel(index, dIndex) { this.items[index].discounts.splice(dIndex, 1); },
+
+                applyBulkDiscount() {
+                    if(!this.bulkDiscValue) return;
+                    const parts = this.bulkDiscValue.toString().split('+').map(d => parseFloat(d) || 0);
+                    this.items.forEach(item => item.discounts = [...parts]);
+                    showToast('Diskon massal diterapkan', 'info');
+                },
+
+                // --- MAIN CALCULATION (Same as Edit PO) ---
+                get totals() {
+                    const subtotal = this.items.reduce((sum, item) => sum + this.calculateRowTotal(item), 0);
+                    let current = subtotal;
+
+                    // Global Discount
+                    if (this.applyDisc) {
+                        current -= subtotal * ((parseFloat(this.discPercent) || 0) / 100);
+                    }
+                    
+                    let discAmount = subtotal - current; // Helper for display
+
+                    // Rounding
+                    if (this.applyRounding) {
+                        current -= (parseFloat(this.roundingAmount) || 0);
+                    }
+
+                    // DPP Logic
+                    let dpp = current;
+                    let factor = 1; 
+                    if(this.useCustomDPP) {
+                        try { 
+                            const input = this.dppInput.toString().replace(/\s/g, '').replace(',', '.');
+                            if (input.includes('/')) {
+                                const parts = input.split('/');
+                                if (parts.length === 2 && parseFloat(parts[1]) !== 0) {
+                                    factor = parseFloat(parts[0]) / parseFloat(parts[1]);
+                                }
+                            } else {
+                                factor = parseFloat(input) || 1;
+                            }
+                        } catch(e){ factor=1; }
+                        dpp = current * factor;
+                    }
+
+                    // Tax
+                    let ppn = 0;
+                    if (this.taxId && taxRates[this.taxId]) {
+                        ppn = dpp * (parseFloat(taxRates[this.taxId]) / 100);
+                    }
+
+                    const grandTotal = current + ppn + (parseFloat(this.shipping) || 0);
+
+                    return {
+                        subtotal,
+                        discAmount,
+                        dpp,
+                        ppn,
+                        grandTotal: Math.max(0, Math.round(grandTotal))
+                    };
+                },
+                
+                get dppFactorCalc() {
+                     // Digunakan untuk hidden input value jika diperlukan
+                     let val = 1;
+                     if (!this.useCustomDPP) return 1;
+                     try { 
+                        const input = this.dppInput.toString().replace(/\s/g, '').replace(',', '.');
+                        if (input.includes('/')) {
+                            const parts = input.split('/');
+                            if (parts.length === 2 && parseFloat(parts[1]) !== 0) val = parseFloat(parts[0]) / parseFloat(parts[1]);
+                        } else {
+                            val = parseFloat(input) || 1;
+                        }
+                     } catch(e) {}
+                     return val;
+                },
+
+                get dppFactorValue() {
+                    return this.dppFactorCalc.toFixed(8);
+                },
+
+                // --- ADJUSTMENT SPECIFIC ---
+                get diffValue() {
+                    // Original - New
+                    return this.originalTotal - this.totals.grandTotal;
+                },
+
+                get adjustmentStatusClass() {
+                    if (this.diffValue > 0) return 'border-emerald-500'; // Credit Note
+                    if (this.diffValue < 0) return 'border-rose-500';    // Debit Note
+                    return 'border-slate-300';
+                },
+
+                get adjustmentColorClass() {
+                    if (this.diffValue > 0) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                    if (this.diffValue < 0) return 'bg-rose-50 text-rose-700 border-rose-200';
+                    return 'bg-slate-50 text-slate-500 border-slate-200';
+                },
+
+                formatRupiah(value, withSymbol = true) {
+                    return new Intl.NumberFormat('id-ID', {
+                        style: withSymbol ? 'currency' : 'decimal',
+                        currency: 'IDR',
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0
+                    }).format(value || 0);
                 }
-                
-                const selectedOpt = select.find(':selected')[0];
-                if(selectedOpt) tr.querySelector('.unit-display').textContent = selectedOpt.dataset.unit || '-';
-            }
-
-            productIndex++;
-        };
-
-        function addDiscountInputToRow(tr, value = '') {
-            const discContainer = tr.querySelector('.discount-wrapper');
-            const nameAttr = tr.querySelector('.product-select').name; 
-            const rowIndexMatch = nameAttr.match(/products\[(\d+)\]/);
-            const rowIndex = rowIndexMatch ? rowIndexMatch[1] : productIndex;
-
-            const div = document.createElement('div');
-            div.className = 'flex items-center justify-center gap-1 relative w-full';
-            div.innerHTML = `
-                <input type="number" step="any" min="0" max="100" class="discount-percentage form-input text-xs w-20 text-center h-8 p-1" name="products[${rowIndex}][discounts][]" placeholder="0" value="${value}">
-                <span class="text-xs text-slate-400 absolute right-6">%</span>
-                <button type="button" class="text-red-400 hover:text-red-600 absolute -right-4" onclick="this.parentElement.remove(); calculateTotals();">&times;</button>
-            `;
-            div.querySelector('input').addEventListener('input', calculateTotals);
-            discContainer.appendChild(div);
-            calculateTotals();
-        }
-
-        // --- 4. BULK DISCOUNT ---
-        function parseChainDiscount(str) {
-            if(!str) return [];
-            return str.split(/[,+]/).map(s => parseFloat(s.trim())).filter(n => !isNaN(n) && n > 0 && n <= 100);
-        }
-        
-        function applyBulkDiscountToRows(rows) {
-            const inputStr = inputBulkChain.value;
-            const discounts = parseChainDiscount(inputStr);
-            if (discounts.length === 0) {
-                Swal.fire('Format Salah', 'Gunakan format seperti: 10+5', 'warning');
-                return;
-            }
-            rows.forEach(tr => {
-                const container = tr.querySelector('.discount-wrapper');
-                container.innerHTML = ''; 
-                discounts.forEach(val => {
-                    addDiscountInputToRow(tr, val);
-                });
-            });
-            calculateTotals();
-        }
-
-        btnApplySelected.addEventListener('click', function() {
-            const checkedRows = Array.from(productItemsContainer.querySelectorAll('tr')).filter(tr => tr.querySelector('.row-checkbox').checked);
-            if(checkedRows.length === 0) return;
-            applyBulkDiscountToRows(checkedRows);
+            }));
         });
-
-        btnApplyAll.addEventListener('click', function() {
-            const allRows = Array.from(productItemsContainer.querySelectorAll('tr'));
-            if(allRows.length === 0) return;
-            applyBulkDiscountToRows(allRows);
-        });
-
-        checkAllRows.addEventListener('change', function() {
-            const isChecked = this.checked;
-            productItemsContainer.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = isChecked);
-        });
-
-        // --- 5. CALCULATION ENGINE ---
-        window.calculateTotals = function() {
-            let subtotalGlobal = 0;
-
-            productItemsContainer.querySelectorAll('tr').forEach(row => {
-                const qty = parseFloat(row.querySelector('.quantity').value) || 0;
-                const price = parseFloat(row.querySelector('.purchase-price-hidden').value) || 0; // Use hidden value
-                
-                let netPrice = price;
-                row.querySelectorAll('.discount-percentage').forEach(d => {
-                    const disc = parseFloat(d.value) || 0;
-                    if(disc > 0) netPrice = netPrice * (1 - (disc / 100));
-                });
-
-                const rowSubtotal = qty * netPrice;
-                row.querySelector('.subtotal').textContent = formatCurrency(rowSubtotal);
-                subtotalGlobal += rowSubtotal;
-            });
-
-            let discFeeVal = 0;
-            if (checkboxDiscFee.checked) {
-                const pct = parseFloat(inputDiscFeePercent.value) || 0;
-                const amt = parseFloat(inputDiscFeeAmountHidden.value) || 0; 
-                
-                if (pct > 0) discFeeVal = subtotalGlobal * (pct / 100);
-                else if (amt > 0) discFeeVal = amt;
-            }
-
-            const roundingVal = checkboxRounding.checked ? (parseFloat(inputRoundingAmountHidden.value) || 0) : 0;
-            let taxableBase = Math.max(0, subtotalGlobal - discFeeVal - roundingVal);
-
-            let dppVal = taxableBase;
-            let ppnVal = 0;
-            const selectedTaxOption = $(inputTaxId).select2('data')[0];
-            const taxRate = (selectedTaxOption && selectedTaxOption.element) ? parseFloat(selectedTaxOption.element.dataset.rate) : 0;
-
-            if (taxRate > 0) {
-                let dppFactor = 1; 
-                if (checkboxCustomDpp.checked) {
-                    dppFactor = parseFractionOrNumber(inputCustomDpp.value);
-                }
-                dppVal = taxableBase * dppFactor;
-                ppnVal = dppVal * (taxRate / 100);
-            }
-
-            const shippingVal = parseFloat(inputShippingHidden.value) || 0;
-            const grandTotal = taxableBase + ppnVal + shippingVal;
-
-            displaySubtotal.textContent = formatCurrency(subtotalGlobal);
-            displayDisc.textContent = `(-) ${formatCurrency(discFeeVal)}`;
-            displayRounding.textContent = `(-) ${formatCurrency(roundingVal)}`;
-            displayDpp.textContent = formatCurrency(dppVal);
-            displayPpn.textContent = `(+) ${formatCurrency(ppnVal)}`;
-            displayTaxRate.textContent = taxRate;
-            displayGrand.textContent = formatCurrency(grandTotal);
-            
-            document.getElementById('disc-fee-inputs').classList.toggle('hidden', !checkboxDiscFee.checked);
-            document.getElementById('rounding_discount_amount_display').classList.toggle('hidden', !checkboxRounding.checked);
-            document.getElementById('custom-dpp-container').classList.toggle('hidden', !checkboxCustomDpp.checked);
-        };
-
-        // --- 6. EVENT LISTENERS ---
-        const calcTriggers = [inputDiscFeePercent, inputCustomDpp];
-        calcTriggers.forEach(el => {
-            if(el) el.addEventListener('input', calculateTotals);
-        });
-        $(inputTaxId).on('select2:select select2:unselect', calculateTotals);
-
-        [checkboxDiscFee, checkboxRounding, checkboxCustomDpp].forEach(el => {
-            el.addEventListener('change', calculateTotals);
-        });
-
-        // --- 7. LOAD & SUBMIT ---
-        if (existingPoItems.length > 0) {
-            existingPoItems.forEach(item => addProductRow(item));
-        } else {
-            addProductRow();
-        }
-
-        form.addEventListener('submit', function(e) {
-            if (getAllRows().length === 0) {
-                e.preventDefault();
-                Swal.fire('Perhatian', 'Harap tambahkan minimal satu item.', 'warning');
-                return;
-            }
-            if (checkboxCustomDpp.checked && inputCustomDpp.value) {
-                inputCustomDpp.value = parseFractionOrNumber(inputCustomDpp.value);
-            }
-            const submitBtn = document.getElementById('submit-btn');
-            if(submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="material-icons animate-spin text-sm">sync</i> Menyimpan...';
-            }
-        });
-        
-        setTimeout(calculateTotals, 500);
-    });
-</script>
-@endpush
+    </script>
+    @endpush
+@endsection

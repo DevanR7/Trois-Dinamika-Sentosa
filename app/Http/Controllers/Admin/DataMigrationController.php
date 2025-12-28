@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\ProductImport;
 use App\Imports\ClientImport;
+use App\Exports\TemplateProductExport;
+use App\Exports\TemplateClientExport;
 
 class DataMigrationController extends Controller
 {
@@ -39,15 +41,15 @@ class DataMigrationController extends Controller
         }
     }
     
-    // Fitur download template kosong agar user tidak bingung
     public function downloadTemplate($type)
     {
-        // Anda bisa membuat file excel kosong manual lalu taruh di folder public/templates
-        // Ini hanya redirect contoh
-        $path = public_path("templates/template_{$type}.xlsx");
-        if (file_exists($path)) {
-            return response()->download($path);
+        if ($type === 'products') {
+            return Excel::download(new TemplateProductExport, 'template_products.xlsx');
         }
-        return back()->with('error', 'Template belum tersedia.');
+        if ($type === 'clients') {
+            return Excel::download(new TemplateClientExport, 'template_clients.xlsx');
+        }
+
+        return back()->with('error', 'Tipe template tidak valid.');
     }
 }

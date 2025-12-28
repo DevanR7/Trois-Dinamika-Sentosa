@@ -7,7 +7,7 @@ use App\Models\Payment;
 use App\Models\SalesInvoice;
 use App\Models\PaymentGatewayCallback;
 use App\Models\ClientLedger;
-use App\Models\BulkSalesPayment; // ✅ MODEL BARU
+use App\Models\BulkSalesPayment;
 use App\Models\PaymentMethod;
 use App\Models\CompanyBankAccount;
 use Illuminate\Http\Request;
@@ -17,17 +17,14 @@ use Midtrans\Config;
 use Midtrans\Snap;
 use Midtrans\Notification;
 use Illuminate\Support\Facades\Auth;
-use Exception;
 
-// Import Service Akuntansi
+use Exception;
 use App\Services\AccountingService;
 use App\Services\AccountingSettingService;
 
 class MidtransController extends Controller
 {
-    /**
-     * Konstruktor: konfigurasi Midtrans SDK.
-     */
+    
     public function __construct()
     {
         Config::$serverKey = config('midtrans.server_key');
@@ -36,19 +33,26 @@ class MidtransController extends Controller
         Config::$is3ds = config('midtrans.is_3ds');
     }
 
-    /**
-     * Men-generate Snap Token Midtrans untuk satu Invoice (Single Pay).
-     */
     public function pay(Request $request, SalesInvoice $invoice)
     {
+        $gatewayMethod = PaymentMethod::where('type', 'gateway')->where('is_active', true)->first();
+        if (!$gatewayMethod) {
+            return response()->json(['message' => 'Pembayaran online saat ini sedang dinonaktifkan oleh Admin.'], 403);
+        }
+
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0',
             'use_credit' => 'nullable|boolean',
         ]);
 
-        $client = Auth::guard('client')->user();
+        $client = $invoice->client; 
+        
+        if (!$client) {
+            return response()->json(['message' => 'Data Klien tidak ditemukan pada invoice ini.'], 404);
+        }
+
         $sisaTagihan = $invoice->remaining_balance;
-        $clientBalance = $client->balance;
+        $clientBalance = $client->balance; 
 
         $amountFromInput = (float) $validated['amount'];
         $useCredit = $validated['use_credit'] ?? false;
@@ -62,7 +66,6 @@ class MidtransController extends Controller
 
         $grossAmountForMidtrans = round(max(0, $totalPaymentValue - $creditToUse));
 
-        // Validasi bisnis
         if ($totalPaymentValue <= 0.01 && $sisaTagihan > 0.01) {
             return response()->json(['message' => 'Jumlah pembayaran harus lebih dari 0.'], 422);
         }
@@ -75,7 +78,6 @@ class MidtransController extends Controller
 
         $uniqueOrderId = $invoice->invoice_number . '-T' . time() . '-C' . $creditToUse;
 
-        // Jika pembayaran sepenuhnya ditutup oleh kredit klien -> proses langsung
         if ($grossAmountForMidtrans == 0 && $creditToUse > 0) {
             try {
                 $this->processCreditOnlyPayment($invoice, $creditToUse); 
@@ -86,7 +88,6 @@ class MidtransController extends Controller
             }
         }
 
-        // Cek token pending yang masih valid
         $isFullPayment = abs($totalPaymentValue - $sisaTagihan) < 0.01;
         if ($isFullPayment && $invoice->pending_snap_token && $invoice->pending_snap_expires_at > now()) {
             return response()->json(['snap_token' => $invoice->pending_snap_token]);
@@ -99,7 +100,7 @@ class MidtransController extends Controller
             ],
             'customer_details' => [
                 'first_name' => $client->client_name,
-                'email' => $client->email,
+                'email' => $client->email, 
                 'phone' => $client->phone_number,
             ],
             'expiry' => [
@@ -120,16 +121,17 @@ class MidtransController extends Controller
             return response()->json(['snap_token' => $snapToken]);
         } catch (Exception $e) {
             Log::error('Midtrans Snap Error (Single): ' . $e->getMessage());
-            return response()->json(['message' => 'Gagal memulai sesi pembayaran. Silakan coba lagi nanti.'], 500);
+            return response()->json(['message' => 'Gagal memulai sesi pembayaran: ' . $e->getMessage()], 500);
         }
     }
 
-    /**
-     * Men-generate Snap Token Midtrans untuk pembayaran BATCH / BULK (Beberapa Invoice).
-     * ✅ REVISI: Menggunakan BulkSalesPayment
-     */
     public function payBatch(Request $request)
     {
+        $gatewayMethod = PaymentMethod::where('type', 'gateway')->where('is_active', true)->first();
+        if (!$gatewayMethod) {
+            return response()->json(['message' => 'Pembayaran online saat ini sedang dinonaktifkan oleh Admin.'], 403);
+        }
+
         $validated = $request->validate([
             'invoice_ids' => 'required|array|min:1',
             'invoice_ids.*' => 'exists:sales_invoices,invoice_id',
@@ -137,20 +139,31 @@ class MidtransController extends Controller
             'use_credit' => 'nullable|boolean',
         ]);
 
-        $client = Auth::guard('client')->user();
+        $invoices = SalesInvoice::whereIn('invoice_id', $validated['invoice_ids'])
+            ->with(['client', 'deductingReturns', 'adjustments'])
+            ->get();
+
+        if ($invoices->isEmpty()) {
+            return response()->json(['message' => 'Data invoice tidak ditemukan.'], 404);
+        }
+
+        $client = $invoices->first()->client;
+        if (!$client) {
+            return response()->json(['message' => 'Data pelanggan tidak valid.'], 404);
+        }
+
+        $invalidInvoices = $invoices->filter(fn($inv) => $inv->client_id !== $client->client_id);
+        if ($invalidInvoices->isNotEmpty()) {
+            return response()->json(['message' => 'Semua invoice harus milik pelanggan yang sama.'], 422);
+        }
+
         $clientBalance = $client->balance;
         $useCredit = $validated['use_credit'] ?? false;
         $amountFromInput = (float) $validated['amount'];
-
-        $invoices = SalesInvoice::whereIn('invoice_id', $validated['invoice_ids'])
-            ->where('client_id', $client->client_id)
-            ->with(['deductingReturns', 'adjustments'])
-            ->get();
-
         $totalTagihanTerpilih = $invoices->reduce(fn ($carry, $inv) => $carry + $inv->remaining_balance, 0.0);
 
         if ($totalTagihanTerpilih <= 0.01) {
-            return response()->json(['message' => 'Tidak ada tagihan yang dipilih.'], 422);
+            return response()->json(['message' => 'Tagihan yang dipilih sudah lunas.'], 422);
         }
 
         $creditToUse = 0;
@@ -163,31 +176,27 @@ class MidtransController extends Controller
 
         $grossAmountForMidtrans = round(max(0, $totalPaymentValue - $creditToUse));
 
-        if ($totalPaymentValue <= 0.01 && $totalTagihanTerpilih > 0.01) {
-            return response()->json(['message' => 'Jumlah pembayaran harus lebih dari 0.'], 422);
+        if ($totalPaymentValue <= 0.01) {
+             return response()->json(['message' => 'Jumlah pembayaran harus lebih dari 0.'], 422);
         }
-
         if ($grossAmountForMidtrans > 0 && $grossAmountForMidtrans < 1000) {
-            return response()->json(['message' => 'Jumlah tagihan online (setelah potong saldo) terlalu kecil. Harap bayar manual.'], 422);
+            return response()->json(['message' => 'Jumlah tagihan online terlalu kecil (min Rp 1.000). Silakan gunakan pelunasan manual atau deposit.'], 422);
         }
 
         DB::beginTransaction();
         try {
-            // ✅ GANTI: BatchPayment -> BulkSalesPayment
             $bulkPayment = BulkSalesPayment::create([
                 'client_id' => $client->client_id,
-                'processed_by_user_id' => null,
+                'processed_by_user_id' => Auth::id(), 
                 'payment_date' => now(),
-                'total_amount' => $totalPaymentValue, // total gabungan
-                'payment_method_id' => null,
+                'total_amount' => $totalPaymentValue, 
+                'payment_method_id' => null, 
                 'status' => 'pending',
                 'details' => ['invoice_ids' => $validated['invoice_ids']],
             ]);
 
-            // ✅ GANTI PREFIX: BATCH -> BULK
             $uniqueOrderId = 'BULK-' . $bulkPayment->bulk_sales_payment_id . '-T' . time() . '-C' . $creditToUse;
 
-            // Jika seluruh pembayaran ditutup oleh kredit -> proses langsung
             if ($grossAmountForMidtrans == 0 && $creditToUse > 0) {
                 $this->processBatchCreditOnlyPayment($bulkPayment, $invoices, $totalPaymentValue); 
                 DB::commit();
@@ -204,22 +213,26 @@ class MidtransController extends Controller
                     'email' => $client->email,
                     'phone' => $client->phone_number,
                 ],
+                'expiry' => [
+                    'start_time' => now()->format('Y-m-d H:i:s O'),
+                    'unit' => 'hour',
+                    'duration' => 24,
+                ],
             ];
 
             $snapToken = Snap::getSnapToken($params);
+            
             DB::commit();
 
             return response()->json(['snap_token' => $snapToken]);
+
         } catch (Exception $e) {
             DB::rollBack();
-            Log::error('Midtrans Bulk Pay Error: ' . $e->getMessage());
-            return response()->json(['message' => 'Gagal memulai sesi pembayaran massal.'], 500);
+            Log::error('Midtrans Admin Bulk Pay Error: ' . $e->getMessage());
+            return response()->json(['message' => 'Gagal memulai sesi pembayaran massal: ' . $e->getMessage()], 500);
         }
     }
 
-    /**
-     * Endpoint callback/webhook Midtrans.
-     */
     public function callback(Request $request)
     {
         Log::info('Midtrans Callback Received');
@@ -227,7 +240,6 @@ class MidtransController extends Controller
         $notification = new Notification();
         $rawOrderId = $notification->order_id ?? '';
 
-        // ✅ GANTI CEK PREFIX: BATCH -> BULK
         if (str_starts_with($rawOrderId, 'BULK-')) {
             $this->handleBatchCallback($notification);
         } else {
@@ -237,9 +249,6 @@ class MidtransController extends Controller
         return response()->json(['message' => 'Notification processed successfully.'], 200);
     }
 
-    /**
-     * Handle callback untuk transaksi tunggal (single invoice).
-     */
     private function handleSingleCallback(Notification $notification)
     {
         $accountingService = app(AccountingService::class);
@@ -376,10 +385,6 @@ class MidtransController extends Controller
         }
     }
 
-    /**
-     * Handle callback untuk transaksi batch/bulk.
-     * ✅ REVISI: Menggunakan BulkSalesPayment dan prefix BULK.
-     */
     private function handleBatchCallback(Notification $notification)
     {
         $accountingService = app(AccountingService::class);
@@ -392,7 +397,6 @@ class MidtransController extends Controller
             $paymentType = $notification->payment_type ?? null;
             $grossAmount = (float) ($notification->gross_amount ?? 0);
 
-            // ✅ GANTI REGEX: BATCH -> BULK
             if (!preg_match('/^BULK-(\d+)-T\d+-C([\d\.]+)$/', $rawOrderId, $matches)) {
                 throw new Exception("Format Bulk Order ID salah: $rawOrderId");
             }
@@ -401,7 +405,6 @@ class MidtransController extends Controller
             $creditUsed = (float) $matches[2]; 
             $totalPaymentAmount = $grossAmount + $creditUsed; 
 
-            // ✅ GANTI: BatchPayment -> BulkSalesPayment
             $bulkPayment = BulkSalesPayment::find($bulkPaymentId);
             if (!$bulkPayment) {
                 throw new Exception("BulkSalesPayment ID #$bulkPaymentId tidak ditemukan.");
@@ -457,7 +460,6 @@ class MidtransController extends Controller
                         $metodeBatch = 'Kredit Klien + ' . $prettyPaymentMethod;
                     }
 
-                    // Update bulk payment status
                     $bulkPayment->update([
                         'payment_method_id' => $gatewayMethod ? $gatewayMethod->payment_method_id : null,
                         'company_bank_account_id' => $gatewayBank->company_bank_account_id, 
@@ -465,12 +467,11 @@ class MidtransController extends Controller
                         'notes' => ($bulkPayment->notes ?? '') . " | Midtrans TX ID: $transactionId | Metode: $metodeBatch",
                     ]);
 
-                    // Catat penggunaan kredit
                     if ($creditUsed > 0) {
                         ClientLedger::create([
                             'client_id' => $bulkPayment->client_id,
-                            'reference_type' => BulkSalesPayment::class, // ✅ Reference Type Baru
-                            'reference_id' => $bulkPayment->bulk_sales_payment_id, // ✅ ID Baru
+                            'reference_type' => BulkSalesPayment::class, 
+                            'reference_id' => $bulkPayment->bulk_sales_payment_id, 
                             'transaction_date' => now(),
                             'type' => 'debit',
                             'amount' => -$creditUsed,
@@ -480,7 +481,6 @@ class MidtransController extends Controller
                         ]);
                     }
 
-                    // Alokasi dana ke invoice
                     $danaTersisaUntukAlokasi = $totalPaymentAmount;
                     $totalPiutangLunas = 0; 
 
@@ -491,7 +491,7 @@ class MidtransController extends Controller
                         $jumlahUntukInvoiceIni = min($sisaTagihanInvoice, $danaTersisaUntukAlokasi);
 
                         $invoice->payments()->create([
-                            'bulk_sales_payment_id' => $bulkPayment->bulk_sales_payment_id, // ✅ Kolom Baru
+                            'bulk_sales_payment_id' => $bulkPayment->bulk_sales_payment_id, 
                             'payment_date' => now(),
                             'amount' => $jumlahUntukInvoiceIni,
                             'payment_method_id' => $gatewayMethod ? $gatewayMethod->payment_method_id : null,
@@ -507,7 +507,6 @@ class MidtransController extends Controller
                         $totalPiutangLunas += $jumlahUntukInvoiceIni; 
                     }
 
-                    // Kelebihan bayar
                     $overpaymentAmount = $danaTersisaUntukAlokasi; 
                     if ($overpaymentAmount > 0.01) {
                         ClientLedger::create([
@@ -523,7 +522,6 @@ class MidtransController extends Controller
                         ]);
                     }
 
-                    // ✅ Post Jurnal Akuntansi (Agregat)
                     $journalGroupId = "BULK-" . $bulkPayment->bulk_sales_payment_id;
                     $description = "Pembayaran Midtrans Bulk #" . $bulkPayment->bulk_sales_payment_id;
 
@@ -559,9 +557,6 @@ class MidtransController extends Controller
         }
     }
 
-    /**
-     * Proses pembayaran single (HANYA KREDIT).
-     */
     private function processCreditOnlyPayment(SalesInvoice $invoice, float $creditToUse)
     {
         $accountingService = app(AccountingService::class);
@@ -617,10 +612,6 @@ class MidtransController extends Controller
         });
     }
 
-    /**
-     * Proses pembayaran batch (HANYA KREDIT).
-     * ✅ REVISI: Menggunakan BulkSalesPayment.
-     */
     private function processBatchCreditOnlyPayment(BulkSalesPayment $bulkPayment, $invoices, float $creditToUse)
     {
         $accountingService = app(AccountingService::class);
@@ -662,7 +653,7 @@ class MidtransController extends Controller
                 $jumlahUntukInvoiceIni = min($sisaTagihanInvoice, $danaTersisaUntukAlokasi);
 
                 $invoice->payments()->create([
-                    'bulk_sales_payment_id' => $bulkPayment->bulk_sales_payment_id, // ✅ Kolom Baru
+                    'bulk_sales_payment_id' => $bulkPayment->bulk_sales_payment_id, 
                     'payment_date' => now(),
                     'amount' => $jumlahUntukInvoiceIni,
                     'payment_method_id' => null,
@@ -677,9 +668,7 @@ class MidtransController extends Controller
                 $totalPiutangLunas += $jumlahUntukInvoiceIni; 
             }
             
-            // Update total_amount di batch payment sebesar yg lunas saja
             $bulkPayment->update(['total_amount' => $totalPiutangLunas]);
-            
             $journalGroupId = "BULK-" . $bulkPayment->bulk_sales_payment_id;
             $description = "Pembayaran Bulk (Kredit) #" . $bulkPayment->bulk_sales_payment_id;
             

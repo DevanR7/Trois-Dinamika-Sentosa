@@ -1,62 +1,262 @@
-/* ==========================================================================
-   UTILITIES (Scrollbar, NProgress, Animations)
-   ========================================================================== */
+/* resources/css/components/utilities.css */
 
-/* --- SCROLLBAR CUSTOM (Tipis & Elegan) --- */
-.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb { 
-    @apply bg-slate-300 dark:bg-slate-600 rounded-full;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover { 
-    @apply bg-slate-400 dark:bg-slate-500;
+@layer base {
+    :root {
+        /* Warna Primary Perusahaan: Slate 900 */
+        --color-primary: 15 23 42; 
+    }
 }
 
-/* --- NPROGRESS (Loading Bar) --- */
-/* Menggunakan currentColor agar warnanya mengikuti seting di admin/app.css atau client/app.css */
-#nprogress .bar { background: currentColor !important; height: 3px !important; }
-#nprogress .peg { box-shadow: 0 0 10px currentColor, 0 0 5px currentColor !important; }
+@layer components {
 
-/* --- INPUT CURRENCY HELPER --- */
-.input-currency { text-align: right; }
+    /* =========================================
+       1. BUTTONS (MODERN & AUTOMATED LOADING)
+       ========================================= */
+    
+    /* Base Button Style */
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm
+               font-medium rounded-xl transition-all duration-200 h-[42px]
+               focus:outline-none focus:ring-4 focus:ring-slate-200 dark:focus:ring-slate-700
+               disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none 
+               relative overflow-hidden shadow-sm;
+    }
 
-/* --- BUTTON LOADING SPINNER --- */
-.btn-loading {
-    position: relative;
-    color: transparent !important;
-    pointer-events: none;
-    opacity: 0.8;
+    /* Sizes */
+    .btn-sm {
+        @apply px-3 py-1.5 text-xs h-9 rounded-lg;
+    }
+    
+    .btn-lg {
+        @apply px-6 py-3.5 text-base h-12 rounded-xl;
+    }
+
+    /* icon-only button (bulat) */
+    .btn-icon {
+        @apply p-0 w-[42px] rounded-full justify-center;
+    }
+    .btn-icon.btn-sm {
+        @apply w-9;
+    }
+
+    /* --- VARIANTS --- */
+
+    /* Primary: Gelap di Light Mode, Indigo di Dark Mode */
+    .btn-primary {
+        @apply bg-[#0f172a] text-white hover:bg-slate-800 
+               border border-transparent
+               dark:bg-indigo-600 dark:hover:bg-indigo-500 
+               hover:shadow-md hover:-translate-y-0.5;
+    }
+
+    /* Secondary: Putih bersih dengan border */
+    .btn-secondary {
+        @apply bg-white text-slate-700 border border-slate-300
+               hover:bg-slate-50 hover:text-indigo-600 hover:border-indigo-300
+               dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600
+               dark:hover:bg-slate-700 dark:hover:text-white;
+    }
+
+    /* Danger: Merah soft */
+    .btn-danger {
+        @apply bg-white text-rose-600 border border-rose-200
+               hover:bg-rose-50 hover:border-rose-300
+               dark:bg-slate-800 dark:text-rose-400 dark:border-rose-900/50
+               dark:hover:bg-rose-900/20;
+    }
+    
+    /* Danger Solid: Merah penuh (untuk aksi destruktif penting) */
+    .btn-danger-solid {
+        @apply bg-rose-600 text-white border border-transparent
+               hover:bg-rose-700 shadow-rose-500/30 hover:shadow-rose-500/40;
+    }
+
+    /* Success: Hijau */
+    .btn-success {
+        @apply bg-emerald-600 text-white border border-transparent
+               hover:bg-emerald-700 shadow-emerald-500/30;
+    }
+
+    /* --- LOADING STATE ANIMATION --- */
+    /* Logika: Ketika class .is-loading ditambahkan via JS, 
+       teks asli dibuat transparan, dan spinner muncul di tengah.
+    */
+    .btn.is-loading {
+        @apply text-transparent pointer-events-none select-none !important;
+    }
+
+    .btn.is-loading::after {
+        content: "";
+        @apply absolute w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin;
+        left: 50%;
+        top: 50%;
+        margin-left: -10px; /* Setengah dari width */
+        margin-top: -10px;  /* Setengah dari height */
+    }
+
+    /* Spinner warna gelap untuk tombol background terang */
+    .btn-secondary.is-loading::after,
+    .btn-danger.is-loading::after {
+        @apply border-slate-400/30 border-t-slate-600 dark:border-slate-500/30 dark:border-t-slate-300;
+    }
+
+
+    /* =========================================
+       2. BADGES (STATUS LABELS)
+       ========================================= */
+    .badge {
+        @apply inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wide;
+    }
+    
+    .badge-pill {
+        @apply rounded-full px-3;
+    }
+
+    .badge-primary   { @apply bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300; }
+    .badge-success   { @apply bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400; }
+    .badge-warning   { @apply bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400; }
+    .badge-danger    { @apply bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400; }
+    .badge-info      { @apply bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400; }
+
+
+    /* =========================================
+       3. CARDS & CONTAINERS
+       ========================================= */
+    .card {
+        @apply bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 
+               shadow-sm transition-all duration-300 relative overflow-hidden;
+    }
+    
+    /* Card Plain (Lebih minimalis) */
+    .card-plain {
+        @apply shadow-none border border-slate-200 dark:border-slate-700;
+    }
+    .card-plain:hover {
+        @apply border-indigo-300 dark:border-indigo-700 shadow-md;
+    }
+
+    .card-header {
+        @apply px-6 py-4 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between bg-white dark:bg-slate-800;
+    }
+
+    .card-header-title {
+        @apply text-base font-bold text-slate-800 dark:text-white tracking-tight;
+    }
+
+    .card-body {
+        @apply p-6;
+    }
+
+    .card-footer {
+        @apply px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700/50;
+    }
+
+    /* Gradient Cards (Untuk Dashboard) */
+    .card-gradient-dark {
+        @apply bg-gradient-to-br from-slate-800 to-[#0f172a] text-white border-none shadow-lg;
+    }
+    
+    .card-gradient-primary {
+        @apply bg-gradient-to-br from-indigo-500 to-indigo-700 text-white border-none shadow-lg shadow-indigo-500/20;
+    }
+
+
+    /* =========================================
+       4. TYPOGRAPHY & TEXT
+       ========================================= */
+    .page-header {
+        @apply mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4;
+    }
+
+    .page-title {
+        @apply text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white;
+    }
+
+    .page-subtitle {
+        @apply mt-1 text-sm text-slate-500 dark:text-slate-400;
+    }
+
+    .section-title {
+        @apply text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-4 mt-2;
+    }
+
+    /* Helper Colors */
+    .text-muted { @apply text-slate-500 dark:text-slate-400; }
+    .text-body  { @apply text-slate-600 dark:text-slate-300; }
+
+
+    /* =========================================
+       5. DASHBOARD STAT WIDGETS
+       ========================================= */
+    .stat-card {
+        @apply p-5 flex items-start justify-between;
+    }
+
+    .stat-icon {
+        @apply w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-sm transition-transform group-hover:scale-110;
+    }
+    
+    /* Warna Background Icon */
+    .bg-icon-primary { @apply bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400; }
+    .bg-icon-success { @apply bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400; }
+    .bg-icon-warning { @apply bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400; }
+    .bg-icon-danger  { @apply bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400; }
+
+    .stat-label {
+        @apply text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1;
+    }
+    
+    .stat-value {
+        @apply text-2xl font-bold text-slate-800 dark:text-white leading-none;
+    }
+
+
+    /* =========================================
+       6. UTILITIES / HELPERS
+       ========================================= */
+    
+    /* Animasi Masuk Halaman (Fade Up) */
+    .animate-enter {
+        animation: fadeUp 0.4s ease-out forwards;
+    }
+
+    @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Alignment untuk AutoNumeric/Uang */
+    .input-currency {
+        text-align: right;
+        font-variant-numeric: tabular-nums; /* Agar angka sejajar vertikal */
+    }
+
+    /* Custom Scrollbar (WebKit) - Agar tidak merusak desain */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+        @apply bg-transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        @apply bg-slate-300 dark:bg-slate-600 rounded-full;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        @apply bg-slate-400 dark:bg-slate-500;
+    }
+
+    /* NProgress (Loading Bar di atas browser) Override Color */
+    #nprogress .bar {
+        @apply bg-indigo-600 dark:bg-indigo-400 !important;
+        height: 3px !important;
+    }
+    #nprogress .peg {
+        box-shadow: 0 0 10px #4f46e5, 0 0 5px #4f46e5 !important;
+    }
+    
+    /* Utilities Visibility Dark Mode */
+    .dark .dark-hidden { display: none !important; }
+    .light-hidden { display: none !important; }
+    .dark .light-hidden { display: block !important; }
 }
-.btn-loading::after {
-    content: '';
-    position: absolute;
-    width: 1.25em;
-    height: 1.25em;
-    top: 50%;
-    left: 50%;
-    margin-top: -0.625em;
-    margin-left: -0.625em;
-    border: 2px solid currentColor;
-    border-radius: 50%;
-    border-right-color: transparent;
-    animation: spin 0.75s linear infinite;
-}
-
-/* --- PAGE ANIMATIONS --- */
-.animate-enter {
-    animation: contentSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    opacity: 0;
-    transform-origin: top center;
-}
-
-@keyframes contentSlideUp {
-    0% { opacity: 0; transform: translateY(20px) scale(0.99); }
-    100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* --- HELPER VISIBILITY --- */
-.dark .dark-hidden { display: none !important; }
-.light-hidden { display: none !important; }
-.dark .light-hidden { display: block !important; }

@@ -1,103 +1,105 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Akun Bank Perusahaan')
+@section('title', 'Rekening Perusahaan')
 
 @section('content')
-<div class="max-w-7xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-end gap-4 mb-8">
+
+    {{-- HEADER & ACTIONS --}}
+    <div class="page-header">
         <div>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Akun Bank Perusahaan</h1>
-            <p class="text-slate-500 text-sm mt-1">Daftar rekening bank dan akun kas yang digunakan dalam transaksi.</p>
+            <h1 class="page-title">Rekening Perusahaan</h1>
+            <p class="page-subtitle">Kelola akun bank/kas yang digunakan untuk transaksi.</p>
         </div>
-        <a href="{{ route('admin.company-bank-accounts.create') }}" class="h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5">
-            <i class="material-icons text-[20px] group-hover:rotate-90 transition-transform">add</i> 
-            <span>Tambah Akun</span>
-        </a>
+        <div class="flex items-center gap-3">
+            <a href="{{ route('admin.company-bank-accounts.create') }}" class="btn btn-primary">
+                <i class="material-icons text-sm mr-1">add_card</i> Tambah Rekening
+            </a>
+        </div>
     </div>
 
-    {{-- TABLE CARD --}}
-    <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
-        <div class="overflow-x-auto">
-            <table class="dashboard-table min-w-full">
-                <thead class="bg-slate-50 border-b border-slate-200">
+    {{-- TABLE DATA --}}
+    <div class="card">
+        <div class="table-container">
+            <table class="table-modern">
+                <thead>
                     <tr>
-                        <th class="pl-6">Nama Bank</th>
-                        <th>Atas Nama</th>
-                        <th>No. Rekening</th>
-                        <th>Akun COA</th>
+                        <th class="w-16 text-center">#</th>
+                        <th>Bank & Atas Nama</th>
+                        <th>Nomor Rekening</th>
+                        <th>Terhubung ke Akun (COA)</th>
                         <th class="text-center">Status</th>
-                        <th class="text-center pr-6 w-32">Aksi</th>
+                        <th class="text-center w-36">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-slate-100">
-                    @forelse ($accounts as $account)
-                        <tr class="hover:bg-slate-50/50 transition-colors group">
-                            <td class="pl-6 py-4">
-                                <span class="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
+                <tbody>
+                    @forelse($accounts as $index => $account)
+                        <tr>
+                            <td class="text-center text-slate-500">{{ $index + 1 }}</td>
+                            <td>
+                                <div class="font-bold text-slate-700 dark:text-slate-200">
                                     {{ $account->bank_name }}
-                                </span>
+                                </div>
+                                <div class="text-xs text-slate-500">
+                                    A.n {{ $account->account_name }}
+                                </div>
                             </td>
-                            <td class="py-4 text-sm text-slate-600">
-                                {{ $account->account_name }}
-                            </td>
-                            <td class="py-4 text-sm font-mono text-slate-700">
+                            <td class="font-mono text-slate-600 dark:text-slate-300">
                                 {{ $account->account_number ?? '-' }}
                             </td>
-                            <td class="py-4">
+                            <td>
                                 @if($account->account)
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100 font-mono">
-                                        {{ $account->account->account_number }}
-                                    </span>
-                                    <span class="text-xs text-slate-500 ml-1">{{ $account->account->account_name }}</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="badge badge-primary font-mono text-[10px]">
+                                            {{ $account->account->account_number }}
+                                        </span>
+                                        <span class="text-sm text-slate-700 dark:text-slate-300">
+                                            {{ $account->account->account_name }}
+                                        </span>
+                                    </div>
                                 @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-                                        <i class="material-icons text-[12px] mr-1">link_off</i> Terputus
-                                    </span>
+                                    <span class="badge badge-danger">Belum Terhubung</span>
                                 @endif
                             </td>
-                            <td class="py-4 text-center">
-                                @if ($account->is_active)
-                                    <span class="status-completed flex items-center justify-center gap-1 w-fit mx-auto px-2 py-0.5">
-                                        <i class="material-icons text-[12px]">check_circle</i> Aktif
-                                    </span>
+                            <td class="text-center">
+                                @if($account->is_active)
+                                    <span class="badge badge-success">Aktif</span>
                                 @else
-                                    <span class="status-draft flex items-center justify-center gap-1 w-fit mx-auto px-2 py-0.5">
-                                        <i class="material-icons text-[12px]">block</i> Non-Aktif
-                                    </span>
+                                    <span class="badge badge-secondary">Non-Aktif</span>
                                 @endif
                             </td>
-                            <td class="pr-6 py-4 text-center">
-                                <div class="flex justify-center items-center gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <a href="{{ route('admin.company-bank-accounts.edit', $account) }}" 
-                                       class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-amber-600 hover:bg-amber-50 hover:border-amber-200 transition shadow-sm" 
-                                       title="Edit">
-                                        <i class="material-icons text-[16px]">edit</i>
-                                    </a>
+                            <td class="text-center">
+                                <div class="flex items-center justify-center gap-2">
                                     
-                                    {{-- Global Delete Handler --}}
-                                    <form action="{{ route('admin.company-bank-accounts.destroy', $account) }}" method="POST" class="delete-form">
-                                        @csrf @method('DELETE')
-                                        <button type="submit" 
-                                                data-name="{{ $account->bank_name }} ({{ $account->account_name }})" 
-                                                class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-red-600 hover:bg-red-50 hover:border-red-200 transition shadow-sm" 
-                                                title="Hapus">
-                                            <i class="material-icons text-[16px]">delete</i>
-                                        </button>
+                                    {{-- Edit Button --}}
+                                    <a href="{{ route('admin.company-bank-accounts.edit', $account->company_bank_account_id) }}" 
+                                       class="w-9 h-9 rounded-full flex items-center justify-center bg-indigo-50 border border-transparent text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors shadow-sm dark:bg-indigo-900/30 dark:text-indigo-400"
+                                       title="Edit">
+                                        <i class="material-icons text-[18px] leading-none">edit</i>
+                                    </a>
+
+                                    {{-- Delete Button --}}
+                                    <button type="button" onclick="confirmDelete('{{ $account->company_bank_account_id }}', '{{ $account->bank_name }}')" 
+                                            class="w-9 h-9 rounded-full flex items-center justify-center bg-rose-50 border border-transparent text-rose-600 hover:bg-rose-600 hover:text-white transition-colors shadow-sm dark:bg-rose-900/30 dark:text-rose-400"
+                                            title="Hapus">
+                                        <i class="material-icons text-[18px] leading-none">delete</i>
+                                    </button>
+                                    
+                                    <form id="delete-form-{{ $account->company_bank_account_id }}" 
+                                          action="{{ route('admin.company-bank-accounts.destroy', $account->company_bank_account_id) }}" 
+                                          method="POST" class="hidden">
+                                        @csrf
+                                        @method('DELETE')
                                     </form>
+
                                 </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-12 text-center">
+                            <td colspan="6" class="text-center p-8">
                                 <div class="flex flex-col items-center justify-center text-slate-400">
-                                    <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                                        <i class="material-icons text-4xl opacity-30">account_balance</i>
-                                    </div>
-                                    <h3 class="text-base font-bold text-slate-800">Belum ada akun bank</h3>
-                                    <p class="text-sm mt-1">Silakan tambahkan akun untuk memulai transaksi.</p>
+                                    <i class="material-icons text-5xl mb-2">account_balance</i>
+                                    <span>Belum ada rekening perusahaan.</span>
                                 </div>
                             </td>
                         </tr>
@@ -106,14 +108,26 @@
             </table>
         </div>
     </div>
-</div>
+
 @endsection
 
 @push('scripts')
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
-        @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
-    });
+    function confirmDelete(id, name) {
+        window.confirmDialog({
+            title: 'Hapus Rekening?',
+            text: "Rekening '" + name + "' akan dihapus. Pastikan tidak ada transaksi yang terkait.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('delete-form-' + id).submit();
+            }
+        });
+    }
 </script>
 @endpush

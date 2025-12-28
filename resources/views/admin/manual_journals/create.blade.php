@@ -1,277 +1,235 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Buat Jurnal Umum Baru')
-
-@push('styles')
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-@endpush
+@section('title', 'Buat Jurnal Manual')
 
 @section('content')
-<div class="max-w-7xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-            <nav class="flex items-center gap-2 text-sm text-slate-500 mb-1">
-                <a href="{{ route('admin.manual-journals.index') }}" class="hover:text-indigo-600 transition-colors">Jurnal Umum</a>
-                <span class="mx-2 text-slate-300">/</span>
-                <span class="text-slate-800 font-semibold">Baru</span>
-            </nav>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Buat Jurnal Umum</h1>
-            <p class="text-sm text-slate-500 mt-1">Catat transaksi penyesuaian atau jurnal manual lainnya.</p>
-        </div>
-        <a href="{{ route('admin.manual-journals.index') }}" 
-           class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
-            <i class="material-icons text-[18px]">arrow_back</i> Kembali
-        </a>
+
+    <div class="max-w-6xl mx-auto">
+        
+        <form action="{{ route('admin.manual-journals.store') }}" method="POST" id="journalForm">
+            @csrf
+
+            {{-- HEADER NAVIGATION --}}
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h1 class="page-title">Buat Jurnal Manual</h1>
+                    <p class="page-subtitle">Pastikan Debit dan Kredit seimbang.</p>
+                </div>
+                <div class="flex gap-3">
+                    <a href="{{ route('admin.manual-journals.index') }}" class="btn btn-secondary">
+                        <i class="material-icons text-sm mr-1">arrow_back</i> Kembali
+                    </a>
+                    <button type="submit" id="btnSave" class="btn btn-primary" disabled>
+                        <i class="material-icons text-sm mr-2">save</i> Posting Jurnal
+                    </button>
+                </div>
+            </div>
+
+            {{-- FORM HEADER --}}
+            <div class="card mb-6">
+                <div class="card-body">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        
+                        <div>
+                            <label class="form-label label-required">Tanggal Transaksi</label>
+                            <input type="date" name="entry_date" class="form-input" 
+                                   value="{{ old('entry_date', date('Y-m-d')) }}" required>
+                            @error('entry_date') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="form-label label-required">Deskripsi / Memo</label>
+                            <input type="text" name="description" class="form-input" 
+                                   placeholder="Contoh: Penyesuaian stok opname bulan Januari..." 
+                                   value="{{ old('description') }}" required>
+                            @error('description') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            {{-- FORM ENTRIES --}}
+            <div class="card">
+                <div class="card-header flex justify-between items-center">
+                    <h3 class="card-header-title">Rincian Jurnal (Debit / Kredit)</h3>
+                    <button type="button" id="btnAddRow" class="btn btn-sm btn-secondary text-indigo-600 bg-indigo-50 border-indigo-200 hover:bg-indigo-100">
+                        <i class="material-icons text-sm mr-1">add</i> Tambah Baris
+                    </button>
+                </div>
+                
+                <div class="table-container overflow-visible"> {{-- Overflow visible agar dropdown tomselect tidak terpotong --}}
+                    <table class="table-modern w-full" id="entriesTable">
+                        <thead>
+                            <tr>
+                                <th class="w-[30%]">Akun (COA)</th>
+                                <th class="w-[25%]">Keterangan Baris (Opsional)</th>
+                                <th class="w-[20%] text-right">Debit</th>
+                                <th class="w-[20%] text-right">Kredit</th>
+                                <th class="w-[5%] text-center"><i class="material-icons text-sm">delete</i></th>
+                            </tr>
+                        </thead>
+                        <tbody id="entriesBody">
+                            {{-- Rows will be added here by JS --}}
+                        </tbody>
+                        <tfoot class="bg-slate-50 dark:bg-slate-800 font-bold border-t border-slate-200 dark:border-slate-700">
+                            <tr>
+                                <td colspan="2" class="px-6 py-4 text-right uppercase text-xs tracking-wider text-slate-500">Total</td>
+                                <td class="px-6 py-4 text-right">
+                                    <span id="totalDebitDisplay" class="text-slate-700 dark:text-slate-200">0</span>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <span id="totalCreditDisplay" class="text-slate-700 dark:text-slate-200">0</span>
+                                </td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" class="px-6 py-2 text-right uppercase text-xs tracking-wider text-slate-500">Balance (Selisih)</td>
+                                <td colspan="2" class="px-6 py-2 text-center">
+                                    <span id="balanceDisplay" class="badge badge-success w-full justify-center">Seimbang</span>
+                                </td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+        </form>
     </div>
 
-    @if ($errors->any())
-        <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-md shadow-sm animate-enter">
-            <div class="flex items-start gap-3">
-                <i class="material-icons text-red-600 text-xl mt-0.5">error_outline</i>
-                <div>
-                    <h3 class="text-sm font-bold text-red-800">Gagal Menyimpan</h3>
-                    <ul class="mt-1 list-disc list-inside text-xs text-red-700">
-                        @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
-                    </ul>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    <form action="{{ route('admin.manual-journals.store') }}" method="POST" id="journal-form">
-        @csrf
-        
-        {{-- HEADER JURNAL --}}
-        <div class="dashboard-card p-0 overflow-hidden shadow-sm mb-6">
-            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                    <i class="material-icons text-[20px]">description</i>
-                </div>
-                <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Header Jurnal</h3>
-            </div>
-            
-            <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                    <label for="entry_date" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Tanggal Jurnal <span class="text-red-500">*</span></label>
-                    <input type="date" name="entry_date" id="entry_date" value="{{ old('entry_date', now()->toDateString()) }}" class="form-input" required>
-                    @error('entry_date') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                </div>
-
-                <div class="md:col-span-2">
-                    <label for="description" class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Deskripsi / Memo <span class="text-red-500">*</span></label>
-                    <input type="text" name="description" id="description" value="{{ old('description') }}" class="form-input" placeholder="Contoh: Penyesuaian stok opname..." required>
-                    @error('description') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                </div>
-            </div>
-        </div>
-
-        {{-- DETAIL AKUN --}}
-        <div class="dashboard-card p-0 overflow-hidden shadow-lg border-0 ring-1 ring-slate-900/5">
-            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                <div class="flex items-center gap-3">
-                    <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                        <i class="material-icons text-[20px]">list_alt</i>
-                    </div>
-                    <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Detail Akun</h3>
-                </div>
-                <button type="button" id="add-entry-row" class="h-[36px] px-4 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-xs font-bold hover:bg-indigo-100 transition flex items-center gap-1">
-                    <i class="material-icons text-[16px]">add</i> Tambah Baris
-                </button>
-            </div>
-
-            <div class="overflow-x-auto">
-                <table class="dashboard-table min-w-full">
-                    <thead class="bg-slate-50 border-b border-slate-200">
-                        <tr>
-                            <th class="pl-6 w-4/12">Akun (COA)</th>
-                            <th class="w-3/12">Keterangan Baris</th>
-                            <th class="text-right w-2/12">Debit</th>
-                            <th class="text-right w-2/12">Kredit</th>
-                            <th class="text-center w-10 pr-6"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="journal-entries-body" class="divide-y divide-slate-100 bg-white">
-                        {{-- Rows injected via JS --}}
-                    </tbody>
-                    <tfoot class="bg-slate-50 border-t border-slate-200">
-                        <tr>
-                            <td colspan="2" class="pl-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Total</td>
-                            <td class="px-4 py-3 text-right text-sm font-bold text-indigo-700 font-mono" id="total-debit">Rp 0</td>
-                            <td class="px-4 py-3 text-right text-sm font-bold text-indigo-700 font-mono" id="total-credit">Rp 0</td>
-                            <td></td>
-                        </tr>
-                        <tr>
-                            <td colspan="2" class="pl-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider border-t border-slate-200">Balance</td>
-                            <td colspan="2" class="px-4 py-3 text-center border-t border-slate-200">
-                                <span id="total-difference" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-600 transition-all duration-300">
-                                    Rp 0
-                                </span>
-                            </td>
-                            <td class="border-t border-slate-200"></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-
-            <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
-                <a href="{{ route('admin.manual-journals.index') }}" class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center shadow-sm">
-                    Batal
-                </a>
-                <button type="submit" id="btn-submit-journal" class="h-[48px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2 group hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                    <i class="material-icons text-[20px] group-hover:scale-110 transition-transform">save</i> Simpan Jurnal
-                </button>
-            </div>
-        </div>
-    </form>
-</div>
-
-{{-- Hidden Template --}}
-<table class="hidden">
-    <tbody id="journal-entry-template">
-        <tr class="journal-entry-row hover:bg-slate-50 transition-colors group">
-            <td class="pl-6 py-3 align-top">
-                <select class="form-input account-select w-full text-sm" name="entries[__INDEX__][account_id]" required>
-                    <option value="" disabled selected>-- Cari Akun --</option>
-                    @foreach ($accounts as $account)
-                        <option value="{{ $account->account_id }}">{{ $account->account_number }} - {{ $account->account_name }}</option>
-                    @endforeach
-                </select>
-            </td>
-            <td class="py-3 align-top">
-                <input type="text" class="form-input w-full text-sm" name="entries[__INDEX__][description]" placeholder="Opsional">
-            </td>
-            <td class="py-3 align-top">
-                <input type="number" class="form-input w-full text-sm text-right font-mono font-bold text-slate-800 debit-input" name="entries[__INDEX__][debit]" value="0" step="0.01" placeholder="0">
-            </td>
-            <td class="py-3 align-top">
-                <input type="number" class="form-input w-full text-sm text-right font-mono font-bold text-slate-800 credit-input" name="entries[__INDEX__][credit]" value="0" step="0.01" placeholder="0">
-            </td>
-            <td class="pr-6 py-3 align-top text-center">
-                <button type="button" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition remove-entry-row">
-                    <i class="material-icons text-[18px]">delete</i>
-                </button>
-            </td>
-        </tr>
-    </tbody>
-</table>
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-{{-- Tidak perlu import Swal lagi jika sudah ada di app.js --}}
-
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const tableBody = $('#journal-entries-body');
-    const template = $('#journal-entry-template').html();
-    let rowIndex = 0;
-
-    const formatRupiah = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
-
-    const addRow = () => {
-        let newRowHtml = template.replace(/__INDEX__/g, rowIndex);
-        let $newRow = $(newRowHtml);
-        tableBody.append($newRow);
-
-        // Manual init Select2 untuk baris baru (karena dinamis)
-        $newRow.find('.account-select').select2({
-            theme: 'bootstrap-5',
-            width: '100%',
-            dropdownParent: $newRow,
-            placeholder: '-- Cari Akun --',
-            dropdownCssClass: 'select2-dropdown-clean'
-        });
-
-        rowIndex++;
-        calculateTotals();
-    };
-
-    // Logic Input (Mutually Exclusive Debit/Credit)
-    tableBody.on('input', '.debit-input, .credit-input', function() {
-        let $row = $(this).closest('tr');
-        if ($(this).hasClass('debit-input') && $(this).val() > 0) {
-            $row.find('.credit-input').val(0);
-        } else if ($(this).hasClass('credit-input') && $(this).val() > 0) {
-            $row.find('.debit-input').val(0);
-        }
-        calculateTotals();
-    });
-
-    tableBody.on('click', '.remove-entry-row', function() {
-        if(tableBody.find('tr').length > 2) {
-            $(this).closest('tr').remove();
-            calculateTotals();
-        } else {
-            Swal.fire({ icon: 'info', title: 'Info', text: 'Minimal harus ada 2 baris akun.', confirmButtonColor: '#6366f1', customClass: { popup: 'colored-toast rounded-xl' } });
-        }
-    });
-
-    $('#add-entry-row').on('click', addRow);
-
-    const calculateTotals = () => {
-        let totalDebit = 0;
-        let totalCredit = 0;
-
-        $('.journal-entry-row').each(function() {
-            let d = parseFloat($(this).find('.debit-input').val()) || 0;
-            let c = parseFloat($(this).find('.credit-input').val()) || 0;
-            totalDebit += d;
-            totalCredit += c;
-        });
-
-        let diff = totalDebit - totalCredit;
-
-        $('#total-debit').text(formatRupiah(totalDebit));
-        $('#total-credit').text(formatRupiah(totalCredit));
+    document.addEventListener('DOMContentLoaded', function() {
+        const entriesBody = document.getElementById('entriesBody');
+        const btnAddRow = document.getElementById('btnAddRow');
+        const btnSave = document.getElementById('btnSave');
         
-        const diffEl = $('#total-difference');
-        const submitBtn = $('#btn-submit-journal');
+        // Data akun dari controller untuk dropdown
+        const accountsData = @json($accounts); 
+        
+        let rowCount = 0;
 
-        // Toleransi float precision
-        if (Math.abs(diff) < 0.01 && totalDebit > 0) {
-            diffEl.removeClass('bg-red-100 text-red-800').addClass('bg-emerald-100 text-emerald-800');
-            diffEl.html('<i class="material-icons text-[14px] mr-1">check_circle</i> Balance');
-            submitBtn.prop('disabled', false);
-        } else {
-            diffEl.removeClass('bg-emerald-100 text-emerald-800').addClass('bg-red-100 text-red-800');
-            diffEl.html(`${formatRupiah(diff)} <span class="ml-1 text-[10px] uppercase">Not Balance</span>`);
-            submitBtn.prop('disabled', true);
+        // --- 1. Fungsi Tambah Baris ---
+        function addRow() {
+            rowCount++;
+            
+            // Build Options HTML
+            let optionsHtml = '<option value="">Pilih Akun...</option>';
+            accountsData.forEach(acc => {
+                optionsHtml += `<option value="${acc.account_id}">${acc.account_number} - ${acc.account_name}</option>`;
+            });
+
+            const tr = document.createElement('tr');
+            tr.className = 'border-b border-slate-100 dark:border-slate-700';
+            tr.innerHTML = `
+                <td class="p-2 align-top">
+                    <select name="entries[${rowCount}][account_id]" class="tom-select-dynamic" required>
+                        ${optionsHtml}
+                    </select>
+                </td>
+                <td class="p-2 align-top">
+                    <input type="text" name="entries[${rowCount}][description]" class="form-input text-sm" placeholder="Ket. khusus baris ini">
+                </td>
+                <td class="p-2 align-top">
+                    <div class="input-group">
+                        <span class="input-group-text px-2 text-xs">Rp</span>
+                        <input type="text" name="entries[${rowCount}][debit]" class="form-input text-right autonumeric debit-input" placeholder="0">
+                    </div>
+                </td>
+                <td class="p-2 align-top">
+                    <div class="input-group">
+                        <span class="input-group-text px-2 text-xs">Rp</span>
+                        <input type="text" name="entries[${rowCount}][credit]" class="form-input text-right autonumeric credit-input" placeholder="0">
+                    </div>
+                </td>
+                <td class="p-2 align-top text-center">
+                    <button type="button" class="text-slate-400 hover:text-rose-500 transition-colors btn-remove-row">
+                        <i class="material-icons text-lg">close</i>
+                    </button>
+                </td>
+            `;
+            
+            entriesBody.appendChild(tr);
+
+            // Init Plugins pada elemen baru
+            // 1. Tom Select
+            const selectEl = tr.querySelector('.tom-select-dynamic');
+            new TomSelect(selectEl, {
+                sortField: { field: "text", direction: "asc" },
+                plugins: ['clear_button'],
+                dropdownParent: 'body' // Penting agar tidak terpotong di tabel
+            });
+
+            // 2. AutoNumeric
+            const anOptions = window.defaultAutoNumericOptions;
+            new AutoNumeric(tr.querySelector('.debit-input'), anOptions);
+            new AutoNumeric(tr.querySelector('.credit-input'), anOptions);
         }
-    };
 
-    // Submit Confirmation (Manual Swal karena logic khusus)
-    $('#journal-form').on('submit', function(e) {
-        e.preventDefault();
-        Swal.fire({
-            title: 'Simpan Jurnal?',
-            text: "Pastikan data sudah benar. Aksi ini akan memposting jurnal ke buku besar.",
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonColor: '#6366f1',
-            cancelButtonColor: '#94a3b8',
-            confirmButtonText: 'Ya, Simpan!',
-            cancelButtonText: 'Batal',
-            customClass: {
-                popup: 'colored-toast rounded-xl',
-                confirmButton: 'px-6 py-2.5 rounded-lg font-bold',
-                cancelButton: 'px-6 py-2.5 rounded-lg font-bold'
-            }
-        }).then((result) => {
-            if (result.isConfirmed) {
-                e.target.submit();
+        // --- 2. Event Listener Global (Delegation) ---
+        entriesBody.addEventListener('click', function(e) {
+            // Hapus Baris
+            if (e.target.closest('.btn-remove-row')) {
+                const row = e.target.closest('tr');
+                if (entriesBody.children.length > 2) { // Minimal 2 baris (Debit & Kredit)
+                    row.remove();
+                    calculateTotals();
+                } else {
+                    // Opsional: Alert minimal 2 baris
+                    window.confirmDialog({ icon: 'info', title: 'Minimal 2 Baris', text: 'Jurnal membutuhkan minimal satu debit dan satu kredit.', timer: 2000, showConfirmButton: false });
+                }
             }
         });
-    });
 
-    // Start with 2 rows
-    addRow();
-    addRow();
-    
-    // Toast dari App.js handle via Session
-    @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
-    @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
-});
+        // Hitung ulang saat input berubah (menggunakan event 'keyup' atau 'autoNumeric:rawValueModified')
+        entriesBody.addEventListener('autoNumeric:rawValueModified', function() {
+            calculateTotals();
+        });
+
+        // --- 3. Kalkulasi Total & Validasi ---
+        function calculateTotals() {
+            let totalDebit = 0;
+            let totalCredit = 0;
+
+            document.querySelectorAll('.debit-input').forEach(el => {
+                totalDebit += parseFloat(AutoNumeric.getAutoNumericElement(el).getNumericString() || 0);
+            });
+
+            document.querySelectorAll('.credit-input').forEach(el => {
+                totalCredit += parseFloat(AutoNumeric.getAutoNumericElement(el).getNumericString() || 0);
+            });
+
+            // Update Tampilan
+            document.getElementById('totalDebitDisplay').innerText = 'Rp ' + totalDebit.toLocaleString('id-ID');
+            document.getElementById('totalCreditDisplay').innerText = 'Rp ' + totalCredit.toLocaleString('id-ID');
+
+            const diff = Math.abs(totalDebit - totalCredit);
+            const balanceBadge = document.getElementById('balanceDisplay');
+
+            if (diff < 1 && totalDebit > 0) { // Toleransi 1 rupiah, dan harus ada isi
+                balanceBadge.className = 'badge badge-success w-full justify-center py-1';
+                balanceBadge.innerText = 'Seimbang';
+                btnSave.disabled = false;
+            } else {
+                balanceBadge.className = 'badge badge-danger w-full justify-center py-1';
+                balanceBadge.innerText = 'Tidak Seimbang (Selisih: ' + diff.toLocaleString('id-ID') + ')';
+                btnSave.disabled = true;
+            }
+
+            // Logic tambahan: Cegah input Debit & Kredit di baris yang sama
+            // (Opsional, tapi validasi controller Anda sudah handle ini)
+        }
+
+        // --- 4. Init Awal ---
+        // Tambahkan 2 baris kosong secara default
+        addRow();
+        addRow();
+        
+        // Bind tombol tambah baris
+        btnAddRow.addEventListener('click', addRow);
+    });
 </script>
 @endpush

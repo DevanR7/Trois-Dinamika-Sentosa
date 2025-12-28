@@ -1,327 +1,247 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Buat Pesanan Penjualan')
-
-@push('styles')
-    <style>
-        /* Styling agar tinggi input Select2 konsisten dengan input lain */
-        .select2-container .select2-selection--single { height: 42px !important; display: flex; align-items: center; }
-        .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 42px !important; padding-left: 12px; }
-        .select2-container--default .select2-selection--single .select2-selection__arrow { height: 40px !important; }
-    </style>
-@endpush
+@section('title', 'Buat Pesanan')
 
 @section('content')
-<div class="max-w-7xl mx-auto pb-20 animate-enter">
-    
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-            <nav class="flex text-sm text-slate-500 mb-1">
-                <a href="{{ route('admin.sales-orders.index') }}" class="hover:text-indigo-600 transition-colors">Pesanan</a>
-                <span class="mx-2 text-slate-300">/</span>
-                <span class="text-slate-800 font-semibold">Baru</span>
-            </nav>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Buat Pesanan Penjualan</h1>
-        </div>
-        <a href="{{ route('admin.sales-orders.index') }}" class="h-[48px] px-6 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
-            <i class="material-icons text-[18px]">arrow_back</i> Kembali
-        </a>
-    </div>
 
-    {{-- ALERT ERROR --}}
-    @if ($errors->any())
-        <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-md shadow-sm">
-            <div class="flex items-start gap-3">
-                <i class="material-icons text-red-600 text-xl mt-0.5">error_outline</i>
+    {{-- Container utama max-w-6xl sudah oke, tapi di mobile kita butuh padding kecil --}}
+    <div class="max-w-6xl mx-auto">
+
+        <form action="{{ route('admin.sales-orders.store') }}" method="POST" id="orderForm">
+            @csrf
+
+            {{-- TOP NAVIGATION --}}
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
-                    <h3 class="text-sm font-bold text-red-800">Terdapat kesalahan input</h3>
-                    <ul class="mt-1 list-disc list-inside text-xs text-red-600">
-                        @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
-                    </ul>
+                    <h1 class="page-title">Buat Pesanan Baru</h1>
+                    <p class="page-subtitle">Isi formulir untuk membuat Sales Order (SO).</p>
+                </div>
+                <div class="flex gap-3">
+                    <a href="{{ route('admin.sales-orders.index') }}" class="btn btn-secondary">Batal</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="material-icons text-sm mr-2">save</i> Simpan Pesanan
+                    </button>
                 </div>
             </div>
-        </div>
-    @endif
 
-    <form action="{{ route('admin.sales-orders.store') }}" method="POST" id="sales-order-form">
-        @csrf
-        
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            {{-- KOLOM KIRI: INFO & ITEM (Span 8) --}}
-            <div class="lg:col-span-8 space-y-6">
+            <div class="space-y-6">
                 
-                {{-- CARD 1: INFO PESANAN --}}
-                <div class="dashboard-card p-0 overflow-hidden shadow-sm">
-                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                        <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                            <i class="material-icons text-[20px]">info</i>
-                        </div>
-                        <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Informasi Pesanan</h3>
+                {{-- 1. HEADER INFO --}}
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-header-title">Informasi Pesanan</h3>
                     </div>
-                    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="md:col-span-2">
-                            <label for="client_id" class="block text-xs font-bold text-slate-500 uppercase mb-1">Pelanggan (Klien) <span class="text-red-500">*</span></label>
-                            
-                            {{-- FIXED: Hapus 'required' dari HTML select, kita validasi via JS --}}
-                            <select name="client_id" id="client_id" class="form-input so-select2" style="width: 100%">
-                                <option value="" disabled selected>-- Pilih Klien --</option>
-                                @foreach ($clients as $client)
-                                    <option value="{{ $client->client_id }}" @selected(old('client_id') == $client->client_id)>{{ $client->client_name }}</option>
+                    <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-6">
+                        
+                        {{-- Client --}}
+                        <div>
+                            <label class="form-label label-required">Pelanggan</label>
+                            <select name="client_id" class="tom-select" required placeholder="Pilih Pelanggan...">
+                                <option value="">Pilih Pelanggan...</option>
+                                @foreach($clients as $client)
+                                    <option value="{{ $client->client_id }}" {{ old('client_id') == $client->client_id ? 'selected' : '' }}>
+                                        {{ $client->client_name }}
+                                    </option>
                                 @endforeach
                             </select>
+                            @error('client_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
+
+                        {{-- Date --}}
                         <div>
-                            <label for="order_date" class="block text-xs font-bold text-slate-500 uppercase mb-1">Tanggal Pesanan</label>
-                            <input type="date" class="form-input" id="order_date" name="order_date" value="{{ old('order_date', now()->format('Y-m-d')) }}" required>
+                            <label class="form-label label-required">Tanggal Pesanan</label>
+                            <input type="date" name="order_date" class="form-input" 
+                                   value="{{ old('order_date', date('Y-m-d')) }}" required>
+                            @error('order_date') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
-                        <div>
-                            <label for="sales_id" class="block text-xs font-bold text-slate-500 uppercase mb-1">Sales Person</label>
-                            <select name="sales_id" id="sales_id" class="form-input so-select2" style="width: 100%">
-                                <option value="" selected>-- Pilih Sales --</option>
-                                @foreach ($salesUsers as $sale)
-                                    <option value="{{ $sale->user_id }}" @selected(old('sales_id') == $sale->user_id)>{{ $sale->full_name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+
+                        {{-- Sales Rep --}}
+                        @if(Auth::user()->hasRole(['admin', 'superadmin']))
+                            <div>
+                                <label class="form-label label-optional">Sales Representative</label>
+                                <select name="sales_id" class="tom-select">
+                                    <option value="">- Pilih Sales -</option>
+                                    @foreach($salesUsers as $sales)
+                                        <option value="{{ $sales->user_id }}" {{ old('sales_id') == $sales->user_id ? 'selected' : '' }}>
+                                            {{ $sales->full_name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @else
+                             <input type="hidden" name="sales_id" value="{{ Auth::id() }}">
+                             <div class="hidden md:block"></div>
+                        @endif
+
                     </div>
                 </div>
 
-                {{-- CARD 2: RINCIAN ITEM --}}
-                <div class="dashboard-card p-0 overflow-hidden shadow-sm min-h-[300px]">
-                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                        <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2">
-                            <i class="material-icons text-indigo-600 text-[20px]">shopping_cart</i> Rincian Item
-                        </h3>
-                        <button type="button" id="add-product-btn" class="inline-flex items-center px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition shadow-sm gap-1">
-                            <i class="material-icons text-base">add</i> Tambah Item
+                {{-- 2. ITEMS TABLE (DIPERBAIKI UNTUK MOBILE) --}}
+                <div class="card">
+                    <div class="card-header flex justify-between items-center bg-slate-50 dark:bg-slate-800">
+                        <h3 class="card-header-title">Item Pesanan</h3>
+                        <button type="button" id="btnAddRow" class="btn btn-sm btn-secondary text-indigo-600 bg-indigo-50 border-indigo-200 hover:bg-indigo-100 transition-colors">
+                            <i class="material-icons text-sm mr-1">add</i> Tambah Barang
                         </button>
                     </div>
                     
-                    <div class="overflow-x-auto">
-                        <table class="dashboard-table min-w-full">
-                            <thead class="bg-slate-50 border-b border-slate-200">
+                    {{-- REVISI: Gunakan overflow-x-auto agar bisa discroll di HP --}}
+                    <div class="overflow-x-auto w-full rounded-b-xl">
+                        <table class="table-modern w-full min-w-[800px]" id="itemsTable"> {{-- min-w-[800px] memaksa tabel lebar di HP --}}
+                            <thead>
                                 <tr>
-                                    <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase w-5/12 pl-6">Produk</th>
-                                    <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-center w-2/12">Qty</th>
-                                    <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-right w-3/12">Harga (@)</th>
-                                    <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-right w-2/12">Subtotal</th>
-                                    <th class="px-4 py-3 w-10 pr-6"></th>
+                                    {{-- Tambahkan min-width pada setiap TH agar tidak gepeng --}}
+                                    <th class="w-[40%] min-w-[250px]">Produk</th>
+                                    <th class="w-[20%] min-w-[150px] text-right">Harga Satuan</th>
+                                    <th class="w-[15%] min-w-[100px] text-center">Qty</th>
+                                    <th class="w-[20%] min-w-[150px] text-right">Subtotal</th>
+                                    <th class="w-[5%] min-w-[50px] text-center"></th>
                                 </tr>
                             </thead>
-                            <tbody id="product-items" class="divide-y divide-slate-100 bg-white">
-                                {{-- JS Inject Rows Here --}}
+                            <tbody id="itemsBody">
+                                {{-- Rows added via JS --}}
                             </tbody>
+                            <tfoot class="bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
+                                <tr>
+                                    <td colspan="3" class="px-6 py-4 text-right font-bold uppercase text-xs text-slate-500">Total Akhir</td>
+                                    <td class="px-6 py-4 text-right font-extrabold text-lg text-indigo-600 dark:text-indigo-400">
+                                        <span id="grandTotalDisplay">Rp 0</span>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
-                    
-                    <div class="p-6 border-t border-slate-100 bg-slate-50/30">
-                        <label for="notes" class="block text-xs font-bold text-slate-500 uppercase mb-1">Catatan / Instruksi</label>
-                        <textarea class="form-textarea bg-white w-full" name="notes" id="notes" rows="2" placeholder="Contoh: Kirim sebelum jam 5 sore...">{{ old('notes') }}</textarea>
+                    @error('products') <div class="p-3 text-center text-xs text-rose-500 font-bold bg-rose-50">{{ $message }}</div> @enderror
+                </div>
+
+                {{-- 3. NOTES --}}
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-header-title">Catatan Tambahan</h3>
+                    </div>
+                    <div class="card-body">
+                        <textarea name="notes" class="form-textarea h-24" 
+                                  placeholder="Contoh: Pengiriman dilakukan hari Senin, barang fragile, dll...">{{ old('notes') }}</textarea>
                     </div>
                 </div>
+
             </div>
+        </form>
 
-            {{-- KOLOM KANAN: TOTAL & AKSI (Span 4) --}}
-            <div class="lg:col-span-4 space-y-6">
-                <div class="dashboard-card p-6 shadow-lg sticky top-6 border-t-4 border-indigo-500">
-                    <h3 class="card-title mb-6 border-b border-slate-100 pb-3 flex items-center gap-2">
-                        <i class="material-icons text-indigo-600">calculate</i> Ringkasan
-                    </h3>
+    </div>
 
-                    <div class="flex justify-between items-center mb-8 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                        <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Total Tagihan</span>
-                        <span class="text-2xl font-bold text-indigo-700 font-mono tracking-tight" id="grand-total">Rp 0</span>
-                    </div>
-
-                    <div class="space-y-3">
-                        <button type="submit" id="submit-btn" class="w-full h-[48px] bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition-all flex justify-center items-center gap-2 hover:-translate-y-0.5">
-                            <i class="material-icons text-[18px]">save</i> Simpan Pesanan
-                        </button>
-                        <a href="{{ route('admin.sales-orders.index') }}" class="w-full h-[48px] bg-white border border-slate-300 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-50 transition-all text-center shadow-sm flex items-center justify-center">
-                            Batal
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </form>
-</div>
-
-{{-- TEMPLATE ROW --}}
-<template id="product-row-template">
-    <tr class="hover:bg-slate-50/50 transition-colors group">
-        <td class="p-3 pl-6 align-top">
-            {{-- FIXED: Hapus 'required' di sini juga --}}
-            <select class="product-select form-input w-full text-sm" style="width: 100%">
-                <option></option>
-                @foreach ($products as $product)
-                    <option value="{{ $product->product_id }}" data-price="{{ $product->selling_price ?? 0 }}">
-                        {{ $product->product_name }}
-                    </option>
-                @endforeach
-            </select>
-        </td>
-        <td class="p-3 align-top">
-            <input type="number" class="form-input quantity text-center w-full font-bold text-slate-700 h-10" value="1" min="1" required>
-        </td>
-        <td class="p-3 align-top">
-            <div class="relative">
-                <input type="text" class="form-input price-display block w-full text-right text-sm bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed font-mono" readonly>
-            </div>
-            <input type="hidden" class="price-raw">
-        </td>
-        <td class="p-3 align-top text-right font-bold text-slate-800 text-sm align-middle font-mono">
-            <span class="subtotal">Rp 0</span>
-        </td>
-        <td class="p-3 pr-6 align-top text-center align-middle">
-            <button type="button" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition remove-product-btn">
-                <i class="material-icons text-[18px]">delete</i>
-            </button>
-        </td>
-    </tr>
-</template>
 @endsection
 
 @push('scripts')
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    
-    // 1. INIT SELECT2 HEADER
-    $('.so-select2').select2({ 
-        placeholder: '-- Pilih --', 
-        width: '100%', 
-        dropdownCssClass: 'select2-dropdown-clean', 
-        allowClear: true 
-    });
+    document.addEventListener('DOMContentLoaded', function() {
+        const itemsBody = document.getElementById('itemsBody');
+        const btnAddRow = document.getElementById('btnAddRow');
+        const grandTotalDisplay = document.getElementById('grandTotalDisplay');
+        const productsData = @json($products); 
+        let rowCount = 0;
 
-    const form = document.getElementById('sales-order-form');
-    const productItemsContainer = document.getElementById('product-items');
-    const productRowTemplate = document.getElementById('product-row-template');
-    const addProductBtn = document.getElementById('add-product-btn');
-    let productIndex = 0;
+        function addRow() {
+            rowCount++;
+            let optionsHtml = '<option value="">Pilih Produk...</option>';
+            productsData.forEach(prod => {
+                optionsHtml += `<option value="${prod.product_id}" data-price="${prod.selling_price}">${prod.product_name} (${prod.product_code})</option>`;
+            });
 
-    function formatRupiah(number) {
-        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
-    }
+            const tr = document.createElement('tr');
+            tr.className = 'border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition';
+            tr.innerHTML = `
+                <td class="p-3 align-top">
+                    <select name="products[${rowCount}][product_id]" class="tom-select-dynamic product-select" required>
+                        ${optionsHtml}
+                    </select>
+                </td>
+                <td class="p-3 align-top text-right">
+                    <div class="text-sm font-mono text-slate-600 dark:text-slate-300 pt-3 price-display">Rp 0</div>
+                    <input type="hidden" class="price-input" value="0">
+                </td>
+                <td class="p-3 align-top">
+                    <input type="number" step="0.01" min="0.01" name="products[${rowCount}][quantity]" 
+                           class="form-input text-center qty-input" value="1" required>
+                </td>
+                <td class="p-3 align-top text-right">
+                    <div class="text-sm font-bold text-slate-800 dark:text-white pt-3 subtotal-display">Rp 0</div>
+                </td>
+                <td class="p-3 align-top text-center">
+                    <button type="button" class="text-slate-400 hover:text-rose-500 transition-colors btn-remove-row pt-2">
+                        <i class="material-icons text-lg">close</i>
+                    </button>
+                </td>
+            `;
+            itemsBody.appendChild(tr);
 
-    // 2. KALKULASI
-    function calculateTotals() {
-        let grandTotal = 0;
-        productItemsContainer.querySelectorAll('tr').forEach(row => {
-            const price = parseFloat(row.querySelector('.price-raw').value) || 0;
-            const quantity = parseInt(row.querySelector('.quantity').value) || 0;
-            const subtotal = price * quantity;
-            row.querySelector('.subtotal').textContent = formatRupiah(subtotal);
-            grandTotal += subtotal;
-        });
-        document.getElementById('grand-total').textContent = formatRupiah(grandTotal);
-    }
+            const selectEl = tr.querySelector('.tom-select-dynamic');
+            new TomSelect(selectEl, {
+                sortField: { field: "text", direction: "asc" },
+                plugins: ['clear_button'],
+                dropdownParent: 'body', // Pastikan ini ada agar dropdown tidak terpotong saat scroll
+                onChange: function(value) {
+                    updateRowPrice(tr, value);
+                }
+            });
 
-    // 3. TAMBAH BARIS
-    function addProductRow(item = null) {
-        const clone = productRowTemplate.content.cloneNode(true);
-        const tr = clone.querySelector('tr');
+            calculateRow(tr);
+        }
 
-        const productSelect = tr.querySelector('.product-select');
-        const quantityInput = tr.querySelector('.quantity');
-        const priceDisplay = tr.querySelector('.price-display');
-        const priceRaw = tr.querySelector('.price-raw');
-        const removeBtn = tr.querySelector('.remove-product-btn');
-
-        // Naming for Laravel
-        productSelect.name = `products[${productIndex}][product_id]`;
-        quantityInput.name = `products[${productIndex}][quantity]`;
-        priceRaw.name = `products[${productIndex}][price]`; 
-
-        productItemsContainer.appendChild(tr);
-
-        // FIXED: Hapus dropdownParent agar render di body (menghindari masalah clipping & focus trap)
-        const select2 = $(productSelect).select2({
-            placeholder: 'Pilih Produk...',
-            dropdownCssClass: 'select2-dropdown-clean',
-            // dropdownParent: $(productSelect).parent(), // <--- BARIS INI DIHAPUS
-            width: '100%'
-        });
-
-        const anPrice = new AutoNumeric(priceDisplay, {
-            currencySymbol: 'Rp ',
-            decimalCharacter: ',',
-            digitGroupSeparator: '.',
-            decimalPlaces: 0,
-            minimumValue: '0',
-            readOnly: true 
-        });
-
-        // Event: Saat Produk Dipilih
-        select2.on('select2:select', function(e) {
-            const selectedOption = e.params.data.element;
-            const price = parseFloat(selectedOption.getAttribute('data-price')) || 0;
+        function updateRowPrice(row, productId) {
+            const product = productsData.find(p => p.product_id == productId);
+            const priceInput = row.querySelector('.price-input');
+            const priceDisplay = row.querySelector('.price-display');
             
-            anPrice.set(price);
-            priceRaw.value = price;
-            calculateTotals();
-        });
-
-        quantityInput.addEventListener('input', calculateTotals);
-        
-        removeBtn.addEventListener('click', () => {
-            select2.select2('destroy');
-            tr.remove();
-            calculateTotals();
-        });
-
-        productIndex++;
-    }
-
-    addProductBtn.addEventListener('click', () => addProductRow());
-    
-    // Tambah 1 baris kosong saat load
-    addProductRow();
-    
-    // 4. VALIDASI MANUAL SEBELUM SUBMIT
-    form.addEventListener('submit', function(e) {
-        e.preventDefault(); // Stop dulu
-
-        // Validasi Klien
-        const clientSelect = $('#client_id');
-        if (!clientSelect.val()) {
-            Swal.fire('Error', 'Silakan pilih Pelanggan (Klien).', 'error');
-            return;
+            if (product) {
+                const price = parseFloat(product.selling_price);
+                priceInput.value = price;
+                priceDisplay.innerText = formatRupiah(price);
+            } else {
+                priceInput.value = 0;
+                priceDisplay.innerText = 'Rp 0';
+            }
+            calculateRow(row);
         }
 
-        // Validasi Produk
-        const rows = productItemsContainer.querySelectorAll('tr');
-        if (rows.length === 0) {
-            Swal.fire('Error', 'Harap tambahkan minimal satu produk.', 'warning');
-            return;
+        function calculateRow(row) {
+            const price = parseFloat(row.querySelector('.price-input').value) || 0;
+            const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+            const subtotal = price * qty;
+            row.querySelector('.subtotal-display').innerText = formatRupiah(subtotal);
+            calculateGrandTotal();
         }
 
-        let isValid = true;
-        rows.forEach((row, index) => {
-            const select = $(row.querySelector('.product-select'));
-            if (!select.val()) {
-                isValid = false;
-                // Highlight error (opsional)
+        function calculateGrandTotal() {
+            let total = 0;
+            document.querySelectorAll('#itemsBody tr').forEach(row => {
+                const price = parseFloat(row.querySelector('.price-input').value) || 0;
+                const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+                total += price * qty;
+            });
+            grandTotalDisplay.innerText = formatRupiah(total);
+        }
+
+        function formatRupiah(amount) {
+            return 'Rp ' + amount.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        }
+
+        itemsBody.addEventListener('click', function(e) {
+            if (e.target.closest('.btn-remove-row')) {
+                e.target.closest('tr').remove();
+                calculateGrandTotal();
             }
         });
 
-        if (!isValid) {
-            Swal.fire('Error', 'Pastikan semua baris produk sudah dipilih.', 'warning');
-            return;
-        }
+        itemsBody.addEventListener('input', function(e) {
+            if (e.target.classList.contains('qty-input')) {
+                calculateRow(e.target.closest('tr'));
+            }
+        });
 
-        // Jika lolos, submit form
-        const btn = document.getElementById('submit-btn');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="material-icons animate-spin text-sm">sync</i> Menyimpan...';
-        
-        this.submit();
+        btnAddRow.addEventListener('click', addRow);
+        addRow();
     });
-
-    @if(session('success')) window.showToast("{{ session('success') }}", 'success'); @endif
-    @if(session('error')) window.showToast("{{ session('error') }}", 'error'); @endif
-});
 </script>
 @endpush

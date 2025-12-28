@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 
-// --- PERHATIKAN: NAMESPACE HARUS MENGARAH KE FOLDER ADMIN ---
 use App\Http\Controllers\Admin\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Admin\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Admin\Auth\EmailVerificationNotificationController;

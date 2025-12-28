@@ -11,41 +11,34 @@ return new class extends Migration
         Schema::create('purchase_order_payments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('po_id')
-                  ->constrained('purchase_orders', 'po_id')
-                  ->onDelete('cascade');
-
-            $table->foreignId('bulk_purchase_payment_id')->nullable()
-                  ->constrained('bulk_purchase_payments', 'bulk_purchase_payment_id')
-                  ->onDelete('set null');
-
-            $table->foreignId('received_by_user_id')->nullable()
-                  ->constrained('users', 'user_id')
-                  ->nullOnDelete();
-
+                ->constrained('purchase_orders', 'po_id')
+                ->onDelete('cascade');
+            $table->foreignId('bulk_purchase_payment_id')
+                ->nullable()
+                ->constrained('bulk_purchase_payments', 'bulk_purchase_payment_id')
+                ->onDelete('set null');
+            $table->foreignId('received_by_user_id')
+                ->nullable()
+                ->constrained('users', 'user_id')
+                ->nullOnDelete();
             $table->date('payment_date');
             $table->decimal('amount', 15, 2);
-
-            $table->foreignId('payment_method_id')->nullable()
-                  ->constrained('payment_methods', 'payment_method_id')
-                  ->onDelete('set null');
-
-            $table->foreignId('company_bank_account_id')->nullable()
-                  ->constrained('company_bank_accounts', 'company_bank_account_id')
-                  ->nullOnDelete();
-
+            $table->foreignId('payment_method_id')
+                ->nullable()
+                ->constrained('payment_methods', 'payment_method_id')
+                ->onDelete('set null');
+            $table->foreignId('company_bank_account_id')
+                ->nullable()
+                ->constrained('company_bank_accounts', 'company_bank_account_id')
+                ->nullOnDelete();
             $table->string('reference_number')->nullable();
-
-            $table->enum('status', [
-                'completed',
-                'pending_clearance',
-                'failed'
-            ])->default('completed');
-
+            $table->string('proof_of_payment_path')->nullable();
+            $table->enum('status', ['completed', 'pending_clearance', 'failed'])->default('completed');
             $table->text('notes')->nullable();
             $table->timestamps();
         });
     }
-
+    
     public function down(): void
     {
         Schema::dropIfExists('purchase_order_payments');

@@ -14,7 +14,6 @@ use App\Models\OrderChangeRequestItem;
 class OrderChangeRequest extends Model
 {
     use HasFactory;
-
     protected $primaryKey = 'request_id';
 
     protected $fillable = [

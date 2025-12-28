@@ -9,9 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Models\ManualJournal;
-use App\Models\ChartOfAccount;
 use App\Models\GeneralLedger;
-use App\Models\Setting;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use App\Services\AccountingService;
@@ -20,26 +18,19 @@ use App\Services\AccountingSettingService;
 class ClosingBookController extends Controller
 {
     protected $accountingService;
-    protected $accountingSettings; // ✅ Tambahkan ini
+    protected $accountingSettings;
 
-    // ✅ Perbarui __construct() untuk inject kedua service
     public function __construct(
         AccountingService $accountingService,
         AccountingSettingService $accountingSettings
     ) {
         $this->accountingService = $accountingService;
-        $this->accountingSettings = $accountingSettings; // ✅ Tambahkan ini
-        
-        // Gunakan permission yang sudah kita sepakati
+        $this->accountingSettings = $accountingSettings;
         $this->middleware('can:manage-settings');
     }
 
-    /**
-     * Menampilkan halaman untuk proses tutup buku.
-     */
     public function index(): View
     {
-        // ... (logika index Anda sudah benar) ...
         $firstEntryYear = GeneralLedger::min(DB::raw('YEAR(entry_date)'));
         $currentYear = now()->year;
         
@@ -61,9 +52,6 @@ class ClosingBookController extends Controller
         return view('admin.closing_book.index', compact('availableYears', 'closedYears'));
     }
 
-    /**
-     * Menjalankan proses Tutup Buku (Membuat Jurnal Penutup).
-     */
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -73,20 +61,17 @@ class ClosingBookController extends Controller
         $year = $validated['year'];
         $startDate = Carbon::create($year, 1, 1)->startOfDay();
         $endDate = Carbon::create($year, 12, 31)->endOfDay();
-
-        // 1. ✅ Validasi Akun Laba Ditahan (menggunakan service)
         $retainedEarningsAccount = $this->accountingSettings->getRetainedEarningsId();
+
         if (!$retainedEarningsAccount) {
             return back()->with('error', 'Gagal: Akun "Laba Ditahan" belum diatur di Pengaturan -> Akun Default.');
         }
 
-        // 2. Cek apakah tahun ini sudah ditutup
         $isClosed = ManualJournal::where('description', 'LIKE', 'Jurnal Penutup Tahun ' . $year)->exists();
         if ($isClosed) {
             return back()->with('error', "Gagal: Tahun $year sudah ditutup sebelumnya.");
         }
 
-        // 3. Ambil semua saldo akun Laba Rugi
         $plAccounts = GeneralLedger::join('chart_of_accounts as coa', 'general_ledgers.chart_of_account_id', '=', 'coa.account_id')
             ->whereIn('coa.account_type', ['Pendapatan', 'HPP', 'Beban'])
             ->whereBetween('general_ledgers.entry_date', [$startDate, $endDate])
@@ -105,18 +90,17 @@ class ClosingBookController extends Controller
         $totalNetIncome = 0;
 
         foreach ($plAccounts as $account) {
-            /** @var object{account_id: int, account_name: string, normal_balance: string, total_debit: float, total_credit: float} $account */
             if ($account->normal_balance == 'Debit') {
                 $balance = $account->total_debit - $account->total_credit;
                 if ($balance > 0) {
                     $creditEntriesForGL[] = [$account->account_id, $balance, "Tutup Buku: " . $account->account_name];
-                    $totalNetIncome -= $balance; // Mengurangi Laba
+                    $totalNetIncome -= $balance; 
                 }
-            } else { // Saldo Normal Kredit (Pendapatan)
+            } else { 
                 $balance = $account->total_credit - $account->total_debit;
                 if ($balance > 0) {
                     $debitEntriesForGL[] = [$account->account_id, $balance, "Tutup Buku: " . $account->account_name];
-                    $totalNetIncome += $balance; // Menambah Laba
+                    $totalNetIncome += $balance; 
                 }
             }
         }
@@ -125,30 +109,26 @@ class ClosingBookController extends Controller
              return back()->with('info', "Tidak ada data Laba Rugi yang bisa ditutup untuk tahun $year.");
         }
 
-        // 4. Tambahkan entri Laba Ditahan
         if ($totalNetIncome > 0) {
             $creditEntriesForGL[] = [$retainedEarningsAccount, $totalNetIncome, "Tutup Buku: Laba Bersih Tahun " . $year];
         } elseif ($totalNetIncome < 0) {
             $debitEntriesForGL[] = [$retainedEarningsAccount, abs($totalNetIncome), "Tutup Buku: Rugi Bersih Tahun " . $year];
         }
         
-        // 5. Hitung total debit/kredit untuk header jurnal manual
         $totalDebit = array_sum(array_column($debitEntriesForGL, 1));
         $totalCredit = array_sum(array_column($creditEntriesForGL, 1));
 
         DB::beginTransaction();
         try {
-            // 6. Buat Jurnal Manual Induk
             $manualJournal = ManualJournal::create([
                 'journal_number' => ManualJournal::generateJournalNumber(),
-                'entry_date' => $endDate, // Jurnal dibuat di akhir tahun
+                'entry_date' => $endDate,
                 'description' => "Jurnal Penutup Tahun " . $year,
                 'total_debit' => $totalDebit,
                 'total_credit' => $totalCredit,
                 'user_id' => Auth::id(),
             ]);
 
-            // 7. Post ke Jurnal Umum (General Ledger)
             $this->accountingService->postJournal(
                 $manualJournal->journal_number,
                 $manualJournal->entry_date,
@@ -159,7 +139,6 @@ class ClosingBookController extends Controller
                 Auth::id()
             );
             
-            // 8. Simpan entri ke tabel manual_journal_entries
             foreach ($debitEntriesForGL as $entry) {
                 $manualJournal->entries()->create(['chart_of_account_id' => $entry[0], 'debit' => $entry[1], 'description' => $entry[2]]);
             }
@@ -168,7 +147,7 @@ class ClosingBookController extends Controller
             }
 
             DB::commit();
-            return redirect()->route('admin.closing_book.index')->with('success', "Tutup Buku Tahun $year berhasil. Laba/Rugi telah dipindahkan ke Laba Ditahan.");
+            return redirect()->route('admin.closing-book.index')->with('success', "Tutup Buku Tahun $year berhasil. Laba/Rugi telah dipindahkan ke Laba Ditahan.");
 
         } catch (\Exception $e) {
             DB::rollBack();

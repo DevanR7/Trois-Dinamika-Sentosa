@@ -10,9 +10,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
-/**
- * Controller ini menangani proses autentikasi (login dan logout) untuk sesi web.
- */
 class AuthenticatedSessionController extends Controller
 {
     /**

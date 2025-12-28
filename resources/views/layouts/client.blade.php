@@ -173,7 +173,7 @@
                 if (typeof window.showToast === 'function') {
                     window.showToast(msg, type);
                 } else {
-                    Swal.fire({ toast: true, position: 'top-end', icon: type, title: msg, showConfirmButton: false, timer: 3000, timerProgressBar: true });
+                    window.confirmDialog({ toast: true, position: 'top-end', icon: type, title: msg, showConfirmButton: false, timer: 3000, timerProgressBar: true });
                 }
             };
 

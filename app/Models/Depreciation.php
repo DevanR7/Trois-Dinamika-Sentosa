@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Depreciation extends Model
 {
     use HasFactory;
-    
     protected $primaryKey = 'depreciation_id';
 
     protected $fillable = [
@@ -24,9 +23,6 @@ class Depreciation extends Model
         'amount' => 'float',
     ];
 
-    /**
-     * Relasi ke Aset Induk
-     */
     public function fixedAsset(): BelongsTo
     {
         return $this->belongsTo(FixedAsset::class, 'fixed_asset_id', 'asset_id');

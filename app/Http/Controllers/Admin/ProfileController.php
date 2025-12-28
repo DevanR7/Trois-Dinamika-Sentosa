@@ -14,9 +14,6 @@ use Illuminate\View\View;
 
 class ProfileController extends Controller
 {
-    /**
-     * Menampilkan formulir profil pengguna.
-     */
     public function edit(Request $request): View
     {
         return view('admin.profile.edit', [
@@ -24,9 +21,6 @@ class ProfileController extends Controller
         ]);
     }
 
-    /**
-     * Memperbarui informasi profil pengguna (bukan password).
-     */
     public function update(Request $request): RedirectResponse
     {
         $user = $request->user();
@@ -42,7 +36,6 @@ class ProfileController extends Controller
 
         $user->fill($validatedData);
 
-        // Reset verifikasi email jika alamat email diubah
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;
         }
@@ -52,9 +45,6 @@ class ProfileController extends Controller
         return Redirect::route('admin.profile.edit')->with('status', 'profile-updated');
     }
 
-    /**
-     * Memperbarui password pengguna secara terpisah.
-     */
     public function updatePassword(Request $request): RedirectResponse
     {
         $validated = $request->validateWithBag('updatePassword', [
@@ -69,9 +59,6 @@ class ProfileController extends Controller
         return back()->with('status', 'password-updated');
     }
 
-    /**
-     * Menghapus akun pengguna secara permanen setelah verifikasi password.
-     */
     public function destroy(Request $request): RedirectResponse
     {
         $request->validateWithBag('userDeletion', [
