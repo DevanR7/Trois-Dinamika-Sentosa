@@ -1,1017 +1,781 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Detail Faktur Penjualan')
+@section('title', 'Detail Invoice #' . $invoice->invoice_number)
 
 @section('content')
+<div class="flex flex-col gap-6">
 
-    <div class="max-w-6xl mx-auto">
-        
-        {{-- =====================================================================
-             1. HEADER & ACTION BUTTONS
-             ===================================================================== --}}
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <div>
-                <div class="flex items-center gap-4">
-                    <a href="{{ route('admin.invoices.index') }}" 
-                       class="w-9 h-9 rounded-full flex items-center justify-center bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 transition-colors shadow-sm dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 group">
-                        <i class="material-icons text-lg leading-none group-hover:-translate-x-0.5 transition-transform">arrow_back</i>
-                    </a>
-                    <h1 class="page-title">{{ $invoice->invoice_number }}</h1>
-                </div>
-                <div class="flex items-center gap-2 mt-1 ml-[52px]">
-                    <span class="text-sm text-slate-500">Tanggal: {{ $invoice->order_date->format('d M Y') }}</span>
-                    <span class="text-slate-300">•</span>
-                    @php
-                        $statusClass = match($invoice->status) {
-                            'paid' => 'badge-success',
-                            'partially_paid' => 'badge-info',
-                            'draft' => 'badge-secondary',
-                            'cancelled' => 'badge-danger',
-                            default => 'badge-warning'
-                        };
-                    @endphp
-                    <span class="badge {{ $statusClass }}">{{ ucfirst($invoice->status) }}</span>
+    {{-- HEADER & TOOLBAR --}}
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-3">
+                <a href="{{ route('admin.invoices.index') }}" class="btn-icon btn-secondary" title="Kembali">
+                    <i class="material-icons text-lg">arrow_back</i>
+                </a>
+                <div>
+                    <div class="flex items-center gap-3">
+                        <h1 class="page-title text-xl font-bold tracking-tight">Invoice <span class="text-indigo-600">#{{ $invoice->invoice_number }}</span></h1>
+                        
+                        @php
+                            $badgeClass = match($invoice->status) {
+                                'draft' => 'bg-slate-100 text-slate-600 border-slate-200',
+                                'unpaid' => 'bg-rose-50 text-rose-600 border-rose-100',
+                                'partially_paid' => 'bg-amber-50 text-amber-600 border-amber-100',
+                                'paid' => 'bg-emerald-50 text-emerald-600 border-emerald-100',
+                                'cancelled' => 'bg-slate-200 text-slate-500 border-slate-300',
+                                'overdue' => 'bg-purple-50 text-purple-600 border-purple-100',
+                                default => 'bg-gray-100 text-gray-600'
+                            };
+                            $statusLabel = match($invoice->status) {
+                                'draft' => 'Draft',
+                                'unpaid' => 'Belum Lunas',
+                                'partially_paid' => 'Bayar Sebagian',
+                                'paid' => 'Lunas',
+                                'cancelled' => 'Dibatalkan',
+                                'overdue' => 'Jatuh Tempo',
+                                default => ucfirst($invoice->status)
+                            };
+                        @endphp
+                        <span class="px-2.5 py-0.5 rounded-md text-xs font-bold uppercase border {{ $badgeClass }}">
+                            {{ $statusLabel }}
+                        </span>
+                    </div>
+                    <p class="text-sm text-slate-500 mt-1 flex items-center gap-2">
+                        <i class="material-icons text-xs">event</i> {{ $invoice->order_date->format('d F Y') }}
+                        <span class="text-slate-300">|</span>
+                        <i class="material-icons text-xs">schedule</i> Dibuat {{ $invoice->created_at->format('d M Y H:i') }}
+                    </p>
                 </div>
             </div>
+        </div>
+
+        {{-- ACTION BUTTONS --}}
+        <div class="flex flex-wrap items-center gap-2">
             
-            <div class="flex gap-2 ml-[52px] sm:ml-0">
-                @if($invoice->status == 'draft')
-                    <a href="{{ route('admin.invoices.edit', $invoice->invoice_id) }}" class="btn btn-secondary">
-                        <i class="material-icons text-sm mr-1">edit</i> Edit
-                    </a>
-                    
-                    {{-- Tombol Posting --}}
-                    <button type="button" onclick="confirmPosting()" class="btn btn-primary">
-                        <i class="material-icons text-sm mr-1">check_circle</i> Posting
+            <a href="{{ route('admin.invoices.pdf', $invoice->invoice_id) }}" target="_blank" class="btn btn-secondary pl-3 pr-4" title="Cetak PDF">
+                <i class="material-icons text-lg mr-1 text-slate-500">print</i> Cetak
+            </a>
+
+            @if($invoice->status === 'draft')
+                <a href="{{ route('admin.invoices.edit', $invoice->invoice_id) }}" class="btn btn-secondary text-amber-600 border-amber-200 hover:bg-amber-50">
+                    <i class="material-icons text-lg">edit</i> Edit
+                </a>
+                <button type="button" onclick="confirmDelete('{{ route('admin.invoices.destroy', $invoice->invoice_id) }}', 'Hapus Draft?', 'Data akan dihapus permanen.')" class="btn btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50">
+                    <i class="material-icons text-lg">delete</i> Hapus
+                </button>
+                <button type="button" onclick="confirmAction('{{ route('admin.invoices.confirm', $invoice->invoice_id) }}', 'Konfirmasi Invoice?', 'Stok akan dikurangi dan jurnal tercatat.', 'success')" class="btn btn-primary bg-emerald-600 hover:bg-emerald-700 border-transparent text-white shadow-lg shadow-emerald-200">
+                    <i class="material-icons text-lg">check_circle</i> Posting
+                </button>
+            @elseif($invoice->status !== 'cancelled')
+                <div class="relative" x-data="{ open: false }">
+                    <button @click="open = !open" @click.outside="open = false" type="button" class="btn btn-secondary pl-3 pr-2 shadow-sm border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                        <i class="material-icons text-lg mr-2">settings</i> Opsi <i class="material-icons text-lg ms-1">expand_more</i>
                     </button>
-                    <form id="form-posting" action="{{ route('admin.invoices.confirm', $invoice->invoice_id) }}" method="POST" class="hidden">
-                        @csrf
-                    </form>
-                @else
-                    <a href="{{ route('admin.invoices.pdf', $invoice->invoice_id) }}" class="btn btn-secondary" target="_blank">
-                        <i class="material-icons text-sm mr-1">print</i> Cetak PDF
-                    </a>
-
-                    @if(!in_array($invoice->status, ['paid', 'cancelled']))
-                         <button type="button" onclick="confirmCancel()" class="btn btn-danger">
-                            <i class="material-icons text-sm mr-1">cancel</i> Batalkan
-                        </button>
-                        <form id="form-cancel" action="{{ route('admin.invoices.cancel', $invoice->invoice_id) }}" method="POST" class="hidden">
-                            @csrf
-                        </form>
-                    @endif
-                    
-                    @if($invoice->status != 'cancelled')
-                        <div class="relative" x-data="{ open: false }">
-                            <button @click="open = !open" @click.outside="open = false" class="btn btn-secondary">
-                                <i class="material-icons text-sm mr-1">more_vert</i> Koreksi
-                            </button>
-                            <div x-show="open" x-transition class="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-100 dark:border-slate-700 z-50 py-1" style="display: none;">
-                                <a href="{{ route('admin.invoice-adjustments.create.manual', $invoice->invoice_id) }}" class="flex items-center px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                                    <div class="w-6 flex justify-center mr-2">
-                                        <i class="material-icons text-base text-slate-400">tune</i>
-                                    </div>
-                                    <span>Penyesuaian Manual</span>
+                    <div x-show="open" style="display: none;" class="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 z-50 overflow-hidden origin-top-right">
+                        <div class="py-1">
+                            @if(in_array($invoice->status, ['unpaid', 'partially_paid', 'paid', 'overdue']))
+                                <a href="{{ route('admin.sales-returns.create', ['sales_invoice_id' => $invoice->invoice_id]) }}" class="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                    <i class="material-icons text-base text-orange-500">keyboard_return</i> Retur Penjualan
                                 </a>
-                                <a href="{{ route('admin.invoice-adjustments.create.auto', $invoice->invoice_id) }}" class="flex items-center px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                                    <div class="w-6 flex justify-center mr-2">
-                                        <i class="material-icons text-base text-slate-400">auto_fix_high</i>
-                                    </div>
-                                    <span>Revisi Otomatis</span>
+                                {{-- Link ke Halaman Pemilihan Adjustment --}}
+                                <a href="{{ route('admin.invoice-adjustments.create', ['invoice_id' => $invoice->invoice_id]) }}" class="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                    <i class="material-icons text-base text-indigo-500">tune</i> Buat Penyesuaian
                                 </a>
-                            </div>
-                        </div>
-                    @endif
-                @endif
-            </div>
-        </div>
-
-        {{-- =====================================================================
-             2. INFORMASI UTAMA & RINGKASAN TAGIHAN
-             ===================================================================== --}}
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            
-            {{-- Kartu Kiri: Info Klien --}}
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-header-title">Informasi Pelanggan</h3>
-                </div>
-                <div class="card-body">
-                    <div class="flex items-start gap-3">
-                        <div class="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                            {{ substr($invoice->client->client_name, 0, 1) }}
-                        </div>
-                        <div>
-                            <div class="font-bold text-slate-800 dark:text-white">{{ $invoice->client->client_name }}</div>
-                            <div class="text-sm text-slate-500">{{ $invoice->client->phone_number ?? '-' }}</div>
-                            <div class="text-xs text-slate-400 mt-1">{{ $invoice->client->address ?? 'Alamat tidak tersedia' }}</div>
-                        </div>
-                    </div>
-                    <hr class="my-4 border-slate-100 dark:border-slate-700">
-                    
-                    {{-- Info Saldo Deposit --}}
-                    <div class="flex justify-between items-center text-sm mb-2 p-2 bg-indigo-50 rounded-lg">
-                        <span class="text-indigo-800">Saldo Deposit Tersedia:</span>
-                        <span class="font-bold text-indigo-700">Rp {{ number_format($invoice->client->balance, 0, ',', '.') }}</span>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4 text-sm mt-3">
-                        <div>
-                            <span class="block text-xs text-slate-400 uppercase">Sales</span>
-                            <span class="font-medium text-slate-700 dark:text-slate-300">{{ $invoice->sales->full_name ?? '-' }}</span>
-                        </div>
-                        <div>
-                            <span class="block text-xs text-slate-400 uppercase">Jatuh Tempo</span>
-                            <span class="font-medium {{ $invoice->due_date < now() && $invoice->status != 'paid' ? 'text-rose-500' : 'text-slate-700 dark:text-slate-300' }}">
-                                {{ $invoice->due_date->format('d M Y') }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Kartu Kanan: Ringkasan Angka --}}
-            <div class="card lg:col-span-2">
-                <div class="card-header">
-                    <h3 class="card-header-title">Ringkasan Tagihan</h3>
-                </div>
-                <div class="card-body">
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
-                        <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
-                            <div class="text-xs text-slate-500 uppercase font-bold mb-1">Total Tagihan</div>
-                            <div class="text-lg font-bold text-slate-800 dark:text-white">
-                                Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}
-                            </div>
-                        </div>
-                        <div class="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800">
-                            <div class="text-xs text-emerald-600 uppercase font-bold mb-1">Sudah Dibayar</div>
-                            <div class="text-lg font-bold text-emerald-700 dark:text-emerald-400">
-                                Rp {{ number_format($invoice->amount_paid, 0, ',', '.') }}
-                            </div>
-                        </div>
-                        <div class="p-4 rounded-xl bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-800">
-                            <div class="text-xs text-rose-600 uppercase font-bold mb-1">Sisa Tagihan</div>
-                            <div class="text-xl font-extrabold text-rose-600 dark:text-rose-400">
-                                Rp {{ number_format($invoice->remaining_balance, 0, ',', '.') }}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    @php
-                        $selisihPembayaran = $invoice->total_due - $invoice->amount_paid;
-                    @endphp
-
-                    @if($selisihPembayaran < -0.01)
-                        <div class="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3 animate-fade-in-up">
-                            <div class="p-2 bg-emerald-100 rounded-full shrink-0 text-emerald-600">
-                                <i class="material-icons text-xl">savings</i>
-                            </div>
-                            <div>
-                                <h4 class="font-bold text-emerald-800 text-sm uppercase tracking-wide mb-1">
-                                    Status: Kelebihan Pembayaran (Overpayment)
-                                </h4>
-                                <p class="text-sm text-emerald-700 leading-relaxed">
-                                    Terdapat kelebihan bayar sebesar 
-                                    <span class="font-bold font-mono text-base">Rp {{ number_format(abs($selisihPembayaran), 0, ',', '.') }}</span>.
-                                    <br>
-                                    Sistem telah otomatis mengamankan dana ini ke dalam 
-                                    <a href="{{ route('admin.clients.show', $invoice->client_id) }}" class="underline hover:text-emerald-900 font-bold" target="_blank">Saldo Kredit (Deposit)</a> 
-                                    klien <strong>{{ $invoice->client->client_name }}</strong>.
-                                </p>
-                            </div>
-                        </div>
-                    @endif
-
-                    @if($invoice->adjustments->count() > 0 || $invoice->returns->count() > 0)
-                        <div class="mt-4 p-3 bg-amber-50 border border-amber-100 rounded-lg flex items-center gap-2 text-xs text-amber-800">
-                            <i class="material-icons text-sm text-amber-500">info</i>
-                            <span>Tagihan ini memiliki riwayat <strong>Penyesuaian</strong> atau <strong>Retur</strong>. Cek tab di bawah.</span>
-                        </div>
-                    @endif
-                </div>
-            </div>
-        </div>
-
-        {{-- =====================================================================
-             3. TABEL RINCIAN BARANG
-             ===================================================================== --}}
-        <div class="card mb-6">
-            <div class="card-header bg-slate-50 dark:bg-slate-800">
-                <h3 class="card-header-title">Rincian Barang</h3>
-            </div>
-            <div class="overflow-x-auto w-full">
-                <table class="table-modern w-full min-w-[600px]">
-                    <thead>
-                        <tr>
-                            <th>Produk</th>
-                            <th class="text-right">Harga</th>
-                            <th class="text-center">Qty</th>
-                            <th class="text-right">Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($invoice->items as $item)
-                            <tr>
-                                <td>
-                                    <div class="font-bold text-slate-700 dark:text-slate-200">{{ $item->product->product_name ?? 'Item Dihapus' }}</div>
-                                    <div class="text-xs text-slate-500 font-mono">{{ $item->product->product_code ?? '-' }}</div>
-                                </td>
-                                <td class="text-right font-mono text-slate-600 dark:text-slate-300">
-                                    Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}
-                                </td>
-                                <td class="text-center font-bold">
-                                    {{ number_format($item->quantity, 0, ',', '.') }}
-                                    @if($item->quantity_returned > 0)
-                                        <span class="text-xs text-rose-500 block">(-{{ $item->quantity_returned }} Retur)</span>
-                                    @endif
-                                </td>
-                                <td class="text-right font-bold text-slate-800 dark:text-white">
-                                    Rp {{ number_format($item->subtotal, 0, ',', '.') }}
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                    <tfoot class="bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 text-sm">
-                        <tr>
-                            <td colspan="3" class="px-6 py-2 text-right font-bold text-slate-500">Subtotal Item</td>
-                            <td class="px-6 py-2 text-right font-mono font-bold">Rp {{ number_format($invoice->subtotal, 0, ',', '.') }}</td>
-                        </tr>
-                        @foreach($invoice->additionalCosts as $cost)
-                            <tr>
-                                <td colspan="3" class="px-6 py-1 text-right text-slate-500 italic">{{ $cost->description }}</td>
-                                <td class="px-6 py-1 text-right font-mono text-indigo-600">+ Rp {{ number_format($cost->amount, 0, ',', '.') }}</td>
-                            </tr>
-                        @endforeach
-                        @if($invoice->discount_amount > 0)
-                            <tr>
-                                <td colspan="3" class="px-6 py-1 text-right text-slate-500">Diskon Global ({{ $invoice->discount_percentage }}%)</td>
-                                <td class="px-6 py-1 text-right font-mono text-rose-500">- Rp {{ number_format($invoice->discount_amount, 0, ',', '.') }}</td>
-                            </tr>
-                        @endif
-                        @foreach($invoice->taxes as $tax)
-                            <tr>
-                                <td colspan="3" class="px-6 py-1 text-right text-slate-500">{{ $tax->name }} ({{ $tax->rate }}%)</td>
-                                <td class="px-6 py-1 text-right font-mono text-emerald-600">+ Rp {{ number_format($tax->pivot->amount, 0, ',', '.') }}</td>
-                            </tr>
-                        @endforeach
-                        <tr class="bg-slate-100 dark:bg-slate-900 border-t-2 border-slate-300 dark:border-slate-600">
-                            <td colspan="3" class="px-6 py-4 text-right font-extrabold uppercase text-slate-600 dark:text-slate-300">Grand Total</td>
-                            <td class="px-6 py-4 text-right font-extrabold text-xl text-indigo-600 dark:text-indigo-400">
-                                Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}
-                            </td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
-
-        {{-- =====================================================================
-             4. TABS & FORM PEMBAYARAN
-             ===================================================================== --}}
-        <div x-data="{ activeTab: 'payments' }" class="mb-10">
-            
-            {{-- Tab Navigation --}}
-            <div class="flex gap-2 mb-4 border-b border-slate-200 dark:border-slate-700">
-                <button @click="activeTab = 'payments'" 
-                        :class="activeTab === 'payments' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
-                        class="px-4 py-2 border-b-2 font-bold text-sm transition-colors flex items-center gap-2">
-                    <i class="material-icons text-sm">payments</i> Pembayaran
-                </button>
-                <button @click="activeTab = 'adjustments'" 
-                        :class="activeTab === 'adjustments' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
-                        class="px-4 py-2 border-b-2 font-bold text-sm transition-colors flex items-center gap-2">
-                    <i class="material-icons text-sm">tune</i> Penyesuaian ({{ $invoice->adjustments->count() }})
-                </button>
-                <button @click="activeTab = 'returns'" 
-                        :class="activeTab === 'returns' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
-                        class="px-4 py-2 border-b-2 font-bold text-sm transition-colors flex items-center gap-2">
-                    <i class="material-icons text-sm">assignment_return</i> Retur ({{ $invoice->returns->count() }})
-                </button>
-            </div>
-
-            {{-- TAB CONTENT: PEMBAYARAN --}}
-            <div x-show="activeTab === 'payments'" x-transition.opacity>
-                
-                {{-- Form Catat Pembayaran Baru (Hanya jika belum lunas & bukan draft) --}}
-                @if($invoice->remaining_balance > 0 && !in_array($invoice->status, ['draft', 'cancelled']))
-                    <div class="card mb-6 border border-indigo-100 bg-indigo-50/30 dark:bg-slate-800 dark:border-slate-700">
-                        <div class="card-header py-3 bg-transparent flex justify-between items-center">
-                            <h4 class="text-sm font-bold text-indigo-700 dark:text-indigo-400">Catat Pembayaran Baru (Internal)</h4>
-                            
-                            {{-- ✅ FIX ALPINE ERROR: LOGIKA INLINE --}}
-@if(isset($gatewayMethod) && $gatewayMethod)
-                                <div x-data="{
-                                    loading: false,
-                                    invoiceId: '{{ $invoice->invoice_id }}',
-                                    originalAmount: {{ (float) $invoice->remaining_balance }},
-                                    
-                                    payNow() {
-                                        window.confirmDialog({
-                                            title: 'Proses Pembayaran Midtrans?',
-                                            text: 'Anda akan diarahkan ke popup pembayaran untuk Invoice ini.',
-                                            icon: 'question',
-                                            showCancelButton: true,
-                                            confirmButtonText: 'Ya, Lanjut',
-                                            cancelButtonText: 'Batal'
-                                        }).then((result) => {
-                                            if (result.isConfirmed) {
-                                                this.executeMidtrans();
-                                            }
-                                        });
-                                    },
-
-                                    executeMidtrans() {
-                                        this.loading = true;
-                                        // ✅ REVISI: Gunakan route ADMIN, bukan Client
-                                        fetch('{{ route('admin.midtrans.pay', $invoice->invoice_id) }}', {
-                                            method: 'POST',
-                                            headers: { 
-                                                'Content-Type': 'application/json', 
-                                                'X-CSRF-TOKEN': document.querySelector('meta[name=\'csrf-token\']').content 
-                                            },
-                                            body: JSON.stringify({ 
-                                                amount: this.originalAmount, 
-                                                use_credit: false 
-                                            })
-                                        })
-                                        .then(r => {
-                                            // Cek jika response bukan JSON (misal HTML error page)
-                                            const contentType = r.headers.get('content-type');
-                                            if (!contentType || !contentType.includes('application/json')) {
-                                                throw new Error('Server Error: Respon bukan JSON (Mungkin error 500/404/403).');
-                                            }
-                                            return r.json().then(data => ({ status: r.status, body: data }));
-                                        })
-                                        .then(({ status, body }) => {
-                                            this.loading = false;
-                                            if (status >= 400) {
-                                                window.showToast(body.message || 'Terjadi kesalahan pada server.', 'error');
-                                                return;
-                                            }
-                                            
-                                            if(body.snap_token) { 
-                                                window.snap.pay(body.snap_token, { 
-                                                    onSuccess: () => window.location.reload(), 
-                                                    onPending: () => window.location.reload(), 
-                                                    onError: () => window.showToast('Gagal', 'error') 
-                                                }); 
-                                            } else { 
-                                                window.showToast(body.message, 'success'); 
-                                                setTimeout(() => window.location.reload(), 1000);
-                                            }
-                                        })
-                                        .catch((err) => { 
-                                            this.loading = false; 
-                                            console.error(err);
-                                            window.showToast('Gagal memproses: ' + err.message, 'error'); 
-                                        });
-                                    }
-                                }">
-                                    <button type="button" @click="payNow()" class="btn btn-sm btn-secondary text-xs flex items-center gap-1" :class="{'is-loading': loading}" :disabled="loading">
-                                        <i class="material-icons text-xs">qr_code</i> Bayar Online (Midtrans)
-                                    </button>
-                                </div>
+                            @endif
+                            <div class="border-t border-slate-100 dark:border-slate-700 my-1"></div>
+                            @if($invoice->amount_paid == 0 && $invoice->returns->isEmpty())
+                                <button type="button" onclick="confirmAction('{{ route('admin.invoices.cancel', $invoice->invoice_id) }}', 'Batalkan Invoice?', 'Stok akan dikembalikan dan jurnal dibalik.', 'danger')" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors text-left">
+                                    <i class="material-icons text-base">block</i> Batalkan Invoice
+                                </button>
                             @endif
                         </div>
-                        <div class="card-body">
-                            <form action="{{ route('admin.payments.store', $invoice->invoice_id) }}" method="POST" enctype="multipart/form-data" id="paymentForm">
-                                @csrf
-                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
-                                    <div class="md:col-span-1">
-                                        <label class="form-label text-[10px]">Tanggal Bayar</label>
-                                        <input type="date" name="payment_date" class="form-input text-sm" value="{{ date('Y-m-d') }}" required>
-                                    </div>
-                                    <div class="md:col-span-1">
-                                        <label class="form-label text-[10px]">Total Bayar (Rp)</label>
-                                        <input type="text" name="amount" id="inputTotalPay" 
-                                               class="form-input text-right font-bold text-emerald-600 autonumeric" 
-                                               value="{{ $invoice->remaining_balance }}" required>
-                                    </div>
+                    </div>
+                </div>
+            @endif
+        </div>
+    </div>
 
-                                    {{-- CHECKBOX GUNAKAN KREDIT --}}
-                                    <div class="md:col-span-2 flex flex-col justify-center pt-5">
-                                        <div class="flex items-center gap-2">
-                                            <input type="checkbox" name="use_credit" id="use_credit" class="form-checkbox rounded text-indigo-600 w-5 h-5" value="1" 
-                                                @if($invoice->client->balance <= 0) disabled @endif>
-                                            <label for="use_credit" class="text-sm text-slate-700 font-medium cursor-pointer select-none">
-                                                Gunakan Deposit Pelanggan
-                                                <span class="text-slate-400 text-xs block font-normal">
-                                                    Saldo tersedia: <strong>Rp {{ number_format($invoice->client->balance, 0, ',', '.') }}</strong>
-                                                </span>
-                                            </label>
+    {{-- SECTION 1: KARTU INFORMASI UTAMA --}}
+    <div class="card p-0 overflow-hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-100 dark:divide-slate-700">
+            {{-- Kiri: Pelanggan --}}
+            <div class="p-6">
+                <h5 class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-4 flex items-center gap-2">
+                    <i class="material-icons text-sm">person</i> Pelanggan
+                </h5>
+                <div class="flex items-start gap-4">
+                    <div class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 flex items-center justify-center font-bold text-lg shrink-0">
+                        {{ substr($invoice->client->client_name ?? 'U', 0, 1) }}
+                    </div>
+                    <div class="space-y-1">
+                        <div class="text-base font-bold text-slate-800 dark:text-white">
+                            {{ $invoice->client->client_name ?? 'Pelanggan Umum' }}
+                        </div>
+                        <div class="text-sm text-slate-500 dark:text-slate-400">
+                            {{ $invoice->client->person_in_charge ?? '-' }} | {{ $invoice->client->phone_number ?? '-' }}
+                        </div>
+                        <div class="text-sm text-slate-500 dark:text-slate-400">
+                            {{ $invoice->client->address ?? '-' }}
+                        </div>
+                        @if($invoice->client && $invoice->client->balance > 0)
+                            <div class="mt-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-full border border-emerald-100">
+                                <i class="material-icons text-[12px]">savings</i>
+                                Deposit: Rp {{ number_format($invoice->client->balance, 0, ',', '.') }}
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            {{-- Kanan: Detail --}}
+            <div class="p-6">
+                <h5 class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-4 flex items-center gap-2">
+                    <i class="material-icons text-sm">info</i> Detail
+                </h5>
+                <div class="grid grid-cols-2 gap-y-4 gap-x-6">
+                    <div>
+                        <span class="block text-xs text-slate-400 mb-0.5">Jatuh Tempo</span>
+                        <span class="block text-sm font-semibold {{ $invoice->status != 'paid' && $invoice->due_date < now() ? 'text-rose-500' : 'text-slate-700 dark:text-slate-200' }}">
+                            {{ $invoice->due_date->format('d/m/Y') }}
+                        </span>
+                    </div>
+                    <div>
+                        <span class="block text-xs text-slate-400 mb-0.5">Sales Person</span>
+                        <span class="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                            {{ $invoice->sales->full_name ?? 'Admin' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- SECTION 2: TABEL BARANG --}}
+    <div class="card overflow-hidden">
+        <div class="table-container border-0 shadow-none rounded-none">
+            <table class="table-modern">
+                <thead class="bg-slate-50 dark:bg-slate-700/50">
+                    <tr>
+                        <th width="40%">Deskripsi Item</th>
+                        <th width="15%" class="text-center">Kuantitas</th>
+                        <th width="20%" class="text-right">Harga Satuan</th>
+                        <th width="25%" class="text-right">Total</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                    @foreach($invoice->items as $item)
+                        <tr>
+                            <td>
+                                <div class="font-bold text-slate-700 dark:text-slate-200">{{ $item->product->product_name ?? 'Item Dihapus' }}</div>
+                                <div class="text-xs text-slate-500">{{ $item->product->product_code ?? '-' }}</div>
+                            </td>
+                            <td class="text-center">
+                                <span class="bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-md text-xs font-bold border border-slate-200 dark:border-slate-600">
+                                    {{ number_format($item->quantity, 0, ',', '.') }} {{ $item->product->unit->name ?? '' }}
+                                </span>
+                            </td>
+                            <td class="text-right font-mono text-slate-600 dark:text-slate-300">
+                                Rp {{ number_format($item->price_per_unit, 0, ',', '.') }}
+                            </td>
+                            <td class="text-right font-mono font-bold text-slate-800 dark:text-white">
+                                Rp {{ number_format($item->subtotal, 0, ',', '.') }}
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+
+        {{-- SUMMARY & CALCULATIONS --}}
+        <div class="p-6 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-700">
+            <div class="flex flex-col md:flex-row justify-between gap-8">
+                <div class="w-full md:w-1/2">
+                    @if($invoice->notes)
+                        <div class="text-sm text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-700 p-4 rounded border border-slate-200 dark:border-slate-600">
+                            <span class="font-bold block mb-1">Catatan:</span>
+                            {{ $invoice->notes }}
+                        </div>
+                    @endif
+                </div>
+
+                <div class="w-full md:w-[400px] space-y-2">
+                    {{-- TOTALS (Subtotal, Tax, Etc) --}}
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-500">Subtotal</span>
+                        <span class="font-mono font-medium text-slate-700 dark:text-slate-200">Rp {{ number_format($invoice->subtotal, 0, ',', '.') }}</span>
+                    </div>
+                    @if($invoice->discount_amount > 0)
+                    <div class="flex justify-between text-sm text-rose-600">
+                        <span>Diskon ({{ $invoice->discount_percentage }}%)</span>
+                        <span class="font-mono">- Rp {{ number_format($invoice->discount_amount, 0, ',', '.') }}</span>
+                    </div>
+                    @endif
+                    @foreach($invoice->taxes as $tax)
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-500">{{ $tax->name }} ({{ $tax->pivot->rate }}%)</span>
+                        <span class="font-mono font-medium text-slate-700 dark:text-slate-200">+ Rp {{ number_format($tax->pivot->amount, 0, ',', '.') }}</span>
+                    </div>
+                    @endforeach
+                    @foreach($invoice->additionalCosts as $cost)
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-500">{{ $cost->description }}</span>
+                        <span class="font-mono font-medium text-slate-700 dark:text-slate-200">+ Rp {{ number_format($cost->amount, 0, ',', '.') }}</span>
+                    </div>
+                    @endforeach
+
+                    <div class="border-t border-slate-200 dark:border-slate-600 my-2"></div>
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-slate-800 dark:text-white">Grand Total</span>
+                        <span class="text-xl font-bold text-indigo-600 font-mono">Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span>
+                    </div>
+
+                    @php
+                        // LOGIKA HITUNG SISA TAGIHAN (REVISI FIX DOUBLE COUNTING)
+                        // Hanya hitung adjustment manual (flag = true)
+                        // Adjustment otomatis diabaikan karena total_amount sudah berubah
+                        
+                        $adjDebit = $invoice->adjustments->where('type', 'debit_note')->where('is_calculation_adjustment', true)->sum('amount');
+                        $adjCredit = $invoice->adjustments->where('type', 'credit_note')->where('is_calculation_adjustment', true)->sum('amount');
+                        $returPotong = $invoice->deductingReturns->sum('total_amount');
+                        
+                        $finalBill = ($invoice->total_amount + $adjDebit) - $adjCredit - $returPotong;
+                        $sisaTagihan = round($finalBill - $invoice->amount_paid, 2);
+
+                        $defaultTab = ($sisaTagihan > 0.01 && $invoice->status != 'cancelled' && $invoice->status != 'draft') ? 'input_payment' : 'history';
+                    @endphp
+
+                    @if($adjDebit > 0 || $adjCredit > 0 || $returPotong > 0)
+                        <div class="pt-2 text-xs text-slate-400 space-y-1 border-t border-dashed border-slate-200 mt-2">
+                            @if($adjDebit) <div class="flex justify-between"><span>+ Koreksi Manual (+)</span> <span>Rp {{ number_format($adjDebit, 0, ',', '.') }}</span></div> @endif
+                            @if($adjCredit) <div class="flex justify-between"><span>- Koreksi Manual (-)</span> <span>Rp {{ number_format($adjCredit, 0, ',', '.') }}</span></div> @endif
+                            @if($returPotong) <div class="flex justify-between"><span>- Retur Barang</span> <span>Rp {{ number_format($returPotong, 0, ',', '.') }}</span></div> @endif
+                        </div>
+                    @endif
+
+                    <div class="flex justify-between items-center text-sm font-medium pt-2 mt-2">
+                        <span class="text-emerald-600">Sudah Dibayar</span>
+                        <span class="font-mono text-emerald-600">Rp {{ number_format($invoice->amount_paid, 0, ',', '.') }}</span>
+                    </div>
+                    
+                    {{-- STATUS PEMBAYARAN --}}
+                    @if($sisaTagihan > 0.01)
+                        {{-- KURANG BAYAR --}}
+                        <div class="bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded p-2 flex justify-between items-center mt-2">
+                            <span class="text-xs font-bold text-rose-600 uppercase">Sisa Tagihan</span>
+                            <span class="font-mono font-bold text-rose-600 text-lg">
+                                Rp {{ number_format($sisaTagihan, 0, ',', '.') }}
+                            </span>
+                        </div>
+                    
+                    @elseif($sisaTagihan < -0.01)
+                        {{-- LEBIH BAYAR (OVERPAID) --}}
+                        <div class="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg p-3 mt-2" x-data="{ showRefundModal: false }">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs font-bold text-indigo-600 uppercase flex items-center gap-1">
+                                    <i class="material-icons text-sm">info</i> Kelebihan Bayar
+                                </span>
+                                <span class="font-mono font-bold text-indigo-600 text-lg">
+                                    Rp {{ number_format(abs($sisaTagihan), 0, ',', '.') }}
+                                </span>
+                            </div>
+                            
+                            {{-- LOGIKA REFUND: Hanya muncul jika SUDAH ADA PEMBAYARAN --}}
+                            @if($invoice->amount_paid > 0)
+                                <button @click="showRefundModal = !showRefundModal" type="button" class="w-full btn btn-sm bg-indigo-600 text-white hover:bg-indigo-700 border-transparent">
+                                    Proses Refund Uang
+                                </button>
+                            @else
+                                <p class="text-[10px] text-indigo-500 italic text-center">
+                                    (Koreksi pada invoice yang belum dibayar. Tidak perlu refund.)
+                                </p>
+                            @endif
+                    
+                            <div x-show="showRefundModal" class="mt-3 pt-3 border-t border-indigo-200">
+                                <form action="{{ route('admin.invoices.refund', $invoice->invoice_id) }}" method="POST">
+                                    @csrf
+                                    <div class="space-y-2">
+                                        <div>
+                                            <label class="text-[10px] font-bold text-indigo-600 uppercase">Sumber Dana</label>
+                                            <select name="company_bank_account_id" class="form-select text-xs h-9 w-full" required>
+                                                @foreach($companyBankAccounts as $bank)
+                                                    <option value="{{ $bank->company_bank_account_id }}">{{ $bank->bank_name }} - {{ $bank->account_name }}</option>
+                                                @endforeach
+                                            </select>
                                         </div>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label class="text-[10px] font-bold text-indigo-600 uppercase">Tanggal</label>
+                                                <input type="date" name="refund_date" class="form-input text-xs h-9" value="{{ date('Y-m-d') }}" required>
+                                            </div>
+                                            <div>
+                                                <label class="text-[10px] font-bold text-indigo-600 uppercase">Nominal</label>
+                                                <input type="number" name="refund_amount" class="form-input text-xs h-9" value="{{ abs($sisaTagihan) }}" max="{{ abs($sisaTagihan) }}" step="0.01" required>
+                                            </div>
+                                        </div>
+                                        <button type="submit" class="w-full btn btn-sm btn-primary">Konfirmasi Refund</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    
+                    @else
+                        {{-- LUNAS --}}
+                        <div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded p-2 flex justify-between items-center mt-2">
+                            <span class="text-xs font-bold text-emerald-600 uppercase">Status</span>
+                            <span class="font-bold text-emerald-600 text-lg flex items-center gap-1">
+                                <i class="material-icons text-base">check_circle</i> LUNAS
+                            </span>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- SECTION 3: TABULASI --}}
+    @if($invoice->status != 'draft')
+    <div class="card overflow-hidden" x-data="{ activeTab: '{{ $defaultTab }}' }">
+        
+        <div class="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            <div class="px-6 flex gap-6 overflow-x-auto">
+                @if($sisaTagihan > 0.01 && $invoice->status != 'cancelled')
+                <button @click="activeTab = 'input_payment'" class="py-4 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-2" :class="activeTab === 'input_payment' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'">
+                    <i class="material-icons text-lg">add_card</i> Input Pembayaran
+                </button>
+                @endif
+                <button @click="activeTab = 'history'" class="py-4 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-2" :class="activeTab === 'history' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'">
+                    <i class="material-icons text-lg">history</i> Riwayat Bayar
+                </button>
+                <button @click="activeTab = 'returns'" class="py-4 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-2" :class="activeTab === 'returns' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'">
+                    <i class="material-icons text-lg">keyboard_return</i> Retur
+                    @if($invoice->returns->count()) <span class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-600 text-[10px]">{{ $invoice->returns->count() }}</span> @endif
+                </button>
+                <button @click="activeTab = 'adjustments'" class="py-4 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-2" :class="activeTab === 'adjustments' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'">
+                    <i class="material-icons text-lg">tune</i> Log Koreksi
+                    @if($invoice->adjustments->count()) <span class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-600 text-[10px]">{{ $invoice->adjustments->count() }}</span> @endif
+                </button>
+            </div>
+        </div>
+        
+        <div class="p-6">
+
+            {{-- TAB 1: INPUT PEMBAYARAN --}}
+            @if($sisaTagihan > 0.01 && $invoice->status != 'cancelled')
+                <div x-show="activeTab === 'input_payment'" x-transition x-data="paymentForm()">
+                    
+                    @if ($errors->any())
+                        <div class="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded text-sm">
+                            <strong>Gagal:</strong> {{ $errors->first() }}
+                        </div>
+                    @endif
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        
+                        {{-- KIRI: OPSI PEMBAYARAN --}}
+                        <div class="space-y-6">
+                            
+                            {{-- Checkbox Deposit --}}
+                            @if($invoice->client->balance > 0)
+                                <div class="p-4 bg-emerald-50/50 border border-emerald-100 rounded-lg">
+                                    <label class="flex items-center gap-3 cursor-pointer">
+                                        <input type="checkbox" name="use_credit" x-model="useCredit" @change="updateCalculation()" class="form-check-input w-5 h-5 text-emerald-600">
+                                        <div class="flex flex-col">
+                                            <span class="text-sm font-bold text-slate-700">Gunakan Saldo Deposit</span>
+                                            <span class="text-xs text-slate-500">Saldo tersedia: <span class="font-bold text-emerald-600">{{ number_format($invoice->client->balance, 0, ',', '.') }}</span></span>
+                                        </div>
+                                    </label>
+                                    
+                                    <div x-show="useCredit" x-transition class="mt-3 ml-8 text-xs text-emerald-700 bg-emerald-100/50 p-2 rounded">
+                                        Akan memotong: <b>- <span x-text="formatRupiah(creditAmount)"></span></b> dari saldo deposit.
+                                    </div>
+                                </div>
+                            @endif
+
+                            {{-- KARTU MIDTRANS --}}
+                            @if($gatewayMethod)
+                            <div class="p-5 border border-indigo-100 bg-indigo-50/30 rounded-xl relative overflow-hidden group hover:border-indigo-300 transition-all">
+                                <div class="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <i class="material-icons text-6xl text-indigo-600">qr_code_2</i>
+                                </div>
+                                <div class="relative z-10">
+                                    <h4 class="font-bold text-indigo-700 text-sm mb-1 flex items-center gap-2">
+                                        <i class="material-icons text-base">payments</i> Bayar Online
+                                    </h4>
+                                    <p class="text-xs text-indigo-600/80 mb-4 max-w-[80%]">
+                                        QRIS, Virtual Account, E-Wallet. Verifikasi Otomatis.
+                                    </p>
+                                    
+                                    <div class="flex items-center justify-between">
+                                        <div class="text-xs font-bold text-slate-500 uppercase">Yang harus dibayar</div>
+                                        <div class="text-lg font-bold text-indigo-700 font-mono" x-text="formatRupiah(balanceAfterPay)"></div>
                                     </div>
                                     
-                                    {{-- RINCIAN ALOKASI (MUNCUL OTOMATIS) --}}
-                                    <div class="md:col-span-4 bg-white p-3 rounded-lg border border-slate-200" id="allocationDetails" style="display:none;">
-                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                                            <div>
-                                                <span class="block text-xs text-slate-400">Diambil dari Deposit</span>
-                                                <span class="font-bold text-indigo-600" id="dispCreditUsed">Rp 0</span>
-                                            </div>
-                                            <div>
-                                                <span class="block text-xs text-slate-400">Sisa Bayar (Transfer/Cash)</span>
-                                                <span class="font-bold text-emerald-600" id="dispCashNeeded">Rp 0</span>
-                                            </div>
-                                            <div>
-                                                <span class="block text-xs text-slate-400">Status</span>
-                                                <span id="dispStatus" class="badge badge-secondary text-[10px]">Menunggu Input</span>
-                                            </div>
+                                    <button type="button" 
+                                            @click="payWithMidtrans"
+                                            :disabled="isProcessing || balanceAfterPay <= 0"
+                                            class="mt-3 w-full btn bg-indigo-600 hover:bg-indigo-700 text-white border-transparent shadow-md shadow-indigo-500/20 justify-center">
+                                        <span x-show="!isProcessing">Bayar Sekarang</span>
+                                        <span x-show="isProcessing" class="flex items-center">
+                                            <svg class="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                            Memproses...
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <div class="h-px bg-slate-200 flex-1"></div>
+                                <span class="text-xs text-slate-400 font-bold uppercase">ATAU MANUAL</span>
+                                <div class="h-px bg-slate-200 flex-1"></div>
+                            </div>
+                            @endif
+                        </div>
+
+                        {{-- KANAN: FORM MANUAL --}}
+                        <div class="space-y-4">
+                            <form action="{{ route('admin.payments.store', $invoice->invoice_id) }}" method="POST" enctype="multipart/form-data">
+                                @csrf
+                                <input type="hidden" name="use_credit" :value="useCredit ? 1 : 0">
+
+                                <div class="space-y-4">
+                                    <h4 class="font-bold text-slate-700 text-sm border-b border-slate-200 pb-2 mb-4">Pencatatan Manual (Admin)</h4>
+
+                                    <div>
+                                        <label class="form-label label-required text-indigo-600 uppercase">Uang Diterima (Cash/Transfer)</label>
+                                        <div class="relative">
+                                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-lg">Rp</span>
+                                            <input type="text" class="form-input pl-10 pr-4 text-xl font-bold font-mono text-right autonumeric h-12" x-ref="amountInput" placeholder="0" :required="!useCredit"> 
+                                            <input type="hidden" name="amount" :value="cashAmount">
+                                        </div>
+                                        <div class="mt-1 text-right">
+                                            <button type="button" @click="setMaxAmount()" class="text-[10px] text-indigo-600 hover:underline font-bold">Isi Sisa Tagihan</button>
                                         </div>
                                     </div>
 
-                                    {{-- BAGIAN METODE BAYAR (HANYA MUNCUL JIKA SISA CASH > 0) --}}
-                                    <div class="md:col-span-4 grid grid-cols-1 md:grid-cols-4 gap-4" id="cashPaymentFields">
-                                        <div class="md:col-span-1">
-                                            <label class="form-label text-[10px]">Metode Bayar (Sisa)</label>
-                                            <select name="payment_method_id" id="paymentMethodSelect" class="tom-select">
-                                                <option value="">Pilih...</option>
+                                    <div class="grid grid-cols-1 gap-4">
+                                        <div>
+                                            <label class="form-label label-required">TANGGAL BAYAR</label>
+                                            <input type="date" name="payment_date" class="form-input" value="{{ date('Y-m-d') }}" required>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="form-label">METODE PEMBAYARAN</label>
+                                        <div x-init="initMethodSelect($el)">
+                                            <select name="payment_method_id" class="tom-select w-full">
+                                                <option value="">Pilih Metode...</option>
                                                 @foreach($paymentMethods as $method)
-                                                    {{-- ✅ PENTING: Gunakan 'internal_input_config' karena ini halaman Admin --}}
-                                                    <option value="{{ $method->payment_method_id }}" 
-                                                            data-config="{{ $method->internal_input_config }}"
-                                                            data-type="{{ $method->type }}">
-                                                        {{ $method->name }}
-                                                    </option>
+                                                    <option value="{{ $method->payment_method_id }}" data-config="{{ $method->internal_input_config }}">{{ $method->name }}</option>
                                                 @endforeach
                                             </select>
                                         </div>
-                                        <div class="md:col-span-1">
-                                            <label class="form-label text-[10px]">Masuk ke Akun</label>
-                                            <select name="company_bank_account_id" id="bankAccountSelect" class="tom-select">
-                                                <option value="">Pilih Rekening...</option>
-                                                @foreach($companyBankAccounts as $bank)
-                                                    <option value="{{ $bank->company_bank_account_id }}">{{ $bank->bank_name }}</option>
+                                    </div>
+
+                                    <div x-show="cashAmount > 0">
+                                        <label class="form-label label-required">MASUK KE AKUN (KAS/BANK)</label>
+                                        <div x-init="initBankSelect($el)">
+                                            <select name="company_bank_account_id" class="tom-select w-full" :required="cashAmount > 0">
+                                                <option value="">Pilih Akun...</option>
+                                                @foreach($companyBankAccounts as $account)
+                                                    <option value="{{ $account->company_bank_account_id }}">{{ $account->bank_name }} - {{ $account->account_name }}</option>
                                                 @endforeach
                                             </select>
                                         </div>
-                                        <div class="md:col-span-1 hidden" id="fieldReference">
-                                            <label class="form-label text-[10px]" id="labelReference">No. Referensi</label>
-                                            <input type="text" name="reference_number" id="inputReference" class="form-input text-sm" placeholder="Contoh: TRF-123">
-                                        </div>
-
-                                        {{-- ✅ PERBAIKAN: FLOWBITE DROPZONE FOR UPLOAD --}}
-                                        <div class="md:col-span-1 hidden" id="fieldProof">
-                                            <label class="form-label text-[10px]" id="labelProof">Bukti Transfer</label>
-                                            
-                                            <div class="flex items-center justify-center w-full">
-                                                <label for="inputProof" class="flex flex-col items-center justify-center w-full h-10 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-bray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600 transition-colors">
-                                                    <div class="flex flex-row items-center justify-center gap-2 pt-1">
-                                                        <i class="material-icons text-gray-400 text-sm">cloud_upload</i>
-                                                        <p class="text-[10px] text-gray-500 dark:text-gray-400" id="fileNameDisplay">Klik upload</p>
-                                                    </div>
-                                                    <input id="inputProof" name="proof_of_payment" type="file" class="hidden" accept="image/*" />
-                                                </label>
-                                            </div> 
-                                        </div>
                                     </div>
 
-                                    <div class="md:col-span-4">
-                                        <label class="form-label text-[10px]">Catatan</label>
-                                        <input type="text" name="notes" class="form-input text-sm" placeholder="Catatan tambahan...">
+                                    <div x-show="requiresRef" class="animate-enter">
+                                        <label class="form-label label-required">No. Referensi</label>
+                                        <input type="text" name="reference_number" class="form-input" placeholder="No. Transaksi" :required="requiresRef">
                                     </div>
 
-                                    <div class="md:col-span-4 mt-2">
-                                        {{-- ALERT REAL-TIME OVERPAYMENT --}}
-                                        <div id="dynamicOverpaymentAlert" class="p-3 bg-blue-50 border border-blue-200 rounded-lg hidden transition-all mb-3">
-                                            <div class="flex gap-2">
-                                                <i class="material-icons text-blue-500 text-sm mt-0.5">info</i>
-                                                <div class="text-xs text-blue-700">
-                                                    <span class="font-bold">Info:</span> Nominal melebihi tagihan. 
-                                                    Kelebihan <span id="excessAmountDisplay" class="font-bold font-mono">Rp 0</span> 
-                                                    akan disimpan otomatis ke <strong>Deposit Pelanggan</strong>.
-                                                </div>
-                                            </div>
-                                        </div>
+                                    <div x-show="requiresProof" class="animate-enter">
+                                        <label class="form-label label-required">Bukti Transfer</label>
+                                        <input type="file" name="proof_of_payment" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept=".jpg,.jpeg,.png,.pdf" :required="requiresProof">
+                                    </div>
 
+                                    <div>
+                                        <label class="form-label">CATATAN</label>
+                                        <textarea name="notes" class="form-textarea h-20" placeholder="Keterangan tambahan..."></textarea>
+                                    </div>
+                                    
+                                    <div class="pt-2">
                                         <button type="submit" class="btn btn-primary w-full justify-center">
-                                            <i class="material-icons text-sm mr-1">save</i> Simpan Pembayaran
+                                            <i class="material-icons mr-2">save</i> Simpan Manual
                                         </button>
                                     </div>
                                 </div>
                             </form>
                         </div>
                     </div>
-                @endif
+                </div>
+            @endif
 
-                {{-- Tabel Riwayat Pembayaran --}}
-                <div class="table-container">
-                    <table class="table-modern">
-                        <thead>
-                            <tr>
-                                <th>Tanggal</th>
-                                <th>Metode / Info</th>
-                                <th>Referensi & Bukti</th>
-                                <th class="text-right">Nominal</th>
-                                <th class="text-center">Status</th>
-                                <th class="text-center w-32">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($invoice->payments as $payment)
+            {{-- TAB 2: RIWAYAT --}}
+            <div x-show="activeTab === 'history'" x-transition>
+                @if($invoice->payments->isEmpty())
+                    <p class="text-center text-slate-400 italic py-8">Belum ada data pembayaran.</p>
+                @else
+                    <div class="table-container">
+                        <table class="table-modern">
+                            <thead>
                                 <tr>
-                                    <td class="text-sm align-top">
-                                        {{ $payment->payment_date->format('d M Y') }}
-                                        <div class="text-[10px] text-slate-400 mt-1">
-                                            ID: #{{ $payment->payment_id }}
-                                        </div>
-                                    </td>
-                                    <td class="align-top">
-                                        {{-- Metode --}}
-                                        <div class="font-bold text-slate-700 dark:text-slate-200 text-xs">
-                                            {{ $payment->paymentMethod->name ?? 'Manual/Kredit' }}
-                                        </div>
-                                        
-                                        {{-- Akun Bank --}}
-                                        @if($payment->companyBankAccount)
-                                            <div class="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
-                                                <i class="material-icons text-[10px]">account_balance</i>
-                                                {{ $payment->companyBankAccount->bank_name }}
-                                            </div>
-                                        @endif
-
-                                        {{-- Diterima Oleh --}}
-                                        @if($payment->receivedBy)
-                                            <div class="text-[10px] text-slate-400 mt-1">
-                                                Oleh: {{ $payment->receivedBy->full_name }}
-                                            </div>
-                                        @endif
-
-                                        {{-- Catatan --}}
-                                        @if($payment->notes)
-                                            <div class="text-[10px] text-slate-500 italic mt-1 border-t border-slate-100 pt-1">
-                                                "{{ $payment->notes }}"
-                                            </div>
-                                        @endif
-                                    </td>
-                                    <td class="align-top">
-                                        {{-- Referensi --}}
-                                        @if($payment->reference_number)
-                                            <div class="text-xs font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded inline-block mb-1">
-                                                {{ $payment->reference_number }}
-                                            </div>
-                                        @else
-                                            <div class="text-xs text-slate-400">-</div>
-                                        @endif
-
-                                        {{-- Tombol Lihat Bukti --}}
-                                        @if($payment->proof_of_payment_path)
-                                            <div class="mt-1">
-                                                <button onclick="showProof('{{ asset('storage/' . $payment->proof_of_payment_path) }}')" class="text-indigo-600 hover:text-indigo-800 text-xs flex items-center gap-1 underline decoration-dashed">
-                                                    <i class="material-icons text-[12px]">image</i> Lihat Bukti
-                                                </button>
-                                            </div>
-                                        @endif
-                                    </td>
-                                    <td class="text-right font-bold text-emerald-600 align-top">
-                                        Rp {{ number_format($payment->amount, 0, ',', '.') }}
-                                    </td>
-                                    <td class="text-center align-top">
-                                        @php
-                                            $badgeClass = match($payment->status) {
-                                                'completed' => 'badge-success',
-                                                'pending_verification' => 'badge-warning',
-                                                'pending_clearance' => 'badge-info',
-                                                'failed' => 'badge-danger',
-                                                default => 'badge-secondary'
-                                            };
-                                        @endphp
-                                        <span class="badge {{ $badgeClass }} text-[10px]">
-                                            {{ ucfirst(str_replace('_', ' ', $payment->status)) }}
-                                        </span>
-                                    </td>
-                                    <td class="text-center align-top">
-                                        <div class="flex items-center justify-center gap-1">
-                                            
-                                            {{-- TOMBOL APPROVE/REJECT (Hanya jika status pending) --}}
-                                            @if($payment->status == 'pending_verification' || $payment->status == 'pending_clearance')
-                                                <button onclick="confirmApprove('{{ $payment->payment_id }}')" class="btn-icon btn-sm btn-success text-white bg-emerald-500 hover:bg-emerald-600 shadow-sm" title="Setujui">
-                                                    <i class="material-icons text-sm">check</i>
-                                                </button>
-                                                <form id="form-approve-{{ $payment->payment_id }}" action="{{ route('admin.payments.approve', $payment->payment_id) }}" method="POST" class="hidden">
-                                                    @csrf @method('POST')
-                                                </form>
-
-                                                <button onclick="confirmReject('{{ $payment->payment_id }}')" class="btn-icon btn-sm btn-danger text-white bg-rose-500 hover:bg-rose-600 shadow-sm" title="Tolak">
-                                                    <i class="material-icons text-sm">close</i>
-                                                </button>
-                                                <form id="form-reject-{{ $payment->payment_id }}" action="{{ route('admin.payments.reject', $payment->payment_id) }}" method="POST" class="hidden">
-                                                    @csrf @method('POST')
-                                                </form>
+                                    <th>Tanggal</th>
+                                    <th>Metode / Rincian</th>
+                                    <th class="text-right">Jumlah</th>
+                                    <th class="text-center">Status</th>
+                                    <th class="text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($invoice->payments->sortByDesc('payment_date') as $payment)
+                                    <tr>
+                                        <td>{{ $payment->payment_date->format('d/m/Y') }}</td>
+                                        <td>
+                                            <span class="font-bold text-slate-700">{{ $payment->paymentMethod->name ?? 'Manual' }}</span>
+                                            @if($payment->reference_number) <span class="text-xs text-slate-500 block">{{ $payment->reference_number }}</span> @endif
+                                            @if(str_contains($payment->notes, 'Subsidi') || str_contains($payment->notes, 'Overpay'))
+                                                <div class="mt-1"><span class="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100 inline-flex items-center"><i class="material-icons text-[10px] mr-1">savings</i> Ada Deposit</span></div>
                                             @endif
-                                            
-                                            {{-- TOMBOL HAPUS (Rollback) --}}
-                                            <button onclick="confirmDeletePayment('{{ $payment->payment_id }}')" class="btn-icon btn-sm btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50" title="Hapus">
-                                                <i class="material-icons text-sm">delete</i>
-                                            </button>
-                                            <form id="delete-payment-{{ $payment->payment_id }}" action="{{ route('admin.payments.destroy', $payment->payment_id) }}" method="POST" class="hidden">
-                                                @csrf @method('DELETE')
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="6" class="text-center p-4 text-slate-400 text-sm">Belum ada riwayat pembayaran.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {{-- TAB CONTENT: ADJUSTMENTS --}}
-            <div x-show="activeTab === 'adjustments'" x-transition.opacity style="display: none;">
-                <div class="table-container">
-                    <table class="table-modern">
-                        <thead>
-                            <tr>
-                                <th>Tanggal</th>
-                                <th>Jenis Nota</th>
-                                <th>Alasan</th>
-                                <th class="text-right">Nominal</th>
-                                <th class="text-center w-24">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($invoice->adjustments as $adj)
-                                <tr>
-                                    <td class="text-sm">{{ $adj->adjustment_date->format('d M Y') }}</td>
-                                    <td>
-                                        @if($adj->type == 'credit_note')
-                                            <span class="badge badge-success text-[10px]">Credit Note (Potongan)</span>
-                                        @else
-                                            <span class="badge badge-danger text-[10px]">Debit Note (Tambahan)</span>
-                                        @endif
-                                    </td>
-                                    <td class="text-xs text-slate-600 italic max-w-md truncate">{{ $adj->reason }}</td>
-                                    <td class="text-right font-mono font-bold text-slate-700">Rp {{ number_format($adj->amount, 0, ',', '.') }}</td>
-                                    <td class="text-center">
-                                        <button onclick="confirmDeleteAdjustment('{{ $adj->adjustment_id }}')" class="btn-icon btn-sm btn-danger" title="Hapus">
-                                            <i class="material-icons text-sm">delete</i>
-                                        </button>
-                                        <form id="delete-adj-{{ $adj->adjustment_id }}" action="{{ route('admin.invoice-adjustments.destroy', $adj->adjustment_id) }}" method="POST" class="hidden">
-                                            @csrf @method('DELETE')
-                                        </form>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="5" class="text-center p-4 text-slate-400 text-sm">Tidak ada penyesuaian.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {{-- TAB CONTENT: RETURNS --}}
-            <div x-show="activeTab === 'returns'" x-transition.opacity style="display: none;">
-                <div class="table-container">
-                    <table class="table-modern">
-                        <thead>
-                            <tr>
-                                <th>No. Retur</th>
-                                <th>Tanggal</th>
-                                <th>Tipe Penanganan</th>
-                                <th class="text-right">Nilai Retur</th>
-                                <th class="text-center w-24">Detail</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($invoice->returns as $ret)
-                                <tr>
-                                    <td class="font-bold text-indigo-600 text-sm">{{ $ret->return_number }}</td>
-                                    <td class="text-sm">{{ $ret->return_date->format('d M Y') }}</td>
-                                    <td>
-                                        @if($ret->return_handling_type == 'deduct_invoice')
-                                            <span class="badge badge-primary text-[10px]">Potong Tagihan</span>
-                                        @else
-                                            <span class="badge badge-secondary text-[10px]">Simpan Kredit</span>
-                                        @endif
-                                    </td>
-                                    <td class="text-right font-bold text-slate-700">Rp {{ number_format($ret->total_amount, 0, ',', '.') }}</td>
-                                    <td class="text-center">
-                                        <a href="{{ route('admin.sales-returns.show', $ret->return_id) }}" class="btn-icon btn-sm btn-secondary" target="_blank">
-                                            <i class="material-icons text-sm">open_in_new</i>
-                                        </a>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="5" class="text-center p-4 text-slate-400 text-sm">Tidak ada retur barang.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
+                                            @if($payment->proof_of_payment_path)
+                                                <a href="{{ asset('storage/'.$payment->proof_of_payment_path) }}" target="_blank" class="text-[10px] text-indigo-600 hover:underline flex items-center gap-1 mt-1"><i class="material-icons text-[10px]">attachment</i> Lihat Bukti</a>
+                                            @endif
+                                        </td>
+                                        <td class="text-right font-mono font-bold text-emerald-600">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
+                                        <td class="text-center">
+                                            @if($payment->status == 'completed') <span class="badge badge-success">Diterima</span>
+                                            @elseif($payment->status == 'pending_verification') <span class="badge badge-warning">Verifikasi</span>
+                                            @else <span class="badge badge-danger">Gagal</span> @endif
+                                        </td>
+                                        <td class="text-center">
+                                            @if($payment->status === 'pending_verification')
+        {{-- Tombol Approval (Tetap Sama) --}}
+        <div class="flex gap-1 justify-center">
+            <button onclick="confirmAction('{{ route('admin.payment-clearance.sales.approve', $payment->payment_id) }}', 'Terima Pembayaran?', 'Dana akan masuk ke kas.', 'success')" class="text-emerald-600 hover:bg-emerald-50 p-1 rounded" title="Approve"><i class="material-icons text-sm">check</i></button>
+            <button onclick="confirmAction('{{ route('admin.payment-clearance.sales.reject', $payment->payment_id) }}', 'Tolak Pembayaran?', '', 'danger')" class="text-rose-600 hover:bg-rose-50 p-1 rounded" title="Reject"><i class="material-icons text-sm">close</i></button>
         </div>
 
-        @if($invoice->notes)
-            <div class="card bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                <div class="card-body p-4 text-sm text-slate-600 dark:text-slate-300 italic">
-                    <span class="font-bold not-italic text-xs block mb-1">Catatan Faktur:</span>
-                    {{ $invoice->notes }}
-                </div>
-            </div>
-        @endif
+    @elseif($payment->status === 'completed')
         
-        {{-- =====================================================================
-             5. IMAGE MODAL (KHUSUS UNTUK SHOW PROOF)
-             ===================================================================== --}}
-        <div id="imageModal" tabindex="-1" aria-hidden="true" class="fixed top-0 left-0 right-0 z-[60] hidden w-full p-4 overflow-x-hidden overflow-y-auto md:inset-0 h-[calc(100%-1rem)] max-h-full flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div class="relative w-full max-w-4xl max-h-full">
-                <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
-                    <div class="flex items-center justify-between p-4 border-b rounded-t dark:border-gray-600">
-                        <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
-                            Bukti Pembayaran
-                        </h3>
-                        <button onclick="closeProof()" type="button" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white">
-                            <i class="material-icons text-base">close</i>
-                        </button>
+        {{-- [REVISI TOMBOL HAPUS] --}}
+        @if($payment->bulk_sales_payment_id)
+            {{-- Jika Bulk Payment: Tampilkan Link ke Induk --}}
+            <a href="{{ route('admin.bulk-sales-payments.show', $payment->bulk_sales_payment_id) }}" 
+               class="text-indigo-500 hover:text-indigo-700 p-1 rounded inline-flex items-center gap-1" 
+               title="Lihat Detail Bulk (Tidak bisa dihapus disini)">
+                <i class="material-icons text-sm">open_in_new</i>
+                <span class="text-[10px] font-bold">Bulk</span>
+            </a>
+        @else
+            {{-- Jika Pembayaran Biasa: Tampilkan Tombol Hapus --}}
+            <button onclick="confirmDelete('{{ route('admin.payments.destroy', $payment->payment_id) }}', 'Hapus Pembayaran?', 'Data akan dihapus dan jurnal dibalik.')" class="text-slate-400 hover:text-rose-500" title="Hapus">
+                <i class="material-icons text-sm">delete</i>
+            </button>
+        @endif
+
+    @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="p-4 space-y-4 flex justify-center bg-gray-50 rounded-b-lg">
-                         <img id="img-preview-full" src="" alt="Bukti" class="max-w-full max-h-[80vh] object-contain rounded-md shadow-sm">
-                    </div>
-                </div>
+                @endif
             </div>
+
+            {{-- TAB 3: RETUR --}}
+            <div x-show="activeTab === 'returns'" style="display: none;">
+                @if($invoice->returns->isEmpty()) <p class="text-center text-slate-400 italic py-8">Belum ada data retur.</p> 
+                @else 
+                    <div class="table-container">
+                        <table class="table-modern">
+                            <thead><tr><th>No. Retur</th><th>Tanggal</th><th>Tipe</th><th class="text-right">Total</th><th>Aksi</th></tr></thead>
+                            <tbody>
+                                @foreach($invoice->returns as $retur)
+                                    <tr>
+                                        <td><a href="{{ route('admin.sales-returns.show', $retur->return_id) }}" class="text-indigo-600 font-bold hover:underline">{{ $retur->return_number }}</a></td>
+                                        <td>{{ $retur->return_date->format('d/m/Y') }}</td>
+                                        <td>{{ $retur->return_handling_type == 'deduct_invoice' ? 'Potong Tagihan' : 'Simpan Kredit' }}</td>
+                                        <td class="text-right font-bold text-rose-500">Rp {{ number_format($retur->total_amount, 0, ',', '.') }}</td>
+                                        <td class="text-center">
+                                            <button onclick="confirmDelete('{{ route('admin.sales-returns.destroy', $retur->return_id) }}', 'Batalkan Retur?')" class="text-slate-400 hover:text-rose-500"><i class="material-icons text-sm">delete</i></button>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+
+            {{-- TAB 4: ADJUSTMENTS (LOG KOREKSI) --}}
+            <div x-show="activeTab === 'adjustments'" style="display: none;">
+                 @if($invoice->adjustments->isEmpty()) <p class="text-center text-slate-400 italic py-8">Belum ada data koreksi.</p> 
+                 @else 
+                    <div class="table-container">
+                        <table class="table-modern">
+                            <thead><tr><th>Tanggal</th><th>Tipe</th><th>Detail Koreksi</th><th class="text-right">Nilai</th><th>Aksi</th></tr></thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @foreach($invoice->adjustments as $adj)
+                                    <tr>
+                                        <td class="align-top py-3">{{ $adj->adjustment_date->format('d/m/Y') }}</td>
+                                        
+                                        <td class="align-top py-3">
+                                            @if($adj->type == 'debit_note')
+                                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-bold bg-rose-50 text-rose-700 border border-rose-100">
+                                                    <i class="material-icons text-[14px]">add_circle</i> Debit Note
+                                                </span>
+                                            @else
+                                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                                    <i class="material-icons text-[14px]">remove_circle</i> Credit Note
+                                                </span>
+                                            @endif
+
+                                            {{-- Indikator Tipe (Manual/Auto) --}}
+                                            @if(!$adj->is_calculation_adjustment)
+                                                <span class="block mt-1 text-[10px] text-slate-400 font-medium">(Revisi Otomatis)</span>
+                                            @else
+                                                <span class="block mt-1 text-[10px] text-indigo-500 font-medium">(Manual)</span>
+                                            @endif
+                                        </td>
+
+                                        <td class="align-top py-3">
+                                            <div class="text-sm text-slate-700 font-medium mb-1">{{ $adj->reason }}</div>
+                                            
+                                            {{-- Detail Perubahan Barang --}}
+                                            @if(isset($adj->details['change_logs']) && count($adj->details['change_logs']) > 0)
+                                                <div class="mt-2 bg-slate-50 rounded p-2 border border-slate-200">
+                                                    <p class="text-[10px] font-bold text-slate-500 uppercase mb-1">Rincian Perubahan:</p>
+                                                    <ul class="text-xs text-slate-600 list-disc list-inside space-y-0.5">
+                                                        @foreach($adj->details['change_logs'] as $log)
+                                                            <li>{{ $log }}</li>
+                                                        @endforeach
+                                                    </ul>
+                                                </div>
+                                            @endif
+                                        </td>
+
+                                        <td class="align-top text-right py-3 font-mono font-bold text-slate-700">
+                                            Rp {{ number_format($adj->amount, 0, ',', '.') }}
+                                        </td>
+
+                                        <td class="align-top text-center py-3">
+                                            <button type="button" onclick="confirmDelete('{{ route('admin.invoice-adjustments.destroy', $adj->adjustment_id) }}', 'Batalkan Koreksi?', 'Item invoice akan dikembalikan ke kondisi sebelum koreksi ini.')" class="text-slate-400 hover:text-rose-500 transition-colors">
+                                                <i class="material-icons text-lg">delete</i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                 @endif
+            </div>
+
         </div>
-
     </div>
+    @endif
 
-@endsection
+</div>
 
 @push('scripts')
-{{-- ✅ 1. SCRIPT MIDTRANS (Hanya jika Gateway Aktif) --}}
-@if(isset($gatewayMethod) && $gatewayMethod)
-    <script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="{{ config('midtrans.client_key') }}"></script>
-@endif
-
+<script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="{{ config('midtrans.client_key') }}"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // --- 1. VARIABLES ---
-        const inputAmount = document.getElementById('inputTotalPay');
-        const checkboxCredit = document.getElementById('use_credit');
-        
-        // Element tampilan Alokasi
-        const divAllocation = document.getElementById('allocationDetails');
-        const dispCreditUsed = document.getElementById('dispCreditUsed');
-        const dispCashNeeded = document.getElementById('dispCashNeeded');
-        const dispStatus = document.getElementById('dispStatus');
-        
-        // Container dropdown bank
-        const cashPaymentFields = document.getElementById('cashPaymentFields');
-        
-        // Input dinamis metode bayar
-        const methodSelect = document.getElementById('paymentMethodSelect');
-        const bankSelect = document.getElementById('bankAccountSelect');
-        
-        // Alert Overpayment
-        const alertBox = document.getElementById('dynamicOverpaymentAlert');
-        const excessDisplay = document.getElementById('excessAmountDisplay');
-        
-        // Data dari PHP
-        const remainingInvoice = {{ $invoice->remaining_balance }};
-        const clientBalance = {{ $invoice->client->balance }};
-        
-        // File Input Label Logic (Flowbite)
-        const fileInput = document.getElementById('inputProof');
-        const fileNameDisplay = document.getElementById('fileNameDisplay');
-        
-        if(fileInput && fileNameDisplay) {
-            fileInput.addEventListener('change', function(e) {
-                 if(e.target.files.length > 0) {
-                     fileNameDisplay.textContent = e.target.files[0].name;
-                     fileNameDisplay.classList.add('text-indigo-600', 'font-bold');
-                 } else {
-                     fileNameDisplay.textContent = "Klik upload";
-                     fileNameDisplay.classList.remove('text-indigo-600', 'font-bold');
-                 }
-            });
-        }
-
-        // --- 2. FUNGSI KALKULASI UTAMA ---
-        function calculatePayment() {
-            if (!inputAmount) return; 
-
-            // Ambil Nilai Input (Total yang ingin dibayar user hari ini)
-            let totalPay = 0;
-            if (AutoNumeric.getAutoNumericElement(inputAmount)) {
-                totalPay = parseFloat(AutoNumeric.getAutoNumericElement(inputAmount).getNumericString() || 0);
-            } else {
-                totalPay = parseFloat(inputAmount.value.replace(/\./g, '').replace(',', '.') || 0);
+    function confirmAction(url, title, text, color) {
+        confirmDialog({ title: title || 'Konfirmasi', text: text || '', icon: 'question', confirmText: 'Ya, Lanjutkan', confirmColor: color || 'primary' }).then((result) => {
+            if (result.isConfirmed) {
+                let form = document.createElement('form'); form.action = url; form.method = 'POST'; form.innerHTML = `@csrf`; document.body.appendChild(form); form.submit();
             }
-
-            // Cek penggunaan kredit
-            let creditUsed = 0;
-            if (checkboxCredit && checkboxCredit.checked) {
-                creditUsed = Math.min(clientBalance, remainingInvoice, totalPay);
+        });
+    }
+    function confirmDelete(url, title, text) {
+        confirmDialog({ title: title || 'Hapus Data?', text: text || 'Tindakan ini tidak dapat dibatalkan.', icon: 'warning', confirmText: 'Ya, Hapus', confirmColor: 'danger' }).then((result) => {
+            if (result.isConfirmed) {
+                let form = document.createElement('form'); form.action = url; form.method = 'POST'; form.innerHTML = `@csrf @method('DELETE')`; document.body.appendChild(form); form.submit();
             }
+        });
+    }
 
-            // Hitung Sisa Cash yang dibutuhkan
-            let cashNeeded = Math.max(0, totalPay - creditUsed);
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('paymentForm', () => ({
+            remainingDue: {{ $sisaTagihan > 0 ? $sisaTagihan : 0 }},
+            creditBalance: {{ $invoice->client->balance }},
+            useCredit: false,
+            creditAmount: 0,
+            cashAmount: {{ $sisaTagihan > 0 ? $sisaTagihan : 0 }},
+            isProcessing: false,
+            requiresProof: false,
+            requiresRef: false,
+            anInstance: null,
 
-            // --- UPDATE UI ALOKASI ---
-            if (checkboxCredit && checkboxCredit.checked) {
-                divAllocation.style.display = 'block';
-                dispCreditUsed.innerText = formatRupiah(creditUsed);
-                dispCashNeeded.innerText = formatRupiah(cashNeeded);
-                
-                if (creditUsed > 0 && cashNeeded <= 0.01) {
-                    dispStatus.innerText = "Lunas dengan Deposit";
-                    dispStatus.className = "badge badge-success text-[10px]";
-                } else if (creditUsed > 0 && cashNeeded > 0) {
-                    dispStatus.innerText = "Split Payment (Deposit + Cash)";
-                    dispStatus.className = "badge badge-info text-[10px]";
+            init() {
+                const el = this.$refs.amountInput;
+                if (el) {
+                    this.anInstance = new AutoNumeric(el, { ...window.defaultAutoNumericOptions, minimumValue: '0' });
+                    this.anInstance.set(this.cashAmount);
+                    el.addEventListener('autoNumeric:rawValueModified', (e) => { this.cashAmount = parseFloat(e.detail.newRawValue) || 0; });
+                }
+            },
+
+            updateCalculation() {
+                if (this.useCredit) {
+                    this.creditAmount = Math.min(this.creditBalance, this.remainingDue);
+                    let sisa = Math.max(0, this.remainingDue - this.creditAmount);
+                    this.cashAmount = sisa;
+                    if(this.anInstance) this.anInstance.set(sisa);
                 } else {
-                    dispStatus.innerText = "Menunggu Input Nominal";
-                    dispStatus.className = "badge badge-secondary text-[10px]";
+                    this.creditAmount = 0;
+                    this.cashAmount = this.remainingDue;
+                    if(this.anInstance) this.anInstance.set(this.remainingDue);
                 }
-            } else {
-                divAllocation.style.display = 'none';
-            }
+            },
 
-            // --- SHOW/HIDE DROPDOWN BANK ---
-            if (cashNeeded > 0.01) {
-                cashPaymentFields.classList.remove('hidden');
-                cashPaymentFields.style.display = 'grid'; 
-                
-                methodSelect.setAttribute('required', 'required');
-                bankSelect.setAttribute('required', 'required');
-            } else {
-                cashPaymentFields.classList.add('hidden');
-                cashPaymentFields.style.display = 'none';
-                
-                methodSelect.removeAttribute('required');
-                bankSelect.removeAttribute('required');
-                
-                if (methodSelect.tomselect) methodSelect.tomselect.clear();
-                if (bankSelect.tomselect) bankSelect.tomselect.clear();
-            }
+            setMaxAmount() {
+                let targetCash = Math.max(0, this.remainingDue - this.creditAmount);
+                this.cashAmount = targetCash;
+                if(this.anInstance) this.anInstance.set(targetCash);
+            },
 
-            // --- ALERT OVERPAYMENT REALTIME ---
-            if (totalPay > remainingInvoice + 1) { // Toleransi 1 perak
-                const excess = totalPay - remainingInvoice;
-                excessDisplay.innerText = formatRupiah(excess);
-                alertBox.classList.remove('hidden');
-            } else {
-                alertBox.classList.add('hidden');
-            }
-        }
+            get balanceAfterPay() { return Math.max(0, this.remainingDue - this.creditAmount); },
 
-        function formatRupiah(amount) {
-            return 'Rp ' + amount.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-        }
+            initMethodSelect(el) {
+                new TomSelect(el.querySelector('select'), { ...window.defaultTomSelectConfig, dropdownParent: 'body', onChange: (val) => this.updateConfig(val, el.querySelector('select')) });
+            },
+            initBankSelect(el) { new TomSelect(el.querySelector('select'), { ...window.defaultTomSelectConfig, dropdownParent: 'body' }); },
 
-        // --- EVENT LISTENERS ---
-        if (inputAmount) {
-            inputAmount.addEventListener('keyup', calculatePayment);
-            inputAmount.addEventListener('change', calculatePayment);
-            inputAmount.addEventListener('autoNumeric:rawValueModified', calculatePayment);
-        }
-        
-        if (checkboxCredit) {
-            checkboxCredit.addEventListener('change', calculatePayment);
-        }
+            updateConfig(val, el) {
+                if(!val) { this.requiresProof = false; this.requiresRef = false; return; }
+                const opt = el.querySelector(`option[value="${val}"]`);
+                const cfg = opt ? opt.dataset.config : 'none';
+                this.requiresProof = (cfg === 'proof_only' || cfg === 'proof_and_reference');
+                this.requiresRef = (cfg === 'reference_only' || cfg === 'proof_and_reference');
+            },
 
-        // --- 3. LOGIC BAWAAN (Dynamic Fields Metode Bayar) ---
-        const fieldRef = document.getElementById('fieldReference');
-        const inputRef = document.getElementById('inputReference');
-        const labelRef = document.getElementById('labelReference');
-        const fieldProof = document.getElementById('fieldProof');
-        const inputProof = document.getElementById('inputProof');
-        const labelProof = document.getElementById('labelProof');
-
-        if (methodSelect) {
-            methodSelect.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                const config = selectedOption.getAttribute('data-config');
-                
-                fieldRef.classList.add('hidden');
-                fieldProof.classList.add('hidden');
-                inputRef.removeAttribute('required');
-                inputProof.removeAttribute('required');
-                labelRef.classList.remove('label-required');
-                labelProof.classList.remove('label-required');
-
-                if (config === 'proof_only' || config === 'proof_and_reference') {
-                    fieldProof.classList.remove('hidden');
-                    inputProof.setAttribute('required', 'required');
-                    labelProof.classList.add('label-required');
-                }
-                if (config === 'reference_only' || config === 'proof_and_reference') {
-                    fieldRef.classList.remove('hidden');
-                    inputRef.setAttribute('required', 'required');
-                    labelRef.classList.add('label-required');
-                }
-            });
-        }
-        
-        // Jalankan kalkulasi awal saat halaman load
-        calculatePayment();
-    });
-
-    // SWEETALERT CONFIRMATIONS
-    function confirmPosting() { 
-        window.confirmDialog({ 
-            title: 'Konfirmasi Invoice?', 
-            text: "Stok akan dikurangi dan jurnal penjualan akan diposting.", 
-            icon: 'question', 
-            showCancelButton: true, 
-            confirmButtonColor: '#4f46e5', 
-            confirmButtonText: 'Ya, Posting!', 
-            cancelButtonText: 'Batal' 
-        }).then((r) => { 
-            if(r.isConfirmed) document.getElementById('form-posting').submit(); 
-        }); 
-    }
-
-    function confirmCancel() { 
-        window.confirmDialog({ 
-            title: 'Batalkan Invoice?', 
-            text: "Status akan berubah menjadi Cancelled. Jurnal pembalik akan dibuat dan stok dikembalikan.", 
-            icon: 'warning', 
-            showCancelButton: true, 
-            confirmButtonColor: '#ef4444', 
-            confirmButtonText: 'Ya, Batalkan!', 
-            cancelButtonText: 'Kembali' 
-        }).then((r) => { 
-            if(r.isConfirmed) document.getElementById('form-cancel').submit(); 
-        }); 
-    }
-
-    function confirmDeletePayment(id) { 
-        window.confirmDialog({ 
-            title: 'Hapus Pembayaran?', 
-            text: "Jurnal pembayaran akan dibalik (reversal).", 
-            icon: 'warning', 
-            showCancelButton: true, 
-            confirmButtonColor: '#ef4444', 
-            confirmButtonText: 'Ya, Hapus!', 
-            cancelButtonText: 'Batal' 
-        }).then((r) => { 
-            if(r.isConfirmed) document.getElementById('delete-payment-'+id).submit(); 
-        }); 
-    }
-
-    function confirmDeleteAdjustment(id) { 
-        window.confirmDialog({ 
-            title: 'Hapus Penyesuaian?', 
-            text: "Nilai koreksi akan dihapus dan jurnal dibalik.", 
-            icon: 'warning', 
-            showCancelButton: true, 
-            confirmButtonColor: '#ef4444', 
-            confirmButtonText: 'Ya, Hapus!', 
-            cancelButtonText: 'Batal' 
-        }).then((r) => { 
-            if(r.isConfirmed) document.getElementById('delete-adj-'+id).submit(); 
-        }); 
-    }
-
-    function confirmApprove(id) { 
-        window.confirmDialog({ 
-            title: 'Setujui Pembayaran?', 
-            text: "Dana akan masuk ke pembukuan dan status menjadi Completed.", 
-            icon: 'question', 
-            showCancelButton: true, 
-            confirmButtonColor: '#10b981', 
-            confirmButtonText: 'Ya, Setujui!', 
-            cancelButtonText: 'Batal' 
-        }).then((r) => { 
-            if(r.isConfirmed) document.getElementById('form-approve-'+id).submit(); 
-        }); 
-    }
-
-    function confirmReject(id) { 
-        window.confirmDialog({ 
-            title: 'Tolak Pembayaran?', 
-            text: "Status akan menjadi Failed. Jika ada deposit terkait, akan dibatalkan.", 
-            icon: 'warning', 
-            showCancelButton: true, 
-            confirmButtonColor: '#ef4444', 
-            confirmButtonText: 'Ya, Tolak!', 
-            cancelButtonText: 'Batal' 
-        }).then((r) => { 
-            if(r.isConfirmed) document.getElementById('form-reject-'+id).submit(); 
-        }); 
-    }
-
-    // LOGIKA MODAL IMAGE (KHUSUS)
-    function showProof(url) { 
-        const modal = document.getElementById('imageModal');
-        const img = document.getElementById('img-preview-full');
-        img.src = url;
-        modal.classList.remove('hidden');
-    }
-
-    function closeProof() { 
-        const modal = document.getElementById('imageModal');
-        const img = document.getElementById('img-preview-full');
-        modal.classList.add('hidden');
-        setTimeout(() => { img.src = ''; }, 300); // Clear src setelah animasi tutup (jika ada)
-    }
-
-    // Klik di luar modal untuk tutup
-    document.getElementById('imageModal').addEventListener('click', function(e) {
-        if (e.target === this) {
-            closeProof();
-        }
+            async payWithMidtrans() {
+                this.isProcessing = true;
+                try {
+                    const response = await fetch("{{ route('admin.invoices.get-snap-token', $invoice->invoice_id) }}", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content') },
+                        body: JSON.stringify({ use_credit: this.useCredit })
+                    });
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        window.snap.pay(data.snap_token, {
+                            onSuccess: function(result) { window.location.reload(); },
+                            onPending: function(result) { window.location.reload(); },
+                            onError: function(result) { alert("Pembayaran gagal!"); },
+                            onClose: function() {}
+                        });
+                    } else if (data.status === 'full_credit') {
+                        alert("Saldo deposit mencukupi. Silakan gunakan tombol Simpan Manual di bawah.");
+                    } else {
+                        alert("Error: " + data.message);
+                    }
+                } catch (error) {
+                    console.error(error); alert("Gagal menghubungkan ke Payment Gateway.");
+                } finally { this.isProcessing = false; }
+            },
+            formatRupiah(num) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num); }
+        }));
     });
 </script>
 @endpush
+@endsection

@@ -22,6 +22,8 @@ class LoanPaymentController extends Controller
     public function __construct(AccountingService $accountingService)
     {
         $this->accountingService = $accountingService;
+        // Gunakan permission yang sama dengan manage-loans
+        $this->middleware('can:manage-loans'); 
     }
 
     public function create(Loan $loan): View

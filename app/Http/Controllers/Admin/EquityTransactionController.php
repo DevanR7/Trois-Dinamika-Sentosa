@@ -21,7 +21,8 @@ class EquityTransactionController extends Controller
     public function __construct(AccountingService $accountingService)
     {
         $this->accountingService = $accountingService;
-        $this->middleware('can:view-reports')->only(['index']);
+        // Karena modal sangat sensitif, kita gunakan manage-finance
+        $this->middleware('can:manage-finance'); 
     }
 
     public function index(Request $request): View

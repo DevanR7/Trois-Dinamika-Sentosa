@@ -10,6 +10,7 @@ use App\Models\PaymentMethod;
 use App\Models\CompanyBankAccount;
 use App\Models\SupplierLedger;
 use App\Models\GeneralLedger;
+use App\Models\PurchaseOrderPayment; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -19,9 +20,13 @@ use Illuminate\Http\JsonResponse;
 use App\Services\AccountingService;
 use App\Services\AccountingSettingService;
 use Illuminate\Support\Facades\Log;
+use App\Traits\ValidatesAccountingPeriod;
+use Illuminate\Validation\Rule;
 
 class BulkPurchasePaymentController extends Controller
 {
+    use ValidatesAccountingPeriod;
+
     protected $accountingService;
     protected $accountingSettings;
 
@@ -31,7 +36,8 @@ class BulkPurchasePaymentController extends Controller
     ) {
         $this->accountingService = $accountingService;
         $this->accountingSettings = $accountingSettingService;
-        // $this->middleware('permission:create-batch-purchase-payments'); 
+        
+        $this->middleware('can:pay-purchase-orders');
     }
 
     public function create(): View
@@ -41,11 +47,10 @@ class BulkPurchasePaymentController extends Controller
             ->whereIn('type', ['direct', 'pending'])
             ->orderBy('name')
             ->get();
-
         $companyBankAccounts = CompanyBankAccount::where('is_active', true)
             ->orderBy('bank_name')
             ->get();
-
+            
         return view('admin.bulk_purchase_payments.create', compact('suppliers', 'paymentMethods', 'companyBankAccounts'));
     }
 
@@ -53,17 +58,26 @@ class BulkPurchasePaymentController extends Controller
     {
         $purchaseOrders = $supplier->purchaseOrders()
             ->whereIn('payment_status', ['unpaid', 'partially_paid'])
+            ->where('status', '!=', 'cancelled') 
             ->with(['deductingReturns', 'adjustments'])
             ->orderBy('due_date', 'asc')
             ->get();
 
         $posWithBalance = $purchaseOrders->map(function ($po) {
-            $sisaTagihan = $po->remaining_balance;
+            $paid = $po->payments()->where('status', 'completed')->sum('amount');
+            
+            $po->load('adjustments');
+            $totalAdj = $po->adjustments->reduce(function ($carry, $adj) {
+                return $carry + ($adj->type === 'debit_note' ? $adj->amount : -$adj->amount);
+            }, 0);
+            
+            $sisaHutang = max(0, round($po->grand_total - $paid - $po->total_returned, 2));
+
             return [
                 'po_id' => $po->po_id,
                 'po_number' => $po->po_number,
                 'due_date_formatted' => optional($po->due_date)->format('d M Y') ?? 'N/A',
-                'sisa_tagihan' => $sisaTagihan,
+                'sisa_tagihan' => $sisaHutang,
             ];
         })->filter(fn($po) => $po['sisa_tagihan'] > 0.01);
 
@@ -72,17 +86,18 @@ class BulkPurchasePaymentController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        // 1. Validasi Input
         $rules = [
             'supplier_id' => 'required|exists:suppliers,supplier_id',
             'payment_date' => 'required|date',
-            'total_amount' => 'required|numeric|min:0',
+            'total_amount' => 'required|numeric|min:0', 
             'payment_method_id' => [
-                'required_unless:total_amount,0',
+                Rule::requiredIf(fn() => $request->input('total_amount', 0) > 0),
                 'nullable',
                 'exists:payment_methods,payment_method_id',
             ],
             'company_bank_account_id' => [
-                'required_unless:total_amount,0',
+                Rule::requiredIf(fn() => $request->input('total_amount', 0) > 0),
                 'nullable',
                 'exists:company_bank_accounts,company_bank_account_id',
             ],
@@ -92,87 +107,109 @@ class BulkPurchasePaymentController extends Controller
             'use_debit_balance' => 'nullable|boolean', 
         ];
 
-        $paymentMethod = $request->filled('payment_method_id')
-            ? PaymentMethod::find($request->payment_method_id)
-            : null;
-
-        if ($paymentMethod) {
-            $config = $paymentMethod->required_fields_config;
-            if (in_array($config, ['proof_only', 'proof_and_reference'])) {
-                $rules['proof_of_payment'] = 'required|image|mimes:jpeg,png,jpg|max:2048';
-            } else {
-                $rules['proof_of_payment'] = 'nullable|image|mimes:jpeg,png,jpg|max:2048';
-            }
-
-            if (in_array($config, ['reference_only', 'proof_and_reference'])) {
-                $rules['reference_number'] = 'required|string|max:255';
-            } else {
-                $rules['reference_number'] = 'nullable|string|max:255';
+        // Validasi Proof & Reference
+        $paymentMethod = null;
+        if ($request->input('total_amount', 0) > 0 && $request->filled('payment_method_id')) {
+            $paymentMethod = PaymentMethod::find($request->payment_method_id);
+            if ($paymentMethod) {
+                $config = $paymentMethod->internal_input_config;
+                $rules['proof_of_payment'] = in_array($config, ['proof_only', 'proof_and_reference']) 
+                    ? 'required|image|mimes:jpeg,png,jpg|max:2048' 
+                    : 'nullable|image|mimes:jpeg,png,jpg|max:2048';
+                $rules['reference_number'] = in_array($config, ['reference_only', 'proof_and_reference']) 
+                    ? 'required|string|max:255' 
+                    : 'nullable|string|max:255';
             }
         } else {
-            $rules['proof_of_payment'] = 'nullable|image|mimes:jpeg,png,jpg|max:2048';
-            $rules['reference_number'] = 'nullable|string|max:255';
+            $rules['proof_of_payment'] = 'nullable';
+            $rules['reference_number'] = 'nullable';
         }
 
         $validated = $request->validate($rules);
 
+        if ($this->isDateClosed($request->payment_date)) {
+            return back()->with('error', 'Gagal: Tanggal pembayaran masuk periode tutup buku.')->withInput();
+        }
+
         DB::beginTransaction();
         try {
-            $supplier = Supplier::findOrFail($validated['supplier_id']);
-            $danaInput = (float)($validated['total_amount'] ?? 0);
-            $pakaiDeposit = $validated['use_debit_balance'] ?? false;
-            $depositAwal = $supplier->balance;
+            $supplier = Supplier::lockForUpdate()->findOrFail($validated['supplier_id']);
+            
+            $danaCashInput = round((float)($validated['total_amount'] ?? 0), 2);
+            $pakaiDeposit = $request->boolean('use_debit_balance');
+            $saldoDepositTersedia = $supplier->balance; 
 
+            // 2. Ambil PO yang dipilih
             $posDipilih = PurchaseOrder::whereIn('po_id', $validated['po_ids'])
-                ->with(['deductingReturns', 'adjustments'])
+                ->lockForUpdate() 
                 ->orderBy('due_date', 'asc')
                 ->get();
 
-            $totalTagihan = $posDipilih->sum(fn($po) => $po->remaining_balance);
+            // 3. Hitung Sisa Hutang Real-time
+            $totalTagihanValid = 0;
+            $posValid = $posDipilih->filter(function($po) use (&$totalTagihanValid) {
+                $kewajiban = $po->grand_total - $po->total_returned;
+                $sudahBayar = $po->payments()->where('status', 'completed')->sum('amount');
+                
+                $sisa = max(0, round($kewajiban - $sudahBayar, 2));
+                
+                // Set property sementara untuk perhitungan
+                $po->temp_remaining = $sisa;
+                
+                if ($sisa > 0.01) {
+                    $totalTagihanValid += $sisa;
+                    return true;
+                }
+                return false;
+            });
 
-            if ($totalTagihan <= 0.01) {
+            if ($posValid->isEmpty()) {
                 throw new \Exception("Semua PO yang dipilih sudah lunas.");
             }
 
-            $pakaiDepositNominal = ($pakaiDeposit && $depositAwal > 0)
-                ? min($depositAwal, $totalTagihan)
-                : 0;
-
-            $sisaTagihan = max(0, $totalTagihan - $pakaiDepositNominal);
-            $pakaiInputNominal = min($danaInput, $sisaTagihan);
-            $totalAlokasi = $pakaiDepositNominal + $pakaiInputNominal;
-            $sisaDana = max(0, $danaInput - $pakaiInputNominal);
-
-            if ($totalAlokasi <= 0.01 && $sisaDana <= 0.01) {
-                throw new \Exception("Dana tidak cukup untuk dialokasikan.");
-            }
-
-            $apAccountId = $this->accountingSettings->getAccountsPayableId();
-            $supplierDepositAccountId = $this->accountingSettings->getSupplierDepositId();
-            if (!$apAccountId || !$supplierDepositAccountId) {
-                throw new \Exception("Akun AP atau Deposit Supplier belum diatur.");
+            // 4. Kalkulasi Alokasi
+            $nominalDepositDipakai = 0;
+            if ($pakaiDeposit && $saldoDepositTersedia > 0) {
+                $nominalDepositDipakai = min($saldoDepositTersedia, $totalTagihanValid);
             }
             
-            $cashBankAccount = null;
-            if ($danaInput > 0) {
-                $cashBankAccount = CompanyBankAccount::find($validated['company_bank_account_id']);
-                if (!$cashBankAccount || !$cashBankAccount->chart_of_account_id) {
-                    throw new \Exception("Akun Bank belum terhubung ke COA.");
-                }
+            $sisaTagihan = max(0, $totalTagihanValid - $nominalDepositDipakai);
+            $nominalCashTerpakai = min($danaCashInput, $sisaTagihan);
+            $sisaCashOverpayment = max(0, $danaCashInput - $nominalCashTerpakai);
+            $totalAlokasiKeHutang = $nominalDepositDipakai + $nominalCashTerpakai;
+
+            if ($totalAlokasiKeHutang <= 0.01 && $sisaCashOverpayment <= 0.01) {
+                throw new \Exception("Tidak ada dana yang diproses (Deposit 0 & Cash 0).");
             }
 
-            $paymentMethodType = $paymentMethod?->type ?? 'direct';
-            $newStatus = $paymentMethodType === 'pending' ? 'pending_clearance' : 'completed';
+            // 5. Validasi Akun
+            $apAccountId = $this->accountingSettings->getAccountsPayableId();
+            $supplierDepositAccountId = $this->accountingSettings->getSupplierDepositId();
+            
+            if (!$apAccountId || !$supplierDepositAccountId) throw new \Exception("Akun AP atau Deposit belum diatur.");
+            
+            $cashBankAccountId = null;
+            $cashBankAccount = null;
+            if ($danaCashInput > 0) {
+                $cashBankAccount = CompanyBankAccount::find($validated['company_bank_account_id']);
+                if (!$cashBankAccount || !$cashBankAccount->chart_of_account_id) throw new \Exception("Akun Bank tidak valid.");
+                $cashBankAccountId = $cashBankAccount->chart_of_account_id;
+            }
 
+            // 6. Simpan File Proof
             $proofPath = $request->hasFile('proof_of_payment')
                 ? $request->file('proof_of_payment')->store('payment_proofs', 'public')
                 : null;
 
+            // 7. Buat Header Bulk Payment
+            $newStatus = ($paymentMethod && $paymentMethod->type === 'pending') ? 'pending_clearance' : 'completed';
+
             $bulkPayment = BulkPurchasePayment::create([
+                'payment_number' => BulkPurchasePayment::generateNumber(),
                 'supplier_id' => $supplier->supplier_id,
                 'processed_by_user_id' => Auth::id(),
                 'payment_date' => $validated['payment_date'],
-                'total_amount' => $totalAlokasi, 
+                'total_amount' => $danaCashInput,
                 'payment_method_id' => $validated['payment_method_id'] ?? null,
                 'company_bank_account_id' => $validated['company_bank_account_id'] ?? null,
                 'status' => $newStatus,
@@ -181,95 +218,102 @@ class BulkPurchasePaymentController extends Controller
                 'proof_of_payment_path' => $proofPath,
             ]);
 
-            $alokasiLog = [];
+            // JIKA COMPLETED, JALANKAN LOGIC
+            if ($newStatus == 'completed') {
 
-            if ($pakaiDepositNominal > 0) {
-                SupplierLedger::create([
-                    'supplier_id' => $supplier->supplier_id,
-                    'reference_type' => BulkPurchasePayment::class,
-                    'reference_id' => $bulkPayment->bulk_purchase_payment_id, 
-                    'transaction_date' => $validated['payment_date'],
-                    'type' => 'debit',
-                    'amount' => -$pakaiDepositNominal,
-                    'status' => 'available',
-                    'description' => 'Digunakan untuk Bulk PO #' . $bulkPayment->bulk_purchase_payment_id,
-                    'user_id' => Auth::id(),
-                ]);
-                $alokasiLog[] = "Deposit digunakan Rp " . number_format($pakaiDepositNominal);
-            }
-
-            $sisaDeposit = $pakaiDepositNominal;
-            $sisaInput = $pakaiInputNominal;
-
-            foreach ($posDipilih as $po) {
-                if ($sisaDeposit <= 0.01 && $sisaInput <= 0.01) break;
-
-                $sisaTagihanPO = $po->remaining_balance;
-                if ($sisaTagihanPO <= 0.01) continue;
-
-                $dariDeposit = min($sisaTagihanPO, $sisaDeposit);
-                $sisaTagihanPO -= $dariDeposit;
-                $dariInput = min($sisaTagihanPO, $sisaInput);
-                $dibayar = $dariDeposit + $dariInput;
-
-                if ($dibayar <= 0.01) continue;
-
-                $po->payments()->create([
-                    'bulk_purchase_payment_id' => $bulkPayment->bulk_purchase_payment_id, 
-                    'payment_date' => $validated['payment_date'],
-                    'amount' => $dibayar,
-                    'payment_method_id' => $validated['payment_method_id'] ?? null,
-                    'company_bank_account_id' => $validated['company_bank_account_id'] ?? null,
-                    'status' => $newStatus,
-                    'received_by_user_id' => Auth::id(),
-                    'reference_number' => $validated['reference_number'] ?? null,
-                    'proof_of_payment_path' => $proofPath,
-                    'notes' => 'Auto-allocated Bulk #' . $bulkPayment->bulk_purchase_payment_id,
-                ]);
-
-                if ($newStatus == 'completed') {
-                    $po->updatePaymentStatus();
+                // A. Debit Ledger Supplier (Pakai Deposit)
+                if ($nominalDepositDipakai > 0) {
+                    SupplierLedger::create([
+                        'supplier_id' => $supplier->supplier_id,
+                        'reference_type' => BulkPurchasePayment::class,
+                        'reference_id' => $bulkPayment->bulk_purchase_payment_id,
+                        'transaction_date' => $validated['payment_date'],
+                        'type' => 'debit', 
+                        'amount' => -$nominalDepositDipakai,
+                        'status' => 'available',
+                        'description' => 'Digunakan untuk Bulk Payment #' . $bulkPayment->payment_number,
+                        'user_id' => Auth::id(),
+                    ]);
                 }
 
-                $alokasiLog[] = "Rp " . number_format($dibayar) . " -> " . $po->po_number;
+                // B. Kredit Ledger Supplier (Overpayment)
+                if ($sisaCashOverpayment > 0) {
+                    SupplierLedger::create([
+                        'supplier_id' => $supplier->supplier_id,
+                        'reference_type' => BulkPurchasePayment::class,
+                        'reference_id' => $bulkPayment->bulk_purchase_payment_id,
+                        'transaction_date' => $validated['payment_date'],
+                        'type' => 'credit',
+                        'amount' => $sisaCashOverpayment,
+                        'status' => 'available',
+                        'description' => 'Kelebihan bayar Bulk Payment #' . $bulkPayment->payment_number,
+                        'user_id' => Auth::id(),
+                    ]);
+                }
 
-                $sisaDeposit -= $dariDeposit;
-                $sisaInput -= $dariInput;
-            }
+                // C. Loop Alokasi ke PO
+                $poolDeposit = $nominalDepositDipakai;
+                $poolCash = $nominalCashTerpakai;
+                $alokasiLog = [];
 
-            if ($sisaDana > 0.01) {
-                SupplierLedger::create([
-                    'supplier_id' => $supplier->supplier_id,
-                    'reference_type' => BulkPurchasePayment::class,
-                    'reference_id' => $bulkPayment->bulk_purchase_payment_id,
-                    'transaction_date' => $validated['payment_date'],
-                    'type' => 'credit',
-                    'amount' => $sisaDana,
-                    'status' => 'available',
-                    'description' => 'Kelebihan dana Bulk PO #' . $bulkPayment->bulk_purchase_payment_id,
-                    'user_id' => Auth::id(),
-                ]);
-                $alokasiLog[] = "Sisa Rp " . number_format($sisaDana) . " jadi deposit.";
-            }
+                foreach ($posValid as $po) {
+                    if (($poolDeposit + $poolCash) <= 0.01) break;
 
-            if ($newStatus == 'completed') {
+                    // Ambil nilai sisa tagihan dari property sementara
+                    $tagihanPO = $po->temp_remaining;
+
+                    // --- [BUG FIX: HAPUS ATTRIBUTE TEMPORARY] ---
+                    // Sangat Penting! Hapus 'temp_remaining' dari model agar Eloquent tidak mencoba menyimpannya ke DB
+                    unset($po['temp_remaining']); 
+                    // --------------------------------------------
+                    
+                    // Ambil dari Deposit dulu
+                    $bayarDariDeposit = min($tagihanPO, $poolDeposit);
+                    $poolDeposit -= $bayarDariDeposit;
+                    $tagihanPO -= $bayarDariDeposit;
+
+                    // Ambil dari Cash
+                    $bayarDariCash = min($tagihanPO, $poolCash);
+                    $poolCash -= $bayarDariCash;
+
+                    $totalBayarPO = round($bayarDariDeposit + $bayarDariCash, 2);
+
+                    if ($totalBayarPO > 0) {
+                        $po->payments()->create([
+                            'bulk_purchase_payment_id' => $bulkPayment->bulk_purchase_payment_id,
+                            'payment_date' => $validated['payment_date'],
+                            'amount' => $totalBayarPO,
+                            'payment_method_id' => $validated['payment_method_id'] ?? null,
+                            'company_bank_account_id' => $validated['company_bank_account_id'] ?? null,
+                            'status' => 'completed',
+                            'received_by_user_id' => Auth::id(),
+                            'reference_number' => $validated['reference_number'] ?? null,
+                            'notes' => 'Bulk #' . $bulkPayment->payment_number . " (Dep: " . number_format($bayarDariDeposit) . ", Cash: " . number_format($bayarDariCash) . ")",
+                        ]);
+
+                        $po->updatePaymentStatus();
+                        $alokasiLog[] = $po->po_number;
+                    }
+                }
+
+                // D. JURNAL AKUNTANSI
                 $journalGroupId = "BLK-PO-" . $bulkPayment->bulk_purchase_payment_id;
-                $description = "Pembayaran Bulk PO #" . $bulkPayment->bulk_purchase_payment_id . " ke " . $supplier->supplier_name;
-
+                $description = "Pembayaran Massal ke " . $supplier->supplier_name;
+                
                 $debitEntries = [];
                 $creditEntries = [];
 
-                if ($totalAlokasi > 0) {
-                    $debitEntries[] = [$apAccountId, $totalAlokasi, "Pelunasan Hutang Bulk"];
+                if ($totalAlokasiKeHutang > 0) {
+                    $debitEntries[] = [$apAccountId, $totalAlokasiKeHutang, "Pelunasan Hutang Bulk"];
                 }
-                if ($sisaDana > 0) {
-                    $debitEntries[] = [$supplierDepositAccountId, $sisaDana, "Kelebihan Bayar Bulk"];
+                if ($sisaCashOverpayment > 0) {
+                    $debitEntries[] = [$supplierDepositAccountId, $sisaCashOverpayment, "Kelebihan Bayar (Masuk Deposit)"];
                 }
-                if ($danaInput > 0 && $cashBankAccount) {
-                    $creditEntries[] = [$cashBankAccount->chart_of_account_id, $danaInput, "Keluar dari " . $cashBankAccount->account_name];
+                if ($danaCashInput > 0 && $cashBankAccountId) {
+                    $creditEntries[] = [$cashBankAccountId, $danaCashInput, "Keluar dari " . $cashBankAccount->account_name];
                 }
-                if ($pakaiDepositNominal > 0) {
-                    $creditEntries[] = [$supplierDepositAccountId, $pakaiDepositNominal, "Potong Deposit Lama"];
+                if ($nominalDepositDipakai > 0) {
+                    $creditEntries[] = [$supplierDepositAccountId, $nominalDepositDipakai, "Potong Deposit Lama"];
                 }
 
                 $this->accountingService->postJournal(
@@ -284,13 +328,16 @@ class BulkPurchasePaymentController extends Controller
             }
 
             DB::commit();
+            
+            $msg = ($newStatus == 'completed') 
+                ? 'Pembayaran Bulk Berhasil! ' . count($alokasiLog) . ' PO terbayar.' 
+                : 'Pembayaran Bulk disimpan (Menunggu Verifikasi).';
 
-            return redirect()->route('admin.purchase-orders.index')
-                ->with('success', 'Pembayaran Bulk Berhasil! ' . implode(', ', $alokasiLog));
+            return redirect()->route('admin.purchase-orders.index')->with('success', $msg);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Gagal Bulk Purchase: ' . $e->getMessage() . " on line " . $e->getLine());
+            Log::error('Gagal Bulk Purchase: ' . $e->getMessage());
             return back()->with('error', 'Gagal: ' . $e->getMessage())->withInput();
         }
     }
@@ -298,6 +345,7 @@ class BulkPurchasePaymentController extends Controller
     public function destroy(BulkPurchasePayment $bulkPayment): RedirectResponse
     {
         $journalGroupId = "BLK-PO-" . $bulkPayment->bulk_purchase_payment_id;
+        
         if ($error = $this->checkTransactionLock($bulkPayment->payment_date, $journalGroupId)) {
             return back()->with('error', "Gagal Hapus: " . $error);
         }
@@ -311,9 +359,7 @@ class BulkPurchasePaymentController extends Controller
             foreach ($bulkPayment->payments as $payment) {
                 $po = $payment->purchaseOrder;
                 $payment->delete();
-                if ($po) {
-                    $po->updatePaymentStatus();
-                }
+                if ($po) $po->updatePaymentStatus();
             }
 
             GeneralLedger::where('journal_group_id', $journalGroupId)->delete();

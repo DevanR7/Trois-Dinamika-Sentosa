@@ -13,50 +13,93 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // 1. Matikan Foreign Key Check secara Global
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         Schema::disableForeignKeyConstraints();
 
-        // Urutkan truncate dari tabel anak ke tabel induk
-        DB::table('purchase_order_item_discounts')->truncate();
-        DB::table('purchase_order_items')->truncate();
-        DB::table('invoice_items')->truncate();
-        DB::table('payments')->truncate();
-        DB::table('purchase_order_payments')->truncate();
-        DB::table('invoice_tax')->truncate();
+        try {
+            // 2. Kosongkan Tabel (Urutan: Anak -> Induk)
+            $this->truncateTables();
 
-        // Kosongkan tabel baru dari Spatie
-        DB::table('model_has_roles')->truncate();
-        DB::table('model_has_permissions')->truncate();
-        DB::table('role_has_permissions')->truncate();
+            // 3. Panggil Seeder (Data Baru)
+            $this->call([
+                // A. System & Auth (Pondasi)
+                RoleAndPermissionSeeder::class, 
+                UserSeeder::class,              
+                
+                // B. Master Data Akuntansi & Keuangan
+                ChartOfAccountsSeeder::class,   
+                SettingSeeder::class, // Setting butuh COA
+                CompanyBankAccountSeeder::class, // Bank butuh COA
+                PaymentMethodSeeder::class,
+                TaxSeeder::class,
+                UnitSeeder::class,
+                
+                // C. Master Data Bisnis
+                SupplierSeeder::class,
+                ClientSeeder::class,
+                ProductSeeder::class,           
+                
+                // D. Data Transaksi Awal (Opsional - untuk demo)
+                PurchaseOrderSeeder::class,      
+                SalesInvoiceSeeder::class, // Ini sekaligus buat item dan payment dummy
+            ]);
 
-        DB::table('purchase_orders')->truncate();
-        DB::table('sales_invoices')->truncate();
-        DB::table('products')->truncate();
-        DB::table('clients')->truncate();
-        DB::table('suppliers')->truncate();
-        DB::table('users')->truncate();
-        DB::table('roles')->truncate();
-        DB::table('permissions')->truncate();
-        DB::table('units')->truncate(); 
+        } finally {
+            // 4. Hidupkan kembali Foreign Key Check (Wajib)
+            Schema::enableForeignKeyConstraints();
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        }
+    }
 
-        $this->call([
-            // Panggil seeder sesuai urutan dependensi
-            RoleAndPermissionSeeder::class,
-            UserSeeder::class,
-            SupplierSeeder::class,
-            ClientSeeder::class,
-            UnitSeeder::class,
-            ProductSeeder::class,
-            TaxSeeder::class,
-            PaymentMethodSeeder::class,
-            ChartOfAccountsSeeder::class,
-            SettingSeeder::class,
-            CompanyBankAccountSeeder::class,
-            //PurchaseOrderSeeder::class,
-            //SalesInvoiceSeeder::class,
-            // Opsional: aktifkan jika ingin generate data invoice juga
-            // InvoiceItemSeeder::class,
-        ]);
+    private function truncateTables()
+    {
+        // List semua tabel yang perlu dikosongkan
+        // Urutan: Tabel Anak (yang punya foreign key) -> Tabel Induk
+        $tables = [
+            // Level 4 (Paling Bawah - Detail Transaksi)
+            'general_ledgers', 'manual_journal_entries', 
+            'purchase_order_item_discounts', 'purchase_order_items', 'purchase_order_payments',
+            'purchase_returns', 'purchase_return_items', 
+            'stock_opname_items', 
+            'invoice_items', 'invoice_tax', 'invoice_additional_costs', 'invoice_adjustments',
+            'sales_return_items', 
+            'client_ledgers', 'supplier_ledgers', 
+            'loan_payments', 'depreciations', 
+            'order_items', 'order_change_request_items',
+            'payment_gateway_callbacks', 'announcement_client',
 
-        Schema::enableForeignKeyConstraints();
+            // Level 3 (Header Transaksi)
+            'manual_journals', 'audit_logs',
+            'stock_opnames', 
+            'purchase_order_adjustments', 
+            'payments', 'sales_returns', 
+            'expenses', 'loans', 
+            'fixed_assets', 'equity_transactions', 'bank_reconciliations',
+            'bulk_sales_payments', 'bulk_purchase_payments', 
+            'order_change_requests', 
+            
+            // Level 2 (Transaksi Utama)
+            'orders', 'purchase_orders', 'sales_invoices', 
+
+            // Level 1 (Master Data)
+            'products', 
+            'categories', 'clients', 'suppliers', 'company_bank_accounts', 'payment_methods',
+            'taxes', 'units', 'announcements',
+
+            // Level 0 (System Core)
+            'model_has_roles', 'model_has_permissions', 'role_has_permissions',
+            'users', 'roles', 'permissions', 'settings', 'chart_of_accounts',
+            
+            // Counters
+            'po_counters', 'invoice_counters', 'sales_order_counters', 
+            'sales_return_counters', 'purchase_return_counters', 'bulk_payment_counters'
+        ];
+
+        foreach ($tables as $table) {
+            if (Schema::hasTable($table)) {
+                DB::table($table)->truncate();
+            }
+        }
     }
 }

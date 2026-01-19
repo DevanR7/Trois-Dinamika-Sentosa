@@ -7,10 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\ChartOfAccount;
+use App\Traits\LogsActivity;
 
 class Loan extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
     protected $primaryKey = 'loan_id';
 
     protected $fillable = [

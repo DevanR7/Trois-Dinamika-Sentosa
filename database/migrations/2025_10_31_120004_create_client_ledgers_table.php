@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id('ledger_id');
             $table->foreignId('client_id')
                 ->constrained('clients', 'client_id')
-                ->onDelete('cascade');
+                ->onDelete('restrict');
             $table->foreignId('sales_invoice_id')
                 ->nullable()
                 ->constrained('sales_invoices', 'invoice_id')

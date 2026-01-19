@@ -22,9 +22,11 @@ class PurchaseOrderCalculator
      *
      * returns array with keys: subtotal, disc_fee_amount, rounding_discount_amount, taxable_base, dpp, ppn, grand_total, tax_rate_percent, dpp_factor, shipping_amount
      */
-    public static function calculate(array $options): array
+public static function calculate(array $options): array
     {
-        $subtotal = floatval($options['subtotal'] ?? 0);
+        // 1. Subtotal (Bulatkan ke Integer)
+        $subtotal = round(floatval($options['subtotal'] ?? 0));
+
         $applyDiscFee = !empty($options['apply_disc_fee']);
         $discFeePercent = isset($options['disc_fee_percent']) ? floatval($options['disc_fee_percent']) : null;
         $discFeeAmountOverride = isset($options['disc_fee_amount']) ? floatval($options['disc_fee_amount']) : null;
@@ -37,7 +39,7 @@ class PurchaseOrderCalculator
 
         $shipping = floatval($options['shipping_amount'] ?? 0);
 
-        // determine tax rate
+        // Determine tax rate
         $taxRatePercent = floatval($options['default_tax_rate_percent'] ?? 0);
         if (!empty($options['tax_id'])) {
             $tax = Tax::find($options['tax_id']);
@@ -46,7 +48,7 @@ class PurchaseOrderCalculator
             }
         }
 
-        // compute disc fee amount
+        // 2. Compute Disc Fee Amount (Bulatkan ke Integer)
         $discFeeAmount = 0.0;
         if ($applyDiscFee) {
             if (!is_null($discFeePercent) && $discFeePercent > 0) {
@@ -54,24 +56,40 @@ class PurchaseOrderCalculator
             } elseif (!is_null($discFeeAmountOverride)) {
                 $discFeeAmount = $discFeeAmountOverride;
             }
+            $discFeeAmount = round($discFeeAmount); // FIX: Integer Rounding
         }
 
-        // rounding discount
+        // Rounding discount (Inputan user biasanya sudah bulat)
         $roundDiscount = ($applyRounding ? floatval($roundingAmount) : 0.0);
 
-        // taxable base (harga jual setelah diskon/pembulatan)
+        // 3. Taxable Base (Harga Setelah Diskon)
         $taxableBase = $subtotal - $discFeeAmount - $roundDiscount;
+        // Pastikan Taxable Base bulat (seharusnya sudah bulat karena komponennya bulat)
+        $taxableBase = round($taxableBase);
+        
         if ($taxableBase < 0) $taxableBase = 0;
 
-        // dpp factor default 11/12 (≈ 0.9166666667)
+        // 4. DPP Calculation (Bulatkan ke Integer)
+        // Faktor DPP default 11/12 (approx 0.916666...)
         $dppFactor = $useCustomDpp && $customDppFactor ? $customDppFactor : (11/12);
+        
+        if ($useCustomDpp) {
+            $dpp = $taxableBase * $dppFactor;
+        } else {
+            // Logic default: DPP = TaxableBase
+            // (Kecuali Anda ingin menerapkan logic PPN Include secara default, 
+            // tapi berdasarkan script JS sebelumnya, default DPP = Amount After Disc)
+            $dpp = $taxableBase; 
+        }
+        
+        $dpp = round($dpp); // FIX: Integer Rounding
 
-        // compute DPP & PPN (pembulatan ke rupiah paling dekat)
-        $dpp = (float) round($taxableBase * $dppFactor);
-        $ppn = (float) round($dpp * ($taxRatePercent / 100.0));
+        // 5. PPN Calculation (Bulatkan ke Integer)
+        $ppn = round($dpp * ($taxRatePercent / 100.0)); // FIX: Integer Rounding
 
-        // grand total: taxable base + ppn + shipping
-        $grandTotal = (float) ($taxableBase + $ppn + $shipping);
+        // 6. Grand Total
+        // Rumus: Base + PPN + Shipping
+        $grandTotal = $taxableBase + $ppn + $shipping;
 
         return [
             'subtotal' => $subtotal,

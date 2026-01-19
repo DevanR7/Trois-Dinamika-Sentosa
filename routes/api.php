@@ -15,6 +15,8 @@ use App\Http\Controllers\Admin\MidtransController;
 |
 */
 
+// Public Midtrans Callback (Webhook)
+// Pastikan route ini dikecualikan di App\Http\Middleware\VerifyCsrfToken
 Route::post('/midtrans/callback', [MidtransController::class, 'callback'])->name('midtrans.callback');
 
 Route::middleware('auth:sanctum')->group(function () {

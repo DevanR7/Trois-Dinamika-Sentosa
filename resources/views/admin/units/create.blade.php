@@ -3,50 +3,57 @@
 @section('title', 'Tambah Satuan')
 
 @section('content')
-
-    <div class="max-w-xl mx-auto">
-        
-        {{-- Navigation --}}
-        <div class="flex items-center justify-between mb-6">
-            <div>
-                <h1 class="page-title">Tambah Satuan</h1>
-                <p class="page-subtitle">Buat satuan baru untuk produk.</p>
-            </div>
+    {{-- Header --}}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Tambah Satuan Baru</h1>
+            <p class="page-subtitle">Buat satuan baru untuk produk (Misal: Pcs, Box, Kg)</p>
+        </div>
+        <div>
             <a href="{{ route('admin.units.index') }}" class="btn btn-secondary">
-                <i class="material-icons text-sm mr-1">arrow_back</i> Kembali
+                <i class="material-icons text-[18px]">arrow_back</i>
+                Kembali
             </a>
         </div>
-
-        <form action="{{ route('admin.units.store') }}" method="POST">
-            @csrf
-
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-header-title">Formulir Satuan</h3>
-                </div>
-                <div class="card-body space-y-6">
-
-                    {{-- Nama Satuan --}}
-                    <div>
-                        <label class="form-label label-required">Nama Satuan</label>
-                        <input type="text" name="name" 
-                               class="form-input @error('name') is-invalid @enderror" 
-                               placeholder="Contoh: Pcs, Kg, Box, Lusin" 
-                               value="{{ old('name') }}" required>
-                        @error('name') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-
-                </div>
-            </div>
-
-            {{-- Submit --}}
-            <div class="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700 flex justify-end">
-                <button type="submit" class="btn btn-primary btn-lg">
-                    <i class="material-icons text-sm mr-2">save</i> Simpan Satuan
-                </button>
-            </div>
-
-        </form>
     </div>
 
+    <div class="max-w-xl">
+        <div class="card">
+            <div class="card-body">
+                <form action="{{ route('admin.units.store') }}" method="POST">
+                    @csrf
+
+                    {{-- Nama Satuan --}}
+                    <div class="form-group mb-6">
+                        <label for="name" class="form-label label-required">Nama Satuan</label>
+                        <input type="text" id="name" name="name" 
+                               class="form-input @error('name') is-invalid @enderror" 
+                               value="{{ old('name') }}" 
+                               placeholder="Contoh: Pcs, Box, Kg, Liter">
+                        @error('name')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    {{-- Status Aktif --}}
+                    <div class="form-group mb-6">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="is_active" value="1" class="form-check-input" checked>
+                            <span class="form-check-label">Aktifkan Satuan Ini</span>
+                        </label>
+                        <p class="text-xs text-slate-400 mt-1 ml-6">Jika tidak dicentang, satuan tidak akan muncul saat menambah/edit produk.</p>
+                    </div>
+
+                    {{-- Actions --}}
+                    <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
+                        <a href="{{ route('admin.units.index') }}" class="btn btn-secondary">Batal</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="material-icons text-[18px]">save</i>
+                            Simpan Satuan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 @endsection

@@ -33,7 +33,11 @@ class PurchaseOrderPolicy
 
     public function delete(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        return false; 
+        // Hanya izinkan jika status draft DAN user punya permission
+        if ($purchaseOrder->status === 'draft') {
+            return $user->can('delete-purchase-orders');
+        }
+        return false;
     }
 
     public function cancel(User $user, PurchaseOrder $purchaseOrder): bool

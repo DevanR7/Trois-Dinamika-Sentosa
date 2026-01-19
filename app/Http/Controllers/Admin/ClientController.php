@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\SalesInvoice;
+use App\Models\SalesReturn;
+use App\Models\InvoiceAdjustment;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -67,13 +70,50 @@ class ClientController extends Controller
 
     public function show(Client $client): View
     {
-        $ledgers = $client->ledgers()
-            ->latest('transaction_date')
-            ->latest('ledger_id')
-            ->paginate(10, ['*'], 'ledger_page');
-
-        return view('admin.clients.show', compact('client', 'ledgers'));
+        return view('admin.clients.show', compact('client'));
     }
+
+    public function getTabContent(Request $request, Client $client)
+{
+    $tab = $request->get('tab');
+
+    switch ($tab) {
+        case 'ledger':
+            $data = $client->ledgers()
+                ->latest('transaction_date')
+                ->latest('ledger_id')
+                ->paginate(10);
+            return view('admin.clients.tabs.ledger', ['ledgers' => $data])->render();
+
+        case 'invoices':
+            $data = $client->salesInvoices()
+                ->latest('order_date')
+                ->paginate(10);
+            return view('admin.clients.tabs.invoices', ['invoices' => $data])->render();
+
+        case 'returns':
+            // Ambil retur melalui relasi invoice atau langsung jika ada relation direct
+            // Di model Client sudah saya buatkan relasi through invoices sebelumnya? 
+            // Jika belum, kita query manual agar efisien:
+            $data = SalesReturn::where('client_id', $client->client_id)
+                ->with('salesInvoice')
+                ->latest('return_date')
+                ->paginate(10);
+            return view('admin.clients.tabs.returns', ['returns' => $data])->render();
+
+        case 'adjustments':
+            // Adjustment biasanya nempel ke Invoice. Kita cari via Invoice ID milik klien
+            $invoiceIds = $client->salesInvoices()->pluck('invoice_id');
+            $data = InvoiceAdjustment::whereIn('sales_invoice_id', $invoiceIds)
+                ->with('salesInvoice')
+                ->latest('adjustment_date')
+                ->paginate(10);
+            return view('admin.clients.tabs.adjustments', ['adjustments' => $data])->render();
+
+        default:
+            return '<div class="p-4 text-center text-red-500">Tab tidak ditemukan</div>';
+    }
+}
 
     public function edit(Client $client): View
     {

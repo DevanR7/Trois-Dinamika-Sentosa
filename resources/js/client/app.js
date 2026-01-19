@@ -1,6 +1,6 @@
 // resources/js/client/app.js
 
-import '../bootstrap'; // Path relative ke folder bootstrap default laravel
+import '../bootstrap'; 
 import 'flowbite';
 import Alpine from 'alpinejs';
 import collapse from '@alpinejs/collapse';
@@ -10,7 +10,7 @@ import TomSelect from 'tom-select';
 import AutoNumeric from 'autonumeric';
 
 // [REUSE]: Import Logic Alert & Sidebar dari komponen Admin yang sudah ada
-// Pastikan path relative-nya benar mengarah ke folder js components
+// Pastikan path relative-nya benar mengarah ke folder js/components
 import { showToast, showConfirmDialog } from '../../js/components/alerts'; 
 import { initSidebarLogic } from '../../js/components/sidebar';
 
@@ -21,8 +21,6 @@ window.Alpine = Alpine;
 // Setup Library Global
 window.TomSelect = TomSelect;
 window.AutoNumeric = AutoNumeric;
-
-// Expose Fungsi Alert ke Global Window (agar bisa dipanggil di Blade Client)
 window.showToast = showToast; 
 window.confirmDialog = showConfirmDialog; 
 
@@ -32,7 +30,7 @@ window.confirmDialog = showConfirmDialog;
 window.defaultTomSelectConfig = {
     sortField: { field: "text", direction: "asc" },
     plugins: ['clear_button'],
-    dropdownParent: 'body', // WAJIB: Agar tidak terpotong di tabel/modal
+    dropdownParent: 'body', 
     render: {
         no_results: function(data, escape) {
             return '<div class="no-results p-3 text-sm text-slate-500 text-center italic">Data tidak ditemukan</div>';
@@ -40,11 +38,14 @@ window.defaultTomSelectConfig = {
     },
     onInitialize: function() {
         if(this.wrapper) this.wrapper.classList.add('ts-wrapper-custom');
+        this.on('change', () => {
+            this.input.dispatchEvent(new Event('change', { bubbles: true }));
+        });
     }
 };
 
 // =============================================================================
-// CONFIG DEFAULT AUTONUMERIC (SAMA DENGAN ADMIN)
+// CONFIG DEFAULT AUTONUMERIC
 // =============================================================================
 window.defaultAutoNumericOptions = {
     digitGroupSeparator: '.',
@@ -56,6 +57,34 @@ window.defaultAutoNumericOptions = {
     minimumValue: '0',
     unformatOnSubmit: true 
 };
+
+// =============================================================================
+// FITUR: UNSAVED CHANGES WARNING (CLIENT PORTAL)
+// =============================================================================
+function initUnsavedChangesWarning() {
+    let isDirty = false;
+    // Kecualikan search form (method GET)
+    const forms = document.querySelectorAll('form:not([method="GET"])');
+
+    forms.forEach(form => {
+        if (form.classList.contains('ignore-unsaved')) return;
+
+        form.addEventListener('change', () => { isDirty = true; });
+        form.addEventListener('input', () => { isDirty = true; });
+
+        form.addEventListener('submit', () => {
+            isDirty = false;
+        });
+    });
+
+    window.addEventListener('beforeunload', (e) => {
+        if (isDirty) {
+            e.preventDefault();
+            e.returnValue = 'Perubahan belum disimpan.';
+            return 'Perubahan belum disimpan.';
+        }
+    });
+}
 
 // =============================================================================
 // MAIN INITIALIZATION CLIENT
@@ -81,8 +110,11 @@ document.addEventListener('alpine:init', () => {
 Alpine.start();
 
 document.addEventListener('DOMContentLoaded', function () {
-    // Init Sidebar Logic (Toggle Mobile, Collapse, dll)
+    // Init Sidebar Logic
     initSidebarLogic();
+
+    // Init Unsaved Changes Warning
+    initUnsavedChangesWarning();
 
     // 1. Handle Flash Messages
     if (window.laravelFlash && window.laravelFlash.length > 0) {
@@ -100,7 +132,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const anInstance = new AutoNumeric(el, window.defaultAutoNumericOptions);
         const originalName = el.getAttribute('name');
         
-        // Logic input hidden agar data terkirim clean (integer)
         if(originalName && !el.hasAttribute('data-an-synced')) {
             el.setAttribute('data-an-synced', 'true');
             el.setAttribute('name', originalName + '_visual');
@@ -114,6 +145,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             el.addEventListener('autoNumeric:rawValueModified', e => {
                 hiddenInput.value = e.detail.newRawValue;
+                hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
             });
         }
     });
@@ -132,6 +164,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const btn = form.querySelector('button[type="submit"]');
             if(btn && !btn.classList.contains('no-loading') && !btn.classList.contains('btn-danger')) {
                 btn.classList.add('is-loading');
+                setTimeout(() => {
+                    btn.classList.remove('is-loading');
+                }, 10000);
             }
         });
     });

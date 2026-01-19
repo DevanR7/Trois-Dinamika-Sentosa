@@ -32,7 +32,7 @@ class ClientLedger extends Model
 
     public function reference(): MorphTo
     {
-        return $this->morphTo();
+        return $this->morphTo()->withTrashed();
     }
 
     public function client(): BelongsTo
@@ -47,6 +47,6 @@ class ClientLedger extends Model
 
     public function salesInvoice(): BelongsTo
     {
-        return $this->belongsTo(SalesInvoice::class, 'sales_invoice_id', 'invoice_id');
+        return $this->belongsTo(SalesInvoice::class, 'sales_invoice_id', 'invoice_id')->withTrashed(); // Tambahkan di sini juga
     }
 }

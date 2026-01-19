@@ -32,19 +32,24 @@ class AccountingService
     ) {
         DB::transaction(function () use ($journalGroupId, $entryDate, $description, $debitEntries, $creditEntries, $referenceModel, $userId) {
 
+            // 1. Simpan status rekonsiliasi lama (jika ini update transaksi)
+            // Agar jika transaksi diedit, status 'reconciled' pada baris jurnal yang akunnya sama tidak hilang (opsional, best effort)
             $oldReconMap = GeneralLedger::where('journal_group_id', $journalGroupId)
                 ->whereNotNull('bank_reconciliation_id')
                 ->pluck('bank_reconciliation_id', 'chart_of_account_id')
                 ->toArray();
 
+            // 2. Hapus jurnal lama dengan Group ID yang sama (Clean slate)
             GeneralLedger::where('journal_group_id', $journalGroupId)->delete();
 
             $totalDebit = 0;
             $totalCredit = 0;
             $journalsToCreate = [];
 
+            // 3. Proses Debit Entries
             foreach ($debitEntries as $entry) {
-                $amount = (float) $entry[1];
+                $amount = round((float) $entry[1], 2); // Pastikan 2 desimal
+                
                 if ($amount > 0) {
                     $totalDebit += $amount;
                     $journalsToCreate[] = [
@@ -63,8 +68,10 @@ class AccountingService
                 }
             }
 
+            // 4. Proses Credit Entries
             foreach ($creditEntries as $entry) {
-                $amount = (float) $entry[1];
+                $amount = round((float) $entry[1], 2); // Pastikan 2 desimal
+
                 if ($amount > 0) {
                     $totalCredit += $amount;
                     $journalsToCreate[] = [
@@ -83,6 +90,7 @@ class AccountingService
                 }
             }
 
+            // 5. Restore Bank Reconciliation ID jika ada
             foreach ($journalsToCreate as &$journal) {
                 $accId = $journal['chart_of_account_id'];
                 if (isset($oldReconMap[$accId])) {
@@ -91,9 +99,13 @@ class AccountingService
             }
             unset($journal); 
 
-            if (abs(round($totalDebit, 2) - round($totalCredit, 2)) > 0.01) {
-                throw new Exception("Jurnal tidak seimbang (Unbalanced Journal) untuk $journalGroupId. Debit: $totalDebit, Kredit: $totalCredit");
+            // 6. Validasi Balance dengan Toleransi Floating Point
+            // Menggunakan abs() > 0.05 untuk mentolerir selisih pembulatan mikro
+            if (abs($totalDebit - $totalCredit) > 0.05) {
+                throw new Exception("Jurnal tidak seimbang (Unbalanced) untuk $journalGroupId. Debit: $totalDebit, Kredit: $totalCredit. Selisih: " . ($totalDebit - $totalCredit));
             }
+
+            // 7. Bulk Insert untuk performa
             if (!empty($journalsToCreate)) {
                 GeneralLedger::insert($journalsToCreate);
             }

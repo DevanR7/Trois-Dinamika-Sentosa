@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\ChartOfAccount;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\Depreciation;
+use App\Traits\LogsActivity;
 
 class FixedAsset extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
     protected $primaryKey = 'asset_id';
 
     protected $fillable = [

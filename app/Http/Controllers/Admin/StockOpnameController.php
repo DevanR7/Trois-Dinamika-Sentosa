@@ -12,9 +12,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Services\AccountingService;
 use App\Services\AccountingSettingService;
+use App\Traits\ValidatesAccountingPeriod;
 
 class StockOpnameController extends Controller
 {
+    use ValidatesAccountingPeriod;
+
     protected $accountingService;
     protected $accountingSettings;
 
@@ -22,6 +25,7 @@ class StockOpnameController extends Controller
     {
         $this->accountingService = $accountingService;
         $this->accountingSettings = $accountingSettingService;
+        
         $this->middleware('can:manage-stock-opnames');
     }
 
@@ -32,31 +36,46 @@ class StockOpnameController extends Controller
     }
 
     public function create()
-    {
-        $products = Product::orderBy('product_name')->get();
-        return view('admin.stock_opnames.create', compact('products'));
-    }
+{
+    // Kita kirim data produk lengkap untuk AlpineJS (ID, Nama, Kode, Stok Sistem, Unit)
+    $products = \App\Models\Product::with('unit')
+        ->where('is_active', true) // Hanya produk aktif
+        ->orderBy('product_name')
+        ->get()
+        ->map(function ($product) {
+            return [
+                'id' => $product->product_id,
+                'name' => $product->product_name,
+                'code' => $product->product_code,
+                'stock' => (float) $product->stock_quantity, // Pastikan float
+                'unit' => $product->unit->name ?? 'pcs',
+                'image' => $product->image_path ? asset('storage/' . $product->image_path) : null,
+            ];
+        });
+
+    return view('admin.stock_opnames.create', compact('products'));
+}
 
     public function store(Request $request)
     {   
-        Log::info('Stock Opname Store Request:', $request->all());
-        
         $validated = $request->validate([
             'opname_date' => 'required|date',
             'notes' => 'nullable|string',
             'products' => 'required|array',
             'products.*.product_id' => 'required|exists:products,product_id',
             'products.*.physical_qty' => 'required|numeric|min:0',
-            'confirmed' => 'sometimes|in:1'
         ]);
         
-        Log::info('Stock Opname Validation Passed:', $validated);
+        // 1. Cek Periode Tutup Buku
+        if ($this->isDateClosed($request->opname_date)) {
+            return back()->with('error', 'Gagal: Tanggal Opname masuk periode tutup buku.')->withInput();
+        }
 
         $inventoryAccountId = $this->accountingSettings->getInventoryId();
-        $adjustmentAccountId = $this->accountingSettings->getInventoryAdjustmentId();
+        $adjustmentAccountId = $this->accountingSettings->getInventoryAdjustmentId(); // Akun Beban/Pendapatan Selisih Stok
 
         if (!$inventoryAccountId || !$adjustmentAccountId) {
-            return back()->with('error', 'Gagal: Akun Persediaan atau Beban Selisih Stok belum diatur di Pengaturan.')->withInput();
+            return back()->with('error', 'Gagal: Akun Persediaan atau Akun Penyesuaian Stok belum diatur di Pengaturan.')->withInput();
         }
 
         DB::beginTransaction();
@@ -70,15 +89,23 @@ class StockOpnameController extends Controller
                 'total_adjustment_value' => 0
             ]);
 
-            $totalAdjustmentValue = 0;
+            $totalAdjustmentValue = 0; // Net Value (Bisa plus atau minus)
             $itemsToInsert = [];
 
             foreach ($validated['products'] as $itemData) {
+                // 2. LOCKING PRODUCT (CRITICAL)
+                // Kunci produk ini. Sales/Purchase lain harus antri sampai opname selesai.
                 $product = Product::lockForUpdate()->find($itemData['product_id']);
                 
+                if(!$product) continue;
+
                 $systemQty = $product->stock_quantity;
                 $physicalQty = (float) $itemData['physical_qty'];
-                $difference = $physicalQty - $systemQty;
+                
+                // Selisih: Jika Fisik > Sistem = Positif (Barang ketemu lebih)
+                // Jika Fisik < Sistem = Negatif (Barang hilang)
+                $difference = $physicalQty - $systemQty; 
+                
                 $cost = $product->average_cost;
                 $adjustmentValue = $difference * $cost;
 
@@ -90,19 +117,25 @@ class StockOpnameController extends Controller
                     'difference' => $difference,
                     'cost_per_unit' => $cost,
                     'adjustment_value' => $adjustmentValue,
-                    'created_at' => now(), 'updated_at' => now()
+                    'created_at' => now(), 
+                    'updated_at' => now()
                 ];
 
-                if ($difference != 0) {
-                    $product->stock_quantity = $physicalQty;
+                if (abs($difference) > 0.0001) {
+                    $product->stock_quantity = $physicalQty; // Paksa stok sesuai fisik
                     $product->save();
+                    
                     $totalAdjustmentValue += $adjustmentValue;
                 }
             }
 
-            StockOpnameItem::insert($itemsToInsert);
+            if (!empty($itemsToInsert)) {
+                StockOpnameItem::insert($itemsToInsert);
+            }
+
             $opname->update(['total_adjustment_value' => $totalAdjustmentValue]);
 
+            // 3. Jurnal Akuntansi (Net Journal)
             if (abs($totalAdjustmentValue) > 0.01) {
                 $journalGroupId = "SO-" . $opname->opname_number;
                 $description = "Penyesuaian Stok Opname #" . $opname->opname_number;
@@ -111,13 +144,19 @@ class StockOpnameController extends Controller
                 $creditEntries = [];
 
                 if ($totalAdjustmentValue < 0) {
+                    // RUGI / SELISIH KURANG (Nilai Persediaan Turun)
+                    // Debit: Beban Selisih Stok
+                    // Kredit: Persediaan
                     $lossAmount = abs($totalAdjustmentValue);
-                    $debitEntries[] = [$adjustmentAccountId, $lossAmount, "Selisih Kurang Stok"];
-                    $creditEntries[] = [$inventoryAccountId, $lossAmount, "Pengurangan nilai persediaan"];
+                    $debitEntries[] = [$adjustmentAccountId, $lossAmount, "Selisih Kurang Stok (Loss)"];
+                    $creditEntries[] = [$inventoryAccountId, $lossAmount, "Pengurangan Persediaan"];
                 } else {
+                    // UNTUNG / SELISIH LEBIH (Nilai Persediaan Naik)
+                    // Debit: Persediaan
+                    // Kredit: Pendapatan Lain/Penyesuaian Stok
                     $gainAmount = $totalAdjustmentValue;
-                    $debitEntries[] = [$inventoryAccountId, $gainAmount, "Penambahan nilai persediaan"];
-                    $creditEntries[] = [$adjustmentAccountId, $gainAmount, "Selisih Lebih Stok (Adjustment)"];
+                    $debitEntries[] = [$inventoryAccountId, $gainAmount, "Penambahan Persediaan"];
+                    $creditEntries[] = [$adjustmentAccountId, $gainAmount, "Selisih Lebih Stok (Gain)"];
                 }
 
                 $this->accountingService->postJournal(
@@ -126,12 +165,13 @@ class StockOpnameController extends Controller
                     $description,
                     $debitEntries,
                     $creditEntries,
-                    $opname
+                    $opname,
+                    Auth::id()
                 );
             }
 
             DB::commit();
-            return redirect()->route('admin.stock-opnames.index')->with('success', 'Stock Opname berhasil disimpan. Stok dan Jurnal telah diperbarui.');
+            return redirect()->route('admin.stock-opnames.index')->with('success', 'Stock Opname berhasil disimpan. Stok fisik disinkronisasi.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -149,23 +189,35 @@ class StockOpnameController extends Controller
     public function destroy(StockOpname $stockOpname): \Illuminate\Http\RedirectResponse
     {
         $journalGroupId = "SO-" . $stockOpname->opname_number;
+        
+        if ($error = $this->checkTransactionLock($stockOpname->opname_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Hapus: " . $error);
+        }
 
         DB::beginTransaction();
         try {
+            // Kembalikan Stok ke posisi sebelum Opname
             foreach ($stockOpname->items as $item) {
-                $product = Product::lockForUpdate()->find($item->product_id);
-                if ($product) {
-                    $product->decrement('stock_quantity', $item->difference);
-                }
-            }
+    // Gunakan withTrashed()
+    $product = Product::withTrashed()->lockForUpdate()->find($item->product_id);
+    
+    if ($product) {
+        // Balikkan stok sesuai selisih (difference)
+        // decrement akan otomatis menangani nilai positif/negatif dengan benar
+        // Contoh: difference +5 -> decrement 5 (stok berkurang)
+        // Contoh: difference -5 -> decrement -5 (sama dengan increment 5, stok bertambah)
+        $product->decrement('stock_quantity', $item->difference);
+    }
+}
 
+            // Hapus Jurnal
             DB::table('general_ledgers')->where('journal_group_id', $journalGroupId)->delete();
-
+            
             $stockOpname->delete();
 
             DB::commit();
             return redirect()->route('admin.stock-opnames.index')
-                ->with('success', 'Stock Opname berhasil dihapus. Stok telah dikembalikan ke posisi semula.');
+                ->with('success', 'Stock Opname berhasil dibatalkan. Stok dikembalikan ke kondisi semula.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -187,7 +239,6 @@ class StockOpnameController extends Controller
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.stock_opnames.pdf_worksheet', $data);
         $pdf->setPaper('a4', 'portrait');
-
         return $pdf->download('Lembar-Kerja-Stock-Opname-' . now()->format('d-m-Y') . '.pdf');
     }
 }

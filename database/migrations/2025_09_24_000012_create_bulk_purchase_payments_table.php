@@ -28,6 +28,7 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->string('reference_number')->nullable();
             $table->string('proof_of_payment_path')->nullable();
+            $table->string('payment_number', 50)->nullable()->unique();
             $table->timestamps();
         });
     }

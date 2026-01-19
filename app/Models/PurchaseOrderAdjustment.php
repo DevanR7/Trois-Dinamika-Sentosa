@@ -7,10 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\PurchaseOrder;
 use App\Models\User;
+use App\Traits\LogsActivity;
 
 class PurchaseOrderAdjustment extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
     protected $primaryKey = 'adjustment_id';
 
     protected $fillable = [
@@ -20,11 +21,13 @@ class PurchaseOrderAdjustment extends Model
         'type',
         'amount',
         'reason',
+        'details',
     ];
 
     protected $casts = [
         'adjustment_date' => 'date',
         'amount' => 'float',
+        'details' => 'array',
     ];
 
     public function purchaseOrder(): BelongsTo

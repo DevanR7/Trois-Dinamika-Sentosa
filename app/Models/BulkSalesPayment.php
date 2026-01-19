@@ -6,15 +6,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
+use App\Traits\LogsActivity;
 
 class BulkSalesPayment extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $table = 'bulk_sales_payments';
     protected $primaryKey = 'bulk_sales_payment_id';
 
     protected $fillable = [
+        'payment_number',
         'client_id',
         'processed_by_user_id',
         'payment_date',
@@ -23,7 +26,7 @@ class BulkSalesPayment extends Model
         'company_bank_account_id',
         'notes',
         'status',
-        'details',
+        'details', // WAJIB ADA: Menyimpan JSON array invoice ID
         'reference_number',
         'proof_of_payment_path',
         'approved_by_user_id',
@@ -36,10 +39,12 @@ class BulkSalesPayment extends Model
     protected $casts = [
         'payment_date' => 'date',
         'total_amount' => 'float',
-        'details' => 'array',
+        'details' => 'array', // PENTING: Cast otomatis JSON ke Array PHP
         'approved_at' => 'datetime',
         'rejected_at' => 'datetime',
     ];
+
+    // --- RELASI ---
 
     public function client(): BelongsTo
     {
@@ -74,5 +79,45 @@ class BulkSalesPayment extends Model
     public function companyBankAccount(): BelongsTo
     {
         return $this->belongsTo(CompanyBankAccount::class, 'company_bank_account_id', 'company_bank_account_id');
+    }
+
+    // --- HELPER ---
+
+    public static function generateNumber(): string
+    {
+        $ym = now()->format('Ym');
+        $type = 'sales';
+
+        return DB::transaction(function() use ($ym, $type) {
+            $counter = DB::table('bulk_payment_counters')
+                ->where('ym', $ym)
+                ->where('type', $type)
+                ->lockForUpdate()
+                ->first();
+            
+            $nextSeq = 1;
+            if ($counter) {
+                $nextSeq = $counter->last_sequence + 1;
+                DB::table('bulk_payment_counters')
+                    ->where('id', $counter->id)
+                    ->update(['last_sequence' => $nextSeq, 'updated_at' => now()]);
+            } else {
+                try {
+                    DB::table('bulk_payment_counters')->insert([
+                        'ym' => $ym, 
+                        'type' => $type, 
+                        'last_sequence' => 1, 
+                        'created_at' => now(), 
+                        'updated_at' => now()
+                    ]);
+                } catch (\Exception $e) {
+                     $counter = DB::table('bulk_payment_counters')->where('ym', $ym)->where('type', $type)->lockForUpdate()->first();
+                     $nextSeq = $counter->last_sequence + 1;
+                     DB::table('bulk_payment_counters')->where('id', $counter->id)->update(['last_sequence' => $nextSeq, 'updated_at' => now()]);
+                }
+            }
+            $seq = str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+            return "BULK/SLS/" . now()->format('Y') . "/" . now()->format('m') . "/" . $seq;
+        });
     }
 }

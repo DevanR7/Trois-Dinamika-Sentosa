@@ -23,8 +23,9 @@ class ExpenseController extends Controller
     public function __construct(AccountingService $accountingService)
     {
         $this->accountingService = $accountingService;
-        $this->middleware('can:view-reports')->only(['index']);
-        // $this->middleware('can:manage-expenses')->except(['index']);
+        
+        $this->middleware('can:view-expenses')->only(['index', 'show']);
+        $this->middleware('can:manage-expenses')->only(['create', 'store', 'edit', 'update', 'destroy']);
     }
     
     public function index(Request $request): View

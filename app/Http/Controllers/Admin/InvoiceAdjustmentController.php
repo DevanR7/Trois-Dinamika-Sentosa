@@ -3,18 +3,16 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\ClientLedger;
 use App\Models\InvoiceAdjustment;
 use App\Models\SalesInvoice;
 use App\Models\Product;
 use App\Models\Tax;
-
+use App\Models\ClientLedger;
+use App\Models\InvoiceItem;
+use App\Models\InvoiceAdditionalCost;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\View\View;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Model; 
 
@@ -24,9 +22,10 @@ use App\Traits\ValidatesAccountingPeriod;
 
 class InvoiceAdjustmentController extends Controller
 {
+    use ValidatesAccountingPeriod;
+
     protected $accountingService;
     protected $accountingSettings;
-    use ValidatesAccountingPeriod;
 
     public function __construct(
         AccountingService $accountingService, 
@@ -34,11 +33,12 @@ class InvoiceAdjustmentController extends Controller
     ) {
         $this->accountingService = $accountingService;
         $this->accountingSettings = $accountingSettingService;
+
         $this->middleware('can:create-invoice-adjustments')->only(['create', 'createManual', 'storeManual', 'createAuto', 'storeAuto']);
         $this->middleware('can:delete-invoice-adjustments')->only(['destroy']);
     }
 
-    public function create(Request $request): View
+    public function create(Request $request)
     {
         $preselectedInvoiceId = $request->query('invoice_id');
         $invoices = SalesInvoice::where('status', '!=', 'cancelled')
@@ -47,12 +47,16 @@ class InvoiceAdjustmentController extends Controller
         return view('admin.invoice_adjustments.create', compact('invoices', 'preselectedInvoiceId'));
     }
 
-    public function createManual(SalesInvoice $invoice): View
+    // =========================================================================
+    // FITUR 1: KOREKSI MANUAL (Hanya Nominal, Tanpa Ubah Barang)
+    // =========================================================================
+    
+    public function createManual(SalesInvoice $invoice)
     {
         return view('admin.invoice_adjustments.create_manual', compact('invoice'));
     }
 
-    public function storeManual(Request $request): RedirectResponse
+    public function storeManual(Request $request)
     {
         $validated = $request->validate([
             'sales_invoice_id' => 'required|exists:sales_invoices,invoice_id',
@@ -63,22 +67,18 @@ class InvoiceAdjustmentController extends Controller
             'overpayment_action' => 'required|string|in:deposit,refund',
         ]);
 
-        if ($this->isDateClosed($request->adjustment_date)) {
-            return back()->with('error', 'Gagal: Tanggal penyesuaian masuk periode tutup buku.')->withInput();
+        if ($this->isDateClosed($validated['adjustment_date'])) {
+            return back()->with('error', 'Gagal: Tanggal penyesuaian masuk periode tutup buku.');
         }
 
         $invoice = SalesInvoice::findOrFail($validated['sales_invoice_id']);
-
-        if ($invoice->status === 'cancelled') {
-            return back()->with('error', 'Invoice yang sudah dibatalkan tidak dapat disesuaikan.');
-        }
-
-        $arAccountId = $this->accountingSettings->getAccountsReceivableId();
-        $salesReturnAccountId = $this->accountingSettings->getSalesReturnId();
-        $salesRevenueAccountId = $this->accountingSettings->getSalesRevenueId();
-
-        if (!$arAccountId || !$salesReturnAccountId || !$salesRevenueAccountId) {
-            return back()->with('error', 'Gagal: Akun default (Piutang, Retur Penjualan, Pendapatan) belum diatur.')->withInput();
+        
+        // Pagar Pengaman: Cegah Credit Note > Sisa Tagihan (Manual)
+        if ($validated['type'] === 'credit_note') {
+            $currentBalance = $invoice->remaining_balance; 
+            if ($validated['amount'] > $currentBalance) {
+                return back()->withInput()->with('error', 'GAGAL: Nominal Credit Note tidak boleh melebihi Sisa Tagihan.');
+            }
         }
 
         DB::beginTransaction();
@@ -88,101 +88,130 @@ class InvoiceAdjustmentController extends Controller
                 'user_id' => Auth::id(),
                 'adjustment_date' => $validated['adjustment_date'],
                 'type' => $validated['type'],
-                'amount' => (float) $validated['amount'],
+                'amount' => $validated['amount'],
                 'reason' => $validated['reason'],
+                
+                // TRUE: Karena header invoice TIDAK berubah, adjustment ini harus dihitung matematikanya
+                'is_calculation_adjustment' => true, 
             ]);
 
-            $journalGroupId = "INV-ADJ-" . $adjustment->adjustment_id;
-            $description = "Penyesuaian Manual Inv #" . $invoice->invoice_number;
-
-            $debitEntries = [];
-            $creditEntries = [];
-
-            if ($validated['type'] === 'credit_note') {
-                $debitEntries[] = [$salesReturnAccountId, $validated['amount'], $validated['reason']];
-                $creditEntries[] = [$arAccountId, $validated['amount'], "Potongan Piutang Inv #" . $invoice->invoice_number];
-            } else {
-                $debitEntries[] = [$arAccountId, $validated['amount'], "Tambahan Piutang Inv #" . $invoice->invoice_number];
-                $creditEntries[] = [$salesRevenueAccountId, $validated['amount'], $validated['reason']]; 
-            }
-
-            $this->accountingService->postJournal(
-                $journalGroupId,
-                $validated['adjustment_date'],
-                $description,
-                $debitEntries,
-                $creditEntries,
-                $adjustment, 
-                Auth::id()
-            );
+            $this->postAdjustmentJournal($adjustment, $invoice, "Manual");
             
             $invoice->updatePaymentStatus();
-            $overpaymentAction = $validated['overpayment_action'];
-            $this->handleOverpayment($invoice, $adjustment, 'dibuat', $overpaymentAction);
+            $this->handleOverpayment($invoice, $adjustment, 'dibuat', $validated['overpayment_action']);
             
             DB::commit();
-            $noteType = $validated['type'] === 'credit_note' ? 'Kredit' : 'Debit';
-            return redirect()->route('admin.invoices.show', $invoice->invoice_id)
-                ->with('success', "Penyesuaian (Nota {$noteType}) berhasil disimpan dan dijurnal.");
+            return redirect()->route('admin.invoices.show', $invoice->invoice_id)->with('success', 'Penyesuaian manual disimpan.');
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Gagal simpan adj manual: ' . $e->getMessage() . " on line " . $e->getLine());
-            return back()->with('error', 'Gagal menyimpan penyesuaian: ' . $e->getMessage())->withInput();
+            return back()->with('error', $e->getMessage());
         }
     }
 
-    public function createAuto(SalesInvoice $invoice): View
+    // =========================================================================
+    // FITUR 2: KOREKSI OTOMATIS (Revisi Item & Harga)
+    // =========================================================================
+
+    public function createAuto(SalesInvoice $invoice)
     {
         $invoice->load('items.product', 'taxes');
-        $products = Product::orderBy('product_name')->get();
+        $products = Product::where('is_active', true)->orderBy('product_name')->get();
         $taxes = Tax::where('is_active', true)->get();
-        $clients = null;
-        $salesUsers = null;
-        return view('admin.invoice_adjustments.create_auto', compact('invoice', 'products', 'taxes', 'clients', 'salesUsers'));
+        return view('admin.invoice_adjustments.create_auto', compact('invoice', 'products', 'taxes'));
     }
 
-    public function storeAuto(Request $request, SalesInvoice $invoice): RedirectResponse
+    public function storeAuto(Request $request, SalesInvoice $invoice): \Illuminate\Http\RedirectResponse
     {
-        if ($invoice->status == 'cancelled') {
-            return back()->with('error', 'Invoice yang sudah dibatalkan tidak dapat disesuaikan.');
-        }
-        if ($this->isDateClosed(now())) {
-            return back()->with('error', 'Gagal: Periode akuntansi saat ini sudah ditutup.');
-        }
+        if ($invoice->status == 'cancelled') return back()->with('error', 'Invoice batal tidak bisa diedit.');
+        if ($this->isDateClosed(now())) return back()->with('error', 'Periode akuntansi tutup.');
         
         $validated = $request->validate([
-            'products' => 'required|array|min:1',
+            'products' => 'required|array',
             'products.*.product_id' => 'required|exists:products,product_id',
-            'products.*.quantity' => 'required|numeric|min:0.01',
+            'products.*.quantity' => 'required|numeric|min:0', // 0 = Hapus Item
+            'products.*.price_per_unit' => 'nullable|numeric',
             'discount_percentage' => 'nullable|numeric|min:0|max:100',
             'taxes' => 'nullable|array',
-            'taxes.*' => 'exists:taxes,id',
             'additional_costs' => 'nullable|array',
-            'additional_costs.*.description' => 'required_with:additional_costs|string|max:255',
-            'additional_costs.*.amount' => 'required_with:additional_costs|numeric|min:0',
-            'notes' => 'required|string|min:5|max:1000',
+            'additional_costs.*.description' => 'required_with:additional_costs|string',
+            'additional_costs.*.amount' => 'required_with:additional_costs|numeric',
+            'notes' => 'required|string|min:5',
             'overpayment_action' => 'required|string|in:deposit,refund',
         ]);
 
-        $arAccountId = $this->accountingSettings->getAccountsReceivableId();
-        $salesReturnAccountId = $this->accountingSettings->getSalesReturnId();
-        $salesRevenueAccountId = $this->accountingSettings->getSalesRevenueId();
-
-        if (!$arAccountId || !$salesReturnAccountId || !$salesRevenueAccountId) {
-            return back()->with('error', 'Gagal: Akun default (Piutang, Retur Penjualan, Pendapatan) belum diatur.')->withInput();
-        }
-
         DB::beginTransaction();
         try {
-            $invoice->load('items.product', 'taxes');
-            $subtotalProducts = 0;
+            $invoice->load('items');
+            
+            // 1. SNAPSHOT HEADER LAMA (PENTING AGAR HARGA TIDAK NYANGKUT SAAT UNDO)
+            $oldHeaderSnapshot = [
+                'subtotal' => (float)$invoice->subtotal,
+                'discount_percentage' => (float)$invoice->discount_percentage,
+                'discount_amount' => (float)$invoice->discount_amount,
+                'total_amount' => (float)$invoice->total_amount
+            ];
 
-            foreach ($validated['products'] as $item) {
-                $product = Product::find($item['product_id']);
-                $price = $product?->selling_price ?? 0;
-                $subtotalProducts += $price * $item['quantity'];
+            // 2. SNAPSHOT ITEM LAMA
+            $oldItemsSnapshot = $invoice->items->map(function($item) {
+                return [
+                    'product_id' => $item->product_id,
+                    'quantity' => (float) $item->quantity,
+                    'price_per_unit' => (float) $item->price_per_unit, // Harga Base
+                    'hpp' => (float) $item->hpp,
+                    'subtotal' => (float) $item->subtotal
+                ];
+            })->toArray();
+
+            $oldItemsMap = $invoice->items->keyBy('product_id');
+            $changeLogs = [];
+            $itemsToCreate = [];
+            $subtotalProducts = 0; // Gross Subtotal
+
+            // 3. PROSES DATA BARU
+            foreach ($validated['products'] as $newItem) {
+                $prodId = $newItem['product_id'];
+                $newQty = (float) $newItem['quantity'];
+                
+                $product = Product::lockForUpdate()->find($prodId);
+                // FIX: Ambil Harga Base (Selling Price) atau Input User. 
+                $price = isset($newItem['price_per_unit']) ? (float)$newItem['price_per_unit'] : $product->selling_price;
+
+                // A. Update Stok (Hanya jika bukan draft)
+                if ($invoice->status !== 'draft') {
+                    $oldItem = $oldItemsMap->get($prodId);
+                    $oldQty = $oldItem ? (float)$oldItem->quantity : 0;
+                    
+                    $diffQty = $newQty - $oldQty; 
+                    
+                    if (abs($diffQty) > 0.001) {
+                        if ($diffQty > 0) { // Nambah
+                            if ($product->stock_quantity < $diffQty) throw new \Exception("Stok kurang: " . $product->product_name);
+                            $product->decrement('stock_quantity', $diffQty);
+                        } else { // Kurang
+                            $product->increment('stock_quantity', abs($diffQty));
+                        }
+                        
+                        $action = ($newQty == 0) ? "Dihapus" : "Qty Ubah";
+                        $changeLogs[] = "{$product->product_name}: {$oldQty} -> {$newQty} ({$action})";
+                    }
+                }
+
+                // B. Data Insert (Skip jika qty 0)
+                if ($newQty > 0) {
+                    $subtotalItem = $newQty * $price; // Harga Gross
+                    $subtotalProducts += $subtotalItem;
+                    
+                    $itemsToCreate[] = [
+                        'product_id' => $prodId,
+                        'quantity' => $newQty,
+                        'price_per_unit' => $price, // Simpan Harga Base
+                        'hpp' => $product->average_cost ?? 0,
+                        'subtotal' => $subtotalItem
+                    ];
+                }
             }
 
+            // 4. HITUNG TOTAL HEADER BARU (Dengan Diskon Global)
             $discountRate = (float) ($validated['discount_percentage'] ?? 0);
             $discountAmount = $subtotalProducts * ($discountRate / 100);
             $subtotalAfterDiscount = $subtotalProducts - $discountAmount;
@@ -204,255 +233,270 @@ class InvoiceAdjustmentController extends Controller
 
             $newTotalAmount = $subtotalAfterDiscount + $totalTaxAmount + $totalAdditionalCosts;
             $oldTotalAmount = $invoice->total_amount;
-            $diff = $oldTotalAmount - $newTotalAmount; 
+            $diffAmount = $oldTotalAmount - $newTotalAmount; // Positif = Tagihan Turun
 
-            if (abs($diff) <= 0.01) {
-                DB::rollBack(); 
-                return redirect()->route('admin.invoices.show', $invoice->invoice_id)
-                    ->with('info', 'Tidak ada perubahan nominal. Penyesuaian tidak dibuat.');
+            if (abs($diffAmount) <= 0.01 && empty($changeLogs)) {
+                DB::rollBack();
+                return redirect()->route('admin.invoices.show', $invoice->invoice_id)->with('info', 'Tidak ada perubahan.');
             }
+
+            // 5. UPDATE INVOICE
+            $invoice->items()->delete();
+            $invoice->additionalCosts()->delete();
             
-            $adjustmentType = $diff > 0 ? 'credit_note' : 'debit_note';
-            $adjustmentAmount = abs($diff);
-            $reasonDetails = [];
-            $oldAdditionalTotal = $invoice->additionalCosts()->sum('amount');
-
-            if (abs($oldAdditionalTotal - $totalAdditionalCosts) > 0.01) {
-                $reasonDetails[] = "Biaya tambahan berubah dari Rp " . number_format($oldAdditionalTotal) . " menjadi Rp " . number_format($totalAdditionalCosts);
+            if (count($itemsToCreate) > 0) {
+                $invoice->items()->createMany($itemsToCreate);
+            }
+            if (!empty($validated['additional_costs'])) {
+                foreach ($validated['additional_costs'] as $cost) {
+                    $invoice->additionalCosts()->create(['description' => $cost['description'], 'amount' => $cost['amount']]);
+                }
             }
 
-            $finalReason = $validated['notes'];
-            if (!empty($reasonDetails)) {
-                $finalReason .= "\n\n[LOG SISTEM]:\n- " . implode("\n- ", $reasonDetails);
-            }
+            $invoice->update([
+                'subtotal' => $subtotalProducts,
+                'discount_percentage' => $discountRate,
+                'discount_amount' => $discountAmount,
+                'total_amount' => $newTotalAmount,
+            ]);
 
+            if (!empty($validated['taxes'])) $invoice->taxes()->sync($validated['taxes']);
+            else $invoice->taxes()->detach();
+
+            // 6. SIMPAN LOG (FIX DOUBLE COUNTING)
+            $adjustmentType = $diffAmount > 0 ? 'credit_note' : 'debit_note';
+            
             $adjustment = InvoiceAdjustment::create([
                 'sales_invoice_id' => $invoice->invoice_id,
                 'user_id' => Auth::id(),
                 'adjustment_date' => now(),
                 'type' => $adjustmentType,
-                'amount' => $adjustmentAmount,
-                'reason' => $finalReason,
+                'amount' => abs($diffAmount),
+                
+                // FIX: FALSE agar tidak dihitung ganda di model SalesInvoice
+                // Karena kita sudah update total_amount di atas.
+                'is_calculation_adjustment' => false, 
+                
+                'reason' => $validated['notes'] . (count($changeLogs) > 0 ? " (" . implode(", ", $changeLogs) . ")" : ""),
+                'details' => [
+                    'old_items_snapshot' => $oldItemsSnapshot, // Backup Items
+                    'old_header_snapshot' => $oldHeaderSnapshot, // Backup Header
+                    'change_logs' => $changeLogs
+                ]
             ]);
-            
-            $journalGroupId = "INV-ADJ-" . $adjustment->adjustment_id;
-            $description = "Penyesuaian Otomatis Inv #" . $invoice->invoice_number;
 
-            $debitEntries = [];
-            $creditEntries = [];
-
-            if ($adjustmentType === 'credit_note') {
-                $debitEntries[] = [$salesReturnAccountId, $adjustmentAmount, $finalReason];
-                $creditEntries[] = [$arAccountId, $adjustmentAmount, "Potongan Piutang Inv #" . $invoice->invoice_number];
-            } else {
-                $debitEntries[] = [$arAccountId, $adjustmentAmount, "Tambahan Piutang Inv #" . $invoice->invoice_number];
-                $creditEntries[] = [$salesRevenueAccountId, $adjustmentAmount, $finalReason];
-            }
-
-            $this->accountingService->postJournal(
-                $journalGroupId,
-                now(),
-                $description,
-                $debitEntries,
-                $creditEntries,
-                $adjustment,
-                Auth::id()
-            );
-
+            // 7. JURNAL & FINALISASI
+            $this->postAdjustmentJournal($adjustment, $invoice, "Otomatis");
             $invoice->updatePaymentStatus();
-            $overpaymentAction = $validated['overpayment_action'];
-            $this->handleOverpayment($invoice, $adjustment, 'dibuat', $overpaymentAction);
-            
+            $this->handleOverpayment($invoice, $adjustment, 'dibuat', $validated['overpayment_action']);
+
             DB::commit();
+            return redirect()->route('admin.invoices.show', $invoice->invoice_id)->with('success', 'Koreksi berhasil disimpan.');
 
-            $formattedAmount = number_format($adjustmentAmount, 0, ',', '.');
-            $noteType = $adjustmentType === 'credit_note' ? 'Kredit' : 'Debit';
-
-            return redirect()->route('admin.invoices.show', $invoice->invoice_id)
-                ->with('success', "Koreksi otomatis berhasil. Nota {$noteType} senilai Rp {$formattedAmount} telah dibuat.");
-        
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Gagal simpan koreksi otomatis: ' . $e->getMessage() . ' on line ' . $e->getLine());
-            
-            return back()->with('error', 'Gagal menyimpan koreksi otomatis: ' . $e->getMessage())->withInput();
+            Log::error('Auto Adj Error: ' . $e->getMessage());
+            return back()->with('error', 'Gagal: ' . $e->getMessage())->withInput();
         }
     }
 
-    public function destroy(InvoiceAdjustment $invoiceAdjustment): RedirectResponse
+    // =========================================================================
+    // DESTROY (UNDO REVISI)
+    // =========================================================================
+
+    public function destroy(InvoiceAdjustment $invoiceAdjustment): \Illuminate\Http\RedirectResponse
     {
         $journalGroupId = "INV-ADJ-" . $invoiceAdjustment->adjustment_id;
-
-        if ($error = $this->checkTransactionLock($invoiceAdjustment->adjustment_date, $journalGroupId)) {
-            return back()->with('error', "Gagal Hapus Penyesuaian: " . $error);
-        }
-        if ($invoiceAdjustment->type === 'debit_note' && str_contains($invoiceAdjustment->reason, 'Otomatis: Memindahkan kelebihan bayar')) {
-            return back()->with('error', 'Gagal: Ini adalah Nota Debit otomatis. Untuk membatalkan, hapus Nota Kredit asli yang memicu pemindahan deposit ini.');
-        }
         
+        if ($error = $this->checkTransactionLock($invoiceAdjustment->adjustment_date, $journalGroupId)) {
+            return back()->with('error', $error);
+        }
+
         DB::beginTransaction();
         try {
-            $invoiceId = $invoiceAdjustment->sales_invoice_id;
-            $invoice = SalesInvoice::find($invoiceId);
+            $invoice = $invoiceAdjustment->salesInvoice;
             
-            if ($invoiceAdjustment->type === 'credit_note') {
-                $ledgerEntry = ClientLedger::where('reference_type', InvoiceAdjustment::class)
-                                            ->where('reference_id', $invoiceAdjustment->adjustment_id)
-                                            ->first();
-                if ($ledgerEntry) {
-                    $autoDebitNote = InvoiceAdjustment::where('sales_invoice_id', $invoiceId)
-                        ->where('type', 'debit_note')
-                        ->where('reason', 'like', '%Ledger ID: ' . $ledgerEntry->ledger_id . '%')
-                        ->first();
-                    
-                    if ($autoDebitNote) {
-                        $this->reverseAndClearJournal("INV-ADJ-" . $autoDebitNote->adjustment_id, "Reversal Overpayment Adj #" . $autoDebitNote->adjustment_id, $autoDebitNote);
-                        $autoDebitNote->delete();
+            // 1. RESTORE DARI SNAPSHOT
+            if (isset($invoiceAdjustment->details['old_items_snapshot'])) {
+                
+                $oldItemsSnapshot = $invoiceAdjustment->details['old_items_snapshot'];
+                $oldHeaderSnapshot = $invoiceAdjustment->details['old_header_snapshot'] ?? null;
+
+                // A. Restore Stok Fisik
+                if ($invoice->status !== 'draft') {
+                    // 1. Balikin stok dari item "SAAT INI" (yang salah/revisi) ke gudang
+                    foreach ($invoice->items as $currentItem) {
+                        Product::withTrashed()->find($currentItem->product_id)
+                            ->increment('stock_quantity', $currentItem->quantity);
                     }
-                    $ledgerEntry->delete();
+                    // 2. Ambil stok dari gudang untuk item "SNAPSHOT" (yang benar/awal)
+                    foreach ($oldItemsSnapshot as $oldItem) {
+                        Product::withTrashed()->lockForUpdate()->find($oldItem['product_id'])
+                            ->decrement('stock_quantity', (float)$oldItem['quantity']);
+                    }
+                }
+
+                // B. Restore DB Items
+                $invoice->items()->delete();
+                foreach ($oldItemsSnapshot as $snap) {
+                    $invoice->items()->create([
+                        'product_id' => $snap['product_id'],
+                        'quantity' => $snap['quantity'],
+                        'price_per_unit' => $snap['price_per_unit'],
+                        'hpp' => $snap['hpp'],
+                        'subtotal' => $snap['subtotal']
+                    ]);
+                }
+
+                // C. Restore Header Invoice (FIX NYANGKUT)
+                if ($oldHeaderSnapshot) {
+                    $invoice->update([
+                        'subtotal' => $oldHeaderSnapshot['subtotal'],
+                        'discount_percentage' => $oldHeaderSnapshot['discount_percentage'],
+                        'discount_amount' => $oldHeaderSnapshot['discount_amount'],
+                        'total_amount' => $oldHeaderSnapshot['total_amount']
+                    ]);
+                } else {
+                    // Fallback Logic Lama
+                    if ($invoiceAdjustment->type == 'credit_note') $invoice->total_amount += $invoiceAdjustment->amount;
+                    else $invoice->total_amount -= $invoiceAdjustment->amount;
+                    $invoice->save();
                 }
             }
+
+            // 2. REVERSAL JURNAL & CLEANUP
+            $this->reverseAndClearJournal($journalGroupId, "Undo Koreksi", $invoiceAdjustment);
             
-            $this->reverseAndClearJournal("INV-ADJ-" . $invoiceAdjustment->adjustment_id, "Reversal Adj #" . $invoiceAdjustment->adjustment_id, $invoiceAdjustment);
+            $relatedLedger = ClientLedger::where('reference_type', InvoiceAdjustment::class)
+                ->where('reference_id', $invoiceAdjustment->adjustment_id)
+                ->first();
+                
+            if ($relatedLedger) {
+                $this->reverseAndClearJournal("INV-ADJ-DEP-" . $relatedLedger->ledger_id, "Undo Deposit", $relatedLedger);
+                $relatedLedger->delete();
+                InvoiceAdjustment::where('reason', 'like', '%Ledger ID: ' . $relatedLedger->ledger_id . '%')->delete();
+            }
 
             $invoiceAdjustment->delete();
-            
-            if ($invoice) {
-                $invoice->updatePaymentStatus();
-                
-                $this->handleOverpayment($invoice, null, 'dihapus', 'deposit');
-            }
-            
+
+            // 3. UPDATE STATUS (CRITICAL)
+            $invoice->refresh(); 
+            $invoice->updatePaymentStatus(); 
+
             DB::commit();
-            return redirect()->route('admin.invoices.show', $invoiceId)
-                             ->with('success', 'Penyesuaian invoice berhasil dibatalkan. Status utang, deposit, dan jurnal diperbarui.');
+            return back()->with('success', 'Koreksi dibatalkan. Data dikembalikan ke kondisi awal.');
+
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Gagal batalkan adj invoice: ' . $e->getMessage() . " on line " . $e->getLine());
-            return back()->with('error', 'Gagal membatalkan penyesuaian: ' . $e->getMessage());
+            Log::error("Undo Koreksi Failed: " . $e->getMessage());
+            return back()->with('error', 'Gagal membatalkan: ' . $e->getMessage());
         }
     }
 
-    private function handleOverpayment(SalesInvoice $invoice, ?InvoiceAdjustment $originalAdjustment, string $context = 'dibuat', string $overpaymentAction = 'deposit')
+    // --- HELPER METHODS ---
+
+    private function postAdjustmentJournal($adjustment, $invoice, $typeStr) 
     {
+        $arId = $this->accountingSettings->getAccountsReceivableId();
+        $retId = $this->accountingSettings->getSalesReturnId();
+        $revId = $this->accountingSettings->getSalesRevenueId();
+
+        $journalGroupId = "INV-ADJ-" . $adjustment->adjustment_id;
+        $description = "$typeStr Adj Inv #" . $invoice->invoice_number;
+
+        $debitEntries = []; $creditEntries = [];
+
+        if ($adjustment->type === 'credit_note') {
+            $debitEntries[] = [$retId, $adjustment->amount, $adjustment->reason];
+            $creditEntries[] = [$arId, $adjustment->amount, "Potongan Piutang"];
+        } else {
+            $debitEntries[] = [$arId, $adjustment->amount, "Tambahan Piutang"];
+            $creditEntries[] = [$revId, $adjustment->amount, $adjustment->reason]; 
+        }
+
+        $this->accountingService->postJournal(
+            $journalGroupId,
+            $adjustment->adjustment_date,
+            $description,
+            $debitEntries,
+            $creditEntries,
+            $adjustment,
+            Auth::id()
+        );
+    }
+
+    private function handleOverpayment($invoice, $adjustment, $context, $action) {
         $invoice->refresh();
-        $remainingBalance = $invoice->remaining_balance ?? 0;
-        $realRemainingBalance = $invoice->total_due - $invoice->amount_paid;
+        $balance = $invoice->remaining_balance;
+        
+        // Cek apakah Saldo Negatif (Overpaid)
+        if ($balance < -0.01) {
+            $overAmt = abs($balance);
 
-        if ($realRemainingBalance < -0.01) { 
-            
-            if ($overpaymentAction === 'refund') {
-                Log::info("Kelebihan bayar terdeteksi di Inv #{$invoice->invoice_id}. Dibiarkan untuk proses refund manual.");
-                return; 
+            // === [FIX LOGIC] ===
+            // Jika user memilih 'refund', kita JANGAN buat ledger deposit.
+            // Biarkan saldo invoice tetap minus (Overpaid).
+            // Nanti di halaman Show Invoice akan muncul tombol biru "Proses Refund Uang".
+            if ($action === 'refund') {
+                return; // STOP DI SINI. Jangan lanjut buat deposit.
             }
 
-            $overpaymentAmount = abs($realRemainingBalance);
-            $client = $invoice->client; 
-            if (!$client) {
-                Log::warning("Gagal memindahkan kelebihan bayar Invoice #{$invoice->invoice_id}: Klien tidak ditemukan.");
-                return;
-            }
+            // Jika user memilih 'deposit', baru kita proses pemindahan ke ledger
+            $client = $invoice->client;
+            $arId = $this->accountingSettings->getAccountsReceivableId();
+            $depId = $this->accountingSettings->getClientDepositId();
 
-            $arAccountId = $this->accountingSettings->getAccountsReceivableId();
-            $clientDepositAccountId = $this->accountingSettings->getClientDepositId();
-            if (!$arAccountId || !$clientDepositAccountId) {
-                Log::error("Gagal proses overpayment Inv #{$invoice->invoice_id}: Akun AR atau Deposit Klien belum diatur.");
-                throw new \Exception("Akun AR atau Deposit Klien belum diatur.");
-            }
-
-            $transDate = now()->format('Y-m-d');
-            $refType = SalesInvoice::class; 
-            $refId = $invoice->invoice_id;
-            if ($originalAdjustment) {
-                $refType = InvoiceAdjustment::class; 
-                $refId = $originalAdjustment->adjustment_id;
-                $transDate = $originalAdjustment->adjustment_date;
-            }
-            
             try {
-                $ledgerEntry = ClientLedger::create([
+                // 1. Buat Ledger Kredit (Deposit Bertambah)
+                $ledger = ClientLedger::create([
                     'client_id' => $client->client_id,
                     'sales_invoice_id' => $invoice->invoice_id,
-                    'reference_type' => $refType,
-                    'reference_id' => $refId,
-                    'transaction_date' => $transDate,
-                    'type' => 'credit', 
-                    'amount' => $overpaymentAmount,
+                    'reference_type' => InvoiceAdjustment::class,
+                    'reference_id' => $adjustment ? $adjustment->adjustment_id : null,
+                    'transaction_date' => now(),
+                    'type' => 'credit',
+                    'amount' => $overAmt,
                     'status' => 'available',
-                    'description' => 'Otomatis: Kelebihan bayar dari Inv #' . $invoice->invoice_number,
-                    'user_id' => Auth::id(),
+                    'description' => 'System: Kelebihan bayar Inv #' . $invoice->invoice_number,
+                    'user_id' => Auth::id()
                 ]);
 
-                $autoDebitNote = InvoiceAdjustment::create([
+                // 2. Buat Adjustment Penyeimbang (Agar Invoice jadi 0/Lunas)
+                $autoAdj = InvoiceAdjustment::create([
                     'sales_invoice_id' => $invoice->invoice_id,
                     'user_id' => Auth::id(),
                     'adjustment_date' => now(),
-                    'type' => 'debit_note', 
-                    'amount' => $overpaymentAmount,
-                    'reason' => 'Otomatis: Memindahkan kelebihan bayar (Rp ' . number_format($overpaymentAmount) . ') ke deposit klien (Ledger ID: ' . $ledgerEntry->ledger_id . ')',
+                    'type' => 'debit_note',
+                    'amount' => $overAmt,
+                    'is_calculation_adjustment' => true, // TRUE: Karena ini penyeimbang saldo
+                    'reason' => 'System: Pindah overpayment ke Deposit (Ledger ID: '.$ledger->ledger_id.')'
                 ]);
-                
-                $journalGroupId = "INV-ADJ-" . $autoDebitNote->adjustment_id;
-                $description = "Otomatis: Pindah overpayment Inv #" . $invoice->invoice_number . " ke deposit";
-                
-                $debitEntries = [
-                    [$arAccountId, $overpaymentAmount]
-                ];
-                $creditEntries = [
-                    [$clientDepositAccountId, $overpaymentAmount]
-                ];
 
+                // 3. Jurnal Pemindahan
                 $this->accountingService->postJournal(
-                    $journalGroupId,
-                    now(),
-                    $description,
-                    $debitEntries,
-                    $creditEntries,
-                    $autoDebitNote,
-                    Auth::id()
+                    "INV-ADJ-DEP-" . $ledger->ledger_id, now(), "System: Overpayment to Deposit",
+                    [[$arId, $overAmt]], [[$depId, $overAmt]], $autoAdj, Auth::id()
                 );
-
+                
                 $invoice->updatePaymentStatus();
             } catch (\Exception $e) {
-                Log::error('Gagal memproses overpayment adjustment invoice: ' . $e->getMessage());
-                throw $e; 
+                Log::error("Overpayment fail: " . $e->getMessage());
             }
         }
     }
 
-    private function reverseAndClearJournal(string $journalGroupId, string $reversalDescription, Model $referenceModel)
-    {
-        $originalJournalEntries = DB::table('general_ledgers')
-                                    ->where('journal_group_id', $journalGroupId)
-                                    ->get();
-        
-        if ($originalJournalEntries->isEmpty()) {
-            return; 
+    private function reverseAndClearJournal($groupId, $desc, $model) {
+        $entries = DB::table('general_ledgers')->where('journal_group_id', $groupId)->get();
+        if ($entries->isEmpty()) return;
+
+        $debit = []; $credit = [];
+        foreach ($entries as $e) {
+            if ($e->debit > 0) $credit[] = [$e->chart_of_account_id, $e->debit, "Reversal"];
+            if ($e->credit > 0) $debit[] = [$e->chart_of_account_id, $e->credit, "Reversal"];
         }
-
-        $debitEntries = [];
-        $creditEntries = [];
-
-        foreach ($originalJournalEntries as $entry) {
-            if ($entry->debit > 0) {
-                $creditEntries[] = [$entry->chart_of_account_id, $entry->debit, "Reversal: " . $entry->description];
-            }
-            if ($entry->credit > 0) {
-                $debitEntries[] = [$entry->chart_of_account_id, $entry->credit, "Reversal: " . $entry->description];
-            }
+        if (!empty($debit)) {
+            $this->accountingService->postJournal($groupId . "-REV", now(), $desc, $debit, $credit, $model);
         }
-
-        if (!empty($debitEntries) || !empty($creditEntries)) {
-            $this->accountingService->postJournal(
-                str_replace('INV-ADJ-', 'INV-ADJ-REV-', $journalGroupId), 
-                now(), 
-                $reversalDescription,
-                $debitEntries,
-                $creditEntries,
-                $referenceModel
-            );
-        }
-
-        DB::table('general_ledgers')->where('journal_group_id', $journalGroupId)->delete();
+        DB::table('general_ledgers')->where('journal_group_id', $groupId)->delete();
     }
 }

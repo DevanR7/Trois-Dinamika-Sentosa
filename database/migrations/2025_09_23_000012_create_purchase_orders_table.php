@@ -19,7 +19,7 @@ return new class extends Migration
                 ->constrained('users', 'user_id');
             $table->foreignId('user_id_admin')
                 ->constrained('users', 'user_id');
-            $table->date('order_date');
+            $table->date('order_date')->index();
             $table->date('due_date')->nullable();
             $table->date('expected_delivery_date')->nullable();
             $table->decimal('total_amount', 15, 2);
@@ -42,7 +42,7 @@ return new class extends Migration
             $table->decimal('grand_total', 15, 2)->nullable();
             $table->decimal('amount_paid', 15, 2)->default(0);
             $table->decimal('total_returned', 15, 2)->default(0);
-            $table->enum('status', ['draft', 'ordered', 'completed', 'cancelled'])->default('draft');
+            $table->enum('status', ['draft', 'ordered', 'completed', 'cancelled'])->default('draft')->index();
             $table->enum('payment_status', ['unpaid', 'paid', 'partially_paid'])->default('unpaid');
             $table->text('notes')->nullable();
             $table->timestamps();

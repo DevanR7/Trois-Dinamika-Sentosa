@@ -18,6 +18,7 @@ return new class extends Migration
                 ->constrained('chart_of_accounts', 'account_id')
                 ->nullOnDelete();
             $table->boolean('is_active')->default(true);
+            $table->softDeletes();
             $table->timestamps();
         });
     }

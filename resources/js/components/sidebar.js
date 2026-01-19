@@ -13,7 +13,7 @@ export function initSidebarLogic() {
     const profilePopup = document.getElementById('profile-popup');         // Popup menu
 
     if (!sidebar) return;
-
+    
     // --- 1. STATE INITIALIZATION ---
     let isCompact = localStorage.getItem('sidebarState') === 'compact';
 

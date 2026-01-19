@@ -14,677 +14,343 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Midtrans\Config;
-use Midtrans\Snap;
 use Midtrans\Notification;
-use Illuminate\Support\Facades\Auth;
-
 use Exception;
 use App\Services\AccountingService;
 use App\Services\AccountingSettingService;
 
 class MidtransController extends Controller
 {
-    
     public function __construct()
     {
+        // Konfigurasi Midtrans Global
         Config::$serverKey = config('midtrans.server_key');
         Config::$isProduction = config('midtrans.is_production');
         Config::$isSanitized = config('midtrans.is_sanitized');
         Config::$is3ds = config('midtrans.is_3ds');
     }
 
-    public function pay(Request $request, SalesInvoice $invoice)
-    {
-        $gatewayMethod = PaymentMethod::where('type', 'gateway')->where('is_active', true)->first();
-        if (!$gatewayMethod) {
-            return response()->json(['message' => 'Pembayaran online saat ini sedang dinonaktifkan oleh Admin.'], 403);
-        }
-
-        $validated = $request->validate([
-            'amount' => 'required|numeric|min:0',
-            'use_credit' => 'nullable|boolean',
-        ]);
-
-        $client = $invoice->client; 
-        
-        if (!$client) {
-            return response()->json(['message' => 'Data Klien tidak ditemukan pada invoice ini.'], 404);
-        }
-
-        $sisaTagihan = $invoice->remaining_balance;
-        $clientBalance = $client->balance; 
-
-        $amountFromInput = (float) $validated['amount'];
-        $useCredit = $validated['use_credit'] ?? false;
-        $creditToUse = 0;
-        $totalPaymentValue = $amountFromInput;
-
-        if ($useCredit && $clientBalance > 0) {
-            $totalPaymentValue = $amountFromInput + $clientBalance;
-            $creditToUse = min($clientBalance, $sisaTagihan, $totalPaymentValue);
-        }
-
-        $grossAmountForMidtrans = round(max(0, $totalPaymentValue - $creditToUse));
-
-        if ($totalPaymentValue <= 0.01 && $sisaTagihan > 0.01) {
-            return response()->json(['message' => 'Jumlah pembayaran harus lebih dari 0.'], 422);
-        }
-        if ($totalPaymentValue > ($sisaTagihan + 0.01)) {
-            return response()->json(['message' => 'Jumlah pembayaran melebihi sisa tagihan.'], 422);
-        }
-        if ($grossAmountForMidtrans > 0 && $grossAmountForMidtrans < 1000) {
-            return response()->json(['message' => 'Jumlah tagihan online (setelah potong saldo) terlalu kecil. Harap bayar manual.'], 422);
-        }
-
-        $uniqueOrderId = $invoice->invoice_number . '-T' . time() . '-C' . $creditToUse;
-
-        if ($grossAmountForMidtrans == 0 && $creditToUse > 0) {
-            try {
-                $this->processCreditOnlyPayment($invoice, $creditToUse); 
-                return response()->json(['snap_token' => null, 'status' => 'paid_by_credit']);
-            } catch (Exception $e) {
-                Log::error('Gagal proses bayar dengan kredit (Single): ' . $e->getMessage());
-                return response()->json(['message' => 'Gagal memproses pembayaran dengan saldo kredit.'], 500);
-            }
-        }
-
-        $isFullPayment = abs($totalPaymentValue - $sisaTagihan) < 0.01;
-        if ($isFullPayment && $invoice->pending_snap_token && $invoice->pending_snap_expires_at > now()) {
-            return response()->json(['snap_token' => $invoice->pending_snap_token]);
-        }
-
-        $params = [
-            'transaction_details' => [
-                'order_id' => $uniqueOrderId,
-                'gross_amount' => $grossAmountForMidtrans,
-            ],
-            'customer_details' => [
-                'first_name' => $client->client_name,
-                'email' => $client->email, 
-                'phone' => $client->phone_number,
-            ],
-            'expiry' => [
-                'start_time' => now()->format('Y-m-d H:i:s O'),
-                'unit' => 'hour',
-                'duration' => 24,
-            ],
-        ];
-
-        try {
-            $snapToken = Snap::getSnapToken($params);
-            if ($isFullPayment) {
-                $invoice->update([
-                    'pending_snap_token' => $snapToken,
-                    'pending_snap_expires_at' => now()->addHours(24),
-                ]);
-            }
-            return response()->json(['snap_token' => $snapToken]);
-        } catch (Exception $e) {
-            Log::error('Midtrans Snap Error (Single): ' . $e->getMessage());
-            return response()->json(['message' => 'Gagal memulai sesi pembayaran: ' . $e->getMessage()], 500);
-        }
-    }
-
-    public function payBatch(Request $request)
-    {
-        $gatewayMethod = PaymentMethod::where('type', 'gateway')->where('is_active', true)->first();
-        if (!$gatewayMethod) {
-            return response()->json(['message' => 'Pembayaran online saat ini sedang dinonaktifkan oleh Admin.'], 403);
-        }
-
-        $validated = $request->validate([
-            'invoice_ids' => 'required|array|min:1',
-            'invoice_ids.*' => 'exists:sales_invoices,invoice_id',
-            'amount' => 'required|numeric|min:0',
-            'use_credit' => 'nullable|boolean',
-        ]);
-
-        $invoices = SalesInvoice::whereIn('invoice_id', $validated['invoice_ids'])
-            ->with(['client', 'deductingReturns', 'adjustments'])
-            ->get();
-
-        if ($invoices->isEmpty()) {
-            return response()->json(['message' => 'Data invoice tidak ditemukan.'], 404);
-        }
-
-        $client = $invoices->first()->client;
-        if (!$client) {
-            return response()->json(['message' => 'Data pelanggan tidak valid.'], 404);
-        }
-
-        $invalidInvoices = $invoices->filter(fn($inv) => $inv->client_id !== $client->client_id);
-        if ($invalidInvoices->isNotEmpty()) {
-            return response()->json(['message' => 'Semua invoice harus milik pelanggan yang sama.'], 422);
-        }
-
-        $clientBalance = $client->balance;
-        $useCredit = $validated['use_credit'] ?? false;
-        $amountFromInput = (float) $validated['amount'];
-        $totalTagihanTerpilih = $invoices->reduce(fn ($carry, $inv) => $carry + $inv->remaining_balance, 0.0);
-
-        if ($totalTagihanTerpilih <= 0.01) {
-            return response()->json(['message' => 'Tagihan yang dipilih sudah lunas.'], 422);
-        }
-
-        $creditToUse = 0;
-        $totalPaymentValue = $amountFromInput;
-
-        if ($useCredit && $clientBalance > 0) {
-            $totalPaymentValue = $amountFromInput + $clientBalance;
-            $creditToUse = min($clientBalance, $totalTagihanTerpilih, $totalPaymentValue);
-        }
-
-        $grossAmountForMidtrans = round(max(0, $totalPaymentValue - $creditToUse));
-
-        if ($totalPaymentValue <= 0.01) {
-             return response()->json(['message' => 'Jumlah pembayaran harus lebih dari 0.'], 422);
-        }
-        if ($grossAmountForMidtrans > 0 && $grossAmountForMidtrans < 1000) {
-            return response()->json(['message' => 'Jumlah tagihan online terlalu kecil (min Rp 1.000). Silakan gunakan pelunasan manual atau deposit.'], 422);
-        }
-
-        DB::beginTransaction();
-        try {
-            $bulkPayment = BulkSalesPayment::create([
-                'client_id' => $client->client_id,
-                'processed_by_user_id' => Auth::id(), 
-                'payment_date' => now(),
-                'total_amount' => $totalPaymentValue, 
-                'payment_method_id' => null, 
-                'status' => 'pending',
-                'details' => ['invoice_ids' => $validated['invoice_ids']],
-            ]);
-
-            $uniqueOrderId = 'BULK-' . $bulkPayment->bulk_sales_payment_id . '-T' . time() . '-C' . $creditToUse;
-
-            if ($grossAmountForMidtrans == 0 && $creditToUse > 0) {
-                $this->processBatchCreditOnlyPayment($bulkPayment, $invoices, $totalPaymentValue); 
-                DB::commit();
-                return response()->json(['snap_token' => null, 'status' => 'paid_by_credit']);
-            }
-
-            $params = [
-                'transaction_details' => [
-                    'order_id' => $uniqueOrderId,
-                    'gross_amount' => $grossAmountForMidtrans,
-                ],
-                'customer_details' => [
-                    'first_name' => $client->client_name,
-                    'email' => $client->email,
-                    'phone' => $client->phone_number,
-                ],
-                'expiry' => [
-                    'start_time' => now()->format('Y-m-d H:i:s O'),
-                    'unit' => 'hour',
-                    'duration' => 24,
-                ],
-            ];
-
-            $snapToken = Snap::getSnapToken($params);
-            
-            DB::commit();
-
-            return response()->json(['snap_token' => $snapToken]);
-
-        } catch (Exception $e) {
-            DB::rollBack();
-            Log::error('Midtrans Admin Bulk Pay Error: ' . $e->getMessage());
-            return response()->json(['message' => 'Gagal memulai sesi pembayaran massal: ' . $e->getMessage()], 500);
-        }
-    }
-
+    /**
+     * PUBLIC WEBHOOK: Menerima notifikasi otomatis dari Server Midtrans.
+     * Endpoint ini dipanggil oleh Midtrans, bukan oleh User.
+     */
     public function callback(Request $request)
     {
-        Log::info('Midtrans Callback Received');
+        try {
+            // 1. Ambil Notifikasi dari Payload Midtrans
+            $notification = new Notification();
+        } catch (Exception $e) {
+            Log::error('Midtrans Payload Error: ' . $e->getMessage());
+            return response()->json(['message' => 'Invalid Payload'], 400);
+        }
 
-        $notification = new Notification();
-        $rawOrderId = $notification->order_id ?? '';
+        // 2. Verifikasi Signature Key (Keamanan)
+        // Rumus: SHA512(order_id + status_code + gross_amount + server_key)
+        $input = $notification->order_id . $notification->status_code . $notification->gross_amount . config('midtrans.server_key');
+        $signature = openssl_digest($input, 'sha512');
 
+        if ($signature !== $notification->signature_key) {
+            Log::warning("Invalid Signature for Order ID: " . $notification->order_id);
+            return response()->json(['message' => 'Invalid Signature'], 403);
+        }
+
+        $rawOrderId = $notification->order_id;
+
+        // 3. Routing Logic berdasarkan prefix Order ID
+        // Format Bulk: BULK-{ID}-...
+        // Format Single: INV-{ID}-...
         if (str_starts_with($rawOrderId, 'BULK-')) {
-            $this->handleBatchCallback($notification);
+            $this->handleBulkCallback($notification);
         } else {
             $this->handleSingleCallback($notification);
         }
 
-        return response()->json(['message' => 'Notification processed successfully.'], 200);
+        return response()->json(['message' => 'OK']);
     }
 
-    private function handleSingleCallback(Notification $notification)
+    /**
+     * Handle Pembayaran Single Invoice
+     */
+    private function handleSingleCallback($notification)
     {
         $accountingService = app(AccountingService::class);
         $accountingSettings = app(AccountingSettingService::class);
 
-        try {
-            $transactionStatus = $notification->transaction_status ?? null;
-            $rawOrderId = $notification->order_id ?? '';
-            $transactionId = $notification->transaction_id ?? null;
-            $paymentType = $notification->payment_type ?? null;
-            $grossAmount = (float) ($notification->gross_amount ?? 0); 
+        $transactionStatus = $notification->transaction_status;
+        $rawOrderId = $notification->order_id;
+        $transactionId = $notification->transaction_id;
+        $grossAmount = (float) $notification->gross_amount; // Uang yang masuk ke Midtrans
+        $paymentType = $notification->payment_type;
 
-            $creditUsed = 0; 
-            if (preg_match('/^(.*)-T\d+-C([\d\.]+)$/', $rawOrderId, $matches)) {
-                $originalInvoiceNumber = $matches[1];
-                $creditUsed = (float) $matches[2];
-            } else {
-                $orderIdParts = explode('-', $rawOrderId);
-                array_pop($orderIdParts);
-                $originalInvoiceNumber = implode('-', $orderIdParts);
+        // Parse Order ID untuk mendapatkan Invoice ID dan Credit Used
+        // Format: INV-{ID}-T{TIMESTAMP}-C{CREDIT}
+        $invoiceId = 0;
+        $creditUsed = 0;
+        
+        if (preg_match('/^INV-(\d+)-T\d+-C([\d\.]+)$/', $rawOrderId, $matches)) {
+            $invoiceId = $matches[1];
+            $creditUsed = (float) $matches[2];
+        } else {
+            // Fallback untuk format lama (jika ada data legacy)
+            $parts = explode('-', $rawOrderId);
+            // Hapus bagian timestamp/random di belakang
+            // Asumsi format lama: INV-{ID}-{RANDOM}
+            if(count($parts) >= 2 && is_numeric($parts[1])) {
+                 $invoiceId = $parts[1];
             }
+        }
 
-            $totalPaymentAmount = $grossAmount + $creditUsed; 
+        // Total Pembayaran Sebenarnya = Uang Midtrans + Saldo Deposit
+        $totalPaymentAmount = round($grossAmount + $creditUsed, 2);
 
-            $invoice = SalesInvoice::where('invoice_number', $originalInvoiceNumber)->firstOrFail();
+        DB::transaction(function () use ($invoiceId, $transactionId, $transactionStatus, $grossAmount, $creditUsed, $totalPaymentAmount, $accountingService, $accountingSettings, $notification, $paymentType) {
             
-            $isProcessed = PaymentGatewayCallback::where('vendor_transaction_id', $transactionId)
-                ->whereIn('status', ['settlement', 'capture'])
-                ->exists();
-
-            if ($isProcessed) {
-                Log::warning("Single Callback already processed for tx_id: {$transactionId}");
+            // 1. Lock Invoice untuk mencegah Race Condition
+            $invoice = SalesInvoice::lockForUpdate()->find($invoiceId);
+            
+            if (!$invoice) {
+                Log::warning("Invoice ID $invoiceId not found via Midtrans Callback.");
                 return;
             }
 
-            PaymentGatewayCallback::updateOrCreate(
-                ['invoice_id' => $invoice->invoice_id, 'vendor_transaction_id' => $transactionId],
-                [
-                    'status' => $transactionStatus,
-                    'amount' => $grossAmount,
-                    'payment_type' => $paymentType,
-                    'raw_response' => (array) $notification,
-                    'processed_at' => now(),
-                ]
-            );
-
-            if (in_array($transactionStatus, ['capture', 'settlement'])) {
-                
-                $arAccountId = $accountingSettings->getAccountsReceivableId();
-                $clientDepositAccountId = $accountingSettings->getClientDepositId();
-                $gatewayAccountId = $accountingSettings->getGatewayAccountId(); 
-                $gatewayMethod = PaymentMethod::where('type', 'gateway')->first();
-                $gatewayBank = CompanyBankAccount::where('chart_of_account_id', $gatewayAccountId)->first();
-
-                if (!$arAccountId || !$clientDepositAccountId || !$gatewayAccountId || !$gatewayBank) {
-                    throw new Exception("Akun default (AR, Deposit, Gateway, atau Akun Bank Gateway) belum diatur.");
-                }
-
-                DB::transaction(function () use (
-                    $invoice, $transactionId, $grossAmount, $notification, $creditUsed, $totalPaymentAmount,
-                    $gatewayMethod, $gatewayBank, $accountingService, $arAccountId, $clientDepositAccountId, $gatewayAccountId
-                ) {
-                    $existingPayment = Payment::where('transaction_id', $transactionId)->first();
-                    if ($existingPayment) return;
-
-                    $prettyPaymentMethod = $this->translatePaymentType($notification); 
-                    $metodeLog = ($creditUsed > 0) ? 'Kredit Klien + ' . $prettyPaymentMethod : $prettyPaymentMethod;
-                    $catatanLog = "Auto processed. Midtrans: " . number_format($grossAmount) . ". Saldo Kredit: " . number_format($creditUsed);
-
-                    $payment = Payment::create([
-                        'invoice_id' => $invoice->invoice_id,
-                        'payment_date' => now(),
-                        'amount' => $totalPaymentAmount,
-                        'payment_method_id' => $gatewayMethod ? $gatewayMethod->payment_method_id : null,
-                        'company_bank_account_id' => $gatewayBank->company_bank_account_id, 
-                        'transaction_id' => $transactionId,
-                        'status' => 'completed',
-                        'notes' => $catatanLog . " | Metode: " . $metodeLog,
-                    ]);
-
-                    if ($creditUsed > 0) {
-                        ClientLedger::create([
-                            'client_id' => $invoice->client_id,
-                            'sales_invoice_id' => $invoice->invoice_id,
-                            'reference_type' => SalesInvoice::class, 
-                            'reference_id' => $invoice->invoice_id,
-                            'transaction_date' => now(),
-                            'type' => 'debit',
-                            'amount' => -$creditUsed,
-                            'status' => 'available',
-                            'description' => 'Digunakan untuk membayar Invoice #' . $invoice->invoice_number,
-                            'user_id' => null,
-                        ]);
-                    }
-                    
-                    $journalGroupId = "PAY-" . $payment->payment_id;
-                    $description = "Pembayaran Midtrans Inv #" . $invoice->invoice_number;
-                    
-                    $debitEntries = [];
-                    $creditEntries = [];
-
-                    if ($grossAmount > 0) {
-                        $debitEntries[] = [$gatewayAccountId, $grossAmount, "Penerimaan Midtrans " . $prettyPaymentMethod];
-                    }
-                    if ($creditUsed > 0) {
-                        $debitEntries[] = [$clientDepositAccountId, $creditUsed, "Penggunaan deposit klien"];
-                    }
-                    if ($totalPaymentAmount > 0) {
-                        $creditEntries[] = [$arAccountId, $totalPaymentAmount, "Pelunasan Piutang Inv #" . $invoice->invoice_number];
-                    }
-
-                    $accountingService->postJournal(
-                        $journalGroupId,
-                        now(),
-                        $description,
-                        $debitEntries,
-                        $creditEntries,
-                        $payment 
-                    );
-
-                    $invoice->updatePaymentStatus();
-                });
-            } elseif ($transactionStatus === 'expire') {
-                if ($invoice->pending_snap_token) {
-                    $invoice->update([
-                        'pending_snap_token' => null,
-                        'pending_snap_expires_at' => null,
-                    ]);
-                    Log::info("Snap token expired and removed for Invoice: {$invoice->invoice_number}");
-                }
-            }
-        } catch (Exception $e) {
-            Log::error('Midtrans Single Callback Error: ' . $e->getMessage() . ' on line ' . $e->getLine());
-        }
-    }
-
-    private function handleBatchCallback(Notification $notification)
-    {
-        $accountingService = app(AccountingService::class);
-        $accountingSettings = app(AccountingSettingService::class);
-
-        try {
-            $transactionStatus = $notification->transaction_status ?? null;
-            $rawOrderId = $notification->order_id ?? '';
-            $transactionId = $notification->transaction_id ?? null;
-            $paymentType = $notification->payment_type ?? null;
-            $grossAmount = (float) ($notification->gross_amount ?? 0);
-
-            if (!preg_match('/^BULK-(\d+)-T\d+-C([\d\.]+)$/', $rawOrderId, $matches)) {
-                throw new Exception("Format Bulk Order ID salah: $rawOrderId");
+            // 2. Idempotency Check (Cegah proses ganda jika Midtrans kirim notif berkali-kali)
+            if (Payment::where('transaction_id', $transactionId)->exists()) {
+                return; 
             }
 
-            $bulkPaymentId = $matches[1];
-            $creditUsed = (float) $matches[2]; 
-            $totalPaymentAmount = $grossAmount + $creditUsed; 
-
-            $bulkPayment = BulkSalesPayment::find($bulkPaymentId);
-            if (!$bulkPayment) {
-                throw new Exception("BulkSalesPayment ID #$bulkPaymentId tidak ditemukan.");
-            }
-
-            $isProcessed = PaymentGatewayCallback::where('vendor_transaction_id', $transactionId)
-                ->whereIn('status', ['settlement', 'capture'])
-                ->exists();
-            if ($isProcessed) {
-                Log::warning("Bulk Callback already processed for tx_id: {$transactionId}");
-                return;
-            }
-
-            PaymentGatewayCallback::updateOrCreate(
-                ['vendor_transaction_id' => $transactionId],
-                [
-                    'invoice_id' => null,
-                    'status' => $transactionStatus,
-                    'amount' => $grossAmount,
-                    'payment_type' => $paymentType,
-                    'raw_response' => (array) $notification,
-                    'processed_at' => now(),
-                ]
-            );
-
-            if (in_array($transactionStatus, ['capture', 'settlement'])) {
-                
-                $arAccountId = $accountingSettings->getAccountsReceivableId();
-                $clientDepositAccountId = $accountingSettings->getClientDepositId();
-                $gatewayAccountId = $accountingSettings->getGatewayAccountId(); 
-                $gatewayMethod = PaymentMethod::where('type', 'gateway')->first();
-                $gatewayBank = CompanyBankAccount::where('chart_of_account_id', $gatewayAccountId)->first();
-
-                if (!$arAccountId || !$clientDepositAccountId || !$gatewayAccountId || !$gatewayBank) {
-                    throw new Exception("Akun default (AR, Deposit, Gateway, atau Akun Bank Gateway) belum diatur.");
-                }
-                
-                $prettyPaymentMethod = $this->translatePaymentType($notification); 
-
-                DB::transaction(function () use (
-                    $bulkPayment, $transactionId, $prettyPaymentMethod, $creditUsed, $totalPaymentAmount, $grossAmount,
-                    $gatewayMethod, $gatewayBank, $accountingService, $arAccountId, $clientDepositAccountId, $gatewayAccountId
-                ) {
-                    
-                    $invoiceIds = $bulkPayment->details['invoice_ids'] ?? [];
-                    $invoices = SalesInvoice::whereIn('invoice_id', $invoiceIds)
-                        ->with(['deductingReturns', 'adjustments'])
-                        ->orderBy('due_date', 'asc')
-                        ->get();
-
-                    $metodeBatch = $prettyPaymentMethod;
-                    if ($creditUsed > 0) {
-                        $metodeBatch = 'Kredit Klien + ' . $prettyPaymentMethod;
-                    }
-
-                    $bulkPayment->update([
-                        'payment_method_id' => $gatewayMethod ? $gatewayMethod->payment_method_id : null,
-                        'company_bank_account_id' => $gatewayBank->company_bank_account_id, 
-                        'status' => 'completed',
-                        'notes' => ($bulkPayment->notes ?? '') . " | Midtrans TX ID: $transactionId | Metode: $metodeBatch",
-                    ]);
-
-                    if ($creditUsed > 0) {
-                        ClientLedger::create([
-                            'client_id' => $bulkPayment->client_id,
-                            'reference_type' => BulkSalesPayment::class, 
-                            'reference_id' => $bulkPayment->bulk_sales_payment_id, 
-                            'transaction_date' => now(),
-                            'type' => 'debit',
-                            'amount' => -$creditUsed,
-                            'status' => 'available',
-                            'description' => 'Digunakan untuk Pembayaran Massal (Bulk) #' . $bulkPayment->bulk_sales_payment_id,
-                            'user_id' => null,
-                        ]);
-                    }
-
-                    $danaTersisaUntukAlokasi = $totalPaymentAmount;
-                    $totalPiutangLunas = 0; 
-
-                    foreach ($invoices as $invoice) {
-                        if ($danaTersisaUntukAlokasi <= 0.01) break;
-                        $sisaTagihanInvoice = $invoice->remaining_balance;
-                        if ($sisaTagihanInvoice <= 0.01) continue;
-                        $jumlahUntukInvoiceIni = min($sisaTagihanInvoice, $danaTersisaUntukAlokasi);
-
-                        $invoice->payments()->create([
-                            'bulk_sales_payment_id' => $bulkPayment->bulk_sales_payment_id, 
-                            'payment_date' => now(),
-                            'amount' => $jumlahUntukInvoiceIni,
-                            'payment_method_id' => $gatewayMethod ? $gatewayMethod->payment_method_id : null,
-                            'company_bank_account_id' => $gatewayBank->company_bank_account_id, 
-                            'received_by_user_id' => null,
-                            'status' => 'completed',
-                            'transaction_id' => $transactionId,
-                            'notes' => 'Auto-allocated from Midtrans Bulk #' . $bulkPayment->bulk_sales_payment_id . " | Metode: " . $metodeBatch,
-                        ]);
-
-                        $invoice->updatePaymentStatus();
-                        $danaTersisaUntukAlokasi -= $jumlahUntukInvoiceIni;
-                        $totalPiutangLunas += $jumlahUntukInvoiceIni; 
-                    }
-
-                    $overpaymentAmount = $danaTersisaUntukAlokasi; 
-                    if ($overpaymentAmount > 0.01) {
-                        ClientLedger::create([
-                            'client_id' => $bulkPayment->client_id,
-                            'reference_type' => BulkSalesPayment::class,
-                            'reference_id' => $bulkPayment->bulk_sales_payment_id,
-                            'transaction_date' => now(),
-                            'type' => 'credit',
-                            'amount' => $overpaymentAmount,
-                            'status' => 'available',
-                            'description' => 'Kelebihan dana dari Pembayaran Bulk #' . $bulkPayment->bulk_sales_payment_id,
-                            'user_id' => null,
-                        ]);
-                    }
-
-                    $journalGroupId = "BULK-" . $bulkPayment->bulk_sales_payment_id;
-                    $description = "Pembayaran Midtrans Bulk #" . $bulkPayment->bulk_sales_payment_id;
-
-                    $debitEntries = [];
-                    $creditEntries = [];
-
-                    if ($grossAmount > 0) {
-                        $debitEntries[] = [$gatewayAccountId, $grossAmount, "Penerimaan Midtrans Bulk " . $prettyPaymentMethod];
-                    }
-                    if ($creditUsed > 0) {
-                        $debitEntries[] = [$clientDepositAccountId, $creditUsed, "Penggunaan deposit klien bulk"];
-                    }
-                    if ($totalPiutangLunas > 0) {
-                        $creditEntries[] = [$arAccountId, $totalPiutangLunas, "Pelunasan Piutang bulk"];
-                    }
-                    if ($overpaymentAmount > 0) {
-                        $creditEntries[] = [$clientDepositAccountId, $overpaymentAmount, "Kelebihan bayar bulk"];
-                    }
-                    
-                    $accountingService->postJournal(
-                        $journalGroupId,
-                        now(),
-                        $description,
-                        $debitEntries,
-                        $creditEntries,
-                        $bulkPayment 
-                    );
-
-                });
-            }
-        } catch (Exception $e) {
-            Log::error('Midtrans Bulk Callback Error: ' . $e->getMessage() . ' on line ' . $e->getLine());
-        }
-    }
-
-    private function processCreditOnlyPayment(SalesInvoice $invoice, float $creditToUse)
-    {
-        $accountingService = app(AccountingService::class);
-        $accountingSettings = app(AccountingSettingService::class);
-
-        $arAccountId = $accountingSettings->getAccountsReceivableId();
-        $clientDepositAccountId = $accountingSettings->getClientDepositId();
-        if (!$arAccountId || !$clientDepositAccountId) {
-            throw new Exception("Akun AR atau Deposit Klien belum diatur.");
-        }
-
-        DB::transaction(function () use ($invoice, $creditToUse, $accountingService, $arAccountId, $clientDepositAccountId) {
-            $uniqueTransactionId = 'CREDIT-' . time() . '-' . $invoice->invoice_id;
-
-            $payment = Payment::create([
+            // 3. Simpan Log Raw (Untuk audit trail teknis)
+            PaymentGatewayCallback::create([
                 'invoice_id' => $invoice->invoice_id,
-                'payment_date' => now(),
-                'amount' => $creditToUse,
-                'payment_method_id' => null,
-                'transaction_id' => $uniqueTransactionId,
-                'status' => 'completed',
-                'notes' => 'Auto processed. Dibayar dengan Saldo Kredit.',
+                'vendor_transaction_id' => $transactionId,
+                'status' => $transactionStatus,
+                'amount' => $grossAmount,
+                'payment_type' => $paymentType,
+                'raw_response' => (array) $notification
             ]);
 
-            ClientLedger::create([
-                'client_id' => $invoice->client_id,
-                'sales_invoice_id' => $invoice->invoice_id,
-                'reference_type' => SalesInvoice::class, 
-                'reference_id' => $invoice->invoice_id,
-                'transaction_date' => now(),
-                'type' => 'debit',
-                'amount' => -$creditToUse,
-                'status' => 'available',
-                'description' => 'Digunakan untuk membayar Invoice #' . $invoice->invoice_number,
-                'user_id' => null,
-            ]);
+            // 4. Proses Jika Status Sukses (Settlement / Capture)
+            if (in_array($transactionStatus, ['capture', 'settlement'])) {
+                
+                // Ambil Setting Akun Akuntansi
+                $gatewayAccountId = $accountingSettings->getGatewayAccountId();
+                $arAccountId = $accountingSettings->getAccountsReceivableId();
+                $depositAccountId = $accountingSettings->getClientDepositId();
+                
+                // Cari Bank Account internal yang terhubung ke Akun Gateway
+                $gatewayBank = CompanyBankAccount::where('chart_of_account_id', $gatewayAccountId)->first();
+                $gatewayMethod = PaymentMethod::where('type', 'gateway')->first();
 
-            $journalGroupId = "PAY-" . $payment->payment_id;
-            $description = "Pembayaran (Kredit) Inv #" . $invoice->invoice_number;
-            
-            $debitEntries = [
-                [$clientDepositAccountId, $creditToUse, "Penggunaan deposit klien"]
-            ];
-            $creditEntries = [
-                [$arAccountId, $creditToUse, "Pelunasan Piutang Inv #" . $invoice->invoice_number]
-            ];
-            
-            $accountingService->postJournal($journalGroupId, now(), $description, $debitEntries, $creditEntries, $payment);
+                if (!$gatewayBank || !$gatewayAccountId) {
+                    throw new Exception("Setup Gateway Bank / COA belum benar di sistem Admin.");
+                }
 
-            $invoice->updatePaymentStatus();
-
-            Log::info("Invoice #{$invoice->invoice_id} lunas dengan saldo kredit (dan dijurnal).");
-        });
-    }
-
-    private function processBatchCreditOnlyPayment(BulkSalesPayment $bulkPayment, $invoices, float $creditToUse)
-    {
-        $accountingService = app(AccountingService::class);
-        $accountingSettings = app(AccountingSettingService::class);
-
-        $arAccountId = $accountingSettings->getAccountsReceivableId();
-        $clientDepositAccountId = $accountingSettings->getClientDepositId();
-        if (!$arAccountId || !$clientDepositAccountId) {
-            throw new Exception("Akun AR atau Deposit Klien belum diatur.");
-        }
-
-        DB::transaction(function () use ($bulkPayment, $invoices, $creditToUse, $accountingService, $arAccountId, $clientDepositAccountId) {
-            $uniqueTransactionId = 'CREDIT-BULK-' . time() . '-' . $bulkPayment->bulk_sales_payment_id;
-
-            $bulkPayment->update([
-                'payment_method_id' => null,
-                'status' => 'completed',
-                'notes' => ($bulkPayment->notes ?? '') . " | Lunas dengan Saldo Kredit.",
-            ]);
-
-            ClientLedger::create([
-                'client_id' => $bulkPayment->client_id,
-                'reference_type' => BulkSalesPayment::class,
-                'reference_id' => $bulkPayment->bulk_sales_payment_id,
-                'transaction_date' => now(),
-                'type' => 'debit',
-                'amount' => -$creditToUse, 
-                'status' => 'available',
-                'description' => 'Digunakan untuk Pembayaran Massal (Bulk) #' . $bulkPayment->bulk_sales_payment_id,
-                'user_id' => null,
-            ]);
-
-            $danaTersisaUntukAlokasi = $creditToUse;
-            $totalPiutangLunas = 0;
-            foreach ($invoices as $invoice) {
-                if ($danaTersisaUntukAlokasi <= 0.01) break;
-                $sisaTagihanInvoice = $invoice->remaining_balance;
-                if ($sisaTagihanInvoice <= 0.01) continue;
-                $jumlahUntukInvoiceIni = min($sisaTagihanInvoice, $danaTersisaUntukAlokasi);
-
-                $invoice->payments()->create([
-                    'bulk_sales_payment_id' => $bulkPayment->bulk_sales_payment_id, 
+                // A. Buat Payment Record (Tercatat Lunas)
+                $payment = Payment::create([
+                    'invoice_id' => $invoice->invoice_id,
                     'payment_date' => now(),
-                    'amount' => $jumlahUntukInvoiceIni,
-                    'payment_method_id' => null,
-                    'received_by_user_id' => null,
-                    'status' => 'completed',
-                    'transaction_id' => $uniqueTransactionId,
-                    'notes' => 'Auto-allocated from Credit-Only Bulk #' . $bulkPayment->bulk_sales_payment_id,
+                    'amount' => $totalPaymentAmount, // Mencatat Total Pelunasan
+                    'payment_method_id' => $gatewayMethod->payment_method_id ?? null,
+                    'company_bank_account_id' => $gatewayBank->company_bank_account_id,
+                    'transaction_id' => $transactionId,
+                    'status' => 'completed', // Langsung Completed karena verified by System
+                    'notes' => "Midtrans Auto: Gateway Rp ".number_format($grossAmount)." + Credit Rp ".number_format($creditUsed),
                 ]);
 
+                // B. Potong Saldo Klien (Ledger) jika ada penggunaan deposit
+                if ($creditUsed > 0) {
+                    ClientLedger::create([
+                        'client_id' => $invoice->client_id,
+                        'sales_invoice_id' => $invoice->invoice_id,
+                        'reference_type' => SalesInvoice::class,
+                        'reference_id' => $invoice->invoice_id,
+                        'transaction_date' => now(),
+                        'type' => 'debit',
+                        'amount' => -$creditUsed,
+                        'status' => 'available',
+                        'description' => 'Pembayaran Inv #' . $invoice->invoice_number . ' (Partial Midtrans)',
+                        'user_id' => null // System
+                    ]);
+                }
+
+                // C. Posting Jurnal Akuntansi Otomatis
+                $journalGroupId = "PAY-" . $payment->payment_id;
+                
+                $debitEntries = [];
+                // Debit 1: Uang Masuk ke Gateway
+                if ($grossAmount > 0) {
+                    $debitEntries[] = [$gatewayAccountId, $grossAmount, "Masuk Gateway (Midtrans)"];
+                }
+                // Debit 2: Potong Deposit Klien
+                if ($creditUsed > 0) {
+                    $debitEntries[] = [$depositAccountId, $creditUsed, "Potong Deposit Klien"];
+                }
+
+                // Kredit: Pelunasan Piutang
+                $creditEntries = [[$arAccountId, $totalPaymentAmount, "Pelunasan Inv #" . $invoice->invoice_number]];
+
+                $accountingService->postJournal($journalGroupId, now(), "Pembayaran Midtrans Inv #".$invoice->invoice_number, $debitEntries, $creditEntries, $payment);
+
+                // D. Update Status Invoice (Unpaid -> Paid)
                 $invoice->updatePaymentStatus();
-                $danaTersisaUntukAlokasi -= $jumlahUntukInvoiceIni;
-                $totalPiutangLunas += $jumlahUntukInvoiceIni; 
+                
+                // Clear Token agar tidak bisa dibayar ulang
+                $invoice->update(['pending_snap_token' => null]);
             }
-            
-            $bulkPayment->update(['total_amount' => $totalPiutangLunas]);
-            $journalGroupId = "BULK-" . $bulkPayment->bulk_sales_payment_id;
-            $description = "Pembayaran Bulk (Kredit) #" . $bulkPayment->bulk_sales_payment_id;
-            
-            $debitEntries = [
-                [$clientDepositAccountId, $totalPiutangLunas, "Penggunaan deposit klien bulk"]
-            ];
-            $creditEntries = [
-                [$arAccountId, $totalPiutangLunas, "Pelunasan Piutang bulk"]
-            ];
-            
-            $accountingService->postJournal($journalGroupId, now(), $description, $debitEntries, $creditEntries, $bulkPayment);
+            // Handle Expire / Cancel / Deny
+            elseif (in_array($transactionStatus, ['expire', 'cancel', 'deny'])) {
+                // Hapus token agar user bisa request ulang
+                $invoice->update(['pending_snap_token' => null]);
+            }
         });
     }
 
-    private function translatePaymentType(Notification $notification): string
+    /**
+     * Handle Pembayaran Bulk (Massal)
+     */
+    private function handleBulkCallback($notification)
     {
-        return 'Payment Gateway Midtrans';
+        $accountingService = app(AccountingService::class);
+        $accountingSettings = app(AccountingSettingService::class);
+
+        $transactionStatus = $notification->transaction_status;
+        $rawOrderId = $notification->order_id;
+        $transactionId = $notification->transaction_id;
+        $grossAmount = (float) $notification->gross_amount;
+        $paymentType = $notification->payment_type;
+
+        // Parse: BULK-{ID}-T{TIMESTAMP}-C{CREDIT}
+        $bulkId = 0;
+        $creditUsed = 0;
+        if (preg_match('/^BULK-(\d+)-T\d+-C([\d\.]+)$/', $rawOrderId, $matches)) {
+            $bulkId = $matches[1];
+            $creditUsed = (float) $matches[2];
+        } else {
+            return; 
+        }
+
+        $totalPaymentAmount = round($grossAmount + $creditUsed, 2);
+
+        DB::transaction(function () use ($bulkId, $transactionId, $transactionStatus, $grossAmount, $creditUsed, $totalPaymentAmount, $accountingService, $accountingSettings, $notification) {
+            
+            // 1. Lock Bulk Payment Record
+            $bulkPayment = BulkSalesPayment::lockForUpdate()->find($bulkId);
+            
+            // Jika sudah completed, skip (Idempotency)
+            if (!$bulkPayment || $bulkPayment->status === 'completed') return;
+
+            // 2. Simpan Log Raw
+            PaymentGatewayCallback::create([
+                'invoice_id' => null, 
+                'vendor_transaction_id' => $transactionId,
+                'status' => $transactionStatus,
+                'amount' => $grossAmount,
+                'payment_type' => $notification->payment_type,
+                'raw_response' => (array) $notification
+            ]);
+
+            if (in_array($transactionStatus, ['capture', 'settlement'])) {
+                
+                // Setup Akun
+                $gatewayAccountId = $accountingSettings->getGatewayAccountId();
+                $arAccountId = $accountingSettings->getAccountsReceivableId();
+                $depositAccountId = $accountingSettings->getClientDepositId();
+                
+                $gatewayBank = CompanyBankAccount::where('chart_of_account_id', $gatewayAccountId)->first();
+                $gatewayMethod = PaymentMethod::where('type', 'gateway')->first();
+
+                if (!$gatewayBank || !$gatewayAccountId) throw new Exception("Setup Gateway Bank salah.");
+
+                // A. Update Header Bulk menjadi Completed
+                $bulkPayment->update([
+                    'status' => 'completed',
+                    'payment_method_id' => $gatewayMethod->payment_method_id ?? null,
+                    'company_bank_account_id' => $gatewayBank->company_bank_account_id ?? null,
+                    'notes' => $bulkPayment->notes . " | Midtrans TX: $transactionId",
+                ]);
+
+                // B. Ambil Invoice yang akan dibayar (Dari detail JSON yang disimpan saat request)
+                $invoiceIds = $bulkPayment->details['invoice_ids'] ?? [];
+                $invoices = SalesInvoice::whereIn('invoice_id', $invoiceIds)
+                    ->lockForUpdate()
+                    ->orderBy('due_date', 'asc')
+                    ->get();
+
+                // C. Potong Deposit Klien (Untuk Bulk)
+                if ($creditUsed > 0) {
+                    ClientLedger::create([
+                        'client_id' => $bulkPayment->client_id,
+                        'reference_type' => BulkSalesPayment::class,
+                        'reference_id' => $bulkPayment->bulk_sales_payment_id,
+                        'transaction_date' => now(),
+                        'type' => 'debit',
+                        'amount' => -$creditUsed,
+                        'status' => 'available',
+                        'description' => 'Digunakan untuk Bulk Payment #' . $bulkPayment->payment_number,
+                        'user_id' => null
+                    ]);
+                }
+
+                // D. Loop Alokasi Dana ke Invoice
+                $danaTersisa = $totalPaymentAmount;
+                $totalAllocatedAR = 0;
+
+                foreach ($invoices as $inv) {
+                    if ($danaTersisa <= 0.01) break;
+
+                    $sisaTagihan = $inv->remaining_balance;
+                    if ($sisaTagihan <= 0.01) continue;
+
+                    $bayarIni = min($sisaTagihan, $danaTersisa);
+                    $bayarIni = round($bayarIni, 2);
+
+                    $inv->payments()->create([
+                        'bulk_sales_payment_id' => $bulkPayment->bulk_sales_payment_id,
+                        'payment_date' => now(),
+                        'amount' => $bayarIni,
+                        'payment_method_id' => $gatewayMethod->payment_method_id ?? null,
+                        'company_bank_account_id' => $gatewayBank->company_bank_account_id ?? null,
+                        'status' => 'completed',
+                        'transaction_id' => $transactionId,
+                        'notes' => 'Auto-allocated Bulk #' . $bulkPayment->payment_number,
+                    ]);
+
+                    $inv->updatePaymentStatus();
+                    $inv->update(['pending_snap_token' => null]); 
+
+                    $danaTersisa -= $bayarIni;
+                    $totalAllocatedAR += $bayarIni;
+                }
+
+                // E. Handle Overpayment (Sisa Dana -> Masuk Deposit Klien)
+                if ($danaTersisa > 0.01) {
+                    ClientLedger::create([
+                        'client_id' => $bulkPayment->client_id,
+                        'reference_type' => BulkSalesPayment::class,
+                        'reference_id' => $bulkPayment->bulk_sales_payment_id,
+                        'transaction_date' => now(),
+                        'type' => 'credit',
+                        'amount' => $danaTersisa,
+                        'status' => 'available',
+                        'description' => 'Kelebihan dana Bulk #' . $bulkPayment->payment_number,
+                        'user_id' => null
+                    ]);
+                }
+
+                // F. Jurnal Akuntansi Bulk
+                $journalGroupId = "BULK-" . $bulkPayment->bulk_sales_payment_id;
+                $debitEntries = [];
+                $creditEntries = [];
+
+                // Debit
+                if ($grossAmount > 0) $debitEntries[] = [$gatewayAccountId, $grossAmount, "Masuk Gateway (Bulk)"];
+                if ($creditUsed > 0) $debitEntries[] = [$depositAccountId, $creditUsed, "Potong Deposit (Bulk)"];
+
+                // Kredit
+                if ($totalAllocatedAR > 0) $creditEntries[] = [$arAccountId, $totalAllocatedAR, "Pelunasan AR (Bulk)"];
+                if ($danaTersisa > 0) $creditEntries[] = [$depositAccountId, $danaTersisa, "Overpayment (Bulk)"];
+
+                $accountingService->postJournal($journalGroupId, now(), "Pembayaran Midtrans Bulk", $debitEntries, $creditEntries, $bulkPayment);
+            }
+        });
     }
 }

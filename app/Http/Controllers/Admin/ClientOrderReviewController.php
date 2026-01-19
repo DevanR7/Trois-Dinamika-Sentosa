@@ -13,7 +13,12 @@ use Illuminate\Http\RedirectResponse;
 use Carbon\Carbon;
 
 class ClientOrderReviewController extends Controller
-{
+{   
+    public function __construct()
+    {
+        $this->middleware('can:approve-client-orders');
+    }
+    
     public function index(Request $request): View
     {
         $this->authorize('review-client-orders');
@@ -101,23 +106,39 @@ class ClientOrderReviewController extends Controller
         }
 
         try {
-
             DB::beginTransaction();
 
-            $order->load('items.product');
+            $order->load('items');
+            
+            // 1. Validasi Stok & Pengurangan Stok (CRITICAL FIX)
             foreach ($order->items as $item) {
-                $product = $item->product()->lockForUpdate()->first();
+                // Lock produk untuk mencegah race condition
+                $product = Product::lockForUpdate()->find($item->product_id);
+                
                 if (!$product) {
                     throw new \Exception("Produk '{$item->product_id}' tidak ditemukan.");
                 }
-                if ($product->stock_quantity < 0) {
-                    throw new \Exception("Stok produk '{$product->product_name}' tidak valid (negatif).");
+                
+                if (!$product->is_active) {
+                    throw new \Exception("Produk '{$product->product_name}' sedang tidak aktif.");
                 }
+
+                // Cek ketersediaan stok
+                if ($product->stock_quantity < $item->quantity) {
+                    throw new \Exception("Stok produk '{$product->product_name}' tidak mencukupi. Sisa: {$product->stock_quantity}, Diminta: {$item->quantity}.");
+                }
+
+                // Kurangi stok karena invoice akan dibuat status 'unpaid' (Confirmed)
+                $product->decrement('stock_quantity', $item->quantity);
             }
 
+            // 2. Pembuatan Invoice
             $subtotalInvoice = 0;
             $invoiceItemsToSave = [];
+            
+            // Re-fetch items with products to get snapshot data if needed (e.g. HPP)
             foreach ($order->items as $orderItem) {
+                $product = $orderItem->product; // Already loaded/cached
                 $price = $orderItem->price_per_unit;
                 $quantity = $orderItem->quantity;
                 $itemSubtotal = $quantity * $price;
@@ -128,26 +149,27 @@ class ClientOrderReviewController extends Controller
                     'quantity' => $quantity,
                     'price_per_unit' => $price,
                     'subtotal' => $itemSubtotal,
+                    'hpp' => $product->average_cost ?? 0, // Snapshot HPP
                 ];
             }
 
+            // Asumsi diskon/pajak 0 dulu untuk order dari klien (bisa diedit di invoice nanti)
             $discountPercentage = 0;
             $discountAmount = 0;
             $subtotalAfterDiscount = $subtotalInvoice;
             $totalTaxAmount = 0;
-            $taxesToAttach = [];
             $totalAmountInvoice = $subtotalAfterDiscount + $totalTaxAmount;
 
             $invoice = SalesInvoice::create([
                 'client_id' => $order->client_id,
                 'invoice_number' => SalesInvoice::generateInvoiceNumber(null, $order->order_source),
                 'order_date' => $order->order_date,
-                'due_date' => $order->order_date->addDays(30),
+                'due_date' => $order->order_date->addDays(30), // Default term
                 'subtotal' => $subtotalInvoice,
                 'discount_percentage' => $discountPercentage,
                 'discount_amount' => $discountAmount,
                 'total_amount' => $totalAmountInvoice,
-                'status' => 'unpaid',
+                'status' => 'unpaid', // Status Unpaid = Stok sudah dibooking/dikirim
                 'user_id_sales' => null,
                 'amount_paid' => 0,
                 'notes' => $order->notes
@@ -155,12 +177,9 @@ class ClientOrderReviewController extends Controller
                     : "Berdasarkan Pesanan Klien #{$order->order_number}",
             ]);
 
-            if (!empty($taxesToAttach)) {
-                $invoice->taxes()->attach($taxesToAttach);
-            }
-
             $invoice->items()->createMany($invoiceItemsToSave);
 
+            // 3. Update Order Status
             $order->update([
                 'status' => 'invoiced',
                 'invoice_id' => $invoice->invoice_id,
@@ -169,7 +188,8 @@ class ClientOrderReviewController extends Controller
             DB::commit();
 
             return redirect()->route('admin.invoices.show', $invoice->invoice_id)
-                ->with('success', "Pesanan {$order->order_number} berhasil disetujui dan invoice #{$invoice->invoice_number} telah dibuat.");
+                ->with('success', "Pesanan {$order->order_number} berhasil disetujui. Invoice #{$invoice->invoice_number} telah dibuat dan stok dikurangi.");
+                
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Gagal menyetujui pesanan: ' . $e->getMessage());
@@ -197,19 +217,15 @@ class ClientOrderReviewController extends Controller
             }
 
             $order->save();
-            $order->loadMissing('items');
-
-            foreach ($order->items as $item) {
-                $product = Product::where('product_id', $item->product_id)->lockForUpdate()->first();
-                if ($product) {
-                    $product->increment('stock_quantity', $item->quantity);
-                }
-            }
+            
+            // Karena status masih pending_review, stok BELUM berkurang.
+            // Jadi saat reject, TIDAK PERLU mengembalikan stok.
+            // Cukup ubah status saja.
 
             DB::commit();
 
             return redirect()->route('admin.client-order-reviews.index')
-                ->with('success', "Pesanan {$order->order_number} berhasil ditolak dan stok dikembalikan.");
+                ->with('success', "Pesanan {$order->order_number} berhasil ditolak.");
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Gagal menolak pesanan: ' . $e->getMessage());

@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
 use App\Models\ManualJournalEntry;
+use App\Traits\LogsActivity;
 
 class ManualJournal extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
     protected $primaryKey = 'journal_id';
 
     protected $fillable = [
@@ -41,21 +42,26 @@ class ManualJournal extends Model
     }
 
     public static function generateJournalNumber(): string
-    {
+{
     return DB::transaction(function () {
         $yearMonth = now()->format('Ym');
         $prefix = "JUM-";
-        $latestJournal = self::where('journal_number', 'like', $prefix . $yearMonth . '%')
+        
+        // Lock baris terakhir jurnal bulan ini
+        $latestJournal = DB::table('manual_journals')
+                             ->where('journal_number', 'like', $prefix . $yearMonth . '%')
                              ->orderBy('journal_number', 'desc')
-                             ->lockForUpdate() 
+                             ->lockForUpdate()
                              ->first();
+                             
         $nextSequence = 1;
         if ($latestJournal) {
             $lastSequence = (int) substr($latestJournal->journal_number, -4);
             $nextSequence = $lastSequence + 1;
         }
+        
         $sequencePadded = str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
         return $prefix . $yearMonth . '-' . $sequencePadded;
     });
-    }
+}
 }

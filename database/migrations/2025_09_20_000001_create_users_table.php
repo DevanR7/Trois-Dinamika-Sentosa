@@ -16,6 +16,8 @@ return new class extends Migration
             $table->boolean('is_approved')->default(false);
             $table->string('full_name', 100);
             $table->string('email', 255)->unique();
+            $table->timestamp('email_verified_at')->nullable(); 
+            $table->string('avatar_path')->nullable(); 
             $table->string('sales_code', 10)->nullable()->unique();
             $table->string('nik', 20)->nullable()->unique();
             $table->text('address')->nullable();

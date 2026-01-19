@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 use App\Models\SalesInvoice;
 use App\Models\PurchaseOrder;
@@ -26,216 +27,250 @@ class DashboardController extends Controller
     public function index(Request $request): View
     {
         $user = Auth::user();
-        
-        // 1. Parameter Filter
         $selectedYear = $request->input('year', date('Y'));
-        $selectedUserId = $request->input('filter_user_id'); // Bisa null jika Admin pilih "Semua"
+        $selectedUserId = $request->input('filter_user_id'); 
         
-        // 2. Permission Checks
         $isAdmin = $user->hasRole(['admin', 'superadmin']);
-        $canViewFinancials = $user->can('view-dashboard-financials'); // Flexibel via Permission
-        $canViewInventory = $user->can('view-dashboard-inventory');
+        $canViewFinancials = $user->can('view-reports'); 
+        $canViewInventory = $user->can('view-products');
 
-        // Jika user biasa (bukan admin) login, paksa filter ke diri sendiri
         if (!$isAdmin) {
             $selectedUserId = $user->user_id;
         }
 
-        // 3. Tahun Tersedia
+        // Optimasi: Gunakan Raw Query untuk tahun agar lebih cepat daripada pluck semua data
         $availableYears = DB::table('sales_invoices')
             ->selectRaw('YEAR(order_date) as year')
             ->union(DB::table('purchase_orders')->selectRaw('YEAR(order_date) as year'))
             ->distinct()->orderByDesc('year')->pluck('year');
+        
         if ($availableYears->isEmpty()) $availableYears = collect([date('Y')]);
         
         $allUsers = $isAdmin ? User::orderBy('full_name')->get() : collect([]);
 
-        // =========================================================================
-        // BAGIAN 1: FINANCIAL STATS (GLOBAL PERUSAHAAN)
-        // Data ini TIDAK TERPENGARUH filter user. Selalu menampilkan kondisi PT.
-        // Hanya dihitung jika user punya izin view-dashboard-financials
-        // =========================================================================
-        
-        $totalRevenue = 0;
-        $totalExpenses = 0;
-        $trendDataIncome = [];
-        $trendDataExpense = [];
+        // --- INIT VARIABLES ---
+        $stats = [
+            'revenue' => 0, 'expense' => 0, 'net_profit' => 0,
+            'growth_revenue' => 0, 'growth_profit' => 0, 'prev_year_label' => $selectedYear - 1,
+            'payables' => 0, 'loans' => 0, 'assets' => 0, 'receivables_global' => 0,
+            'total_invoices' => 0, 'paid_invoices' => 0, 'total_sales_value' => 0,
+            'items_sold' => 0, 'active_clients' => 0, 'success_rate' => 0, 'receivables_filtered' => 0,
+            'sales_breakdown' => [], 
+            'purchase_breakdown' => []
+        ];
+
+        $forecast = [
+            'incoming_30_days' => 0, 'outgoing_30_days' => 0, 'net_forecast' => 0,
+            'monthly_target' => 500000000, 'current_monthly_sales' => 0, 'target_percentage' => 0
+        ];
+
+        $trendDataIncome = array_fill(0, 12, 0);
+        $trendDataExpense = array_fill(0, 12, 0);
+        $expenseCompositionData = [0, 0, 0, 0, 0];
         $months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        $topClients = collect([]);
 
-        // Stat Sekunder Global (Hutang, Aset, Sisa Pinjaman)
-        // Ini selalu global
-        $totalPayables = 0; 
-        $totalActiveLoans = 0; 
-        $totalAssetsValue = 0;
-        $receivablesGlobal = 0;
-
+        // =========================================================================
+        // BAGIAN 1: FINANCIALS (Database Aggregate - Efficient)
+        // =========================================================================
         if ($canViewFinancials) {
-            // A. PEMASUKAN GLOBAL (Cash In)
-            $q_inc_sales_global = Payment::whereYear('payment_date', $selectedYear)->where('status', 'completed');
-            $q_inc_equity = EquityTransaction::whereYear('transaction_date', $selectedYear)->where('type', 'investment');
-            $q_inc_loan = Loan::whereYear('loan_date', $selectedYear);
+            // 1. DATA TAHUN INI
+            $inc_sales = Payment::whereYear('payment_date', $selectedYear)->where('status', 'completed')->sum('amount');
+            $inc_equity = EquityTransaction::whereYear('transaction_date', $selectedYear)->where('type', 'investment')->sum('amount');
+            $inc_loan = Loan::whereYear('loan_date', $selectedYear)->sum('principal_amount');
+            $stats['revenue'] = $inc_sales + $inc_equity + $inc_loan;
 
-            // B. PENGELUARAN GLOBAL (Cash Out)
-            $q_exp_ops = Expense::whereYear('expense_date', $selectedYear);
-            $q_exp_po = PurchaseOrderPayment::whereYear('payment_date', $selectedYear)->where('status', 'completed');
-            $q_exp_asset = FixedAsset::whereYear('purchase_date', $selectedYear);
-            $q_exp_loan = LoanPayment::whereYear('payment_date', $selectedYear);
-            $q_exp_equity = EquityTransaction::whereYear('transaction_date', $selectedYear)->where('type', 'drawing');
+            $val_exp_ops = Expense::whereYear('expense_date', $selectedYear)->sum('amount');
+            $val_exp_po = PurchaseOrderPayment::whereYear('payment_date', $selectedYear)->where('status', 'completed')->sum('amount');
+            $val_exp_asset = FixedAsset::whereYear('purchase_date', $selectedYear)->sum('purchase_cost');
+            $val_exp_loan = LoanPayment::whereYear('payment_date', $selectedYear)->sum('total_paid');
+            $val_exp_equity = EquityTransaction::whereYear('transaction_date', $selectedYear)->where('type', 'drawing')->sum('amount');
 
-            // Hitung Total Utama
-            $totalRevenue = $q_inc_sales_global->sum('amount') + $q_inc_equity->sum('amount') + $q_inc_loan->sum('principal_amount');
-            $totalExpenses = $q_exp_ops->sum('amount') + $q_exp_po->sum('amount') + $q_exp_asset->sum('purchase_cost') + $q_exp_loan->sum('total_paid') + $q_exp_equity->sum('amount');
+            $stats['expense'] = $val_exp_ops + $val_exp_po + $val_exp_asset + $val_exp_loan + $val_exp_equity;
+            $stats['net_profit'] = $stats['revenue'] - $stats['expense'];
 
-            // Hitung Stat Sekunder
-            $totalPayables = PurchaseOrder::whereIn('payment_status', ['unpaid', 'partially_paid'])
-                ->where('status', '!=', 'cancelled')->sum(DB::raw('grand_total - amount_paid - total_returned'));
-            $totalActiveLoans = Loan::where('status', 'active')->sum('remaining_balance');
-            $totalAssetsValue = FixedAsset::sum('current_book_value');
-            $receivablesGlobal = SalesInvoice::whereIn('status', ['unpaid', 'partially_paid'])
-                ->where('status', '!=', 'cancelled')->sum(DB::raw('total_amount - amount_paid'));
+            // 2. DATA TAHUN SEBELUMNYA
+            $prevYear = $selectedYear - 1;
+            $prev_sales = Payment::whereYear('payment_date', $prevYear)->where('status', 'completed')->sum('amount');
+            $prev_equity = EquityTransaction::whereYear('transaction_date', $prevYear)->where('type', 'investment')->sum('amount');
+            $prev_loan = Loan::whereYear('loan_date', $prevYear)->sum('principal_amount');
+            $prevRevenue = $prev_sales + $prev_equity + $prev_loan;
 
-            // Data Grafik Tren (Bulanan Global)
-            $groupByMonth = function($query, $dateCol, $sumCol) {
-                return $query->selectRaw("MONTH($dateCol) as month, SUM($sumCol) as total")
-                    ->groupBy(DB::raw("MONTH($dateCol)"))
-                    ->pluck('total', 'month')->toArray();
+            $prevExpense = Expense::whereYear('expense_date', $prevYear)->sum('amount') + 
+                           PurchaseOrderPayment::whereYear('payment_date', $prevYear)->where('status', 'completed')->sum('amount') +
+                           FixedAsset::whereYear('purchase_date', $prevYear)->sum('purchase_cost') +
+                           LoanPayment::whereYear('payment_date', $prevYear)->sum('total_paid') +
+                           EquityTransaction::whereYear('transaction_date', $prevYear)->where('type', 'drawing')->sum('amount');
+
+            $prevProfit = $prevRevenue - $prevExpense;
+
+            $calculateGrowth = function($current, $previous) {
+                if ($previous == 0) return $current > 0 ? 100 : 0;
+                return round((($current - $previous) / $previous) * 100, 1);
             };
 
-            $monthly_sales = $groupByMonth(clone $q_inc_sales_global, 'payment_date', 'amount');
-            $monthly_equity_in = $groupByMonth(clone $q_inc_equity, 'transaction_date', 'amount');
-            $monthly_loan_in = $groupByMonth(clone $q_inc_loan, 'loan_date', 'principal_amount');
+            $stats['growth_revenue'] = $calculateGrowth($stats['revenue'], $prevRevenue);
+            $stats['growth_profit'] = $calculateGrowth($stats['net_profit'], $prevProfit);
+            $expenseCompositionData = [$val_exp_ops, $val_exp_po, $val_exp_asset, $val_exp_loan, $val_exp_equity];
 
-            $monthly_expense_ops = $groupByMonth(clone $q_exp_ops, 'expense_date', 'amount');
-            $monthly_po_pay = $groupByMonth(clone $q_exp_po, 'payment_date', 'amount');
-            $monthly_asset_buy = $groupByMonth(clone $q_exp_asset, 'purchase_date', 'purchase_cost');
-            $monthly_loan_pay = $groupByMonth(clone $q_exp_loan, 'payment_date', 'total_paid');
-            $monthly_equity_out = $groupByMonth(clone $q_exp_equity, 'transaction_date', 'amount');
+            // Global Stats (Optimized SUM DB)
+            $stats['payables'] = PurchaseOrder::whereIn('payment_status', ['unpaid', 'partially_paid'])
+                ->where('status', '!=', 'cancelled')->sum(DB::raw('grand_total - amount_paid - total_returned'));
+                
+            $stats['loans'] = Loan::where('status', 'active')->sum('remaining_balance');
+            $stats['assets'] = FixedAsset::sum('current_book_value');
+            
+            $stats['receivables_global'] = SalesInvoice::whereIn('status', ['unpaid', 'partially_paid'])
+                ->where('status', '!=', 'cancelled')->sum(DB::raw('total_amount - amount_paid'));
+
+            // Chart Data
+            $m_sales = Payment::whereYear('payment_date', $selectedYear)->where('status', 'completed')
+                ->selectRaw("MONTH(payment_date) as month, SUM(amount) as total")
+                ->groupBy('month')->pluck('total', 'month')->toArray();
+     
+            $m_exp = Expense::whereYear('expense_date', $selectedYear)
+                ->selectRaw("MONTH(expense_date) as month, SUM(amount) as total")->groupBy('month')->pluck('total', 'month')->toArray();
+            
+            $m_po = PurchaseOrderPayment::whereYear('payment_date', $selectedYear)->where('status', 'completed')
+                ->selectRaw("MONTH(payment_date) as month, SUM(amount) as total")->groupBy('month')->pluck('total', 'month')->toArray();
 
             for ($i = 1; $i <= 12; $i++) {
-                $trendDataIncome[] = ($monthly_sales[$i] ?? 0) + ($monthly_equity_in[$i] ?? 0) + ($monthly_loan_in[$i] ?? 0);
-                $trendDataExpense[] = ($monthly_expense_ops[$i] ?? 0) + ($monthly_po_pay[$i] ?? 0) + ($monthly_asset_buy[$i] ?? 0) + ($monthly_loan_pay[$i] ?? 0) + ($monthly_equity_out[$i] ?? 0);
+                $trendDataIncome[$i-1] = $m_sales[$i] ?? 0;
+                $trendDataExpense[$i-1] = ($m_exp[$i] ?? 0) + ($m_po[$i] ?? 0);
+            }
+
+            $topClients = SalesInvoice::whereYear('order_date', $selectedYear)
+                ->where('status', '!=', 'cancelled')
+                ->select('client_id', DB::raw('SUM(total_amount) as total_spent'))
+                ->with('client:client_id,client_name') // Eager load specific columns
+                ->groupBy('client_id')
+                ->orderByDesc('total_spent')
+                ->take(5)->get();
+
+            // Forecasting (Optimized)
+            $forecast['incoming_30_days'] = SalesInvoice::whereIn('status', ['unpaid', 'partially_paid'])
+                ->where('status', '!=', 'cancelled')
+                ->whereBetween('due_date', [Carbon::now(), Carbon::now()->addDays(30)])
+                ->sum(DB::raw('total_amount - amount_paid'));
+
+            $forecast['outgoing_30_days'] = PurchaseOrder::whereIn('payment_status', ['unpaid', 'partially_paid'])
+                ->where('status', '!=', 'cancelled')
+                ->whereBetween('due_date', [Carbon::now(), Carbon::now()->addDays(30)])
+                ->sum(DB::raw('grand_total - amount_paid - total_returned'));
+
+            $forecast['net_forecast'] = $forecast['incoming_30_days'] - $forecast['outgoing_30_days'];
+            $forecast['current_monthly_sales'] = Payment::whereYear('payment_date', date('Y'))
+                ->whereMonth('payment_date', date('m'))->where('status', 'completed')->sum('amount');
+
+            if ($forecast['monthly_target'] > 0) {
+                $forecast['target_percentage'] = min(100, round(($forecast['current_monthly_sales'] / $forecast['monthly_target']) * 100));
             }
         }
 
         // =========================================================================
-        // BAGIAN 2: OPERATIONAL STATS & SALES DATA (FILTERABLE)
-        // Data ini DIPENGARUHI oleh Filter User.
-        // Jika Admin pilih User A -> Muncul data User A.
-        // Jika Staff login -> Muncul data Staff itu sendiri.
+        // BAGIAN 2: OPERATIONAL & BREAKDOWN (Optimized Counts)
         // =========================================================================
-
-        $salesQuery = SalesInvoice::whereYear('order_date', $selectedYear)
-            ->where('status', '!=', 'cancelled');
-
-        if ($selectedUserId) {
-            $salesQuery->where('user_id_sales', $selectedUserId);
-        }
-
-        // Statistik Operasional (Personal/Filtered)
-        $countInvoices = (clone $salesQuery)->count();
-        $countPaidInvoices = (clone $salesQuery)->where('status', 'paid')->count();
-        $totalSalesValue = (clone $salesQuery)->sum('total_amount'); 
         
-        $itemsSoldQuery = DB::table('invoice_items')
-            ->join('sales_invoices', 'invoice_items.invoice_id', '=', 'sales_invoices.invoice_id')
-            ->whereYear('sales_invoices.order_date', $selectedYear)
-            ->where('sales_invoices.status', '!=', 'cancelled');
-            
-        if ($selectedUserId) {
-            $itemsSoldQuery->where('sales_invoices.user_id_sales', $selectedUserId);
-        }
-        $itemsSold = $itemsSoldQuery->sum('quantity');
+        $baseSalesQuery = SalesInvoice::whereYear('order_date', $selectedYear)->where('status', '!=', 'cancelled');
+        if ($selectedUserId) $baseSalesQuery->where('user_id_sales', $selectedUserId);
 
-        $activeClients = (clone $salesQuery)->distinct('client_id')->count('client_id');
-        $successRate = $countInvoices > 0 ? round(($countPaidInvoices / $countInvoices) * 100) : 0;
+        // Breakdown menggunakan conditional count untuk menghindari multiple query berat
+        $salesStatsRaw = (clone $baseSalesQuery)
+            ->selectRaw("
+                COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid,
+                COUNT(CASE WHEN status = 'partially_paid' THEN 1 END) as partial,
+                COUNT(CASE WHEN status = 'unpaid' AND due_date >= CURRENT_DATE THEN 1 END) as unpaid_current,
+                COUNT(CASE WHEN status IN ('unpaid', 'partially_paid') AND due_date < CURRENT_DATE THEN 1 END) as overdue,
+                COUNT(*) as total,
+                SUM(total_amount) as total_value,
+                COUNT(DISTINCT client_id) as distinct_clients
+            ")->first();
 
-        // Piutang (Bisa difilter per user jika perlu, atau global)
-        // Di sini kita buat Piutang mengikuti filter user untuk Operasional View
-        $receivablesFiltered = (clone $salesQuery)->whereIn('status', ['unpaid', 'partially_paid'])
+        $stats['sales_breakdown'] = [
+            'paid' => $salesStatsRaw->paid,
+            'partial' => $salesStatsRaw->partial,
+            'unpaid_current' => $salesStatsRaw->unpaid_current,
+            'overdue' => $salesStatsRaw->overdue,
+        ];
+
+        $stats['total_invoices'] = $salesStatsRaw->total;
+        $stats['paid_invoices'] = $salesStatsRaw->paid;
+        $stats['total_sales_value'] = $salesStatsRaw->total_value ?? 0;
+        $stats['active_clients'] = $salesStatsRaw->distinct_clients;
+        $stats['success_rate'] = $stats['total_invoices'] > 0 ? round(($stats['paid_invoices'] / $stats['total_invoices']) * 100) : 0;
+
+        // Hitung piutang filtered
+        $stats['receivables_filtered'] = (clone $baseSalesQuery)
+            ->whereIn('status', ['unpaid', 'partially_paid'])
             ->sum(DB::raw('total_amount - amount_paid'));
 
-        // =========================================================================
-        // BAGIAN 3: TRANSAKSI TERAKHIR & PRODUK
-        // =========================================================================
+        // Purchase Breakdown
+        if ($isAdmin || $canViewFinancials) {
+            $poStatsRaw = PurchaseOrder::whereYear('order_date', $selectedYear)
+                ->where('status', '!=', 'cancelled')
+                ->selectRaw("
+                    COUNT(CASE WHEN payment_status = 'paid' THEN 1 END) as paid,
+                    COUNT(CASE WHEN payment_status = 'partially_paid' THEN 1 END) as partial,
+                    COUNT(CASE WHEN payment_status = 'unpaid' AND due_date >= CURRENT_DATE THEN 1 END) as unpaid_current,
+                    COUNT(CASE WHEN payment_status IN ('unpaid', 'partially_paid') AND due_date < CURRENT_DATE THEN 1 END) as overdue
+                ")->first();
 
-        // Recent Invoices (Tabel Bawah) - Mengikuti Filter User
-        $recentInvoices = (clone $salesQuery)->with(['client', 'sales'])
-            ->latest('order_date')
-            ->take(10)
-            ->get();
+            $stats['purchase_breakdown'] = [
+                'paid' => $poStatsRaw->paid,
+                'partial' => $poStatsRaw->partial,
+                'unpaid_current' => $poStatsRaw->unpaid_current,
+                'overdue' => $poStatsRaw->overdue,
+            ];
+        }
 
-        // Top Products (Donut Chart) - Mengikuti Filter User
-        $topProductsQuery = DB::table('invoice_items')
+        // Items Sold - Optimized with Join
+        $stats['items_sold'] = DB::table('invoice_items')
+            ->join('sales_invoices', 'invoice_items.invoice_id', '=', 'sales_invoices.invoice_id')
+            ->whereYear('sales_invoices.order_date', $selectedYear)
+            ->where('sales_invoices.status', '!=', 'cancelled')
+            ->when($selectedUserId, fn($q) => $q->where('sales_invoices.user_id_sales', $selectedUserId))
+            ->sum('invoice_items.quantity');
+
+        // Recent Invoices
+        $recentInvoices = (clone $baseSalesQuery)->with(['client', 'sales'])->latest('order_date')->take(5)->get();
+
+        // Top Products - Optimized
+        $topProducts = DB::table('invoice_items')
             ->join('sales_invoices', 'invoice_items.invoice_id', '=', 'sales_invoices.invoice_id')
             ->join('products', 'invoice_items.product_id', '=', 'products.product_id')
             ->whereYear('sales_invoices.order_date', $selectedYear)
-            ->where('sales_invoices.status', '!=', 'cancelled');
-            
-        if ($selectedUserId) {
-            $topProductsQuery->where('sales_invoices.user_id_sales', $selectedUserId);
-        }
-
-        $topProducts = $topProductsQuery
+            ->where('sales_invoices.status', '!=', 'cancelled')
+            ->when($selectedUserId, fn($q) => $q->where('sales_invoices.user_id_sales', $selectedUserId))
             ->select('products.product_name', DB::raw('SUM(invoice_items.quantity) as total_qty'))
             ->groupBy('products.product_id', 'products.product_name')
             ->orderByDesc('total_qty')
+            ->limit(5)
             ->get();
 
-        // =========================================================================
-        // COMPILE DATA
-        // =========================================================================
-
-        $stats = [
-            // Financials (Global) - Hanya diisi jika canViewFinancials
-            'revenue' => $totalRevenue,
-            'expense' => $totalExpenses,
-            'net_profit' => $totalRevenue - $totalExpenses,
-            'payables' => $totalPayables,
-            'loans' => $totalActiveLoans,
-            'assets' => $totalAssetsValue,
-            'receivables_global' => $receivablesGlobal,
-
-            // Operational (Filtered)
-            'total_invoices' => $countInvoices,
-            'paid_invoices' => $countPaidInvoices,
-            'total_sales_value' => $totalSalesValue,
-            'items_sold' => $itemsSold,
-            'active_clients' => $activeClients,
-            'success_rate' => $successRate,
-            'receivables_filtered' => $receivablesFiltered,
-        ];
-
         $charts = [
-            'months' => $months,
-            'trend_data_income' => $trendDataIncome,
+            'months' => $months, 
+            'trend_data_income' => $trendDataIncome, 
             'trend_data_expense' => $trendDataExpense,
-            'trend_label_1' => 'Pemasukan',
-            'trend_label_2' => 'Pengeluaran',
-            'top_products_labels' => $topProducts->pluck('product_name')->toArray(),
+            'expense_composition' => $expenseCompositionData, 
+            'top_products_labels' => $topProducts->pluck('product_name')->toArray(), 
             'top_products_data' => $topProducts->pluck('total_qty')->toArray(),
         ];
 
-        // Pending Actions Widget
+        // Pending Actions
         $pendingActions = [
-            'invoice_draft' => SalesInvoice::where('status', 'draft')
-                ->when($selectedUserId, fn($q) => $q->where('user_id_sales', $selectedUserId))
-                ->count(),
+            'invoice_draft' => SalesInvoice::where('status', 'draft')->when($selectedUserId, fn($q) => $q->where('user_id_sales', $selectedUserId))->count(),
             'po_draft' => ($isAdmin) ? PurchaseOrder::where('status', 'draft')->count() : 0,
             'pending_payments' => ($user->can('manage-payment-clearance')) ? Payment::where('status', 'pending_verification')->count() : 0,
             'stock_opname_draft' => ($canViewInventory) ? StockOpname::where('status', 'draft')->count() : 0,
             'stock_alert' => ($canViewInventory) ? Product::where('stock_quantity', '<=', 5)->count() : 0,
         ];
-
-        $lowStockProducts = Product::where('stock_quantity', '<', 10)
-            ->orderBy('stock_quantity', 'asc')
-            ->take(5)
-            ->get();
+        
+        $lowStockProducts = Product::where('stock_quantity', '<=', 10)->orderBy('stock_quantity', 'asc')->take(5)->get();
 
         return view('admin.dashboard', compact(
-            'user', 'availableYears', 'allUsers', 
-            'selectedYear', 'selectedUserId', 'isAdmin',
-            'stats', 'charts', 'pendingActions', 'recentInvoices', 'lowStockProducts',
-            'canViewFinancials'
+            'user', 'availableYears', 'allUsers', 'selectedYear', 'selectedUserId', 'isAdmin',
+            'stats', 'charts', 'pendingActions', 'recentInvoices', 'lowStockProducts', 'canViewFinancials',
+            'topClients', 'forecast'
         ));
     }
 }

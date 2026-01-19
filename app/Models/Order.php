@@ -6,16 +6,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
 use App\Models\Client;
 use App\Models\OrderItem;
 use App\Models\OrderChangeRequest;
 use App\Models\SalesInvoice;
+use App\Traits\LogsActivity;
 
 class Order extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes, LogsActivity;
     protected $primaryKey = 'order_id';
 
     protected $fillable = [
@@ -35,20 +37,49 @@ class Order extends Model
         'total_amount' => 'float',
     ];
 
-    public static function generateOrderNumber($salesUserId = null): string
-    {
-        $yearMonth = now()->format('Ym');
-        $year = now()->format('Y');
-        $month = now()->format('m');
-        $counter = DB::table('sales_order_counters')->where('ym', $yearMonth)->lockForUpdate()->first();
+
+public static function generateOrderNumber($salesUserId = null): string
+{
+    $yearMonth = now()->format('Ym');
+    $year = now()->format('Y');
+    $month = now()->format('m');
+    
+    // Gunakan Transaction
+    return DB::transaction(function() use ($yearMonth, $year, $month, $salesUserId) {
+        // Lock tabel counter
+        $counter = DB::table('sales_order_counters')
+            ->where('ym', $yearMonth)
+            ->lockForUpdate() // <--- KUNCI UTAMA
+            ->first();
 
         if ($counter) {
             $nextSequence = $counter->last_sequence + 1;
-            DB::table('sales_order_counters')->where('ym', $yearMonth)->update(['last_sequence' => $nextSequence]);
+            DB::table('sales_order_counters')
+                ->where('ym', $yearMonth)
+                ->update(['last_sequence' => $nextSequence, 'updated_at' => now()]);
         } else {
-            $nextSequence = 1;
-            DB::table('sales_order_counters')->insert(['ym' => $yearMonth, 'last_sequence' => $nextSequence, 'created_at' => now(), 'updated_at' => now()]);
+            // Handle Insert Race Condition
+            try {
+                $nextSequence = 1;
+                DB::table('sales_order_counters')->insert([
+                    'ym' => $yearMonth, 
+                    'last_sequence' => $nextSequence, 
+                    'created_at' => now(), 
+                    'updated_at' => now()
+                ]);
+            } catch (\Exception $e) {
+                // Jika insert gagal (baru saja dibuat orang lain), update saja
+                $counter = DB::table('sales_order_counters')
+                    ->where('ym', $yearMonth)
+                    ->lockForUpdate()
+                    ->first();
+                $nextSequence = $counter->last_sequence + 1;
+                DB::table('sales_order_counters')
+                    ->where('ym', $yearMonth)
+                    ->update(['last_sequence' => $nextSequence, 'updated_at' => now()]);
+            }
         }
+
         $sequencePadded = str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
         $prefix = $salesUserId ? "SO" : "CO"; 
         $baseNumber = "{$prefix}/{$year}/{$month}/{$sequencePadded}";
@@ -60,7 +91,8 @@ class Order extends Model
             }
         }
         return $baseNumber;
-    }
+    });
+}
 
     public function client(): BelongsTo
     {

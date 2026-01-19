@@ -13,10 +13,11 @@ use App\Models\Order;
 use App\Notifications\ClientResetPasswordNotification;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Auth\Passwords\CanResetPassword as CanResetPasswordTrait;
+use App\Traits\LogsActivity;
 
 class Client extends Authenticatable implements CanResetPassword
 {
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes, CanResetPasswordTrait;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes, CanResetPasswordTrait, LogsActivity;
     protected $primaryKey = 'client_id';
 
     protected $fillable = [
@@ -29,6 +30,7 @@ class Client extends Authenticatable implements CanResetPassword
         'is_approved',
         'is_locked',
         'google_id', 
+        'avatar_path',
     ];
 
     protected $hidden = [
@@ -83,5 +85,14 @@ class Client extends Authenticatable implements CanResetPassword
                     ->where('status', 'pending')
                     ->where('type', 'credit')
                     ->sum('amount');
+    }
+
+    public function getAvatarUrlAttribute()
+    {
+        if ($this->avatar_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($this->avatar_path)) {
+            return asset('storage/' . $this->avatar_path);
+        }
+        $name = urlencode($this->client_name);
+        return "https://ui-avatars.com/api/?name={$name}&color=7F9CF5&background=EBF4FF";
     }
 }

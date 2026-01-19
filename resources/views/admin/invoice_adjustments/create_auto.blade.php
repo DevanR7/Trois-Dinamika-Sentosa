@@ -1,418 +1,549 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Revisi Otomatis Invoice')
+@section('title', 'Koreksi Otomatis Invoice #' . $invoice->invoice_number)
 
 @section('content')
+<div x-data="autoAdjustmentForm()" x-init="initData()" class="max-w-7xl mx-auto">
 
-    <div class="max-w-6xl mx-auto">
+    {{-- HEADER --}}
+    <div class="flex items-center gap-4 mb-6">
+        <a href="{{ route('admin.invoice-adjustments.create', ['invoice_id' => $invoice->invoice_id]) }}" 
+           class="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition-all shadow-sm">
+            <i class="material-icons text-xl leading-none">arrow_back</i>
+        </a>
+        <div>
+            <div class="flex items-center gap-3">
+                <h1 class="page-title text-xl">Koreksi Otomatis <span class="text-indigo-600">#{{ $invoice->invoice_number }}</span></h1>
+            </div>
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+                Ubah Qty menjadi <strong>0</strong> untuk menghapus item (Retur Penuh).
+            </p>
+        </div>
+    </div>
+
+    {{-- ALERT INFO --}}
+    <div class="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl p-4 mb-6 flex gap-4 items-start">
+        <div class="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-800 text-indigo-600 dark:text-indigo-300 flex items-center justify-center shrink-0">
+            <i class="material-icons">auto_fix_high</i>
+        </div>
+        <div>
+            <h4 class="font-bold text-indigo-800 dark:text-indigo-300 text-sm">Mode Revisi Fleksibel</h4>
+            <ul class="text-xs text-indigo-700 dark:text-indigo-400 mt-1 leading-relaxed list-disc list-inside">
+                <li>Set <strong>Qty = 0</strong> untuk menghapus barang dari invoice (Retur Penuh).</li>
+                <li>Kurangi Qty untuk Retur Sebagian (Partial).</li>
+                <li>Sistem otomatis membuat <strong>Credit Note</strong> (Potong Tagihan) atau <strong>Debit Note</strong> (Tagihan Tambahan).</li>
+            </ul>
+        </div>
+    </div>
+
+    {{-- MAIN FORM --}}
+    <form action="{{ route('admin.invoice-adjustments.store.auto', $invoice->invoice_id) }}" method="POST" @submit="validateForm($event)">
+        @csrf
         
-        <form action="{{ route('admin.invoice-adjustments.store.auto', $invoice->invoice_id) }}" method="POST" id="adjustmentForm">
-            @csrf
+        <div class="card overflow-hidden">
+            <div class="h-1 bg-emerald-500 w-full"></div>
 
-            {{-- HEADER --}}
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                <div>
-                    <h1 class="page-title">Revisi Otomatis: {{ $invoice->invoice_number }}</h1>
-                    <p class="page-subtitle">Ubah rincian di bawah. Sistem akan menghitung selisih (adjustment) secara otomatis.</p>
-                </div>
-                <div class="flex gap-3">
-                    <a href="{{ route('admin.invoice-adjustments.create', ['invoice_id' => $invoice->invoice_id]) }}" class="btn btn-secondary">Kembali</a>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="material-icons text-sm mr-2">save</i> Simpan Revisi
-                    </button>
-                </div>
-            </div>
-
-            {{-- ALERT INFO --}}
-            <div class="alert alert-info bg-indigo-50 border-indigo-100 text-indigo-900 mb-6 flex items-start gap-3 p-4 rounded-xl">
-                <i class="material-icons text-indigo-500 mt-0.5">auto_fix_high</i>
-                <div class="text-sm">
-                    <strong>Cara Kerja:</strong> Edit daftar barang, biaya, atau pajak di bawah ini sesuai kondisi seharusnya. <br>
-                    Sistem akan membandingkan <strong>Grand Total Baru</strong> dengan <strong>Total Lama (Rp {{ number_format($invoice->total_amount,0,',','.') }})</strong> 
-                    dan membuat Nota Kredit/Debit atas selisihnya.
-                </div>
-            </div>
-
-            <div class="space-y-6">
+            <div class="p-6 md:p-8 space-y-8">
                 
-                {{-- 1. ITEM PRODUK --}}
-                <div class="card">
-                    <div class="card-header flex justify-between items-center bg-slate-50 dark:bg-slate-800">
-                        <h3 class="card-header-title">1. Item Produk (Baru)</h3>
-                        <button type="button" id="btnAddRow" class="btn btn-sm btn-secondary text-indigo-600 bg-indigo-50 border-indigo-200 hover:bg-indigo-100 transition-colors">
+                {{-- SECTION 1: HEADER (Read Only) --}}
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="lg:col-span-1">
+                        <label class="form-label">Klien</label>
+                        <input type="text" class="form-input bg-slate-100 text-slate-500 cursor-not-allowed" value="{{ $invoice->client->client_name }}" readonly>
+                    </div>
+                    <div class="lg:col-span-1">
+                        <label class="form-label">Sales Person</label>
+                        <input type="text" class="form-input bg-slate-100 text-slate-500 cursor-not-allowed" value="{{ $invoice->sales->full_name ?? '-' }}" readonly>
+                        <input type="hidden" name="requester_user_id" value="{{ $invoice->user_id_sales }}">
+                    </div>
+                    <div class="lg:col-span-1">
+                        <label class="form-label label-required">Tanggal Invoice</label>
+                        <input type="date" name="order_date" class="form-input" value="{{ old('order_date', $invoice->order_date->format('Y-m-d')) }}" required>
+                    </div>
+                    <div class="lg:col-span-1">
+                        <label class="form-label label-required">Jatuh Tempo</label>
+                        <input type="date" name="due_date" class="form-input" value="{{ old('due_date', $invoice->due_date->format('Y-m-d')) }}" required>
+                    </div>
+                </div>
+
+                <hr class="border-slate-100 dark:border-slate-700">
+
+                {{-- SECTION 2: ITEM BARANG --}}
+                <div>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-slate-700 dark:text-white flex items-center gap-2">
+                            <i class="material-icons text-indigo-500">shopping_cart</i> Item Barang (Revisi)
+                        </h3>
+                        <button type="button" @click="addItem()" class="btn btn-sm btn-secondary hover:text-indigo-600">
                             <i class="material-icons text-sm mr-1">add</i> Tambah Barang
                         </button>
                     </div>
-                    
-                    <div class="overflow-x-auto w-full rounded-b-xl">
-                        <table class="table-modern w-full min-w-[900px]" id="itemsTable">
-                            <thead>
+
+                    <div class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-50 dark:bg-slate-800 text-xs text-slate-500 uppercase font-bold">
                                 <tr>
-                                    <th class="w-[40%] min-w-[250px]">Produk</th>
-                                    <th class="w-[20%] min-w-[150px] text-right">Harga Satuan</th>
-                                    <th class="w-[15%] min-w-[100px] text-center">Qty</th>
-                                    <th class="w-[20%] min-w-[150px] text-right">Subtotal</th>
-                                    <th class="w-[5%] min-w-[50px] text-center"></th>
+                                    <th class="px-4 py-3 min-w-[250px]">Produk</th>
+                                    <th class="px-4 py-3 w-32 text-right">Stok Gudang</th>
+                                    <th class="px-4 py-3 w-48 text-right">Harga Satuan</th>
+                                    <th class="px-4 py-3 w-24 text-center">Qty</th>
+                                    <th class="px-4 py-3 w-40 text-right">Total</th>
+                                    <th class="px-4 py-3 w-10"></th>
                                 </tr>
                             </thead>
-                            <tbody id="itemsBody">
-                                {{-- Rows populated via JS --}}
+                            <tbody class="divide-y divide-slate-100 dark:divide-slate-700 bg-white dark:bg-slate-800/50">
+                                <template x-for="(item, index) in items" :key="item.key">
+                                    {{-- 
+                                        VISUAL FEEDBACK: 
+                                        - Merah (Rose) jika Qty = 0 (Dihapus)
+                                        - Kuning (Amber) jika Qty < Original (Retur Parsial)
+                                    --}}
+                                    <tr :class="item.qty == 0 ? 'bg-rose-50/50 dark:bg-rose-900/10' : (item.qty < item.original_qty ? 'bg-amber-50/50 dark:bg-amber-900/10' : '')">
+                                        
+                                        {{-- KOLOM PRODUK --}}
+                                        <td class="px-4 py-3 align-top">
+                                            <select :name="`products[${index}][product_id]`" class="tom-select-dynamic w-full" x-init="initTomSelect($el, index)" required>
+                                                <option value="">Pilih Produk...</option>
+                                                @foreach($products as $product)
+                                                    <option value="{{ $product->product_id }}" data-price="{{ $product->selling_price }}" data-stock="{{ $product->stock_quantity }}">
+                                                        {{ $product->product_name }} ({{ $product->product_code }})
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            
+                                            <div class="flex items-center gap-4 mt-2">
+                                                {{-- Checkbox Update Harga Master --}}
+                                                <label class="inline-flex items-center cursor-pointer" x-show="item.qty > 0">
+                                                    <input type="checkbox" :name="`products[${index}][update_master_price]`" value="1" class="form-checkbox h-3 w-3 text-indigo-600 rounded border-gray-300">
+                                                    <span class="ml-2 text-[10px] text-slate-500">Update harga master</span>
+                                                </label>
+                                                
+                                                {{-- Label Status --}}
+                                                <span x-show="item.qty == 0" class="text-[10px] text-rose-600 font-bold flex items-center gap-1 uppercase tracking-wider">
+                                                    <i class="material-icons text-sm">delete_forever</i> Dihapus / Retur Full
+                                                </span>
+                                                <span x-show="item.qty > 0 && item.qty < item.original_qty" class="text-[10px] text-amber-600 font-bold flex items-center gap-1">
+                                                    <i class="material-icons text-[10px]">history</i> Qty Awal: <span x-text="item.original_qty"></span>
+                                                </span>
+                                            </div>
+                                        </td>
+
+                                        {{-- STOK --}}
+                                        <td class="px-4 py-3 align-top text-right pt-4">
+                                            <span class="font-mono text-xs" :class="item.stock > 0 ? 'text-emerald-600' : 'text-red-500'" x-text="formatNumber(item.stock)"></span>
+                                        </td>
+
+                                        {{-- HARGA SATUAN --}}
+                                        <td class="px-4 py-3 align-top">
+                                            <div class="relative">
+                                                <span class="absolute left-3 top-2 text-slate-400 text-xs font-bold">Rp</span>
+                                                <input type="text" 
+                                                       x-model="item.formatted_price"
+                                                       @input="handlePriceInput(index, $el.value)"
+                                                       @blur="formatPriceOnBlur(index)"
+                                                       class="form-input text-right pl-8 h-9 font-mono" 
+                                                       :disabled="item.qty == 0"
+                                                       required>
+                                                <input type="hidden" :name="`products[${index}][price_per_unit]`" :value="item.price">
+                                            </div>
+                                        </td>
+
+                                        {{-- QUANTITY (BISA 0) --}}
+                                        <td class="px-4 py-3 align-top">
+                                            <input type="number" 
+                                                   :name="`products[${index}][quantity]`" 
+                                                   x-model.number="item.qty" 
+                                                   @input="calculateRow(index)" 
+                                                   class="form-input text-center h-9 font-bold" 
+                                                   :class="item.qty == 0 ? 'text-rose-600 bg-rose-50 border-rose-300' : ''"
+                                                   min="0" 
+                                                   step="any" 
+                                                   required>
+                                        </td>
+
+                                        {{-- SUBTOTAL --}}
+                                        <td class="px-4 py-3 align-top text-right pt-4">
+                                            <span class="font-bold text-slate-700 dark:text-white" :class="item.qty == 0 ? 'line-through text-slate-400' : ''" x-text="formatNumber(item.subtotal)"></span>
+                                        </td>
+
+                                        {{-- TOMBOL HAPUS BARIS --}}
+                                        <td class="px-4 py-3 align-top text-center pt-2">
+                                            <button type="button" @click="removeItem(index)" class="text-slate-400 hover:text-red-500 transition-colors" title="Hapus Baris">
+                                                <i class="material-icons text-lg">close</i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                {{-- 2. BIAYA TAMBAHAN --}}
-                <div class="card">
-                    <div class="card-header flex justify-between items-center bg-slate-50 dark:bg-slate-800">
-                        <h3 class="card-header-title">2. Biaya Tambahan</h3>
-                        <button type="button" id="btnAddCost" class="btn btn-sm btn-secondary text-emerald-600 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 transition-colors">
-                            <i class="material-icons text-sm mr-1">add</i> Tambah Biaya
-                        </button>
-                    </div>
-                    <div class="card-body bg-slate-50/50 dark:bg-slate-800/20">
-                        <div id="additionalCostsContainer" class="space-y-3">
-                            {{-- Cost rows added via JS --}}
-                        </div>
-                        <div id="noCostPlaceholder" class="text-center text-sm text-slate-400 py-2 italic" style="display: none;">
-                            Belum ada biaya tambahan.
-                        </div>
-                    </div>
-                </div>
-
-                {{-- 3. SPLIT LAYOUT: ALASAN & RINGKASAN --}}
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    
-                    {{-- KIRI: Alasan & Opsi Overpayment --}}
+                {{-- SECTION 3: BIAYA, NOTES & OVERPAYMENT LOGIC --}}
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-4">
                     <div class="space-y-6">
-                        <div class="card h-full flex flex-col">
-                            <div class="card-header">
-                                <h3 class="card-header-title">Alasan Revisi</h3>
+                        
+                        {{-- Biaya Tambahan --}}
+                        <div>
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="font-bold text-slate-700 dark:text-white flex items-center gap-2 text-sm">
+                                    <i class="material-icons text-amber-500 text-sm">add_circle</i> Biaya Tambahan
+                                </h3>
+                                <button type="button" @click="addCost()" class="text-xs text-indigo-600 font-bold hover:underline">+ Tambah Biaya</button>
                             </div>
-                            <div class="card-body flex flex-col gap-4 flex-1">
-                                
-                                {{-- Textarea mengisi sisa ruang --}}
-                                <div class="flex-1">
-                                    <textarea name="notes" class="form-textarea w-full h-full min-h-[120px] resize-none" 
-                                              placeholder="Wajib diisi: Contoh: Salah input jumlah barang, perubahan harga dari pusat..." required></textarea>
-                                </div>
-                                
-                                {{-- PERBAIKAN TAMPILAN CREDIT NOTE --}}
-                                <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                                    <div class="flex gap-3">
-                                        <div class="shrink-0">
-                                            <i class="material-icons text-amber-600">info</i>
+                            <div class="space-y-3">
+                                <template x-for="(cost, index) in costs" :key="cost.key">
+                                    <div class="flex gap-3 items-start">
+                                        <input type="text" :name="`additional_costs[${index}][description]`" x-model="cost.desc" placeholder="Keterangan" class="form-input h-9 text-xs" required>
+                                        <div class="relative w-32">
+                                            <span class="absolute left-2 top-2 text-xs text-slate-400">Rp</span>
+                                            <input type="number" :name="`additional_costs[${index}][amount]`" x-model.number="cost.amount" @input="calculateTotal()" class="form-input h-9 text-xs text-right pl-6" required>
                                         </div>
-                                        <div class="w-full">
-                                            <p class="text-xs font-bold text-amber-800 mb-2 uppercase tracking-wide">
-                                                Jika Total Baru Lebih Kecil (Credit Note):
-                                            </p>
-                                            
-                                            <div class="space-y-2">
-                                                <label class="flex items-center p-2 rounded-lg border border-amber-200 bg-white cursor-pointer hover:bg-amber-100/50 transition-colors">
-                                                    <input type="radio" name="overpayment_action" value="deposit" 
-                                                           class="form-radio text-amber-600 w-4 h-4 focus:ring-amber-500" checked>
-                                                    <span class="ml-3 text-sm text-slate-700 font-medium">
-                                                        Simpan selisih ke <b>Deposit Pelanggan</b>
-                                                    </span>
-                                                </label>
-                                                
-                                                <label class="flex items-center p-2 rounded-lg border border-transparent hover:bg-amber-100/50 cursor-pointer transition-colors">
-                                                    <input type="radio" name="overpayment_action" value="refund" 
-                                                           class="form-radio text-amber-600 w-4 h-4 focus:ring-amber-500">
-                                                    <span class="ml-3 text-sm text-slate-600">
-                                                        Akan di-Refund Manual (Tidak masuk deposit)
-                                                    </span>
-                                                </label>
-                                            </div>
-                                        </div>
+                                        <button type="button" @click="removeCost(index)" class="text-slate-400 hover:text-red-500 mt-2"><i class="material-icons text-sm">close</i></button>
                                     </div>
-                                </div>
-                                {{-- END PERBAIKAN --}}
-
+                                </template>
                             </div>
+                        </div>
+
+                        {{-- Catatan --}}
+                        <div>
+                            <label class="form-label label-required">Alasan Koreksi</label>
+                            <textarea name="notes" class="form-textarea h-24 text-sm" placeholder="Contoh: Barang retur, revisi harga, item batal..." required minlength="5"></textarea>
+                        </div>
+
+                        {{-- LOGIKA OVERPAYMENT (CONDITIONAL SHOW) --}}
+                        {{-- LOGIKA OVERPAYMENT (CONDITIONAL SHOW) --}}
+                        <div x-show="diffValue < 0" x-transition.opacity>
+                            
+                            {{-- KASUS 1: Overpayment Real (Tagihan Baru < Sudah Bayar) --}}
+                            {{-- Muncul jika terjadi kelebihan bayar --}}
+                            <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-4" x-show="grandTotal < amountPaid">
+                                <label class="form-label label-required text-indigo-800">Tindakan Kelebihan Bayar</label>
+                                <p class="text-xs text-indigo-600 mb-3">
+                                    Total baru (Rp <span x-text="formatNumber(grandTotal)"></span>) lebih kecil dari pembayaran yang masuk (Rp <span x-text="formatNumber(amountPaid)"></span>). 
+                                    <br>Selisih <strong>Rp <span x-text="formatNumber(amountPaid - grandTotal)"></span></strong> akan:
+                                </p>
+                                <div class="space-y-2">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        {{-- Tambahkan :disabled --}}
+                                        <input type="radio" name="overpayment_action" value="deposit" class="form-radio text-indigo-600" 
+                                               :disabled="grandTotal >= amountPaid" checked>
+                                        <span class="text-sm text-slate-700">Disimpan ke Deposit Klien (Untuk Invoice Lain)</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        {{-- Tambahkan :disabled --}}
+                                        <input type="radio" name="overpayment_action" value="refund" class="form-radio text-indigo-600"
+                                               :disabled="grandTotal >= amountPaid">
+                                        <span class="text-sm text-slate-700">Biarkan sebagai Lebih Bayar (Untuk di-Refund Manual)</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {{-- KASUS 2: Hanya Mengurangi Hutang (Tagihan Baru >= Sudah Bayar) --}}
+                            <div class="bg-emerald-50 border border-emerald-100 rounded-lg p-4" x-show="grandTotal >= amountPaid">
+                                <div class="flex items-center gap-2 text-emerald-700 font-bold text-sm">
+                                    <i class="material-icons">check_circle</i> Sisa Tagihan Berkurang
+                                </div>
+                                <p class="text-xs text-emerald-600 mt-1">
+                                    Tagihan berkurang, tetapi tidak terjadi kelebihan bayar. 
+                                    <br>Sistem akan otomatis memotong sisa hutang (Credit Note).
+                                    
+                                    {{-- FIX: Input ini hanya aktif jika kondisi terpenuhi --}}
+                                    <input type="hidden" name="overpayment_action" value="deposit" :disabled="grandTotal < amountPaid">
+                                </p>
+                            </div>
+
                         </div>
                     </div>
 
-                    {{-- KANAN: Ringkasan & Kalkulasi --}}
-                    <div class="card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm h-full">
-                        <div class="card-header bg-slate-50 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-700">
-                            <h3 class="card-header-title text-slate-800 dark:text-white">Ringkasan (Kalkulasi Baru)</h3>
-                        </div>
-                        <div class="card-body space-y-4">
+                    {{-- SECTION 4: RINGKASAN --}}
+                    <div class="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-6 border border-slate-200 dark:border-slate-700 h-fit">
+                        <h3 class="font-bold text-slate-700 dark:text-white mb-4">Ringkasan Revisi</h3>
+                        
+                        <div class="space-y-3 text-sm">
+                            <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                                <span>Subtotal Barang</span>
+                                <span class="font-bold" x-text="formatNumber(subtotal)">0</span>
+                            </div>
                             
-                            {{-- Subtotal --}}
-                            <div class="flex justify-between items-center text-sm">
-                                <span class="text-slate-600 dark:text-slate-400">Subtotal Item</span>
-                                <span class="font-bold font-mono text-slate-800 dark:text-slate-200" id="subtotalDisplay">Rp 0</span>
-                            </div>
-
-                            {{-- Total Biaya --}}
-                            <div class="flex justify-between items-center text-sm">
-                                <span class="text-slate-600 dark:text-slate-400">Total Biaya Tambahan</span>
-                                <span class="font-bold font-mono text-slate-800 dark:text-slate-200" id="totalCostDisplay">Rp 0</span>
-                            </div>
-
                             {{-- Diskon --}}
-                            <div class="flex justify-between items-center text-sm">
+                            <div class="flex justify-between items-center text-rose-600">
                                 <div class="flex items-center gap-2">
-                                    <span class="text-slate-600 dark:text-slate-400">Diskon Global</span>
-                                    <div class="input-group w-20">
-                                        <input type="number" name="discount_percentage" id="discountInput" 
-                                               class="form-input text-right py-1 px-2 text-xs h-7" 
-                                               min="0" max="100" step="0.01" value="{{ old('discount_percentage', $invoice->discount_percentage) }}">
-                                        <span class="input-group-text px-1 text-[10px]">%</span>
+                                    <span>Diskon Global</span>
+                                    <div class="relative w-16">
+                                        <input type="number" name="discount_percentage" x-model.number="discountPercent" @input="calculateTotal()" class="form-input h-7 text-center text-xs pr-4 border-rose-200 focus:border-rose-500" min="0" max="100">
+                                        <span class="absolute right-1.5 top-1.5 text-[10px] font-bold">%</span>
                                     </div>
                                 </div>
-                                <span class="font-bold font-mono text-rose-500" id="discountAmountDisplay">- Rp 0</span>
+                                <span>- <span x-text="formatNumber(discountAmount)">0</span></span>
+                            </div>
+
+                            <div class="h-px bg-slate-200 dark:bg-slate-700 my-2"></div>
+                            
+                            <div class="flex justify-between text-slate-500 text-xs">
+                                <span>DPP</span>
+                                <span x-text="formatNumber(taxableBase)">0</span>
                             </div>
 
                             {{-- Pajak --}}
-                            <div class="flex justify-between items-start text-sm pt-1">
-                                <span class="text-slate-600 dark:text-slate-400 mt-2">Pajak (PPN/PPh)</span>
-                                <div class="w-1/2 text-right">
-                                    <select name="taxes[]" id="taxInput" class="tom-select" multiple placeholder="Pilih Pajak...">
-                                        @php $selectedTaxes = $invoice->taxes->pluck('id')->toArray(); @endphp
+                            <div class="flex justify-between items-start text-slate-600 dark:text-slate-300">
+                                <div class="flex flex-col gap-1 w-1/2">
+                                    <span>Pajak (PPN)</span>
+                                    <div class="flex flex-wrap gap-2 mt-1">
                                         @foreach($taxes as $tax)
-                                            <option value="{{ $tax->id }}" data-rate="{{ $tax->rate }}" {{ in_array($tax->id, $selectedTaxes) ? 'selected' : '' }}>
-                                                {{ $tax->name }} ({{ $tax->rate }}%)
-                                            </option>
+                                            <label class="inline-flex items-center p-1.5 border rounded cursor-pointer bg-white hover:bg-slate-50 transition-colors" :class="selectedTaxes.includes({{ $tax->id }}) ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'">
+                                                <input type="checkbox" name="taxes[]" value="{{ $tax->id }}" @change="toggleTax({{ $tax->id }}, {{ $tax->rate }})" class="hidden">
+                                                <span class="text-[10px] font-bold" :class="selectedTaxes.includes({{ $tax->id }}) ? 'text-indigo-600' : 'text-slate-500'">{{ $tax->name }} ({{ $tax->rate }}%)</span>
+                                            </label>
                                         @endforeach
-                                    </select>
-                                    <div class="text-xs text-emerald-600 font-mono mt-1" id="taxAmountDisplay">+ Rp 0</div>
+                                    </div>
                                 </div>
+                                <span class="font-bold mt-1">+ <span x-text="formatNumber(taxAmount)">0</span></span>
                             </div>
 
-                            <hr class="border-slate-200 dark:border-slate-700 my-2">
-
-                            {{-- Grand Total Baru --}}
-                            <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg">
-                                <span class="text-sm font-extrabold text-slate-800 dark:text-white uppercase">Grand Total Baru</span>
-                                <span class="text-xl font-extrabold text-indigo-600 dark:text-indigo-400" id="grandTotalDisplay">Rp 0</span>
+                            <div class="flex justify-between text-slate-600 dark:text-slate-400" x-show="totalAdditionalCosts > 0">
+                                <span>Biaya Tambahan</span>
+                                <span>+ <span x-text="formatNumber(totalAdditionalCosts)">0</span></span>
                             </div>
 
-                            {{-- Selisih (Diff) --}}
-                            <div class="flex justify-between items-center p-3 rounded-lg border border-dashed border-slate-300 dark:border-slate-600">
-                                <span class="text-xs font-bold text-slate-500 uppercase">Selisih (Adjustment)</span>
-                                <span class="text-base font-mono font-bold" id="diffDisplay">Rp 0</span>
-                            </div>
-                            <div class="text-[10px] text-center text-slate-400">
-                                Total Lama: Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}
+                            <div class="h-px bg-slate-300 dark:bg-slate-600 my-2"></div>
+                            
+                            {{-- COMPARE SECTION --}}
+                            <div class="flex justify-between items-center text-slate-400 text-xs">
+                                <span>Total Lama</span>
+                                <span class="line-through decoration-rose-500">Rp {{ number_format($invoice->total_amount, 0, ',', '.') }}</span>
                             </div>
 
+                            <div class="flex justify-between items-center mt-2">
+                                <span class="text-base font-bold text-slate-800 dark:text-white">Total Baru</span>
+                                <span class="text-2xl font-black text-indigo-600 dark:text-indigo-400">Rp <span x-text="formatNumber(grandTotal)">0</span></span>
+                            </div>
+
+                            <div class="flex justify-between items-center text-xs text-emerald-600 mt-1">
+                                <span>Sudah Dibayar</span>
+                                <span class="font-bold">Rp {{ number_format($invoice->amount_paid, 0, ',', '.') }}</span>
+                            </div>
+
+                            {{-- SELISIH INDICATOR --}}
+                            <div class="mt-4 p-3 rounded-lg border flex justify-between items-center transition-all duration-300"
+                                 :class="diffValue > 0 ? 'bg-rose-50 border-rose-200 text-rose-700' : (diffValue < 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-500')">
+                                <div class="flex flex-col">
+                                    <span class="text-xs font-bold uppercase">Estimasi Koreksi</span>
+                                    <span class="text-[10px]" x-text="diffValue > 0 ? 'Debit Note (Tagihan Naik)' : (diffValue < 0 ? 'Credit Note (Tagihan Turun)' : 'Tidak ada perubahan')"></span>
+                                </div>
+                                <span class="font-mono font-bold text-lg" x-text="(diffValue > 0 ? '+' : '') + formatNumber(diffValue)"></span>
+                            </div>
+                        </div>
+
+                        <div class="mt-8 flex gap-3">
+                            <a href="{{ route('admin.invoice-adjustments.create', ['invoice_id' => $invoice->invoice_id]) }}" class="btn btn-secondary flex-1 justify-center">Batal</a>
+                            <button type="submit" class="btn btn-primary flex-1 justify-center shadow-lg shadow-indigo-500/30" :disabled="grandTotal == originalTotal">
+                                <i class="material-icons text-sm mr-2">save</i> Simpan Koreksi
+                            </button>
                         </div>
                     </div>
                 </div>
 
             </div>
-        </form>
-    </div>
+        </div>
+    </form>
+</div>
 
-@endsection
+@php
+    // Prepare Data for AlpineJS
+    $initialItems = $invoice->items->map(function($item) {
+        return [
+            'id' => $item->item_id,
+            'product_id' => $item->product_id,
+            'price' => (float)$item->price_per_unit,
+            'qty' => (float)$item->quantity,
+            'original_qty' => (float)$item->quantity, 
+            'stock' => (float)($item->product->stock_quantity ?? 0),
+            'subtotal' => (float)$item->subtotal
+        ];
+    });
+
+    $initialCosts = $invoice->additionalCosts->map(function($cost) {
+        return ['desc' => $cost->description, 'amount' => (float)$cost->amount];
+    });
+
+    $initialTaxes = $invoice->taxes->pluck('id')->toArray();
+@endphp
 
 @push('scripts')
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const itemsBody = document.getElementById('itemsBody');
-        const costsContainer = document.getElementById('additionalCostsContainer');
-        const noCostPlaceholder = document.getElementById('noCostPlaceholder');
-        const grandTotalDisplay = document.getElementById('grandTotalDisplay');
-        const diffDisplay = document.getElementById('diffDisplay');
-        
-        const productsData = @json($products);
-        const existingItems = @json($invoice->items);
-        const existingCosts = @json($invoice->additionalCosts);
-        const oldTotal = {{ $invoice->total_amount }};
-        
-        let rowCount = 0;
-        let costCount = 0;
+    function autoAdjustmentForm() {
+        return {
+            items: [],
+            costs: [],
+            subtotal: 0,
+            discountPercent: {{ $invoice->discount_percentage ?? 0 }},
+            discountAmount: 0,
+            taxableBase: 0,
+            selectedTaxes: [],
+            selectedTaxRates: {},
+            taxAmount: 0,
+            totalAdditionalCosts: 0,
+            grandTotal: 0,
+            originalTotal: {{ $invoice->total_amount }},
+            amountPaid: {{ $invoice->amount_paid }}, 
+            taxesRef: @json($taxes->pluck('rate', 'id')),
 
-        function addRow(data = null) {
-            rowCount++;
-            const selectedProductId = data ? data.product_id : '';
-            const qtyValue = data ? parseFloat(data.quantity) : 1;
-            const priceValue = data ? parseFloat(data.price_per_unit) : 0;
-            
-            let optionsHtml = '<option value="">Pilih Produk...</option>';
-            productsData.forEach(prod => {
-                const selected = prod.product_id == selectedProductId ? 'selected' : '';
-                optionsHtml += `<option value="${prod.product_id}" data-price="${prod.selling_price}" ${selected}>${prod.product_name}</option>`;
-            });
+            initData() {
+                const prefilledItems = @json($initialItems);
+                this.items = prefilledItems.map(item => ({
+                    ...item,
+                    key: Date.now() + Math.random(),
+                    formatted_price: this.formatNumber(item.price)
+                }));
 
-            const tr = document.createElement('tr');
-            tr.className = 'border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition';
-            tr.innerHTML = `
-                <td class="p-3 align-top">
-                    <select name="products[${rowCount}][product_id]" class="tom-select-dynamic product-select" required>
-                        ${optionsHtml}
-                    </select>
-                </td>
-                <td class="p-3 align-top text-right">
-                    <div class="input-group">
-                        <span class="input-group-text px-2 text-xs">Rp</span>
-                        <input type="text" name="products[${rowCount}][price_per_unit]" 
-                               class="form-input text-right autonumeric price-input" value="${priceValue}" required>
-                    </div>
-                </td>
-                <td class="p-3 align-top">
-                    <input type="number" step="0.01" min="0.01" name="products[${rowCount}][quantity]" 
-                           class="form-input text-center qty-input" value="${qtyValue}" required>
-                </td>
-                <td class="p-3 align-top text-right">
-                    <div class="text-sm font-bold text-slate-800 dark:text-white pt-2 subtotal-display">Rp 0</div>
-                </td>
-                <td class="p-3 align-top text-center">
-                    <button type="button" class="text-slate-400 hover:text-rose-500 transition-colors btn-remove-row pt-1">
-                        <i class="material-icons text-lg">close</i>
-                    </button>
-                </td>
-            `;
-            
-            itemsBody.appendChild(tr);
+                const prefilledCosts = @json($initialCosts);
+                this.costs = prefilledCosts.map(cost => ({ ...cost, key: Date.now() + Math.random() }));
 
-            new TomSelect(tr.querySelector('.tom-select-dynamic'), {
-                sortField: { field: "text", direction: "asc" },
-                plugins: ['clear_button'],
-                dropdownParent: 'body',
-                onChange: function(value) {
-                    if(!data) updateRowPrice(tr, value);
-                }
-            });
-
-            new AutoNumeric(tr.querySelector('.price-input'), window.defaultAutoNumericOptions);
-            
-            tr.querySelector('.price-input').addEventListener('keyup', () => calculateRow(tr));
-            tr.querySelector('.price-input').addEventListener('autoNumeric:rawValueModified', () => calculateRow(tr));
-            calculateRow(tr);
-        }
-
-        function addCostRow(data = null) {
-            costCount++;
-            noCostPlaceholder.style.display = 'none';
-
-            const desc = data ? data.description : '';
-            const amount = data ? data.amount : 0;
-
-            const div = document.createElement('div');
-            div.className = 'flex items-center gap-2 cost-row bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-200 dark:border-slate-700';
-            div.innerHTML = `
-                <div class="flex-1">
-                    <input type="text" name="additional_costs[${costCount}][description]" class="form-input text-xs w-full" value="${desc}" placeholder="Keterangan (Cth: Ongkir)" required>
-                </div>
-                <div class="input-group w-40">
-                    <span class="input-group-text px-2 text-xs">Rp</span>
-                    <input type="text" name="additional_costs[${costCount}][amount]" class="form-input text-right text-xs autonumeric cost-input" value="${amount}" placeholder="0" required>
-                </div>
-                <button type="button" class="text-slate-400 hover:text-rose-500 btn-remove-cost">
-                    <i class="material-icons text-sm">close</i>
-                </button>
-            `;
-            costsContainer.appendChild(div);
-            
-            new AutoNumeric(div.querySelector('.cost-input'), window.defaultAutoNumericOptions);
-            div.querySelector('.cost-input').addEventListener('autoNumeric:rawValueModified', calculateTotals);
-        }
-
-        function updateRowPrice(row, productId) {
-            const product = productsData.find(p => p.product_id == productId);
-            const priceInput = row.querySelector('.price-input');
-            if (product) {
-                AutoNumeric.getAutoNumericElement(priceInput).set(product.selling_price);
-            } else {
-                AutoNumeric.getAutoNumericElement(priceInput).set(0);
-            }
-            calculateRow(row);
-        }
-
-        function calculateRow(row) {
-            const price = parseFloat(AutoNumeric.getAutoNumericElement(row.querySelector('.price-input')).getNumericString() || 0);
-            const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
-            const subtotal = price * qty;
-            row.querySelector('.subtotal-display').innerText = formatRupiah(subtotal);
-            calculateTotals();
-        }
-
-        function calculateTotals() {
-            let subtotal = 0;
-            document.querySelectorAll('#itemsBody tr').forEach(row => {
-                const price = parseFloat(AutoNumeric.getAutoNumericElement(row.querySelector('.price-input')).getNumericString() || 0);
-                const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
-                subtotal += price * qty;
-            });
-
-            let totalCosts = 0;
-            document.querySelectorAll('.cost-input').forEach(input => {
-                totalCosts += parseFloat(AutoNumeric.getAutoNumericElement(input).getNumericString() || 0);
-            });
-
-            const discPercent = parseFloat(document.getElementById('discountInput').value) || 0;
-            const discAmount = subtotal * (discPercent / 100);
-            const afterDisc = subtotal - discAmount;
-
-            let totalTax = 0;
-            const taxSelect = document.getElementById('taxInput');
-            if(taxSelect.tomselect) {
-                const selectedIds = taxSelect.tomselect.getValue();
-                selectedIds.forEach(id => {
-                     const option = taxSelect.querySelector(`option[value="${id}"]`);
-                     if(option) {
-                         const rate = parseFloat(option.dataset.rate);
-                         totalTax += afterDisc * (rate / 100);
-                     }
+                const prefilledTaxIds = @json($initialTaxes);
+                prefilledTaxIds.forEach(id => {
+                    if (this.taxesRef[id] !== undefined) {
+                        this.selectedTaxes.push(id);
+                        this.selectedTaxRates[id] = parseFloat(this.taxesRef[id]);
+                    }
                 });
+
+                this.calculateTotal();
+            },
+
+            addItem() {
+                this.items.push({
+                    key: Date.now() + Math.random(),
+                    product_id: '',
+                    stock: 0,
+                    price: 0,
+                    formatted_price: '',
+                    qty: 1,
+                    original_qty: 0,
+                    subtotal: 0
+                });
+            },
+            
+            removeItem(index) { 
+                this.items.splice(index, 1); 
+                this.calculateTotal(); 
+            },
+
+            addCost() { 
+                this.costs.push({ key: Date.now() + Math.random(), desc: '', amount: 0 }); 
+            },
+            
+            removeCost(index) { 
+                this.costs.splice(index, 1); 
+                this.calculateTotal(); 
+            },
+
+            toggleTax(id, rate) {
+                if (this.selectedTaxes.includes(id)) {
+                    this.selectedTaxes = this.selectedTaxes.filter(t => t !== id);
+                    delete this.selectedTaxRates[id];
+                } else {
+                    this.selectedTaxes.push(id);
+                    this.selectedTaxRates[id] = rate;
+                }
+                this.calculateTotal();
+            },
+
+            handlePriceInput(index, value) {
+                let raw = value.replace(/\./g, '').replace(/,/g, '').replace(/\D/g, '');
+                this.items[index].price = parseFloat(raw) || 0;
+                this.calculateRow(index);
+            },
+            
+            formatPriceOnBlur(index) {
+                this.items[index].formatted_price = this.formatNumber(this.items[index].price);
+            },
+
+            calculateRow(index) {
+                const item = this.items[index];
+                item.subtotal = item.price * item.qty;
+                this.calculateTotal();
+            },
+
+            calculateTotal() {
+                this.subtotal = this.items.reduce((sum, item) => sum + item.subtotal, 0);
+                this.discountAmount = this.subtotal * (this.discountPercent / 100);
+                this.taxableBase = Math.max(0, this.subtotal - this.discountAmount);
+
+                let totalRate = 0;
+                this.selectedTaxes.forEach(id => totalRate += this.selectedTaxRates[id]);
+                this.taxAmount = this.taxableBase * (totalRate / 100);
+
+                this.totalAdditionalCosts = this.costs.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
+                
+                this.grandTotal = this.taxableBase + this.taxAmount + this.totalAdditionalCosts;
+            },
+
+            get diffValue() {
+                return this.grandTotal - this.originalTotal;
+            },
+
+            updateProduct(index, el, productId) {
+                const option = el.querySelector(`option[value="${productId}"]`);
+                if (option) {
+                    const price = parseFloat(option.dataset.price) || 0;
+                    const stock = parseFloat(option.dataset.stock) || 0;
+                    
+                    this.items[index].product_id = productId;
+                    this.items[index].price = price;
+                    this.items[index].formatted_price = this.formatNumber(price);
+                    this.items[index].stock = stock;
+                    // Reset qty ke 1 jika produk diganti (kecuali user set 0)
+                    if(this.items[index].qty === 0) this.items[index].qty = 1; 
+                    this.items[index].original_qty = 0;
+                    
+                    this.calculateRow(index);
+                }
+            },
+
+            initTomSelect(el, index) {
+                if (el.tomselect) return;
+                new TomSelect(el, {
+                    ...window.defaultTomSelectConfig,
+                    placeholder: 'Cari Produk...',
+                    onChange: (value) => { this.updateProduct(index, el, value); }
+                });
+                if (this.items[index].product_id) {
+                    el.tomselect.setValue(this.items[index].product_id, true);
+                }
+            },
+
+            formatNumber(num) {
+                return new Intl.NumberFormat('id-ID').format(Math.round(num));
+            },
+
+            validateForm(e) {
+                if (this.items.length === 0) {
+                    e.preventDefault();
+                    window.showToast('Minimal harus ada 1 barang (walaupun qty 0).', 'error');
+                    return;
+                }
+                
+                if (this.grandTotal === this.originalTotal) {
+                    e.preventDefault();
+                    window.showToast('Tidak ada perubahan nilai. Koreksi tidak diperlukan.', 'warning');
+                    return;
+                }
+
+                let valid = true;
+                // Revisi validasi: Qty boleh 0 (untuk hapus), tapi tidak boleh kosong/null
+                this.items.forEach(item => { 
+                    if (!item.product_id) valid = false; 
+                    if (item.qty === '' || item.qty === null || item.qty < 0) valid = false; 
+                });
+                
+                if (!valid) {
+                    e.preventDefault();
+                    window.showToast('Data produk tidak lengkap (Cek Produk/Qty).', 'error');
+                }
             }
-
-            const grandTotal = afterDisc + totalTax + totalCosts;
-            const diff = grandTotal - oldTotal;
-
-            document.getElementById('subtotalDisplay').innerText = formatRupiah(subtotal);
-            document.getElementById('totalCostDisplay').innerText = formatRupiah(totalCosts);
-            document.getElementById('discountAmountDisplay').innerText = '- ' + formatRupiah(discAmount);
-            document.getElementById('taxAmountDisplay').innerText = '+ ' + formatRupiah(totalTax);
-            document.getElementById('grandTotalDisplay').innerText = formatRupiah(grandTotal);
-
-            if (diff > 0) {
-                diffDisplay.innerHTML = `<span class="text-rose-600">+ ${formatRupiah(Math.abs(diff))} (Kurang Bayar)</span>`;
-            } else if (diff < 0) {
-                diffDisplay.innerHTML = `<span class="text-emerald-600">- ${formatRupiah(Math.abs(diff))} (Lebih Bayar)</span>`;
-            } else {
-                diffDisplay.innerHTML = `<span class="text-slate-400">0 (Tidak ada perubahan)</span>`;
-            }
         }
-
-        function formatRupiah(amount) {
-            return 'Rp ' + amount.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-        }
-
-        itemsBody.addEventListener('click', function(e) { if (e.target.closest('.btn-remove-row')) { e.target.closest('tr').remove(); calculateTotals(); } });
-        itemsBody.addEventListener('input', function(e) { if (e.target.classList.contains('qty-input')) { calculateRow(e.target.closest('tr')); } });
-        
-        costsContainer.addEventListener('click', function(e) {
-             if (e.target.closest('.btn-remove-cost')) {
-                e.target.closest('.cost-row').remove();
-                calculateTotals();
-                if(costsContainer.children.length === 0) noCostPlaceholder.style.display = 'block';
-            }
-        });
-
-        document.getElementById('btnAddRow').addEventListener('click', () => addRow());
-        document.getElementById('btnAddCost').addEventListener('click', () => addCostRow());
-        document.getElementById('discountInput').addEventListener('input', calculateTotals);
-        document.getElementById('taxInput').addEventListener('change', calculateTotals);
-
-        if (existingItems && existingItems.length > 0) {
-            existingItems.forEach(item => addRow(item));
-        } else {
-            addRow();
-        }
-        
-        if (existingCosts && existingCosts.length > 0) {
-            existingCosts.forEach(cost => addCostRow(cost));
-        } else {
-            noCostPlaceholder.style.display = 'block';
-        }
-        
-        setTimeout(calculateTotals, 500); 
-    });
+    }
 </script>
 @endpush
+@endsection

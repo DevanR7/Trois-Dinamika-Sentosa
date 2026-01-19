@@ -1,241 +1,225 @@
+/* resources/css/components/tomselect-custom.css */
+
 /* ==========================================================================
-   TOM SELECT CUSTOMIZATION
+   TOM SELECT - CLEANEST VERSION
+   No Outer Wrapper Border, Floating Dropdown, Separated Options
    ========================================================================== */
 
-/* 1. WRAPPER & CONTROL */
+/* ---------------------------------------------------------
+   1. WRAPPER (CONTAINER LUAR) - RESET TOTAL
+   Ini kuncinya: Kita hilangkan border/bg dari pembungkus luar
+   agar tidak terlihat "double border" atau kotak dalam kotak.
+   --------------------------------------------------------- */
 .ts-wrapper {
-    position: relative;
-    width: 100%;
-}
-
-.ts-wrapper-custom {
-    width: 100% !important;
-}
-
-/* Base Control */
-.ts-control {
-    @apply bg-white border border-slate-300 text-slate-700 text-sm rounded-lg 
-           block w-full transition-all duration-200 !important;
-    @apply dark:bg-slate-800 dark:border-slate-600 dark:placeholder-slate-500 
-           dark:text-slate-200 !important;
+    @apply w-full relative text-sm;
     
-    min-height: 38px !important;
-    height: auto !important;
-    padding: 0.35rem 2.5rem 0.35rem 0.75rem !important;
-    line-height: 1.3 !important;
-    cursor: pointer !important;
+    /* Paksa reset style wrapper agar 'invisible' */
+    background: transparent !important;
+    border: none !important;
     box-shadow: none !important;
-    display: flex !important;
-    align-items: center !important;
+    padding: 0 !important;
+    min-height: auto !important;
 }
 
+/* Jika wrapper memiliki class 'form-select' atau 'form-control' bawaan,
+   kita paksa hilangkan border-nya juga */
+.ts-wrapper.form-select,
+.ts-wrapper.form-control,
+.ts-wrapper.single,
+.ts-wrapper.multi {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important; 
+}
+
+/* ---------------------------------------------------------
+   2. CONTROL (Input Box Utama)
+   Di sini kita berikan styling border yang sebenarnya.
+   --------------------------------------------------------- */
+.ts-control {
+    @apply flex items-center w-full px-3 py-2.5 transition-all duration-200 ease-in-out;
+    @apply bg-white border border-slate-300 rounded-xl shadow-sm; 
+    @apply text-slate-700 placeholder:text-slate-400;
+    
+    /* Dark Mode */
+    @apply dark:bg-slate-800 dark:border-slate-600 dark:text-slate-200 dark:placeholder-slate-500;
+    
+    min-height: 42px; 
+    padding-right: 2.5rem !important; 
+    
+    /* Pastikan control menutupi wrapper sepenuhnya secara visual */
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Hover State Input */
 .ts-control:hover {
-    @apply border-slate-400 dark:border-slate-500 !important;
+    @apply border-slate-400 dark:border-slate-500;
 }
 
-.ts-control.focus {
-    @apply ring-2 ring-indigo-500/20 border-indigo-500 outline-none !important;
-    @apply dark:ring-indigo-500/30 dark:border-indigo-400 !important;
+/* Focus State (Active) */
+.ts-wrapper.focus .ts-control {
+    @apply border-indigo-500 ring-4 ring-indigo-500/10 outline-none z-10;
+    @apply dark:border-indigo-400 dark:ring-indigo-500/20;
 }
 
-/* Text Elements */
-.ts-control .item,
-.ts-control.single .ts-input,
-.ts-control .placeholder {
+/* Input text area (tempat mengetik) */
+.ts-control > input {
     @apply text-slate-700 dark:text-slate-200 !important;
-    line-height: 1.3 !important;
-    padding: 0 !important;
+    font-size: 0.875rem !important;
+    letter-spacing: 0.01em;
+    font-weight: 500;
+    /* Reset input bawaan agar tidak merusak layout */
     margin: 0 !important;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    padding: 0 !important;
+    min-height: 0 !important;
 }
 
-/* Clear Button */
-.ts-wrapper .clear-button {
-    right: 30px !important;
-    width: 16px !important;
-    height: 16px !important;
-    top: 50% !important;
-    transform: translateY(-50%) !important;
-    @apply text-slate-400 hover:text-red-500 transition-colors duration-200 !important;
-    padding: 0 !important;
-    margin: 0 !important;
+/* Text Items (Tampilan pilihan terpilih) */
+.ts-control .item {
+    @apply text-slate-700 dark:text-slate-200 font-medium;
+    margin: 0 !important; /* Reset margin item */
 }
 
-/* Dropdown Arrow */
+/* ---------------------------------------------------------
+   3. DROPDOWN ARROW (Chevron)
+   --------------------------------------------------------- */
 .ts-wrapper.single .ts-control:after {
     content: '';
-    position: absolute;
-    right: 0.75rem !important;
-    top: 50% !important;
-    transform: translateY(-50%);
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 5px solid currentColor;
-    @apply text-slate-500 dark:text-slate-400 !important;
-    transition: transform 0.2s ease !important;
+    @apply absolute right-4 top-1/2 w-2 h-2;
+    right: 1rem !important;
+    border-right: 2px solid #94a3b8; 
+    border-bottom: 2px solid #94a3b8;
+    transform: translateY(-60%) rotate(45deg);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+    pointer-events: none;
 }
 
-.ts-wrapper.single .ts-control.dropdown-active:after {
-    transform: translateY(-50%) rotate(180deg);
+.dark .ts-wrapper.single .ts-control:after {
+    border-color: #64748b; 
 }
 
-/* 2. DROPDOWN */
+/* Putar panah saat aktif */
+.ts-wrapper.dropdown-active .ts-control:after {
+    transform: translateY(-20%) rotate(225deg);
+    border-color: #6366f1; 
+}
+
+/* ---------------------------------------------------------
+   4. DROPDOWN MENU (Container Pilihan)
+   --------------------------------------------------------- */
 .ts-dropdown {
-    @apply bg-white border border-slate-200 rounded-lg shadow-xl !important;
-    @apply dark:bg-slate-800 dark:border-slate-600 !important;
+    @apply bg-white dark:bg-slate-800;
+    @apply border border-slate-200 dark:border-slate-700;
+    @apply rounded-xl shadow-xl;
     
-    z-index: 10000 !important;
     margin-top: 6px !important;
-    overflow: hidden !important;
-    opacity: 0;
-    transform: translateY(-8px) scale(0.98);
-    animation: dropdownSlideDown 0.2s ease forwards;
-}
-
-@keyframes dropdownSlideDown {
-    to { 
-        opacity: 1; 
-        transform: translateY(0) scale(1); 
-    }
-}
-
-/* 3. SEARCH INPUT */
-.ts-dropdown-header {
-    @apply bg-slate-50/80 border-b border-slate-200 p-2 rounded-t-lg !important;
-    @apply dark:bg-slate-900/50 dark:border-slate-700 !important;
-}
-
-.ts-dropdown .ts-control.ts-input {
-    @apply bg-white border border-slate-300 text-slate-700 text-sm rounded-lg 
-           block w-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 !important;
-    @apply dark:bg-slate-800 dark:border-slate-600 dark:text-slate-200 !important;
-    height: 36px !important;
-    padding: 0.25rem 0.5rem !important;
-}
-
-/* 4. CONTENT & OPTIONS */
-.ts-dropdown .ts-dropdown-content {
-    max-height: 260px !important;
-    overflow-y: auto !important;
     padding: 6px !important;
-    transform: translateZ(0);
-}
-
-.ts-dropdown .option {
-    @apply text-sm text-slate-700 font-medium cursor-pointer rounded-md !important;
-    @apply dark:text-slate-200 !important;
+    z-index: 9999 !important;
     
-    padding: 0.6rem 0.75rem !important;
-    margin: 3px 0 !important;
-    line-height: 1.3 !important;
-    display: flex !important;
-    align-items: center !important;
-    min-height: 36px !important;
-    transition: background-color 0.1s ease, color 0.1s ease !important;
+    /* Animasi Dropdown */
+    animation: tsSlideDown 0.15s ease-out forwards;
 }
 
-.ts-dropdown .option:hover,
-.ts-dropdown .option.active {
-    @apply bg-indigo-50 text-indigo-700 !important;
-    @apply dark:bg-indigo-900/30 dark:text-indigo-300 !important;
+@keyframes tsSlideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
+/* ---------------------------------------------------------
+   5. DROPDOWN OPTIONS (Item Pilihan)
+   --------------------------------------------------------- */
+.ts-dropdown .option {
+    @apply px-3 py-2.5 text-sm text-slate-600 dark:text-slate-300 cursor-pointer;
+    @apply flex items-center justify-between;
+    @apply rounded-lg;
+    @apply transition-all duration-150;
+    
+    margin-bottom: 2px !important; /* Jarak antar item */
+}
+
+/* Hilangkan margin item terakhir */
+.ts-dropdown .option:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* Hover & Active State */
+.ts-dropdown .option.active,
+.ts-dropdown .option:hover {
+    @apply bg-slate-100 text-slate-900;
+    @apply dark:bg-slate-700/60 dark:text-white;
+    transform: translateX(2px); /* Efek geser halus */
+}
+
+/* Selected State */
 .ts-dropdown .option.selected {
-    @apply bg-indigo-600 text-white !important;
-    @apply dark:bg-indigo-600 dark:text-white !important;
-    font-weight: 600 !important;
-    box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2) !important;
+    @apply bg-indigo-50 text-indigo-700 font-semibold;
+    @apply dark:bg-indigo-900/30 dark:text-indigo-300;
 }
 
+/* Centang pada item terpilih */
 .ts-dropdown .option.selected:after {
     content: '✓';
-    position: absolute;
-    right: 0.75rem;
-    @apply text-white !important;
-    font-weight: bold;
-    font-size: 14px;
+    @apply text-indigo-600 dark:text-indigo-400 text-sm font-bold ml-2;
 }
 
-/* 5. OPTGROUP */
-.ts-dropdown .optgroup {
-    border-top: 1px solid #f1f5f9 !important;
-    margin-top: 4px !important;
-    padding-top: 4px !important;
+/* ---------------------------------------------------------
+   6. MULTI SELECT TAGS
+   --------------------------------------------------------- */
+.ts-wrapper.multi .ts-control > div.item {
+    @apply inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold;
+    @apply bg-slate-100 text-slate-700 border border-slate-200;
+    @apply dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600;
+    
+    margin: 2px 4px 2px 0 !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
-.ts-dropdown .optgroup:first-child {
-    border-top: none !important;
-    margin-top: 0 !important;
-    padding-top: 0 !important;
+.ts-wrapper.multi .ts-control > div.item .remove {
+    @apply ml-2 text-slate-400 hover:text-red-500 border-l border-slate-300/50 pl-1.5;
+    font-size: 1rem;
+    line-height: 1;
 }
 
+/* ---------------------------------------------------------
+   7. LAIN-LAIN (Clear Button, Loading, Headers)
+   --------------------------------------------------------- */
 .ts-dropdown .optgroup-header {
-    @apply font-extrabold text-slate-500 dark:text-slate-400 !important;
-    background: transparent !important;
-    font-size: 10px !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
-    padding: 8px 6px 4px 6px !important;
-    margin-bottom: 2px !important;
-    cursor: default !important;
-    pointer-events: none !important;
+    @apply px-3 py-2 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest bg-transparent;
+    cursor: default;
+    margin-top: 4px;
 }
 
-.ts-dropdown .optgroup .option {
-    padding-left: 12px !important;
+.ts-wrapper.loading .ts-control:after {
+    border: 2px solid #cbd5e1;
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    animation: spin 0.6s linear infinite;
+    top: 50%;
+    margin-top: -9px;
+    transform: none;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.ts-wrapper .clear-button {
+    @apply absolute right-10 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 cursor-pointer bg-transparent !important;
+    font-size: 1.2rem !important;
+    padding: 0 !important;
 }
 
-/* 6. MULTI SELECT */
-.ts-wrapper.multi .ts-control {
-    padding: 3px 6px !important;
-    min-height: 38px !important;
-    gap: 4px !important;
-}
-
-.ts-wrapper.multi .ts-control .item {
-    @apply bg-indigo-100 text-indigo-700 text-xs font-medium rounded px-2 py-1 !important;
-    @apply dark:bg-indigo-900/30 dark:text-indigo-300 !important;
-}
-
-/* 7. SCROLLBAR */
-.ts-dropdown .ts-dropdown-content::-webkit-scrollbar {
+.ts-dropdown-content::-webkit-scrollbar {
     width: 5px;
 }
-
-.ts-dropdown .ts-dropdown-content::-webkit-scrollbar-track {
-    @apply bg-transparent !important;
+.ts-dropdown-content::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 dark:bg-slate-600 rounded-full;
+}
+.ts-dropdown-content::-webkit-scrollbar-track {
+    @apply bg-transparent;
 }
 
-.ts-dropdown .ts-dropdown-content::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 dark:bg-slate-600 rounded-full !important;
-}
-
-/* 8. FLIP UP ANIMATION */
-.ts-dropdown.ts-flip-up {
-    transform: translateY(8px) scale(0.98);
-    animation: dropdownSlideUp 0.2s ease forwards !important;
-    box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.1), 0 -2px 4px -2px rgb(0 0 0 / 0.1) !important;
-    margin-top: 0 !important;
-    margin-bottom: 6px !important;
-}
-
-@keyframes dropdownSlideUp {
-    to { 
-        opacity: 1; 
-        transform: translateY(0) scale(1); 
-    }
-}
-
-/* 9. DISABLED STATE */
-.ts-control:disabled {
-    @apply bg-slate-100 cursor-not-allowed opacity-70 !important;
-    @apply dark:bg-slate-900 !important;
-}
-
-/* 10. NO RESULTS */
 .ts-dropdown .no-results {
-    @apply p-2 text-sm text-slate-500 text-center !important;
-    @apply dark:text-slate-400 !important;
+    @apply p-4 text-center text-slate-400 italic text-xs;
 }

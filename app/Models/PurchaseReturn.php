@@ -11,10 +11,11 @@ use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Models\PurchaseReturnItem;
+use App\Traits\LogsActivity;
 
 class PurchaseReturn extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
     protected $primaryKey = 'return_id';
 
     protected $fillable = [
@@ -32,22 +33,48 @@ class PurchaseReturn extends Model
         'return_date' => 'date',
     ];
 
-     public static function generateReturnNumber(): string
-    {
-        $yearMonth = now()->format('Ym');
-        $year = now()->format('Y');
-        $month = now()->format('m');
-        $counter = DB::table('purchase_return_counters')->where('ym', $yearMonth)->lockForUpdate()->first();
+    public static function generateReturnNumber(): string
+{
+    $yearMonth = now()->format('Ym');
+    $year = now()->format('Y');
+    $month = now()->format('m');
+
+    return DB::transaction(function() use ($yearMonth, $year, $month) {
+        $counter = DB::table('purchase_return_counters')
+            ->where('ym', $yearMonth)
+            ->lockForUpdate()
+            ->first();
+
         if ($counter) {
             $nextSequence = $counter->last_sequence + 1;
-            DB::table('purchase_return_counters')->where('ym', $yearMonth)->update(['last_sequence' => $nextSequence]);
+            DB::table('purchase_return_counters')
+                ->where('ym', $yearMonth)
+                ->update(['last_sequence' => $nextSequence, 'updated_at' => now()]);
         } else {
-            $nextSequence = 1;
-            DB::table('purchase_return_counters')->insert(['ym' => $yearMonth, 'last_sequence' => $nextSequence]);
+            try {
+                $nextSequence = 1;
+                DB::table('purchase_return_counters')->insert([
+                    'ym' => $yearMonth, 
+                    'last_sequence' => $nextSequence,
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ]);
+            } catch (\Exception $e) {
+                $counter = DB::table('purchase_return_counters')
+                    ->where('ym', $yearMonth)
+                    ->lockForUpdate()
+                    ->first();
+                $nextSequence = $counter->last_sequence + 1;
+                DB::table('purchase_return_counters')
+                    ->where('ym', $yearMonth)
+                    ->update(['last_sequence' => $nextSequence, 'updated_at' => now()]);
+            }
         }
+
         $sequencePadded = str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
         return "PR/{$year}/{$month}/{$sequencePadded}";
-    }
+    });
+}
 
     public function purchaseOrder(): BelongsTo
     {

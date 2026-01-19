@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Laravel\Socialite\Facades\Socialite;
+use Spatie\Permission\Models\Role; // Tambahkan ini
 use Exception;
 
 class GoogleAuthController extends Controller
@@ -17,7 +18,6 @@ class GoogleAuthController extends Controller
     {
         try {
             return Socialite::driver('google')->redirect();
-
         } catch (Exception $e) {
             Log::error('Google redirect error', ['message' => $e->getMessage()]);
             return redirect()->route('admin.login')->with('error', 'Gagal menghubungkan ke Google. Silakan coba lagi.');
@@ -28,29 +28,44 @@ class GoogleAuthController extends Controller
     {
         try {
             $googleUser = Socialite::driver('google')->user();
+            
+            // Cari user berdasarkan email
             $user = User::where('email', $googleUser->email)->first();
 
+            // Jika user belum ada, buat baru
             if (!$user) {
+                // Generate username unik sederhana
+                $baseUsername = explode('@', $googleUser->email)[0];
+                $uniqueUsername = $baseUsername . rand(100, 999);
+
                 $user = User::create([
                     'full_name'   => $googleUser->name,
                     'email'       => $googleUser->email,
                     'google_id'   => $googleUser->id,
-                    'username'    => explode('@', $googleUser->email)[0],
-                    'password'    => Hash::make(uniqid()),
-                    'is_approved' => false, 
+                    'username'    => $uniqueUsername,
+                    'password'    => Hash::make(uniqid()), // Password random aman
+                    'is_approved' => false, // Tetap butuh approval admin
+                    'avatar_path' => $googleUser->avatar, // Opsional: simpan foto google
                 ]);
 
-                $user->assignRole('sales');
+                // REVISI: Safety Check Role
+                if (Role::where('name', 'sales')->exists()) {
+                    $user->assignRole('sales');
+                } else {
+                    Log::error("Role 'sales' tidak ditemukan saat user Google {$googleUser->email} mendaftar.");
+                }
 
                 return redirect()->route('admin.login')
                     ->with('error', 'Akun Anda berhasil dibuat dan sedang menunggu persetujuan admin.');
             }
 
+            // Jika user sudah ada tapi belum link Google ID
             if (empty($user->google_id)) {
                 $user->google_id = $googleUser->id;
                 $user->save();
             }
 
+            // Cek Approval & Role Admin
             $isAdmin = $user->hasRole(['admin', 'superadmin']);
 
             if (!$user->is_approved && !$isAdmin) {
@@ -58,6 +73,7 @@ class GoogleAuthController extends Controller
                     ->with('error', 'Akun Anda sedang dalam proses verifikasi admin.');
             }
 
+            // Login sukses
             Auth::login($user, true);
 
             return redirect()->intended(route('admin.dashboard'));

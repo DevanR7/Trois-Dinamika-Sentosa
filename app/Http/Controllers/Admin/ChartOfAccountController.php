@@ -90,16 +90,33 @@ class ChartOfAccountController extends Controller
     }
 
     public function destroy(ChartOfAccount $chartOfAccount): RedirectResponse
-    {
-        if ($chartOfAccount->children()->exists()) {
-            return back()->with('error', 'Gagal: Akun ini tidak bisa dihapus karena memiliki akun anak.');
-        }
-
-        try {
-            $chartOfAccount->delete();
-            return redirect()->route('admin.chart-of-accounts.index')->with('success', 'Akun berhasil dihapus.');
-        } catch (\Exception $e) {
-            return back()->with('error', 'Gagal menghapus akun: ' . $e->getMessage());
-        }
+{
+    // 1. Cek Anak
+    if ($chartOfAccount->children()->exists()) {
+        return back()->with('error', 'Gagal: Akun ini tidak bisa dihapus karena memiliki sub-akun.');
     }
+
+    // 2. [REVISI] Cek Penggunaan di Jurnal Umum
+    // Gunakan DB table agar lebih ringan daripada load model
+    $existsInLedger = \Illuminate\Support\Facades\DB::table('general_ledgers')
+        ->where('chart_of_account_id', $chartOfAccount->account_id)
+        ->exists();
+
+    if ($existsInLedger) {
+        return back()->with('error', 'Gagal: Akun ini sudah digunakan dalam transaksi jurnal. Non-aktifkan akun jika tidak ingin digunakan lagi.');
+    }
+
+    // 3. [REVISI] Cek Penggunaan di Settings (Akun Default)
+    $isDefault = \App\Models\Setting::where('value', $chartOfAccount->account_id)->exists();
+    if ($isDefault) {
+        return back()->with('error', 'Gagal: Akun ini diset sebagai Akun Default di Pengaturan Sistem.');
+    }
+
+    try {
+        $chartOfAccount->delete();
+        return redirect()->route('admin.chart-of-accounts.index')->with('success', 'Akun berhasil dihapus.');
+    } catch (\Exception $e) {
+        return back()->with('error', 'Gagal menghapus akun: ' . $e->getMessage());
+    }
+}
 }

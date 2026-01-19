@@ -1,247 +1,330 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Buat Pesanan')
+@section('title', 'Buat Pesanan Penjualan')
 
 @section('content')
+<div x-data="salesOrderForm()" x-init="initData()" class="flex flex-col gap-6">
 
-    {{-- Container utama max-w-6xl sudah oke, tapi di mobile kita butuh padding kecil --}}
-    <div class="max-w-6xl mx-auto">
+    {{-- HEADER --}}
+    <div class="flex items-center gap-4">
+        <a href="{{ route('admin.sales-orders.index') }}" class="btn-icon btn-secondary">
+            <i class="material-icons">arrow_back</i>
+        </a>
+        <div>
+            <h1 class="page-title text-xl">Buat Pesanan Baru</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Input pesanan penjualan dari klien.</p>
+        </div>
+    </div>
 
-        <form action="{{ route('admin.sales-orders.store') }}" method="POST" id="orderForm">
-            @csrf
+    {{-- FORM UTAMA --}}
+    <form action="{{ route('admin.sales-orders.store') }}" method="POST" class="flex flex-col gap-6" @submit="validateForm($event)">
+        @csrf
 
-            {{-- TOP NAVIGATION --}}
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                <div>
-                    <h1 class="page-title">Buat Pesanan Baru</h1>
-                    <p class="page-subtitle">Isi formulir untuk membuat Sales Order (SO).</p>
+        {{-- SECTION 1: INFO PESANAN --}}
+        <div class="card p-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {{-- Klien --}}
+                <div class="col-span-1">
+                    <label class="form-label label-required">Klien / Pelanggan</label>
+                    <select name="client_id" class="tom-select" required placeholder="Pilih Klien...">
+                        <option value="">- Pilih Klien -</option>
+                        @foreach($clients as $client)
+                            <option value="{{ $client->client_id }}" {{ old('client_id') == $client->client_id ? 'selected' : '' }}>
+                                {{ $client->client_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('client_id') <p class="invalid-feedback">{{ $message }}</p> @enderror
                 </div>
-                <div class="flex gap-3">
-                    <a href="{{ route('admin.sales-orders.index') }}" class="btn btn-secondary">Batal</a>
-                    <button type="submit" class="btn btn-primary">
+
+                {{-- Tanggal Order --}}
+                <div class="col-span-1">
+                    <label class="form-label label-required">Tanggal Pesanan</label>
+                    <input type="date" name="order_date" class="form-input" value="{{ old('order_date', date('Y-m-d')) }}" required>
+                    @error('order_date') <p class="invalid-feedback">{{ $message }}</p> @enderror
+                </div>
+
+                {{-- Sales Person (Khusus Admin/Superadmin bisa pilih, Sales otomatis dirinya sendiri) --}}
+                <div class="col-span-1">
+                    <label class="form-label label-required">Salesperson</label>
+                    @if(Auth::user()->hasRole('sales'))
+                        <input type="text" class="form-input bg-slate-100 text-slate-500 cursor-not-allowed" value="{{ Auth::user()->full_name }}" readonly>
+                        <input type="hidden" name="sales_id" value="{{ Auth::user()->user_id }}">
+                    @else
+                        <select name="sales_id" class="tom-select">
+                            <option value="">- Pilih Sales -</option>
+                            @foreach($salesUsers as $sales)
+                                <option value="{{ $sales->user_id }}" {{ old('sales_id', Auth::id()) == $sales->user_id ? 'selected' : '' }}>
+                                    {{ $sales->full_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    @endif
+                    @error('sales_id') <p class="invalid-feedback">{{ $message }}</p> @enderror
+                </div>
+
+            </div>
+        </div>
+
+        {{-- SECTION 2: ITEM PRODUK --}}
+        <div class="card overflow-hidden">
+            <div class="card-header flex justify-between items-center bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                <h3 class="font-bold text-slate-700 dark:text-white">Daftar Barang</h3>
+                <button type="button" @click="addItem()" class="btn btn-sm btn-primary">
+                    <i class="material-icons text-sm mr-1">add</i> Tambah Baris
+                </button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="text-xs text-slate-500 uppercase bg-slate-100 dark:bg-slate-700/50">
+                        <tr>
+                            <th class="px-4 py-3 min-w-[250px]">Produk</th>
+                            <th class="px-4 py-3 w-32 text-right">Stok</th>
+                            <th class="px-4 py-3 w-40 text-right">Harga Satuan</th>
+                            <th class="px-4 py-3 w-32 text-center">Qty</th>
+                            <th class="px-4 py-3 w-40 text-right">Subtotal</th>
+                            <th class="px-4 py-3 w-16 text-center">Hapus</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        <template x-for="(item, index) in items" :key="item.id">
+                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                {{-- Produk Select --}}
+                                <td class="px-4 py-3 align-top">
+                                    <select 
+                                        :name="`products[${index}][product_id]`" 
+                                        class="tom-select-dynamic w-full"
+                                        x-init="initTomSelect($el, index)"
+                                        required
+                                    >
+                                        <option value="">Pilih Produk...</option>
+                                        @foreach($products as $product)
+                                            <option value="{{ $product->product_id }}" 
+                                                data-price="{{ $product->selling_price }}"
+                                                data-stock="{{ $product->stock_quantity }}"
+                                                data-code="{{ $product->product_code }}">
+                                                {{ $product->product_name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <div class="text-[10px] text-slate-400 mt-1" x-text="item.code || '-'"></div>
+                                </td>
+
+                                {{-- Stok Info --}}
+                                <td class="px-4 py-3 text-right align-top">
+                                    <span class="font-mono font-bold" 
+                                          :class="{'text-red-500': item.stock <= 0, 'text-emerald-600': item.stock > 0}" 
+                                          x-text="formatNumber(item.stock)">0</span>
+                                </td>
+
+                                {{-- Harga Satuan (Read Only untuk Sales Order) --}}
+                                <td class="px-4 py-3 text-right align-top">
+                                    <div class="relative">
+                                        <span class="text-xs text-slate-400 absolute left-0 top-1">Rp</span>
+                                        <input type="text" 
+                                               class="text-right bg-transparent border-0 p-0 w-full focus:ring-0 font-medium text-slate-700 dark:text-slate-300" 
+                                               :value="formatNumber(item.price)" 
+                                               readonly>
+                                    </div>
+                                </td>
+
+                                {{-- Qty Input --}}
+                                <td class="px-4 py-3 align-top">
+                                    <input type="number" 
+                                           :name="`products[${index}][quantity]`" 
+                                           x-model.number="item.quantity"
+                                           @input="calculateRow(index)"
+                                           min="1" 
+                                           :max="item.stock > 0 ? item.stock : 1"
+                                           class="form-input text-center h-9" 
+                                           required>
+                                    <div x-show="item.quantity > item.stock && item.stock > 0" class="text-[10px] text-red-500 mt-1 text-center">
+                                        Max: <span x-text="item.stock"></span>
+                                    </div>
+                                </td>
+
+                                {{-- Subtotal --}}
+                                <td class="px-4 py-3 text-right align-top">
+                                    <span class="font-bold text-indigo-600 dark:text-indigo-400" x-text="'Rp ' + formatNumber(item.subtotal)"></span>
+                                </td>
+
+                                {{-- Delete Button --}}
+                                <td class="px-4 py-3 text-center align-top">
+                                    <button type="button" @click="removeItem(index)" class="text-slate-400 hover:text-red-500 transition-colors" title="Hapus Baris">
+                                        <i class="material-icons text-xl">delete</i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                        
+                        {{-- Empty State --}}
+                        <tr x-show="items.length === 0">
+                            <td colspan="6" class="px-6 py-10 text-center text-slate-400">
+                                <div class="flex flex-col items-center justify-center">
+                                    <i class="material-icons text-4xl mb-2 text-slate-300">add_shopping_cart</i>
+                                    <p class="text-sm">Belum ada barang yang ditambahkan.</p>
+                                    <button type="button" @click="addItem()" class="text-indigo-600 font-bold hover:underline text-sm mt-1">Klik tambah baris</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                    
+                    {{-- Footer Total --}}
+                    <tfoot class="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700" x-show="items.length > 0">
+                        <tr>
+                            <td colspan="4" class="px-4 py-4 text-right font-bold text-slate-600 dark:text-slate-400 uppercase text-xs tracking-wider">Total Estimasi</td>
+                            <td class="px-4 py-4 text-right">
+                                <span class="text-lg font-black text-slate-800 dark:text-white" x-text="'Rp ' + formatNumber(grandTotal)"></span>
+                                <input type="hidden" name="total_amount" :value="grandTotal">
+                            </td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        {{-- SECTION 3: NOTES & SUBMIT --}}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="card p-4">
+                <label class="form-label">Catatan Pesanan</label>
+                <textarea name="notes" class="form-textarea h-24" placeholder="Contoh: Barang dikirim sore, jangan lupa bubble wrap..."></textarea>
+            </div>
+            
+            <div class="flex flex-col justify-end gap-3">
+                <div class="card p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800">
+                    <div class="flex gap-3">
+                        <i class="material-icons text-indigo-500">info</i>
+                        <div>
+                            <h4 class="font-bold text-indigo-700 dark:text-indigo-300 text-sm">Informasi Penting</h4>
+                            <p class="text-xs text-indigo-600/80 dark:text-indigo-400 mt-1">
+                                Stok barang akan dikurangi secara otomatis setelah pesanan ini diproses menjadi Invoice oleh Admin. Saat ini stok hanya di-booking.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex gap-3 mt-auto">
+                    <a href="{{ route('admin.sales-orders.index') }}" class="btn btn-secondary flex-1 justify-center">Batal</a>
+                    <button type="submit" class="btn btn-primary flex-1 justify-center shadow-lg shadow-indigo-500/30">
                         <i class="material-icons text-sm mr-2">save</i> Simpan Pesanan
                     </button>
                 </div>
             </div>
+        </div>
 
-            <div class="space-y-6">
-                
-                {{-- 1. HEADER INFO --}}
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-header-title">Informasi Pesanan</h3>
-                    </div>
-                    <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-6">
-                        
-                        {{-- Client --}}
-                        <div>
-                            <label class="form-label label-required">Pelanggan</label>
-                            <select name="client_id" class="tom-select" required placeholder="Pilih Pelanggan...">
-                                <option value="">Pilih Pelanggan...</option>
-                                @foreach($clients as $client)
-                                    <option value="{{ $client->client_id }}" {{ old('client_id') == $client->client_id ? 'selected' : '' }}>
-                                        {{ $client->client_name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('client_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
-
-                        {{-- Date --}}
-                        <div>
-                            <label class="form-label label-required">Tanggal Pesanan</label>
-                            <input type="date" name="order_date" class="form-input" 
-                                   value="{{ old('order_date', date('Y-m-d')) }}" required>
-                            @error('order_date') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
-
-                        {{-- Sales Rep --}}
-                        @if(Auth::user()->hasRole(['admin', 'superadmin']))
-                            <div>
-                                <label class="form-label label-optional">Sales Representative</label>
-                                <select name="sales_id" class="tom-select">
-                                    <option value="">- Pilih Sales -</option>
-                                    @foreach($salesUsers as $sales)
-                                        <option value="{{ $sales->user_id }}" {{ old('sales_id') == $sales->user_id ? 'selected' : '' }}>
-                                            {{ $sales->full_name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        @else
-                             <input type="hidden" name="sales_id" value="{{ Auth::id() }}">
-                             <div class="hidden md:block"></div>
-                        @endif
-
-                    </div>
-                </div>
-
-                {{-- 2. ITEMS TABLE (DIPERBAIKI UNTUK MOBILE) --}}
-                <div class="card">
-                    <div class="card-header flex justify-between items-center bg-slate-50 dark:bg-slate-800">
-                        <h3 class="card-header-title">Item Pesanan</h3>
-                        <button type="button" id="btnAddRow" class="btn btn-sm btn-secondary text-indigo-600 bg-indigo-50 border-indigo-200 hover:bg-indigo-100 transition-colors">
-                            <i class="material-icons text-sm mr-1">add</i> Tambah Barang
-                        </button>
-                    </div>
-                    
-                    {{-- REVISI: Gunakan overflow-x-auto agar bisa discroll di HP --}}
-                    <div class="overflow-x-auto w-full rounded-b-xl">
-                        <table class="table-modern w-full min-w-[800px]" id="itemsTable"> {{-- min-w-[800px] memaksa tabel lebar di HP --}}
-                            <thead>
-                                <tr>
-                                    {{-- Tambahkan min-width pada setiap TH agar tidak gepeng --}}
-                                    <th class="w-[40%] min-w-[250px]">Produk</th>
-                                    <th class="w-[20%] min-w-[150px] text-right">Harga Satuan</th>
-                                    <th class="w-[15%] min-w-[100px] text-center">Qty</th>
-                                    <th class="w-[20%] min-w-[150px] text-right">Subtotal</th>
-                                    <th class="w-[5%] min-w-[50px] text-center"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="itemsBody">
-                                {{-- Rows added via JS --}}
-                            </tbody>
-                            <tfoot class="bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
-                                <tr>
-                                    <td colspan="3" class="px-6 py-4 text-right font-bold uppercase text-xs text-slate-500">Total Akhir</td>
-                                    <td class="px-6 py-4 text-right font-extrabold text-lg text-indigo-600 dark:text-indigo-400">
-                                        <span id="grandTotalDisplay">Rp 0</span>
-                                    </td>
-                                    <td></td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                    @error('products') <div class="p-3 text-center text-xs text-rose-500 font-bold bg-rose-50">{{ $message }}</div> @enderror
-                </div>
-
-                {{-- 3. NOTES --}}
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-header-title">Catatan Tambahan</h3>
-                    </div>
-                    <div class="card-body">
-                        <textarea name="notes" class="form-textarea h-24" 
-                                  placeholder="Contoh: Pengiriman dilakukan hari Senin, barang fragile, dll...">{{ old('notes') }}</textarea>
-                    </div>
-                </div>
-
-            </div>
-        </form>
-
-    </div>
-
-@endsection
+    </form>
+</div>
 
 @push('scripts')
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const itemsBody = document.getElementById('itemsBody');
-        const btnAddRow = document.getElementById('btnAddRow');
-        const grandTotalDisplay = document.getElementById('grandTotalDisplay');
-        const productsData = @json($products); 
-        let rowCount = 0;
+    function salesOrderForm() {
+        return {
+            items: [],
+            grandTotal: 0,
 
-        function addRow() {
-            rowCount++;
-            let optionsHtml = '<option value="">Pilih Produk...</option>';
-            productsData.forEach(prod => {
-                optionsHtml += `<option value="${prod.product_id}" data-price="${prod.selling_price}">${prod.product_name} (${prod.product_code})</option>`;
-            });
+            initData() {
+                // Tambah 1 baris kosong saat load pertama
+                this.addItem();
+            },
 
-            const tr = document.createElement('tr');
-            tr.className = 'border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition';
-            tr.innerHTML = `
-                <td class="p-3 align-top">
-                    <select name="products[${rowCount}][product_id]" class="tom-select-dynamic product-select" required>
-                        ${optionsHtml}
-                    </select>
-                </td>
-                <td class="p-3 align-top text-right">
-                    <div class="text-sm font-mono text-slate-600 dark:text-slate-300 pt-3 price-display">Rp 0</div>
-                    <input type="hidden" class="price-input" value="0">
-                </td>
-                <td class="p-3 align-top">
-                    <input type="number" step="0.01" min="0.01" name="products[${rowCount}][quantity]" 
-                           class="form-input text-center qty-input" value="1" required>
-                </td>
-                <td class="p-3 align-top text-right">
-                    <div class="text-sm font-bold text-slate-800 dark:text-white pt-3 subtotal-display">Rp 0</div>
-                </td>
-                <td class="p-3 align-top text-center">
-                    <button type="button" class="text-slate-400 hover:text-rose-500 transition-colors btn-remove-row pt-2">
-                        <i class="material-icons text-lg">close</i>
-                    </button>
-                </td>
-            `;
-            itemsBody.appendChild(tr);
+            addItem() {
+                this.items.push({
+                    id: Date.now(), // Unique ID untuk key
+                    product_id: '',
+                    code: '',
+                    price: 0,
+                    stock: 0,
+                    quantity: 1,
+                    subtotal: 0
+                });
+            },
 
-            const selectEl = tr.querySelector('.tom-select-dynamic');
-            new TomSelect(selectEl, {
-                sortField: { field: "text", direction: "asc" },
-                plugins: ['clear_button'],
-                dropdownParent: 'body', // Pastikan ini ada agar dropdown tidak terpotong saat scroll
-                onChange: function(value) {
-                    updateRowPrice(tr, value);
+            removeItem(index) {
+                this.items.splice(index, 1);
+                this.calculateTotal();
+            },
+
+            initTomSelect(el, index) {
+                // Inisialisasi Tom Select pada elemen spesifik
+                if (el.tomselect) return; // Prevent double init
+
+                new TomSelect(el, {
+                    ...window.defaultTomSelectConfig,
+                    placeholder: 'Pilih Produk...',
+                    onChange: (value) => {
+                        this.updateRow(index, el, value);
+                    }
+                });
+            },
+
+            updateRow(index, selectElement, productId) {
+                // Cari option yang dipilih untuk ambil data attribute
+                const option = selectElement.querySelector(`option[value="${productId}"]`);
+                
+                if (option) {
+                    const price = parseFloat(option.dataset.price) || 0;
+                    const stock = parseFloat(option.dataset.stock) || 0;
+                    const code = option.dataset.code || '';
+
+                    // Update Alpine Data
+                    this.items[index].product_id = productId;
+                    this.items[index].price = price;
+                    this.items[index].stock = stock;
+                    this.items[index].code = code;
+                    
+                    // Reset Qty jika stok habis (visual warning handled in HTML)
+                    if(stock <= 0) {
+                        this.items[index].quantity = 0;
+                    } else {
+                        this.items[index].quantity = 1;
+                    }
+
+                    this.calculateRow(index);
                 }
-            });
+            },
 
-            calculateRow(tr);
-        }
+            calculateRow(index) {
+                const item = this.items[index];
+                item.subtotal = item.price * item.quantity;
+                this.calculateTotal();
+            },
 
-        function updateRowPrice(row, productId) {
-            const product = productsData.find(p => p.product_id == productId);
-            const priceInput = row.querySelector('.price-input');
-            const priceDisplay = row.querySelector('.price-display');
-            
-            if (product) {
-                const price = parseFloat(product.selling_price);
-                priceInput.value = price;
-                priceDisplay.innerText = formatRupiah(price);
-            } else {
-                priceInput.value = 0;
-                priceDisplay.innerText = 'Rp 0';
+            calculateTotal() {
+                this.grandTotal = this.items.reduce((sum, item) => sum + item.subtotal, 0);
+            },
+
+            formatNumber(num) {
+                return new Intl.NumberFormat('id-ID').format(num);
+            },
+
+            validateForm(e) {
+                if (this.items.length === 0) {
+                    e.preventDefault();
+                    window.showToast('Minimal harus ada 1 barang.', 'error');
+                    return;
+                }
+                
+                // Cek Validitas Stok
+                let isValid = true;
+                this.items.forEach(item => {
+                    if (item.quantity > item.stock) {
+                        isValid = false;
+                    }
+                    if(!item.product_id) {
+                         isValid = false;
+                    }
+                });
+
+                if (!isValid) {
+                    e.preventDefault();
+                    window.showToast('Harap periksa kembali stok dan kelengkapan data barang.', 'error');
+                }
             }
-            calculateRow(row);
         }
-
-        function calculateRow(row) {
-            const price = parseFloat(row.querySelector('.price-input').value) || 0;
-            const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
-            const subtotal = price * qty;
-            row.querySelector('.subtotal-display').innerText = formatRupiah(subtotal);
-            calculateGrandTotal();
-        }
-
-        function calculateGrandTotal() {
-            let total = 0;
-            document.querySelectorAll('#itemsBody tr').forEach(row => {
-                const price = parseFloat(row.querySelector('.price-input').value) || 0;
-                const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
-                total += price * qty;
-            });
-            grandTotalDisplay.innerText = formatRupiah(total);
-        }
-
-        function formatRupiah(amount) {
-            return 'Rp ' + amount.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-        }
-
-        itemsBody.addEventListener('click', function(e) {
-            if (e.target.closest('.btn-remove-row')) {
-                e.target.closest('tr').remove();
-                calculateGrandTotal();
-            }
-        });
-
-        itemsBody.addEventListener('input', function(e) {
-            if (e.target.classList.contains('qty-input')) {
-                calculateRow(e.target.closest('tr'));
-            }
-        });
-
-        btnAddRow.addEventListener('click', addRow);
-        addRow();
-    });
+    }
 </script>
 @endpush
+@endsection

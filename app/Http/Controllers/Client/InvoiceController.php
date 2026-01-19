@@ -28,7 +28,6 @@ class InvoiceController extends Controller
         
         $uniqueOrderDates = $client->salesInvoices()->select(DB::raw('DISTINCT DATE(order_date) as order_date'))->pluck('order_date');
         $uniqueDueDates = $client->salesInvoices()->select(DB::raw('DISTINCT DATE(due_date) as due_date'))->pluck('due_date');
-
         return view('client.invoices.index', compact('invoices', 'uniqueOrderDates', 'uniqueDueDates'));
     }
 
@@ -37,7 +36,6 @@ class InvoiceController extends Controller
         if ($invoice->client_id !== Auth::guard('client')->id() || $invoice->status === 'draft') {
             abort(403, 'Akses Ditolak');
         }
-
         $invoice->load(['items.product', 'taxes', 'payments.receivedBy', 'payments.paymentMethod', 'deductingReturns', 'adjustments.user', 'returns.items.product']);
         $salesUsers = User::role('sales')->get();
         
@@ -45,19 +43,16 @@ class InvoiceController extends Controller
             ->whereIn('type', ['direct', 'pending'])
             ->orderBy('name')
             ->get();
-
         $gatewayMethod = PaymentMethod::where('is_active', true)
             ->where('type', 'gateway')
             ->first();
-
         $companyBankAccounts = CompanyBankAccount::where('is_active', true)
             ->orderBy('bank_name')
             ->get();
-
         return view('client.invoices.show', compact('invoice', 'salesUsers', 'paymentMethods', 'companyBankAccounts', 'gatewayMethod'));
     }
 
-    public function showBulkPay(): View
+public function showBulkPay(): View
     {
         $client = Auth::guard('client')->user();
         $invoices = $client->salesInvoices()
@@ -65,10 +60,8 @@ class InvoiceController extends Controller
             ->with(['deductingReturns', 'adjustments'])
             ->orderBy('due_date', 'asc')
             ->get();
-
         $availableBalance = $client->balance;
         $pendingBalance = $client->pending_balance;
-
         $paymentMethods = PaymentMethod::where('is_active', true)
             ->whereIn('type', ['direct', 'pending'])
             ->orderBy('name')
@@ -77,22 +70,18 @@ class InvoiceController extends Controller
         $gatewayMethod = PaymentMethod::where('is_active', true)
             ->where('type', 'gateway')
             ->first();
-
         $companyBankAccounts = CompanyBankAccount::where('is_active', true)
             ->orderBy('bank_name')
             ->get();
-
         return view('client.invoices.bulk_pay', compact('invoices', 'availableBalance', 'pendingBalance', 'paymentMethods', 'companyBankAccounts', 'gatewayMethod'));
     }
 
     public function uploadProof(Request $request, SalesInvoice $invoice): RedirectResponse
     {
-        if ($invoice->client_id !== Auth::guard('client')->id()) abort(403);
-
+if ($invoice->client_id !== Auth::guard('client')->id()) abort(403);
         $client = Auth::guard('client')->user();
         $sisaTagihan = $invoice->remaining_balance;
         $saldoKlien = $client->balance;
-
         $validated = $request->validate([
             'payment_method_id' => [
                 Rule::requiredIf(fn() => $request->input('payment_amount', 0) > 0 || !$request->has('use_credit')),
@@ -109,40 +98,33 @@ class InvoiceController extends Controller
             'user_id_sales'     => 'nullable|exists:users,user_id',
             'notes'             => 'nullable|string',
         ]);
-
         $paymentMethod = null;
         if (!empty($validated['payment_method_id'])) {
             $paymentMethod = PaymentMethod::find($validated['payment_method_id']);
             
             $config = $paymentMethod->client_input_config;
-
             if (in_array($config, ['proof_only', 'proof_and_reference'])) {
                 $request->validate(['proof_of_payment' => 'required|image|mimes:jpeg,png,jpg|max:2048']);
             } else {
                 $request->validate(['proof_of_payment' => 'nullable|image|mimes:jpeg,png,jpg|max:2048']);
             }
-
             if (in_array($config, ['reference_only', 'proof_and_reference'])) {
                 $request->validate(['reference_number' => 'required|string|max:255']);
             } else {
                 $request->validate(['reference_number' => 'nullable|string|max:255']);
             }
         }
-
         $amountFromInput = (float) $validated['payment_amount'];
         $useCredit = $validated['use_credit'] ?? false;
         $creditToUse = 0;
         $totalPaymentValue = $amountFromInput;
-
         if ($useCredit && $saldoKlien > 0) {
             $totalPaymentValue = $amountFromInput + $saldoKlien;
             $creditToUse = min($saldoKlien, $sisaTagihan, $totalPaymentValue);
         }
-
         if ($totalPaymentValue <= 0.01 && $sisaTagihan > 0.01) {
             return back()->with('error', 'Jumlah pembayaran harus lebih dari 0.');
         }
-
         DB::beginTransaction();
         try {
             $path = $request->hasFile('proof_of_payment')
@@ -150,7 +132,6 @@ class InvoiceController extends Controller
                 : null;
             
             $status = $paymentMethod ? $paymentMethod->client_status_default : 'pending_verification';
-
             if ($creditToUse > 0) {
                 Payment::create([
                     'invoice_id'        => $invoice->invoice_id,
@@ -160,7 +141,6 @@ class InvoiceController extends Controller
                     'status'            => 'completed', 
                     'notes'             => 'Saldo kredit digunakan oleh klien.',
                 ]);
-
                 ClientLedger::create([
                     'client_id'        => $client->client_id,
                     'sales_invoice_id' => $invoice->invoice_id,
@@ -174,7 +154,6 @@ class InvoiceController extends Controller
                     'user_id'          => null,
                 ]);
             }
-
             if ($amountFromInput > 0) {
                 $invoice->payments()->create([
                     'payment_date'        => now(),
@@ -188,10 +167,8 @@ class InvoiceController extends Controller
                     'reference_number'    => $request->input('reference_number'),
                 ]);
             }
-
             $invoice->updatePaymentStatus();
             DB::commit();
-
             return back()->with('success', 'Informasi pembayaran berhasil dikirim.');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -200,10 +177,9 @@ class InvoiceController extends Controller
         }
     }
 
-    public function storeBatchProof(Request $request): RedirectResponse
+public function storeBulkProof(Request $request): RedirectResponse
     {
         $client = Auth::guard('client')->user();
-
         $rules = [
             'invoice_ids'   => 'required|array|min:1',
             'invoice_ids.*' => 'exists:sales_invoices,invoice_id',
@@ -221,19 +197,16 @@ class InvoiceController extends Controller
                  'exists:company_bank_accounts,company_bank_account_id'
             ],
         ];
-
         $paymentMethod = null;
         if ($request->filled('payment_method_id')) {
             $paymentMethod = PaymentMethod::find($request->input('payment_method_id'));
             
             $config = $paymentMethod->client_input_config;
-
             if (in_array($config, ['proof_only', 'proof_and_reference'])) {
                 $rules['proof_of_payment'] = 'required|image|mimes:jpeg,png,jpg|max:2048';
             } else {
                 $rules['proof_of_payment'] = 'nullable|image|mimes:jpeg,png,jpg|max:2048';
             }
-
             if (in_array($config, ['reference_only', 'proof_and_reference'])) {
                 $rules['reference_number'] = 'required|string|max:255';
             } else {
@@ -243,9 +216,8 @@ class InvoiceController extends Controller
             $rules['proof_of_payment'] = 'nullable|image|mimes:jpeg,png,jpg|max:2048';
             $rules['reference_number'] = 'nullable|string|max:255';
         }
-
         $validated = $request->validate($rules);
-
+        
         DB::beginTransaction();
         try {
             $path = $request->hasFile('proof_of_payment')
@@ -276,6 +248,7 @@ class InvoiceController extends Controller
 
             BulkSalesPayment::create([
                 'client_id'             => $client->client_id,
+                'payment_number' => BulkSalesPayment::generateNumber(),
                 'processed_by_user_id'  => null,
                 'payment_date'          => now(),
                 'total_amount'          => $validated['payment_amount'], 
@@ -297,7 +270,6 @@ class InvoiceController extends Controller
             ]);
 
             DB::commit();
-
             return redirect()->route('client.invoices.index')
                 ->with('success', 'Informasi pembayaran batch berhasil dikirim.');
         } catch (\Exception $e) {

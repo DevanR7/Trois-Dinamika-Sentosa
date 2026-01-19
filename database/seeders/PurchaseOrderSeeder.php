@@ -7,141 +7,144 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
-use App\Models\PurchaseOrderItemDiscount;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Models\Tax;
 
 class PurchaseOrderSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::transaction(function () {
+        // 1. Setup Data Pendukung
+        $tax12 = Tax::firstOrCreate(['rate' => 12.00], ['name' => 'PPN 12%', 'is_active' => true]);
+        $admin = User::role('admin')->first() ?? User::first(); // Mengisi user_id_admin
+        
+        // Cari Supplier CV. BUDI LUHUR
+        $supplier = Supplier::where('supplier_name', 'CV. BUDI LUHUR')->first();
+        
+        if(!$supplier) {
+            $this->command->warn('Supplier CV. BUDI LUHUR tidak ditemukan. Pastikan SupplierSeeder sudah dijalankan.');
+            return;
+        }
 
-            // 1. Setup Supplier (SESUAI TABEL SUPPLIERS KAMU)
-            $supplier = Supplier::firstOrCreate(
-                ['supplier_name' => 'BULL Central Distributor'], // Kunci pencarian
-                [
-                    // Data jika belum ada (sesuai kolom di migration kamu)
-                    'person_in_charge' => 'Budi Santoso (Sales Pusat)',
-                    'phone_number' => '021-555-9999', // Menggunakan phone_number
-                    'address' => 'Jl. Teknik Industri No. 88, Jakarta',
-                    'npwp' => '01.234.567.8-901.000',
-                ]
+        DB::transaction(function () use ($admin, $tax12, $supplier) {
+            
+            // ---------------------------------------------------------
+            // 2. LOGIKA GENERATE PO NUMBER (Manual via po_counters)
+            // ---------------------------------------------------------
+            // Kita set tanggal order sesuai nota: 23 September 2025
+            $orderDate = Carbon::create(2025, 9, 23);
+            $ymString  = $orderDate->format('Ym'); // "202509"
+
+            // Cek counter terakhir di tabel po_counters
+            $counter = DB::table('po_counters')
+                ->where('ym', $ymString)
+                ->where('supplier_id', $supplier->supplier_id)
+                ->lockForUpdate()
+                ->first();
+
+            $nextSequence = $counter ? $counter->last_sequence + 1 : 1;
+
+            // Update atau Insert ke tabel po_counters
+            DB::table('po_counters')->updateOrInsert(
+                ['ym' => $ymString, 'supplier_id' => $supplier->supplier_id],
+                ['last_sequence' => $nextSequence, 'updated_at' => now()]
             );
 
-            // 2. Setup Admin (Asumsi tabel users standar Laravel/breeze)
-            $admin = User::firstOrCreate(
-                ['username' => 'admin_gudang'],
-                [
-                    'full_name' => 'Admin Gudang',
-                    'email' => 'admingudang@example.com',
-                    'password' => bcrypt('password'),
-                    'is_approved' => true,
-                ]
+            // Format PO Number: PO/YYYYMM/SUPPLIER_ID/SEQUENCE (Contoh format standar)
+            // Hasil: PO/202509/4/0001
+            $generatedPoNumber = sprintf(
+                "PO/%s/%s/%04d", 
+                $ymString, 
+                $supplier->supplier_id, 
+                $nextSequence
             );
 
-            // 3. Helper Generate PO Number
-            $generatePoNumber = function () {
-                $ym = Carbon::now()->format('Ym');
-                $counter = DB::table('po_counters')->where('ym', $ym)->lockForUpdate()->first();
-                if ($counter) {
-                    $next = $counter->last_sequence + 1;
-                    DB::table('po_counters')->where('ym', $ym)->update(['last_sequence' => $next, 'updated_at' => now()]);
-                } else {
-                    $next = 1;
-                    DB::table('po_counters')->insert(['ym' => $ym, 'last_sequence' => $next, 'created_at' => now(), 'updated_at' => now()]);
-                }
-                return sprintf('PO-%s-%03d', $ym, $next);
-            };
+            // ---------------------------------------------------------
+            // 3. PERSIAPAN DATA NOMINAL (Hardcode sesuai Nota Gambar)
+            // ---------------------------------------------------------
+            // Subtotal dari penjumlahan item di kolom "Jumlah"
+            $subtotalNota = 3303050; 
+            
+            // Angka di pojok kanan bawah nota
+            $dppValue     = 3027796; // DPP (11/12 x Hrg Jual)
+            $ppnValue     = 363335;  // PPN 12%
+            $grandTotal   = 3666386; // Jumlah Total
 
-            // 4. DATA TRANSAKSI (Sesuai Nota Gambar)
-            $itemsData = [
-                ['code' => 'BL-001', 'qty' => 3, 'price' => 400000, 'discounts' => [61.00, 10.00, 9.91]],
-                ['code' => 'BL-002', 'qty' => 2, 'price' => 300000, 'discounts' => [61.00, 10.00, 9.91]],
-                ['code' => 'BL-003', 'qty' => 3, 'price' => 144000, 'discounts' => [61.00, 5.00, 9.91]],
-                ['code' => 'BL-004', 'qty' => 2, 'price' => 158000, 'discounts' => [61.00, 5.00, 9.91]],
-                ['code' => 'BL-005', 'qty' => 4, 'price' => 174000, 'discounts' => [61.00, 5.00, 9.91]],
-                ['code' => 'BL-006', 'qty' => 5, 'price' => 120000, 'discounts' => [61.00, 5.00, 9.91]],
-                ['code' => 'BL-007', 'qty' => 12, 'price' => 80000, 'discounts' => [61.00, 10.00, 9.91]],
-                ['code' => 'BL-008', 'qty' => 12, 'price' => 100000, 'discounts' => [61.00, 10.00, 9.91]],
-                ['code' => 'BL-009', 'qty' => 6, 'price' => 88000, 'discounts' => [61.00, 10.00, 9.91]],
-                ['code' => 'BL-010', 'qty' => 200, 'price' => 16000, 'discounts' => [61.00, 10.00, 9.91]],
-                ['code' => 'BL-011', 'qty' => 30, 'price' => 20000, 'discounts' => [61.00, 10.00, 9.91]],
-            ];
-
-            // 5. Kalkulasi Total
-            $poGrandTotal = 0;
-            $preparedItems = [];
-
-            foreach ($itemsData as $data) {
-                $product = Product::where('product_code', $data['code'])->first();
-                
-                if ($product) {
-                    $basePrice = $data['price'];
-                    $currentPrice = $basePrice;
-                    
-                    // Hitung Netto
-                    foreach ($data['discounts'] as $discPercentage) {
-                        $currentPrice = $currentPrice * (1 - ($discPercentage / 100));
-                    }
-                    
-                    $netPricePerUnit = round($currentPrice, 2);
-                    $lineTotal = $netPricePerUnit * $data['qty'];
-                    
-                    $poGrandTotal += $lineTotal;
-
-                    $preparedItems[] = [
-                        'product' => $product,
-                        'qty' => $data['qty'],
-                        'base_price' => $basePrice,
-                        'net_price' => $netPricePerUnit,
-                        'subtotal' => $lineTotal,
-                        'discounts' => $data['discounts']
-                    ];
-                }
-            }
-
-            // 6. Buat Header PO (STATUS = DRAFT)
+            // ---------------------------------------------------------
+            // 4. CREATE HEADER PO
+            // ---------------------------------------------------------
             $po = PurchaseOrder::create([
-                'po_number' => $generatePoNumber(),
-                'supplier_id' => $supplier->supplier_id,
-                'requester_user_id' => null,
-                'user_id_admin' => $admin->user_id,
-                'order_date' => Carbon::now()->toDateString(),
-                'due_date' => Carbon::now()->addDays(30)->toDateString(),
-                'expected_delivery_date' => Carbon::now()->addDays(3)->toDateString(),
-                'status' => 'draft',           // Draft
-                'payment_status' => 'unpaid',
-                'subtotal' => $poGrandTotal,
-                'total_amount' => $poGrandTotal,
-                'grand_total' => $poGrandTotal,
-                'dpp' => $poGrandTotal,
-                'ppn' => 0, 
-                'shipping_amount' => 0,
-                'notes' => 'Draft PO Restock BULL (Waiting Approval)',
+                // Generated otomatis by system (simulasi)
+                'po_number'               => $generatedPoNumber, 
+                
+                // Nomor Faktur dari Kertas Nota
+                'supplier_invoice_number' => 'E59750', 
+                
+                'supplier_id'             => $supplier->supplier_id,
+                'user_id_admin'           => $admin->user_id,
+                'requester_user_id'       => $admin->user_id, // Opsional, disamakan saja
+                
+                'order_date'              => $orderDate,
+                'due_date'                => $orderDate, // Jatuh tempo sama dgn tgl nota (tunai/tempo)
+                'expected_delivery_date'  => $orderDate->copy()->addDays(3),
+                
+                'status'                  => 'draft', // SESUAI REQUEST: DRAFT
+                'payment_status'          => 'unpaid',
+                
+                // Nominal
+                'subtotal'                => $subtotalNota,
+                'tax_id'                  => $tax12->id,
+                'dpp'                     => $dppValue,
+                'taxable_amount'          => $dppValue, // Biasanya sama dengan DPP
+                'ppn'                     => $ppnValue,
+                'grand_total'             => $grandTotal,
+                'total_amount'            => $grandTotal, // Total amount biasanya sama dgn Grand Total
+                
+                'notes'                   => 'Input data historis dari Nota Fisik E59750',
+                'created_at'              => $orderDate,
+                'updated_at'              => $orderDate,
             ]);
 
-            // 7. Simpan Item & Diskon
-            foreach ($preparedItems as $item) {
-                $poItem = PurchaseOrderItem::create([
-                    'po_id' => $po->po_id,
-                    'product_id' => $item['product']->product_id,
-                    'quantity' => $item['qty'],
-                    'quantity_returned' => 0,
-                    'price_per_unit' => $item['base_price'], 
-                    'subtotal' => $item['subtotal'],
-                ]);
+            // ---------------------------------------------------------
+            // 5. CREATE PO ITEMS
+            // ---------------------------------------------------------
+            // Data produk & harga sesuai kolom "Jumlah" di nota
+            $notaItems = [
+                ['BL-ARM-870', 3, 400000, 379459],
+                ['BL-ARM-602', 2, 300000, 189729],
+                ['BL-CSB-24T', 3, 144000, 144194],
+                ['BL-CSB-40T', 2, 158000, 105475],
+                ['BL-CSB-60T', 4, 174000, 232313],
+                ['BL-SIG-601', 5, 120000, 200270],
+                ['BL-CAP-100', 12, 80000, 303567],
+                ['BL-CAP-200', 12, 100000, 379459],
+                ['BL-GLS-TRM', 6, 88000, 166962],
+                ['BL-CB-411A', 200, 16000, 1011890],
+                ['BL-CB-2000', 30, 20000, 189729],
+            ];
 
-                foreach ($item['discounts'] as $discValue) {
-                    PurchaseOrderItemDiscount::create([
-                        'purchase_order_item_id' => $poItem->item_id,
-                        'percentage' => $discValue
+            foreach ($notaItems as $item) {
+                $code     = $item[0];
+                $qty      = $item[1];
+                $priceRaw = $item[2]; // Harga List
+                $subtotal = $item[3]; // Harga Netto (setelah diskon ribet)
+
+                $product = Product::where('product_code', $code)->first();
+
+                if ($product) {
+                    PurchaseOrderItem::create([
+                        'po_id'          => $po->po_id,
+                        'product_id'     => $product->product_id,
+                        'quantity'       => $qty,
+                        'price_per_unit' => $priceRaw, 
+                        'subtotal'       => $subtotal,
+                        'created_at'     => $orderDate,
+                        'updated_at'     => $orderDate,
                     ]);
                 }
             }
-
-            $this->command->info("✅ PO Draft {$po->po_number} Berhasil! Supplier menggunakan 'phone_number'.");
         });
     }
 }

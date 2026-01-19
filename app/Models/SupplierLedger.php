@@ -6,9 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-use App\Models\Supplier;
-use App\Models\User;
-use App\Models\PurchaseOrder;
 
 class SupplierLedger extends Model
 {
@@ -35,7 +32,7 @@ class SupplierLedger extends Model
 
     public function reference(): MorphTo
     {
-        return $this->morphTo();
+        return $this->morphTo()->withTrashed();
     }
 
     public function supplier(): BelongsTo
@@ -50,6 +47,6 @@ class SupplierLedger extends Model
 
     public function purchaseOrder(): BelongsTo
     {
-        return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id', 'po_id');
+        return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id', 'po_id')->withTrashed(); // Tambahkan di sini juga
     }
 }

@@ -3,63 +3,71 @@
 @section('title', 'Buat Rekonsiliasi Baru')
 
 @section('content')
-    <div class="max-w-2xl mx-auto">
-        
-        <div class="mb-6">
-            <a href="{{ route('admin.bank-reconciliations.index') }}" class="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors w-fit mb-2">
-                <i class="material-icons text-sm">arrow_back</i> Kembali
+<div class="flex flex-col gap-6 max-w-3xl mx-auto">
+    
+    <div class="flex items-center justify-between">
+        <div>
+            <a href="{{ route('admin.bank-reconciliations.index') }}" class="flex items-center text-sm text-slate-500 hover:text-indigo-600 transition-colors mb-2">
+                <i class="material-icons text-[16px] mr-1">arrow_back</i> Kembali
             </a>
-            <h1 class="page-title">Mulai Rekonsiliasi Baru</h1>
-            <p class="page-subtitle">Pilih akun bank dan periode laporan rekening koran.</p>
-        </div>
-
-        <div class="card">
-            <div class="card-body">
-                <form action="{{ route('admin.bank-reconciliations.store') }}" method="POST">
-                    @csrf
-
-                    <div class="space-y-5">
-                        {{-- 1. Pilih Akun Bank --}}
-                        <div>
-                            <label class="form-label label-required">Akun Bank Perusahaan</label>
-                            <select name="company_bank_account_id" class="tom-select" required>
-                                <option value="">Pilih Bank...</option>
-                                @foreach($bankAccounts as $bank)
-                                    <option value="{{ $bank->company_bank_account_id }}">
-                                        {{ $bank->bank_name }} - {{ $bank->account_name }} ({{ $bank->account_number }})
-                                    </option>
-                                @endforeach
-                            </select>
-                            <p class="text-[10px] text-slate-500 mt-1">Hanya akun bank yang sudah terhubung dengan Chart of Account yang muncul.</p>
-                        </div>
-
-                        {{-- 2. Tanggal Laporan (Statement Date) --}}
-                        <div>
-                            <label class="form-label label-required">Tanggal Akhir Laporan (Statement Date)</label>
-                            <input type="date" name="statement_date" class="form-input" value="{{ date('Y-m-d') }}" required>
-                            <p class="text-[10px] text-slate-500 mt-1">Masukkan tanggal akhir periode rekening koran (misal: 31 Jan 2025).</p>
-                        </div>
-
-                        {{-- 3. Saldo Akhir Laporan (Target) --}}
-                        <div>
-                            <label class="form-label label-required">Saldo Akhir di Rekening Koran (Statement Balance)</label>
-                            <div class="relative">
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">Rp</div>
-                                <input type="text" class="form-input pl-10 text-lg font-bold text-indigo-700 autonumeric" 
-                                       name="statement_balance" placeholder="0" required data-an-synced="true">
-                            </div>
-                            <p class="text-[10px] text-slate-500 mt-1">Masukkan saldo akhir yang tertera pada cetakan/PDF rekening koran bank.</p>
-                        </div>
-
-                        <div class="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-end">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="material-icons text-sm mr-2">play_arrow</i>
-                                Mulai Proses
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
+            <h1 class="page-title">Mulai Rekonsiliasi</h1>
         </div>
     </div>
+
+    <form action="{{ route('admin.bank-reconciliations.store') }}" method="POST">
+        @csrf
+
+        <div class="card p-6">
+            <div class="grid grid-cols-1 gap-6">
+                
+                {{-- Pilih Akun Bank --}}
+                <div>
+                    <label for="company_bank_account_id" class="form-label label-required">Akun Bank Perusahaan</label>
+                    <select id="company_bank_account_id" name="company_bank_account_id" class="tom-select" required>
+                        <option value="">Pilih Akun Bank...</option>
+                        @foreach($bankAccounts as $bank)
+                            <option value="{{ $bank->company_bank_account_id }}">
+                                {{ $bank->bank_name }} - {{ $bank->account_number }} ({{ $bank->account->account_name ?? 'No COA' }})
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="text-[11px] text-slate-400 mt-1">Pastikan akun bank sudah terhubung dengan Chart of Account (COA).</p>
+                    @error('company_bank_account_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                {{-- Tanggal Statement --}}
+                <div>
+                    <label for="statement_date" class="form-label label-required">Tanggal Rekening Koran (Statement Date)</label>
+                    <input type="date" id="statement_date" name="statement_date" 
+                           value="{{ old('statement_date', date('Y-m-d')) }}" 
+                           class="form-input @error('statement_date') is-invalid @enderror" required>
+                    <p class="text-[11px] text-slate-400 mt-1">Transaksi sampai tanggal ini akan ditarik untuk dicocokkan.</p>
+                    @error('statement_date') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                {{-- Saldo Akhir Bank --}}
+                <div>
+                    <label for="statement_balance" class="form-label label-required">Saldo Akhir di Rekening Koran</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-2.5 text-slate-500 font-bold">Rp</span>
+                        <input type="text" class="form-input pl-10 text-right font-mono font-bold autonumeric"
+                               name="statement_balance_visual"
+                               data-an-synced="true"
+                               placeholder="0" required>
+                        <input type="hidden" name="statement_balance" value="0">
+                    </div>
+                    @error('statement_balance') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+            </div>
+
+            <div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-slate-100 dark:border-slate-700">
+                <a href="{{ route('admin.bank-reconciliations.index') }}" class="btn btn-secondary">Batal</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="material-icons text-[18px] mr-2">play_arrow</i> Proses Data
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
 @endsection

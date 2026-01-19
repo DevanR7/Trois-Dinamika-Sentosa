@@ -3,125 +3,175 @@
 @section('title', 'Tambah Supplier Baru')
 
 @section('content')
-    <div class="max-w-4xl mx-auto">
+<div class="max-w-5xl mx-auto animate-enter">
+    <form action="{{ route('admin.suppliers.store') }}" method="POST">
+        @csrf
         
-        {{-- Header --}}
-        <div class="flex items-center justify-between mb-6">
+        {{-- HEADER --}}
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
             <div>
-                <h2 class="page-title">Tambah Supplier</h2>
-                <a href="{{ route('admin.suppliers.index') }}" class="flex items-center gap-1 text-sm text-slate-500 hover:text-indigo-600 transition-colors mt-1">
-                    <i class="material-icons text-base">arrow_back</i> Kembali ke Daftar
-                </a>
+                <h1 class="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                    <i class="material-icons text-indigo-500">person_add</i> Supplier Baru
+                </h1>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Daftarkan mitra pemasok baru ke dalam sistem.</p>
+            </div>
+            <div class="flex gap-2">
+                <a href="{{ route('admin.suppliers.index') }}" class="btn btn-secondary">Batal</a>
+                <button type="submit" class="btn btn-primary shadow-lg shadow-indigo-500/30">
+                    <i class="material-icons text-sm">save</i> Simpan Data
+                </button>
             </div>
         </div>
 
-        {{-- Form Card --}}
-        <div class="card">
-            <form action="{{ route('admin.suppliers.store') }}" method="POST" class="p-6">
-                @csrf
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {{-- KOLOM KIRI: IDENTITAS & KONTAK (2/3 Lebar) --}}
+            <div class="lg:col-span-2 space-y-6">
+                <div class="card p-6">
+                    <h3 class="section-title flex items-center gap-2 mb-4">
+                        <i class="material-icons text-slate-400 text-sm">badge</i> Identitas & Kontak
+                    </h3>
                     
-                    {{-- Nama Supplier --}}
-                    <div class="col-span-1 md:col-span-2">
-                        <label class="form-label">Nama Supplier / PT <span class="text-red-500">*</span></label>
-                        <div class="relative">
-                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                                <i class="material-icons text-lg">store</i>
-                            </span>
-                            <input type="text" name="supplier_name" value="{{ old('supplier_name') }}" 
-                                   class="form-input pl-10 @error('supplier_name') border-red-500 @enderror" 
-                                   placeholder="Contoh: PT. Sumber Makmur" required>
+                    <div class="space-y-5">
+                        {{-- Nama Supplier --}}
+                        <div>
+                            <label class="form-label label-required">Nama Supplier / Perusahaan</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="material-icons text-slate-400 text-lg">store</i>
+                                </div>
+                                <input type="text" name="supplier_name" 
+                                       class="form-input pl-10 @error('supplier_name') is-invalid @enderror" 
+                                       value="{{ old('supplier_name') }}" 
+                                       placeholder="Contoh: PT. Sumber Makmur Jaya" required autofocus>
+                            </div>
+                            @error('supplier_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
-                        @error('supplier_name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                    </div>
 
-                    {{-- PIC --}}
-                    <div>
-                        <label class="form-label">Penanggung Jawab (PIC)</label>
-                        <div class="relative">
-                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                                <i class="material-icons text-lg">person</i>
-                            </span>
-                            <input type="text" name="person_in_charge" value="{{ old('person_in_charge') }}" 
-                                   class="form-input pl-10" placeholder="Nama kontak...">
+                        {{-- Grid: PIC & Phone --}}
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
+                                <label class="form-label">Person In Charge (PIC)</label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <i class="material-icons text-slate-400 text-lg">person</i>
+                                    </div>
+                                    <input type="text" name="person_in_charge" 
+                                           class="form-input pl-10" 
+                                           value="{{ old('person_in_charge') }}" 
+                                           placeholder="Nama Sales / Kontak">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="form-label">No. Telepon / WhatsApp</label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <i class="material-icons text-slate-400 text-lg">call</i>
+                                    </div>
+                                    <input type="text" name="phone_number" 
+                                           class="form-input pl-10" 
+                                           value="{{ old('phone_number') }}" 
+                                           placeholder="0812xxxx (Wajib Aktif)">
+                                </div>
+                            </div>
                         </div>
-                    </div>
 
-                    {{-- No Telepon --}}
-                    <div>
-                        <label class="form-label">No. Telepon / WA</label>
-                        <div class="relative">
-                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                                <i class="material-icons text-lg">phone</i>
-                            </span>
-                            <input type="text" name="phone_number" value="{{ old('phone_number') }}" 
-                                   class="form-input pl-10" placeholder="0812...">
-                        </div>
-                    </div>
-
-                    {{-- NPWP --}}
-                    <div>
-                        <label class="form-label">NPWP</label>
-                        <div class="relative">
-                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                                <i class="material-icons text-lg">badge</i>
-                            </span>
-                            <input type="text" name="npwp" value="{{ old('npwp') }}" 
-                                   class="form-input pl-10" placeholder="Nomor NPWP...">
-                        </div>
-                    </div>
-
-                    {{-- Alamat --}}
-                    <div class="col-span-1 md:col-span-2">
-                        <label class="form-label">Alamat Lengkap</label>
-                        <div class="relative">
-                            <span class="absolute top-3 left-0 flex items-start pl-3 text-slate-400">
-                                <i class="material-icons text-lg">location_on</i>
-                            </span>
-                            <textarea name="address" rows="2" class="form-input pl-10" placeholder="Alamat gudang / kantor...">{{ old('address') }}</textarea>
+                        {{-- Alamat --}}
+                        <div>
+                            <label class="form-label">Alamat Lengkap</label>
+                            <div class="relative">
+                                <div class="absolute top-3 left-3 pointer-events-none">
+                                    <i class="material-icons text-slate-400 text-lg">place</i>
+                                </div>
+                                <textarea name="address" class="form-textarea pl-10" rows="3" 
+                                          placeholder="Alamat kantor atau gudang supplier...">{{ old('address') }}</textarea>
+                            </div>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <div class="col-span-1 md:col-span-2 my-2 border-t border-slate-100 dark:border-slate-700">
-                        <p class="text-xs font-bold text-slate-400 uppercase mt-2">Informasi Rekening Bank</p>
+            {{-- KOLOM KANAN: KEUANGAN & LEGAL (1/3 Lebar) --}}
+            <div class="lg:col-span-1 space-y-6">
+                
+                {{-- Card Keuangan --}}
+                <div class="card p-6 h-full border-t-4 border-t-indigo-500">
+                    <h3 class="section-title flex items-center gap-2 mb-4">
+                        <i class="material-icons text-slate-400 text-sm">account_balance_wallet</i> Info Pembayaran
+                    </h3>
+                    
+                    <div class="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-lg mb-5 flex gap-3 items-start">
+                        <i class="material-icons text-indigo-500 text-lg mt-0.5">info</i>
+                        <p class="text-xs text-indigo-700 dark:text-indigo-300 leading-snug">
+                            Data ini digunakan otomatis saat pembuatan bukti transfer pelunasan hutang.
+                        </p>
                     </div>
 
-                    {{-- Nama Bank --}}
-                    <div>
-                        <label class="form-label">Nama Bank</label>
-                        <div class="relative">
-                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                                <i class="material-icons text-lg">account_balance</i>
-                            </span>
-                            <input type="text" name="bank_name" value="{{ old('bank_name') }}" 
-                                   class="form-input pl-10" placeholder="BCA, Mandiri, dll...">
+                    <div class="space-y-5">
+                        {{-- Nama Bank --}}
+                        <div>
+                            <label class="form-label">Nama Bank</label>
+                            <div class="relative">
+                                {{-- Icon ditaruh di luar select jika pakai TomSelect, atau diabaikan --}}
+                                <select name="bank_name" class="tom-select">
+                                    <option value="">Pilih Bank</option>
+                                    @foreach(['BCA', 'MANDIRI', 'BRI', 'BNI', 'CIMB', 'BSI', 'DANAMON', 'PERMATA', 'LAINNYA'] as $bank)
+                                        <option value="{{ $bank }}" {{ old('bank_name') == $bank ? 'selected' : '' }}>{{ $bank }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+
+                        {{-- No Rekening --}}
+                        <div>
+                            <label class="form-label">Nomor Rekening</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="material-icons text-slate-400 text-lg">credit_card</i>
+                                </div>
+                                <input type="text" name="account_number" 
+                                       class="form-input pl-10 font-mono tracking-wide" 
+                                       value="{{ old('account_number') }}" 
+                                       placeholder="xxxx-xxxx-xxxx">
+                            </div>
+                        </div>
+
+                        <hr class="border-slate-100 dark:border-slate-700">
+
+                        {{-- NPWP --}}
+                        <div>
+                            <label class="form-label">NPWP (Opsional)</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="material-icons text-slate-400 text-lg">assignment</i>
+                                </div>
+                                <input type="text" name="npwp" 
+                                       class="form-input pl-10" 
+                                       value="{{ old('npwp') }}" 
+                                       placeholder="00.000.000.0-000.000">
+                            </div>
                         </div>
                     </div>
-
-                    {{-- No Rekening --}}
-                    <div>
-                        <label class="form-label">Nomor Rekening</label>
-                        <div class="relative">
-                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                                <i class="material-icons text-lg">numbers</i>
-                            </span>
-                            <input type="text" name="account_number" value="{{ old('account_number') }}" 
-                                   class="form-input pl-10" placeholder="Nomor rekening...">
-                        </div>
-                    </div>
-
                 </div>
 
-                {{-- Action Buttons --}}
-                <div class="flex justify-end gap-3">
-                    <a href="{{ route('admin.suppliers.index') }}" class="btn btn-secondary">Batal</a>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="material-icons text-lg">save</i>
-                        Simpan Supplier
-                    </button>
-                </div>
-            </form>
+            </div>
         </div>
-    </div>
+    </form>
+</div>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Init TomSelect untuk Bank
+        document.querySelectorAll('.tom-select').forEach(el => {
+            new TomSelect(el, {
+                create: true, // Izinkan user ngetik nama bank baru jika tidak ada di list
+                sortField: {field: "text", direction: "asc"},
+                placeholder: 'Pilih atau ketik bank...',
+                controlClass: 'ts-control !min-h-[42px] !h-[42px] !rounded-xl !border-slate-300 dark:!border-slate-600 !pl-4'
+            });
+        });
+    });
+</script>
+@endpush

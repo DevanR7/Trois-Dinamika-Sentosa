@@ -16,9 +16,21 @@ class UnitController extends Controller
         $this->middleware('can:manage-settings');
     }
 
-    public function index(): View
+    public function index(Request $request): View
     {
-        $units = Unit::latest('unit_id')->paginate(10);
+        $query = Unit::query();
+
+        if ($request->get('status') === 'trash') {
+            $query->onlyTrashed();
+        }
+
+        // Search
+        if ($request->filled('search')) {
+            $query->where('name', 'like', '%' . $request->search . '%');
+        }
+
+        $units = $query->latest('unit_id')->paginate(10)->appends($request->query());
+
         return view('admin.units.index', compact('units'));
     }
 
@@ -31,7 +43,10 @@ class UnitController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:50|unique:units,name',
+            'is_active' => 'nullable|boolean',
         ]);
+
+        $validated['is_active'] = $request->has('is_active');
 
         Unit::create($validated);
 
@@ -47,21 +62,51 @@ class UnitController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:50', Rule::unique('units')->ignore($unit->unit_id, 'unit_id')],
+            'is_active' => 'nullable|boolean',
         ]);
+
+        $validated['is_active'] = $request->has('is_active');
 
         $unit->update($validated);
 
         return redirect()->route('admin.units.index')->with('success', 'Satuan berhasil diperbarui.');
     }
 
+    // Soft Delete (Pindah ke Sampah)
     public function destroy(Unit $unit): RedirectResponse
     {
-        if ($unit->products()->exists()) {
-            return back()->with('error', 'Satuan ini tidak bisa dihapus karena sedang digunakan oleh produk.');
+        // REVISI: Cek produk aktif DAN yang di sampah (withTrashed)
+        if ($unit->products()->withTrashed()->count() > 0) {
+             return back()->with('error', 'Gagal: Satuan ini digunakan oleh Produk (Aktif/Arsip). Non-aktifkan saja jika tidak ingin digunakan.');
         }
 
         $unit->delete();
+        return redirect()->route('admin.units.index')->with('success', 'Satuan dipindahkan ke sampah.');
+    }
 
-        return redirect()->route('admin.units.index')->with('success', 'Satuan berhasil dihapus.');
+    // Restore (Pulihkan dari Sampah)
+    public function restore($id): RedirectResponse
+    {
+        $unit = Unit::onlyTrashed()->findOrFail($id);
+        $unit->restore();
+
+        return redirect()->route('admin.units.index', ['status' => 'trash'])
+            ->with('success', 'Satuan berhasil dipulihkan.');
+    }
+
+    // Force Delete (Hapus Permanen)
+    public function forceDelete($id): RedirectResponse
+    {
+        $unit = Unit::onlyTrashed()->findOrFail($id);
+        
+        // REVISI: Cek produk historis
+        if ($unit->products()->withTrashed()->exists()) {
+            return back()->with('error', 'Gagal: Satuan ini terikat dengan data produk historis. Tidak bisa dihapus permanen.');
+        }
+
+        $unit->forceDelete();
+
+        return redirect()->route('admin.units.index', ['status' => 'trash'])
+            ->with('success', 'Satuan dihapus permanen.');
     }
 }

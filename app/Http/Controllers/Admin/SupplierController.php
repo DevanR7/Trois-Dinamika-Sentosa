@@ -10,29 +10,38 @@ use Illuminate\View\View;
 use Illuminate\Validation\Rule;
 
 class SupplierController extends Controller
-{
-    public function index(Request $request): View
+{   
+    public function __construct()
     {
-        $this->authorize('viewAny', Supplier::class);
-
-        $query = Supplier::query();
-
-        if ($request->get('status') === 'deleted') {
-            $query->onlyTrashed();
-        }
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('supplier_name', 'like', "%{$search}%")
-                  ->orWhere('person_in_charge', 'like', "%{$search}%")
-                  ->orWhere('phone_number', 'like', "%{$search}%");
-            });
-        }
-
-        $suppliers = $query->latest('supplier_id')->paginate(10);
-        return view('admin.suppliers.index', compact('suppliers'));
+        $this->middleware('can:view-suppliers')->only(['index', 'show']);
+        $this->middleware('can:create-suppliers')->only(['create', 'store']);
+        $this->middleware('can:edit-suppliers')->only(['edit', 'update']);
+        $this->middleware('can:delete-suppliers')->only(['destroy', 'restore']);
     }
+    
+    public function index(Request $request): View
+{
+    $this->authorize('viewAny', Supplier::class);
+
+    // Tambahkan withCount('products') agar bisa menampilkan jumlah produk
+    $query = Supplier::withCount('products'); 
+
+    if ($request->get('status') === 'deleted') {
+        $query->onlyTrashed();
+    }
+
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('supplier_name', 'like', "%{$search}%")
+              ->orWhere('person_in_charge', 'like', "%{$search}%")
+              ->orWhere('phone_number', 'like', "%{$search}%");
+        });
+    }
+
+    $suppliers = $query->latest('supplier_id')->paginate(10);
+    return view('admin.suppliers.index', compact('suppliers'));
+}
 
     public function create(): View
     {

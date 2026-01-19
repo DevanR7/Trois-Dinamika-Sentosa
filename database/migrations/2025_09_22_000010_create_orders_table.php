@@ -24,6 +24,7 @@ return new class extends Migration
             $table->enum('status', ['pending', 'approved', 'rejected', 'invoiced', 'pending_review'])->default('pending');
             $table->string('order_source')->default('sales');
             $table->text('notes')->nullable();
+            $table->softDeletes();
             $table->timestamps();
         });
     }

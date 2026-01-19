@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-use App\Models\ChartOfAccount;
 
 class GeneralLedger extends Model
 {
@@ -39,7 +38,7 @@ class GeneralLedger extends Model
 
     public function reference(): MorphTo
     {
-        return $this->morphTo();
+        return $this->morphTo()->withTrashed(); 
     }
 
     public function user(): BelongsTo

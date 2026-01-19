@@ -17,7 +17,9 @@ return new class extends Migration
             $table->date('adjustment_date');
             $table->enum('type', ['credit_note', 'debit_note']);
             $table->decimal('amount', 15, 2);
+            $table->boolean('is_calculation_adjustment')->default(true);
             $table->text('reason');
+            $table->json('details')->nullable();
             $table->timestamps();
         });
     }

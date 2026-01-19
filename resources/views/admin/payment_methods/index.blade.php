@@ -4,166 +4,204 @@
 
 @section('content')
 
-    {{-- HEADER & ACTIONS --}}
-    <div class="page-header">
+    {{-- 1. PAGE HEADER --}}
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-            <h1 class="page-title">Metode Pembayaran</h1>
-            <p class="page-subtitle">Atur metode pembayaran dan konfigurasi alur verifikasi.</p>
+            <h1 class="text-2xl font-bold text-slate-800 dark:text-white tracking-tight">Metode Pembayaran</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Atur jalur pembayaran (Cash, Transfer, Gateway) dan aturan verifikasinya.
+            </p>
         </div>
-        <div class="flex items-center gap-3">
+
+        <div class="flex flex-wrap gap-3">
             {{-- Link ke Arsip --}}
-            <a href="{{ route('admin.payment-methods.archived.index') }}" class="btn btn-secondary text-slate-500">
-                <i class="material-icons text-sm mr-1">archive</i> Arsip
+            <a href="{{ route('admin.payment-methods.archived.index') }}" 
+               class="btn bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-rose-600 transition-colors dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:text-rose-400"
+               title="Lihat Metode Non-Aktif/Dihapus">
+                <i class="material-icons text-[18px]">inventory_2</i>
+                <span class="hidden sm:inline">Arsip</span>
             </a>
-            
-            <a href="{{ route('admin.payment-methods.create') }}" class="btn btn-primary">
-                <i class="material-icons text-sm mr-1">add</i> Tambah Metode
-            </a>
+
+            {{-- Tambah Baru --}}
+            @can('manage-payment-methods')
+                <a href="{{ route('admin.payment-methods.create') }}" class="btn btn-primary">
+                    <i class="material-icons text-[18px]">add</i>
+                    <span>Metode Baru</span>
+                </a>
+            @endcan
         </div>
     </div>
 
-    {{-- TABLE DATA --}}
-    <div class="card">
-        <div class="table-container">
+    {{-- 2. DATA TABLE --}}
+    <div class="card border-0 shadow-none bg-transparent">
+        <div class="table-container bg-white dark:bg-slate-800 shadow-sm rounded-xl border border-slate-200 dark:border-slate-700">
             <table class="table-modern">
                 <thead>
                     <tr>
-                        <th class="w-12 text-center">#</th>
-                        <th class="w-48">Nama Metode</th>
-                        <th class="w-32 text-center">Tipe Proses</th>
-                        
-                        {{-- Kolom Konfigurasi --}}
-                        <th>
-                            <div class="grid grid-cols-2 gap-4 text-center">
-                                <span>Config Client</span>
-                                <span>Config Internal</span>
-                            </div>
+                        <th class="w-14 text-center">No</th>
+                        <th>Nama Metode & Tipe</th>
+                        <th>Syarat Input (Klien / Admin)</th>
+                        <th>Status Default</th>
+                        <th class="text-center w-24">Aktif</th>
+                        <th class="text-right sticky right-0 z-10 bg-slate-50 dark:bg-slate-800/50 backdrop-blur-sm w-28 px-4">
+                            Aksi
                         </th>
-                        
-                        <th class="text-center w-24">Status</th>
-                        <th class="text-center w-36">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($paymentMethods as $index => $method)
-                        <tr>
-                            <td class="text-center text-slate-500">{{ $index + 1 }}</td>
-                            <td>
-                                <div class="font-bold text-slate-700 dark:text-slate-200">
-                                    {{ $method->name }}
-                                </div>
-                            </td>
-                            <td class="text-center">
-                                @php
-                                    $typeLabel = match($method->type) {
-                                        'direct' => 'Langsung',
-                                        'pending' => 'Verifikasi',
-                                        'gateway' => 'Gateway',
-                                        default => $method->type
-                                    };
-                                    $typeClass = match($method->type) {
-                                        'direct' => 'badge-success',
-                                        'pending' => 'badge-warning',
-                                        'gateway' => 'badge-primary',
-                                        default => 'badge-secondary'
-                                    };
-                                @endphp
-                                <span class="badge {{ $typeClass }} text-[10px]">{{ $typeLabel }}</span>
-                            </td>
+                        <tr class="group hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                             
-                            {{-- KONFIGURASI --}}
-                            <td class="p-0">
-                                <div class="grid grid-cols-2 h-full divide-x divide-slate-100 dark:divide-slate-700">
+                            {{-- No --}}
+                            <td class="text-center text-slate-400 text-xs">
+                                {{ $index + 1 }}
+                            </td>
+
+                            {{-- Nama & Tipe --}}
+                            <td>
+                                <div class="flex flex-col">
+                                    <span class="font-bold text-slate-700 dark:text-slate-200 text-sm">
+                                        {{ $method->name }}
+                                    </span>
                                     
-                                    {{-- CLIENT --}}
-                                    <div class="p-3 text-sm">
-                                        <div class="flex flex-col gap-1">
-                                            @php
-                                                $clientReq = match($method->client_input_config) {
-                                                    'none' => 'Tanpa Syarat',
-                                                    'proof_only' => 'Wajib Bukti',
-                                                    'reference_only' => 'Wajib Ref.',
-                                                    'proof_and_reference' => 'Bukti & Ref.',
-                                                };
-                                                $clientStat = match($method->client_status_default) {
-                                                    'completed' => 'Lunas',
-                                                    'pending_verification' => 'Pending',
-                                                };
-                                                $clientStatClass = $method->client_status_default == 'completed' ? 'text-emerald-600' : 'text-amber-600';
-                                            @endphp
-                                            <span class="font-medium text-slate-600 dark:text-slate-300">{{ $clientReq }}</span>
-                                            <span class="text-[10px] {{ $clientStatClass }} font-bold bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 rounded w-fit">
-                                                -> {{ $clientStat }}
+                                    {{-- Badge Tipe --}}
+                                    <div class="mt-1">
+                                        @if($method->type == 'gateway')
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200">
+                                                <i class="material-icons text-[10px]">hub</i> Gateway (Auto)
                                             </span>
-                                        </div>
-                                    </div>
-
-                                    {{-- INTERNAL --}}
-                                    <div class="p-3 text-sm bg-slate-50/50 dark:bg-slate-800/30">
-                                        <div class="flex flex-col gap-1">
-                                            @php
-                                                $intReq = match($method->internal_input_config) {
-                                                    'none' => 'Bebas',
-                                                    'proof_only' => 'Wajib Bukti',
-                                                    'reference_only' => 'Wajib Ref.',
-                                                    'proof_and_reference' => 'Bukti & Ref.',
-                                                };
-                                                $intStat = match($method->internal_status_default) {
-                                                    'completed' => 'Lunas',
-                                                    'pending_verification' => 'Pending',
-                                                };
-                                                $intStatClass = $method->internal_status_default == 'completed' ? 'text-emerald-600' : 'text-amber-600';
-                                            @endphp
-                                            <span class="font-medium text-slate-600 dark:text-slate-300">{{ $intReq }}</span>
-                                            <span class="text-[10px] {{ $intStatClass }} font-bold bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-1.5 py-0.5 rounded w-fit">
-                                                -> {{ $intStat }}
+                                        @elseif($method->type == 'pending')
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                                                <i class="material-icons text-[10px]">hourglass_empty</i> Pending (Cek/Giro)
                                             </span>
-                                        </div>
+                                        @else {{-- Direct --}}
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                                <i class="material-icons text-[10px]">payments</i> Langsung (Cash/TF)
+                                            </span>
+                                        @endif
                                     </div>
-
                                 </div>
                             </td>
 
-                            <td class="text-center">
-                                @if($method->is_active)
-                                    <span class="badge badge-success text-[10px]">Aktif</span>
+                            {{-- Konfigurasi Input --}}
+                            <td>
+                                <div class="flex flex-col gap-2 text-xs">
+                                    {{-- Client Config --}}
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-14 text-slate-400 font-mono text-[10px] uppercase">Client:</span>
+                                        @if($method->client_input_config == 'none')
+                                            <span class="text-slate-400">-</span>
+                                        @else
+                                            <div class="flex gap-1">
+                                                @if(in_array($method->client_input_config, ['proof_only', 'proof_and_reference']))
+                                                    <span class="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded border border-blue-100 text-[10px] flex items-center gap-1" title="Wajib Upload Bukti">
+                                                        <i class="material-icons text-[10px]">image</i> Bukti
+                                                    </span>
+                                                @endif
+                                                @if(in_array($method->client_input_config, ['reference_only', 'proof_and_reference']))
+                                                    <span class="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded border border-indigo-100 text-[10px] flex items-center gap-1" title="Wajib Isi No. Ref">
+                                                        <i class="material-icons text-[10px]">tag</i> Ref
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        @endif
+                                    </div>
+
+                                    {{-- Admin Config --}}
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-14 text-slate-400 font-mono text-[10px] uppercase">Admin:</span>
+                                        @if($method->internal_input_config == 'none')
+                                            <span class="text-slate-400">-</span>
+                                        @else
+                                            <div class="flex gap-1">
+                                                @if(in_array($method->internal_input_config, ['proof_only', 'proof_and_reference']))
+                                                    <span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded border border-slate-200 text-[10px] flex items-center gap-1">
+                                                        <i class="material-icons text-[10px]">image</i> Bukti
+                                                    </span>
+                                                @endif
+                                                @if(in_array($method->internal_input_config, ['reference_only', 'proof_and_reference']))
+                                                    <span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded border border-slate-200 text-[10px] flex items-center gap-1">
+                                                        <i class="material-icons text-[10px]">tag</i> Ref
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            </td>
+
+                            {{-- Status Default --}}
+                            <td>
+                                @if($method->type == 'gateway')
+                                    <span class="text-xs text-purple-600 font-medium">Otomatis by System</span>
                                 @else
-                                    <span class="badge badge-danger text-[10px]">Non-Aktif</span>
+                                    <div class="flex flex-col text-xs">
+                                        <div class="flex justify-between items-center mb-1">
+                                            <span class="text-slate-400">Client:</span>
+                                            @if($method->client_status_default == 'completed')
+                                                <span class="text-emerald-600 font-bold">Lunas</span>
+                                            @else
+                                                <span class="text-amber-600 font-bold">Verifikasi</span>
+                                            @endif
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-slate-400">Admin:</span>
+                                            @if($method->internal_status_default == 'completed')
+                                                <span class="text-emerald-600 font-bold">Lunas</span>
+                                            @else
+                                                <span class="text-amber-600 font-bold">Verifikasi</span>
+                                            @endif
+                                        </div>
+                                    </div>
                                 @endif
                             </td>
-                            <td class="text-center">
-                                <div class="flex items-center justify-center gap-2">
-                                    
-                                    {{-- Edit Button --}}
-                                    <a href="{{ route('admin.payment-methods.edit', $method->payment_method_id) }}" 
-                                       class="w-8 h-8 rounded-full flex items-center justify-center bg-indigo-50 border border-transparent text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors shadow-sm dark:bg-indigo-900/30 dark:text-indigo-400"
-                                       title="Edit">
-                                        <i class="material-icons text-[16px] leading-none">edit</i>
-                                    </a>
 
-                                    {{-- Delete Button (Soft Delete) --}}
-                                    <button type="button" onclick="confirmDelete('{{ $method->payment_method_id }}', '{{ $method->name }}')" 
-                                            class="w-8 h-8 rounded-full flex items-center justify-center bg-rose-50 border border-transparent text-rose-600 hover:bg-rose-600 hover:text-white transition-colors shadow-sm dark:bg-rose-900/30 dark:text-rose-400"
-                                            title="Arsipkan">
-                                        <i class="material-icons text-[16px] leading-none">archive</i>
-                                    </button>
+                            {{-- Aktif --}}
+                            <td class="text-center">
+                                @if($method->is_active)
+                                    <i class="material-icons text-emerald-500" title="Aktif">check_circle</i>
+                                @else
+                                    <i class="material-icons text-slate-300" title="Non-Aktif">cancel</i>
+                                @endif
+                            </td>
+
+                            {{-- Aksi --}}
+                            <td class="text-right sticky right-0 bg-white dark:bg-slate-800 border-l border-slate-100 dark:border-slate-700/50 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/30 transition-colors z-10 px-4">
+                                <div class="flex items-center justify-end gap-2">
                                     
-                                    <form id="delete-form-{{ $method->payment_method_id }}" 
-                                          action="{{ route('admin.payment-methods.destroy', $method->payment_method_id) }}" 
-                                          method="POST" class="hidden">
-                                        @csrf
-                                        @method('DELETE')
-                                    </form>
+                                    @can('manage-payment-methods')
+                                        {{-- Edit --}}
+                                        <a href="{{ route('admin.payment-methods.edit', $method->payment_method_id) }}" class="btn-action btn-action-edit" title="Edit Konfigurasi">
+                                            <i class="material-icons">edit</i>
+                                        </a>
+
+                                        {{-- Delete (Arsip) --}}
+                                        <form action="{{ route('admin.payment-methods.destroy', $method->payment_method_id) }}" method="POST" class="inline-block m-0">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="button" 
+                                                    class="btn-action btn-action-delete" 
+                                                    title="Arsipkan Metode"
+                                                    onclick="handleAction(this, 'Arsipkan Metode?', 'Metode ini tidak akan muncul lagi di pilihan pembayaran.', 'warning')">
+                                                <i class="material-icons">archive</i>
+                                            </button>
+                                        </form>
+                                    @endcan
 
                                 </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center p-8">
-                                <div class="flex flex-col items-center justify-center text-slate-400">
-                                    <i class="material-icons text-5xl mb-2">payments</i>
-                                    <span>Belum ada metode pembayaran.</span>
+                            <td colspan="6" class="text-center py-12">
+                                <div class="flex flex-col items-center justify-center opacity-60">
+                                    <i class="material-icons text-4xl text-slate-300 mb-2">payments</i>
+                                    <p class="text-slate-500 text-sm">Belum ada metode pembayaran.</p>
+                                    @can('manage-payment-methods')
+                                        <a href="{{ route('admin.payment-methods.create') }}" class="mt-2 text-indigo-600 hover:underline text-sm">
+                                            Buat Metode Baru
+                                        </a>
+                                    @endcan
                                 </div>
                             </td>
                         </tr>
@@ -173,25 +211,28 @@
         </div>
     </div>
 
-@endsection
-
-@push('scripts')
-<script>
-    function confirmDelete(id, name) {
-        window.confirmDialog({
-            title: 'Arsipkan Metode?',
-            text: "Metode '" + name + "' akan dinonaktifkan sementara (soft delete).",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#ef4444',
-            cancelButtonColor: '#64748b',
-            confirmButtonText: 'Ya, Arsipkan!',
-            cancelButtonText: 'Batal'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                document.getElementById('delete-form-' + id).submit();
+    {{-- Script Handle Action --}}
+    @push('scripts')
+    <script>
+        function handleAction(button, title, text, type) {
+            event.preventDefault();
+            const form = button.closest('form');
+            if (typeof window.confirmDialog === 'function') {
+                window.confirmDialog({
+                    title: title,
+                    text: text,
+                    icon: type === 'danger' ? 'error' : type,
+                    confirmButtonText: 'Ya, Lanjutkan',
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: type
+                }).then((result) => {
+                    if (result.isConfirmed) form.submit();
+                });
+            } else {
+                if(confirm(text)) form.submit();
             }
-        });
-    }
-</script>
-@endpush
+        }
+    </script>
+    @endpush
+
+@endsection

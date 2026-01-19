@@ -78,7 +78,7 @@ class OrderChangeRequestController extends Controller
         return view('admin.order_change_requests.show', compact('changeRequest'));
     }
 
-    public function process(Request $request, OrderChangeRequest $changeRequest): RedirectResponse
+public function process(Request $request, OrderChangeRequest $changeRequest): RedirectResponse
     {
         $validated = $request->validate([
             'action' => 'required|in:approve,reject',
@@ -103,11 +103,23 @@ class OrderChangeRequestController extends Controller
                 'processed_at' => now(),
             ]);
 
+            // HANYA JIKA ADMIN MENYETUJUI PERUBAHAN
             if ($newStatus === 'approved') {
+                
+                // KASUS 1: PEMBATALAN PESANAN
                 if ($changeRequest->request_type === 'cancel') {
                     $order->update(['status' => 'rejected']);
+                    
+                    // [REVISI]: Kembalikan stok semua item
+                    foreach ($order->items as $item) {
+                         $product = \App\Models\Product::lockForUpdate()->find($item->product_id);
+                         if ($product) {
+                             $product->increment('stock_quantity', $item->quantity);
+                         }
+                    }
                 }
-
+                
+                // KASUS 2: MODIFIKASI ITEM
                 elseif ($changeRequest->request_type === 'modify') {
                     $order->load('items');
                     $currentItems = $order->items->keyBy('product_id');
@@ -118,43 +130,81 @@ class OrderChangeRequestController extends Controller
                         $requestedQty = $reqItem->requested_quantity;
                         $price = $reqItem->price_per_unit;
                         $subtotal = $requestedQty * $price;
+                        
+                        // Kunci Produk untuk update stok
+                        $product = \App\Models\Product::lockForUpdate()->find($productId);
 
                         if ($reqItem->action === 'add') {
+                            // Cek stok dulu
+                            if (!$product || $product->stock_quantity < $requestedQty) {
+                                throw new \Exception("Gagal: Stok produk '{$product->product_name}' tidak cukup untuk penambahan ini.");
+                            }
+                            
                             $order->items()->create([
                                 'product_id' => $productId,
                                 'quantity' => $requestedQty,
                                 'price_per_unit' => $price,
                                 'subtotal' => $subtotal,
                             ]);
+                            
+                            // [REVISI]: Kurangi stok
+                            $product->decrement('stock_quantity', $requestedQty);
+                            
                             $newTotalAmount += $subtotal;
                         }
-
                         elseif ($reqItem->action === 'remove') {
                             if (isset($currentItems[$productId])) {
+                                $qtyToRestore = $currentItems[$productId]->quantity;
                                 $currentItems[$productId]->delete();
+                                
+                                // [REVISI]: Kembalikan stok
+                                if ($product) {
+                                    $product->increment('stock_quantity', $qtyToRestore);
+                                }
                             }
                         }
-
                         elseif ($reqItem->action === 'update_qty') {
                             if (isset($currentItems[$productId])) {
+                                $oldQty = $currentItems[$productId]->quantity;
+                                $diff = $requestedQty - $oldQty; // Positif = nambah, Negatif = kurang
+                                
+                                // Validasi stok jika nambah
+                                if ($diff > 0) {
+                                    if (!$product || $product->stock_quantity < $diff) {
+                                        throw new \Exception("Gagal: Stok produk '{$product->product_name}' tidak cukup untuk penambahan qty.");
+                                    }
+                                    $product->decrement('stock_quantity', $diff);
+                                } elseif ($diff < 0) {
+                                    // Jika berkurang, kembalikan ke gudang
+                                    $product->increment('stock_quantity', abs($diff));
+                                }
+
                                 $currentItems[$productId]->update([
                                     'quantity' => $requestedQty,
                                     'price_per_unit' => $price,
                                     'subtotal' => $subtotal,
                                 ]);
                             } else {
+                                // Fallback jika item ternyata belum ada (dianggap add)
+                                if (!$product || $product->stock_quantity < $requestedQty) {
+                                     throw new \Exception("Stok tidak cukup.");
+                                }
                                 $order->items()->create([
                                     'product_id' => $productId,
                                     'quantity' => $requestedQty,
                                     'price_per_unit' => $price,
                                     'subtotal' => $subtotal,
                                 ]);
+                                $product->decrement('stock_quantity', $requestedQty);
                             }
                             $newTotalAmount += $subtotal;
                         }
                     }
-
-                    $order->update(['total_amount' => $newTotalAmount]);
+                    
+                    // Recalculate total amount order (untuk item yg tidak berubah juga harus dihitung)
+                    // Ambil fresh items setelah perubahan
+                    $finalTotal = $order->items()->sum('subtotal');
+                    $order->update(['total_amount' => $finalTotal]);
                 }
             }
 

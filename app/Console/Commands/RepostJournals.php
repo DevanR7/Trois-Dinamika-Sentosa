@@ -23,7 +23,8 @@ use App\Models\PurchaseOrderAdjustment;
 class RepostJournals extends Command
 {
     protected $signature = 'accounting:repost-all {--force : Lewati konfirmasi}';
-    protected $description = 'Menghapus dan membuat ulang seluruh Jurnal Umum berdasarkan data transaksi operasional.';
+    protected $description = 'HARD RESET: Menghapus dan membuat ulang seluruh Jurnal Umum. PERHATIAN: Riwayat Rekonsiliasi Bank akan HILANG.';
+    
     protected $accService;
     protected $settings;
 
@@ -37,28 +38,31 @@ class RepostJournals extends Command
     public function handle()
     {
         if (!$this->option('force')) {
-            $this->warn('PERINGATAN: Command ini akan MENGHAPUS SELURUH DATA di tabel:');
-            $this->warn('- general_ledgers (Buku Besar)');
-            $this->warn('- bank_reconciliations (Rekonsiliasi Bank)');
-            $this->warn('Pastikan Anda sudah membackup database sebelum melanjutkan.');
+            $this->error('PERINGATAN KERAS!!');
+            $this->warn('Command ini akan MENGHAPUS SELURUH DATA JURNAL & REKONSILIASI BANK.');
+            $this->warn('Data akan digenerate ulang dari transaksi, TAPI status "Reconciled" akan hilang (kembali ke pending).');
+            $this->warn('Gunakan ini hanya jika data akuntansi rusak total atau saat setup awal.');
             
-            if (!$this->confirm('Apakah Anda yakin ingin melanjutkan?')) {
+            if (!$this->confirm('Ketik "yes" jika Anda benar-benar yakin ingin mereset total pembukuan:')) {
                 $this->info('Proses dibatalkan.');
                 return;
             }
         }
 
-        $this->info('Memulai proses Reposting Jurnal...');
+        $this->info('Memulai Hard Reset Jurnal...');
         $startTime = microtime(true);
-        $this->info('1. Membersihkan tabel akuntansi...');
         
+        // 1. Bersihkan Tabel
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         GeneralLedger::truncate();
-        DB::table('bank_reconciliations')->truncate();
+        DB::table('bank_reconciliations')->truncate(); // Reset Bank Recon juga karena ID GL berubah total
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
-        DB::beginTransaction();
         
+        // Mulai Transaksi Besar
+        DB::beginTransaction();
+       
         try {
+            // Helper untuk memproses chunk
             $processChunked = function($query, $callback, $label) {
                 $count = $query->count();
                 if ($count === 0) {
@@ -70,7 +74,12 @@ class RepostJournals extends Command
                 
                 $query->chunk(100, function($items) use ($bar, $callback) {
                     foreach($items as $item) {
-                        $callback($item);
+                        try {
+                            $callback($item);
+                        } catch (\Exception $e) {
+                            // Log error tapi lanjut ke item berikutnya (agar 1 data rusak tidak stop semua)
+                            \Illuminate\Support\Facades\Log::error("Gagal repost item ID " . $item->getKey() . ": " . $e->getMessage());
+                        }
                         $bar->advance();
                     }
                 });
@@ -78,6 +87,8 @@ class RepostJournals extends Command
                 $bar->finish();
                 $this->newLine();
             };
+
+            // --- EKSEKUSI RE-POSTING PER MODUL ---
 
             $processChunked(ManualJournal::with('entries'), function($journal) {
                 $this->postManualJournal($journal);
@@ -133,15 +144,14 @@ class RepostJournals extends Command
             $this->info("SUKSES! Jurnal Umum berhasil diperbarui dalam {$duration} detik.");
 
         } catch (\Exception $e) {
-            if (DB::transactionLevel() > 0) {
-                DB::rollBack();
-            }
-            
-            $this->error("GAGAL: " . $e->getMessage());
+            DB::rollBack();
+            $this->error("GAGAL TOTAL: " . $e->getMessage());
             $this->error("Line: " . $e->getLine());
             $this->error("File: " . $e->getFile());
         }
     }
+
+    // --- PRIVATE METHODS (Sama dengan controller masing-masing) ---
 
     private function postManualJournal($journal)
     {
@@ -179,7 +189,12 @@ class RepostJournals extends Command
 
         $totalHpp = $invoice->items()->sum(DB::raw('quantity * hpp'));
         $totalAdditionalCosts = $invoice->additionalCosts()->sum('amount');
-        $revenueProducts = $invoice->total_amount - $totalAdditionalCosts;
+        
+        // PPN (Revisi: Ambil dari pivot table)
+        $totalTax = $invoice->taxes()->sum('invoice_tax.amount');
+        
+        // Revenue Murni = Total - Biaya Tambahan - Pajak
+        $revenueProducts = $invoice->total_amount - $totalAdditionalCosts - $totalTax;
 
         $debitEntries = [
             [$arId, $invoice->total_amount, "Piutang atas " . ($invoice->client->client_name ?? '')],
@@ -193,6 +208,11 @@ class RepostJournals extends Command
 
         if ($totalAdditionalCosts > 0) {
              $creditEntries[] = [$revId, $totalAdditionalCosts, "Pendapatan Biaya Tambahan #" . $invoice->invoice_number];
+        }
+        
+        if ($totalTax > 0) {
+             // Pastikan akun hutang pajak diset (misal disatukan ke revenue atau akun khusus, disini kita asumsi revenue dulu jika belum ada setting khusus tax payable)
+             $creditEntries[] = [$revId, $totalTax, "Hutang Pajak (PPN)"]; 
         }
 
         $this->accService->postJournal(
@@ -210,7 +230,11 @@ class RepostJournals extends Command
     {
         $arId = $this->settings->getAccountsReceivableId();
         $cashBankId = $payment->companyBankAccount?->chart_of_account_id;
-        $clientDepositId = $this->settings->getClientDepositId();
+        
+        // Jika payment via gateway, akun bank mungkin null di relasi tapi logicnya masuk gateway account
+        if (!$cashBankId && $payment->payment_method_id) {
+             $cashBankId = $this->settings->getGatewayAccountId();
+        }
 
         if (!$arId || !$cashBankId) return;
 
@@ -219,7 +243,7 @@ class RepostJournals extends Command
             $payment->payment_date,
             "Penerimaan Pembayaran Inv #" . ($payment->salesInvoice->invoice_number ?? 'N/A'),
             [
-                [$cashBankId, $payment->amount, "Penerimaan ke " . ($payment->companyBankAccount->account_name ?? 'Bank')]
+                [$cashBankId, $payment->amount, "Penerimaan Pembayaran"]
             ],
             [ 
                 [$arId, $payment->amount, "Pelunasan Piutang"]
@@ -267,6 +291,8 @@ class RepostJournals extends Command
 
     private function postExpense($expense)
     {
+        if (!$expense->chart_of_account_id || !$expense->cash_bank_account_id) return;
+        
         $this->accService->postJournal(
             "EXP-" . $expense->expense_id,
             $expense->expense_date,
@@ -280,6 +306,8 @@ class RepostJournals extends Command
 
     private function postFixedAsset($asset)
     {
+        if (!$asset->fixed_asset_account_id || !$asset->cash_bank_account_id) return;
+
         $this->accService->postJournal(
             "FASSET-" . $asset->asset_id,
             $asset->purchase_date,
@@ -293,6 +321,8 @@ class RepostJournals extends Command
 
     private function postEquity($equity)
     {
+        if (!$equity->equity_account_id || !$equity->cash_bank_account_id) return;
+
         $debit = [];
         $credit = [];
 
@@ -317,6 +347,8 @@ class RepostJournals extends Command
 
     private function postLoan($loan)
     {
+        if (!$loan->loan_account_id || !$loan->cash_bank_account_id) return;
+
         $this->accService->postJournal(
             "LOAN-" . $loan->loan_id,
             $loan->loan_date,
@@ -331,6 +363,8 @@ class RepostJournals extends Command
     private function postLoanPayment($payment)
     {
         $loan = $payment->loan;
+        if (!$loan || !$payment->cash_bank_account_id) return;
+
         $debit = [];
         $debit[] = [$loan->loan_account_id, $payment->principal_paid]; 
         

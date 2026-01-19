@@ -18,7 +18,7 @@ return new class extends Migration
             $table->decimal('quantity', 15, 2);
             $table->decimal('quantity_returned', 15, 2)->default(0);
             $table->decimal('price_per_unit', 15, 2);
-            $table->decimal('hpp', 15, 2)->nullable()->default(0.00);
+            $table->decimal('hpp', 15, 2)->default(0);
             $table->decimal('subtotal', 15, 2);
             $table->timestamps();
         });

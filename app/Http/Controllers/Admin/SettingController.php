@@ -19,24 +19,22 @@ class SettingController extends Controller
     public function index(): View 
     {
         $settings = Setting::getAllSettings();
-        
         $assetAccounts = ChartOfAccount::where('account_type', 'Aset')->where('is_active', true)->orderBy('account_number')->get();
         $liabilityAccounts = ChartOfAccount::where('account_type', 'Liabilitas')->where('is_active', true)->orderBy('account_number')->get();
         $revenueAccounts = ChartOfAccount::where('account_type', 'Pendapatan')->where('is_active', true)->orderBy('account_number')->get();
         $cogsAccounts = ChartOfAccount::where('account_type', 'HPP')->where('is_active', true)->orderBy('account_number')->get();
         
         $expenseOrRevenueAccounts = ChartOfAccount::whereIn('account_type', ['Beban', 'Pendapatan'])
-                                        ->where('is_active', true)
-                                        ->orderBy('account_number')
-                                        ->get();
+                                                ->where('is_active', true)
+                                                ->orderBy('account_number')
+                                                ->get();
 
         $assetOrLiabilityAccounts = ChartOfAccount::whereIn('account_type', ['Aset', 'Liabilitas'])
-                                        ->where('is_active', true)
-                                        ->orderBy('account_number')
-                                        ->get();
+                                                ->where('is_active', true)
+                                                ->orderBy('account_number')
+                                                ->get();
 
         $equityAccounts = ChartOfAccount::where('account_type', 'Ekuitas')->where('is_active', true)->orderBy('account_number')->get();
-
 
         return view('admin.settings.index', compact(
             'settings',
@@ -46,14 +44,15 @@ class SettingController extends Controller
             'cogsAccounts',
             'expenseOrRevenueAccounts',
             'assetOrLiabilityAccounts',
-            'assetOrLiabilityAccounts',
             'equityAccounts' 
         ));
     }
 
     public function update(Request $request): RedirectResponse
     {
+        // [REVISI]: Validasi lebih ketat (Regex & Nullable)
         $request->validate([
+            // Validasi Akun Default
             'acct_default_ar' => 'nullable|exists:chart_of_accounts,account_id',
             'acct_default_ap' => 'nullable|exists:chart_of_accounts,account_id',
             'acct_default_inventory' => 'nullable|exists:chart_of_accounts,account_id',
@@ -65,21 +64,38 @@ class SettingController extends Controller
             'acct_default_client_deposit' => 'nullable|exists:chart_of_accounts,account_id',
             'acct_default_gateway' => 'nullable|exists:chart_of_accounts,account_id',
             'acct_default_inventory_adjustment' => 'nullable|exists:chart_of_accounts,account_id',
+            'acct_default_retained_earnings' => 'nullable|exists:chart_of_accounts,account_id',
+
+            // Validasi Profil Perusahaan
             'company_name' => 'required|string|max:255',
             'company_owner' => 'required|string|max:255',
             'company_address' => 'nullable|string',
             'company_city_province' => 'nullable|string|max:255',
-            'company_phone' => 'nullable|string|max:20',
-            'company_npwp' => 'nullable|string|max:30',
+            
+            // [REVISI]: Regex Phone (Hanya angka, +, -, spasi)
+            'company_phone' => ['nullable', 'string', 'max:20', 'regex:/^[0-9\+\-\s]+$/'], 
+            
+            // [REVISI]: Regex NPWP (Hanya angka, titik, strip)
+            'company_npwp' => ['nullable', 'string', 'max:30', 'regex:/^[0-9\.\-\/]+$/'],
+            
             'system_version' => 'nullable|string|max:20',
+        ], [
+            'company_phone.regex' => 'Format nomor telepon tidak valid.',
+            'company_npwp.regex' => 'Format NPWP tidak valid (hanya angka, titik, strip).',
         ]);
 
+        // Simpan setting ke database
+        // Kita loop semua input kecuali token dan method agar fleksibel jika ada field baru di view
         foreach ($request->except('_token', '_method') as $key => $value) {
             Setting::updateOrCreate(
                 ['key' => $key],
                 ['value' => $value ?? '']
             );
         }
+
+        // Cache clearing handled by Setting Model Observer (booted method), 
+        // tapi untuk memastikan sinkronisasi langsung di request ini:
+        // Cache::forget('app_settings'); 
 
         return back()->with('success', 'Pengaturan berhasil diperbarui.');
     }

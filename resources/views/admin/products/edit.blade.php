@@ -3,267 +3,239 @@
 @section('title', 'Edit Produk')
 
 @section('content')
-    <div class="max-w-5xl mx-auto flex flex-col gap-8">
-        
-        {{-- Header Navigation --}}
-        <div class="flex items-center gap-4">
-            <a href="{{ route('admin.products.index') }}" 
-               class="w-10 h-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm">
-                <i class="material-icons text-[20px]">arrow_back</i>
-            </a>
-            <div>
-                <h1 class="text-xl font-bold text-slate-900 dark:text-white">Edit Produk</h1>
-                <p class="text-sm text-slate-500 dark:text-slate-400">Perbarui informasi produk <strong>{{ $product->product_name }}</strong>.</p>
-            </div>
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Edit Produk</h1>
+            <p class="page-subtitle">Perbarui informasi produk: <strong>{{ $product->product_name }}</strong></p>
         </div>
+        <div>
+            <a href="{{ route('admin.products.index') }}" class="btn btn-secondary">
+                <i class="material-icons text-[18px]">arrow_back</i> Kembali
+            </a>
+        </div>
+    </div>
 
-        <form action="{{ route('admin.products.update', $product->product_id) }}" method="POST" enctype="multipart/form-data">
-            @csrf
-            @method('PUT')
+    <form action="{{ route('admin.products.update', $product->product_id) }}" method="POST" enctype="multipart/form-data" 
+          x-data="codeGenerator()">
+        @csrf
+        @method('PUT')
 
-            <div class="flex flex-col gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {{-- KOLOM KIRI --}}
+            <div class="lg:col-span-2 space-y-6">
                 
-                {{-- Card 1: Informasi Utama --}}
-                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 sm:p-8 border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
-                        <i class="material-icons text-indigo-500">edit_note</i> Detail Produk
-                    </h3>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {{-- Image Upload --}}
-                        <div class="lg:col-span-1">
-                            <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Foto Produk</label>
-                            
-                            <div class="relative w-full aspect-square bg-slate-50 dark:bg-slate-900 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-indigo-400 transition-colors group cursor-pointer overflow-hidden flex flex-col items-center justify-center text-center">
-                                <input type="file" id="image_input" name="image" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" accept="image/*" onchange="previewImage(event)">
-                                
-                                {{-- Loading Indicator --}}
-                                <div id="image-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-white/90 dark:bg-slate-800/90 z-20 hidden">
-                                    <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    <span class="text-xs text-indigo-600 font-medium mt-2">Memuat...</span>
-                                </div>
-
-                                {{-- Jika ada gambar lama --}}
-                                @if($product->image_path)
-                                    <img id="image-preview" src="{{ asset('storage/' . $product->image_path) }}" alt="Preview" class="absolute inset-0 w-full h-full object-cover">
-                                    <div id="placeholder-content" class="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-0">
-                                        <i class="material-icons text-white text-3xl">edit</i>
-                                        <p class="text-white text-xs mt-1">Ganti Foto</p>
-                                    </div>
-                                @else
-                                    <div id="placeholder-content" class="flex flex-col items-center p-4">
-                                        <div class="w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                                            <i class="material-icons text-indigo-500">add_a_photo</i>
-                                        </div>
-                                        <p class="text-xs text-slate-500 dark:text-slate-400">Upload Foto</p>
-                                    </div>
-                                    <img id="image-preview" src="#" alt="Preview" class="absolute inset-0 w-full h-full object-cover hidden">
-                                @endif
-                            </div>
-                            @error('image') <p class="text-xs text-red-500 mt-2">{{ $message }}</p> @enderror
+                {{-- Card Identitas --}}
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-header-title">Identitas Produk</h3>
+                    </div>
+                    <div class="card-body grid grid-cols-1 md:grid-cols-2 gap-5">
+                        
+                        <div class="md:col-span-2">
+                            <label class="form-label label-required">Supplier</label>
+                            <select name="supplier_id" class="tom-select" required>
+                                <option value="">-- Pilih Supplier --</option>
+                                @foreach($suppliers as $supplier)
+                                    <option value="{{ $supplier->supplier_id }}" {{ old('supplier_id', $product->supplier_id) == $supplier->supplier_id ? 'selected' : '' }}>
+                                        {{ $supplier->supplier_name }}
+                                    </option>
+                                @endforeach
+                            </select>
                         </div>
 
-                        {{-- Inputs --}}
-                        <div class="lg:col-span-2 flex flex-col gap-6">
-                            
-                            {{-- Nama Produk --}}
-                            <div>
-                                <label for="product_name" class="form-label">Nama Produk</label>
-                                <input type="text" id="product_name" name="product_name" 
-                                       class="form-input" 
-                                       value="{{ old('product_name', $product->product_name) }}" required>
-                                @error('product_name') <p class="form-error">{{ $message }}</p> @enderror
-                            </div>
+                        <div class="md:col-span-2">
+                            <label class="form-label label-required">Nama Produk</label>
+                            <input type="text" name="product_name" id="product_name"
+                                   value="{{ old('product_name', $product->product_name) }}"
+                                   class="form-input font-medium" required>
+                        </div>
 
-                            {{-- Kode Produk dengan Smart Generator --}}
-                            <div>
-                                <label for="product_code" class="form-label flex justify-between">
-                                    <span>Kode Produk</span>
-                                    <span class="text-[10px] text-indigo-500 cursor-pointer hover:underline" onclick="generateSmartCode()">Generate Ulang</span>
-                                </label>
-                                <div class="relative flex items-center">
-                                    <input type="text" id="product_code" name="product_code" 
-                                           class="form-input pr-12 font-mono uppercase bg-slate-50 dark:bg-slate-900 @error('product_code') border-red-500 @enderror" 
-                                           value="{{ old('product_code', $product->product_code) }}" required>
-                                    
-                                    {{-- Tombol Generate --}}
-                                    <button type="button" 
-                                            onclick="generateSmartCode()"
-                                            class="absolute right-1.5 w-9 h-8 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-indigo-600 rounded-lg transition-colors flex items-center justify-center shadow-sm border border-slate-200 dark:border-slate-600"
-                                            title="Generate Ulang Kode">
-                                        <i class="material-icons text-[18px]">auto_fix_high</i>
+                        {{-- Wizard Code --}}
+                        <div class="md:col-span-2 relative">
+                            <label class="form-label label-required">Kode Produk (SKU)</label>
+                            <div class="flex gap-2">
+                                <div class="relative flex-1">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <i class="material-icons text-slate-400 text-[18px]">qr_code</i>
+                                    </div>
+                                    <input type="text" name="product_code" 
+                                           value="{{ old('product_code', $product->product_code) }}"
+                                           class="form-input pl-10 font-mono uppercase" required>
+                                </div>
+                                <div class="relative">
+                                    <button type="button" @click="generateSuggestions()" 
+                                            class="btn btn-secondary h-full px-3 text-indigo-600 border-indigo-200 bg-indigo-50 hover:bg-indigo-100 transition-colors">
+                                        <i class="material-icons text-[20px]">auto_fix_high</i>
                                     </button>
+                                    <div x-show="showSuggestions" @click.outside="showSuggestions = false" x-transition class="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden" style="display: none;">
+                                        <div class="px-3 py-2 bg-slate-50 border-b text-xs font-bold text-slate-500 uppercase">Saran Kode</div>
+                                        <ul class="max-h-60 overflow-y-auto custom-scrollbar p-1">
+                                            <template x-for="code in suggestions" :key="code">
+                                                <li><button type="button" @click="selectCode(code)" class="w-full text-left px-3 py-2 text-sm font-mono hover:bg-indigo-50 rounded-lg"><span x-text="code"></span></button></li>
+                                            </template>
+                                        </ul>
+                                    </div>
                                 </div>
-                                @error('product_code') <p class="form-error">{{ $message }}</p> @enderror
-                            </div>
-
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                <div>
-                                    <label class="form-label">Pemasok</label>
-                                    <select name="supplier_id" class="tom-select" required>
-                                        @foreach($suppliers as $supplier)
-                                            <option value="{{ $supplier->supplier_id }}" {{ old('supplier_id', $product->supplier_id) == $supplier->supplier_id ? 'selected' : '' }}>
-                                                {{ $supplier->supplier_name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="form-label">Satuan</label>
-                                    <select name="unit_id" class="tom-select" required>
-                                        @foreach($units as $unit)
-                                            <option value="{{ $unit->unit_id }}" {{ old('unit_id', $product->unit_id) == $unit->unit_id ? 'selected' : '' }}>
-                                                {{ $unit->name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label class="form-label">Deskripsi</label>
-                                <textarea name="description" rows="3" class="form-textarea">{{ old('description', $product->description) }}</textarea>
                             </div>
                         </div>
+
+                        <div>
+                            <label class="form-label">Kategori</label>
+                            <select name="category_id" class="tom-select">
+                                <option value="">-- Tanpa Kategori --</option>
+                                @foreach($categories as $cat)
+                                    <option value="{{ $cat->category_id }}" {{ old('category_id', $product->category_id) == $cat->category_id ? 'selected' : '' }}>
+                                        {{ $cat->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="form-label label-required">Satuan Unit</label>
+                            <select name="unit_id" class="tom-select" required>
+                                @foreach($units as $unit)
+                                    <option value="{{ $unit->unit_id }}" {{ old('unit_id', $product->unit_id) == $unit->unit_id ? 'selected' : '' }}>
+                                        {{ $unit->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="form-label label-optional">Deskripsi Lengkap</label>
+                            <textarea name="description" class="form-textarea" rows="3">{{ old('description', $product->description) }}</textarea>
+                        </div>
+
                     </div>
                 </div>
 
-                {{-- Card 2: Harga & Stok --}}
-                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 sm:p-8 border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
-                        <i class="material-icons text-emerald-500">price_check</i> Pembaruan Harga
-                    </h3>
-
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {{-- Harga & Stok --}}
+                <div class="card">
+                    <div class="card-header border-l-4 border-amber-500">
+                        <h3 class="card-header-title">Harga & Inventaris</h3>
+                    </div>
+                    <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-5">
                         <div>
-                            <label class="form-label">Harga Beli</label>
+                            <label class="form-label label-required">Harga Beli</label>
                             <div class="relative">
-                                <div class="absolute inset-y-0 left-0 w-10 flex items-center justify-center pointer-events-none z-10 border-r border-slate-200 dark:border-slate-700 h-full bg-slate-50 dark:bg-slate-900 rounded-l-lg">
-                                    <span class="text-slate-500 font-medium text-xs">Rp</span>
-                                </div>
-                                <input type="text" name="purchase_price" 
-                                       class="form-input pl-12 text-right font-medium autonumeric" 
-                                       value="{{ old('purchase_price', $product->purchase_price) }}" required>
+                                <span class="absolute left-3 top-2.5 text-slate-400 text-sm font-bold">Rp</span>
+                                <input type="text" name="purchase_price" class="form-input pl-10 input-currency autonumeric" 
+                                       required value="{{ old('purchase_price', $product->purchase_price) }}">
                             </div>
                         </div>
-
                         <div>
                             <label class="form-label">Harga Jual</label>
                             <div class="relative">
-                                <div class="absolute inset-y-0 left-0 w-10 flex items-center justify-center pointer-events-none z-10 border-r border-slate-200 dark:border-slate-700 h-full bg-slate-50 dark:bg-slate-900 rounded-l-lg">
-                                    <span class="text-slate-500 font-medium text-xs">Rp</span>
-                                </div>
-                                <input type="text" name="selling_price" 
-                                       class="form-input pl-12 text-right font-bold text-emerald-600 dark:text-emerald-400 autonumeric" 
-                                       value="{{ old('selling_price', $product->selling_price) }}" required>
+                                <span class="absolute left-3 top-2.5 text-slate-400 text-sm font-bold">Rp</span>
+                                <input type="text" name="selling_price" class="form-input pl-10 input-currency autonumeric" 
+                                       value="{{ old('selling_price', $product->selling_price) }}">
                             </div>
                         </div>
-
                         <div>
-                            <label class="form-label">Stok Saat Ini</label>
-                            <div class="relative">
-                                <div class="absolute inset-y-0 left-0 w-10 flex items-center justify-center pointer-events-none z-10 border-r border-slate-200 dark:border-slate-700 h-full bg-slate-50 dark:bg-slate-900 rounded-l-lg">
-                                    <i class="material-icons text-slate-400 text-[18px]">layers</i>
-                                </div>
-                                <input type="text" name="stock_quantity" 
-                                       class="form-input pl-12 text-right bg-slate-50 dark:bg-slate-900 autonumeric" 
-                                       value="{{ old('stock_quantity', $product->stock_quantity) }}">
+                            <label class="form-label label-required">Stok Saat Ini</label>
+                            <input type="text" name="stock_quantity" class="form-input autonumeric bg-slate-100" 
+                                   data-an-m-dec="0" required value="{{ old('stock_quantity', $product->stock_quantity) }}">
+                            <p class="text-[10px] text-slate-400 mt-1">Gunakan <b>Stock Opname</b> untuk adjustment akurat.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- KOLOM KANAN --}}
+            <div class="space-y-6">
+                
+                {{-- Foto --}}
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-header-title">Foto Produk</h3>
+                    </div>
+                    <div class="card-body">
+                        @if($product->image_path)
+                            <div class="mb-4 text-center bg-slate-50 dark:bg-slate-700/30 p-4 rounded-lg border border-slate-100 dark:border-slate-700">
+                                <img src="{{ asset('storage/' . $product->image_path) }}" 
+                                     class="h-48 w-48 object-cover mx-auto rounded-lg shadow-sm border border-slate-200 dark:border-slate-600">
+                                <p class="text-xs text-slate-400 mt-2">Gambar Saat Ini (1:1)</p>
                             </div>
-                            <p class="text-[10px] text-slate-400 mt-1">Ubah manual atau gunakan Stock Opname.</p>
+                        @endif
+                        <x-ui.file-upload name="image" label="Ganti Foto" :required="false" helperText="JPG, PNG (Max 10MB)" />
+                    </div>
+                </div>
+
+                {{-- Status --}}
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-header-title">Status</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <div>
+                                <span class="text-sm font-bold text-slate-700 dark:text-white block">Status Aktif</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="is_active" class="sr-only peer" {{ $product->is_active ? 'checked' : '' }}>
+                                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                            </label>
+                        </div>
+                        
+                        <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+                            <p class="text-xs text-slate-400 mb-1">Dibuat: {{ $product->created_at->format('d M Y H:i') }}</p>
+                            <p class="text-xs text-slate-400">Update: {{ $product->updated_at->format('d M Y H:i') }}</p>
                         </div>
                     </div>
                 </div>
 
-                {{-- Action Buttons --}}
-                <div class="flex items-center justify-end gap-4 pt-4">
-                    <a href="{{ route('admin.products.index') }}" class="btn btn-secondary h-11 px-6">Batal</a>
-                    <button type="submit" class="btn btn-primary h-11 px-8 shadow-lg shadow-indigo-500/30">
-                        <span class="flex items-center gap-2">
-                            <i class="material-icons text-[20px]">check</i> Simpan Perubahan
-                        </span>
+                <div class="flex flex-col gap-3">
+                    <button type="submit" class="btn btn-primary w-full shadow-lg">
+                        <i class="material-icons">save</i> Simpan Perubahan
                     </button>
+                    <a href="{{ route('admin.products.index') }}" class="btn btn-secondary w-full">Batal</a>
                 </div>
-
             </div>
-        </form>
-    </div>
+        </div>
+    </form>
 
     @push('scripts')
     <script>
-        function previewImage(event) {
-            const loading = document.getElementById('image-loading');
-            const preview = document.getElementById('image-preview');
-            const placeholder = document.getElementById('placeholder-content');
-            
-            loading.classList.remove('hidden');
-            if(placeholder) placeholder.style.opacity = '0';
-            
-            const reader = new FileReader();
-            reader.onload = function(){
-                setTimeout(() => {
-                    preview.src = reader.result;
-                    preview.classList.remove('hidden');
-                    loading.classList.add('hidden');
-                }, 400);
-            };
-            if(event.target.files[0]) {
-                reader.readAsDataURL(event.target.files[0]);
-            }
-        }
-
-        // === SAMA DENGAN CREATE: SCRIPT SMART GENERATOR ===
-        function generateSmartCode() {
-            const nameInput = document.getElementById('product_name');
-            const codeInput = document.getElementById('product_code');
-            const rawName = nameInput.value.trim().toUpperCase();
-
-            if (!rawName) {
-                if(typeof window.showToast === 'function') {
-                    window.showToast('Harap isi Nama Produk terlebih dahulu!', 'warning');
-                } else {
-                    alert('Harap isi Nama Produk terlebih dahulu!');
-                }
-                nameInput.focus();
-                return;
-            }
-
-            const aliases = {
-                'BULL': 'BL', 'TEKIRO': 'TKR', 'MAKITA': 'MKT', 'BOSCH': 'BSH',
-                'HONDA': 'HND', 'YAMAHA': 'YMH', 'MESIN': 'MSN', 'OBENG': 'OBG',
-                'PALU': 'PLU', 'PAKU': 'PKU', 'SEMEN': 'SMN', 'CAT': 'PT',
-                'BESI': 'FE', 'KAYU': 'WD', 'BATU': 'STN', 'GERINDA': 'GRN'
-            };
-
-            const words = rawName.replace(/[^A-Z0-9\s]/g, '').split(/\s+/);
-            let codeParts = [];
-            let numbers = [];
-
-            words.forEach(word => {
-                if (aliases[word]) {
-                    codeParts.push(aliases[word]);
-                } else if (/\d/.test(word)) {
-                    numbers.push(word);
-                } else {
-                    if (word.length > 2) {
-                        const consonants = word.replace(/[AIUEO]/g, '');
-                        const code = consonants.length > 0 ? consonants.substring(0, 3) : word.substring(0, 3);
-                        codeParts.push(code);
+        function codeGenerator() {
+            return {
+                showSuggestions: false,
+                suggestions: [],
+                generateSuggestions() {
+                    const name = document.getElementById('product_name').value.trim();
+                    if (name.length < 3) {
+                        window.showToast('Nama produk terlalu pendek.', 'warning');
+                        return;
                     }
+                    const words = name.split(/\s+/);
+                    const firstWord = words[0].toUpperCase();
+                    const numbers = name.match(/\d+/g); 
+                    const lastNumber = numbers ? numbers[numbers.length - 1] : '';
+                    let results = new Set();
+                    results.add(name.toUpperCase().replace(/\s+/g, '-'));
+                    if (lastNumber) {
+                        results.add(`${firstWord} ${lastNumber}`);
+                        results.add(`${firstWord}-${lastNumber}`);
+                    }
+                    if (words.length > 1) {
+                        const secondWord = words[1].toUpperCase();
+                        if (/\d/.test(secondWord)) {
+                            results.add(`${secondWord}`);
+                            results.add(`${firstWord}-${secondWord}`);
+                        }
+                    }
+                    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+                    results.add(`${firstWord.substring(0, 3)}-${randomSuffix}`);
+                    this.suggestions = Array.from(results).filter(s => s.length > 3).slice(0, 7);
+                    this.showSuggestions = true;
+                },
+                selectCode(code) {
+                    document.getElementsByName('product_code')[0].value = code;
+                    this.showSuggestions = false;
+                    window.showToast('Kode diperbarui!', 'success');
                 }
-            });
-
-            let finalParts = [...codeParts.slice(0, 3), ...numbers];
-            let baseCode = finalParts.join('-').toUpperCase();
-            if(!baseCode) baseCode = rawName.substring(0, 3);
-            const randomSuffix = Math.floor(Math.random() * 900) + 100;
-
-            codeInput.value = `${baseCode}-${randomSuffix}`;
-            codeInput.focus();
-            codeInput.classList.add('ring-2', 'ring-indigo-500');
-            setTimeout(() => codeInput.classList.remove('ring-2', 'ring-indigo-500'), 500);
+            }
         }
     </script>
     @endpush

@@ -3,154 +3,174 @@
 @section('title', 'Daftar Pinjaman')
 
 @section('content')
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 animate-enter">
+    {{-- Header --}}
+    <div class="page-header">
         <div>
-            <h1 class="page-title">Pinjaman & Hutang Bank</h1>
-            <p class="page-subtitle">Kelola daftar pinjaman perusahaan, monitoring sisa pokok, dan riwayat pembayaran.</p>
+            <h1 class="page-title">Manajemen Pinjaman</h1>
+            <p class="page-subtitle">Daftar hutang perusahaan (Liabilitas) dan status pelunasan</p>
         </div>
-        
-        @can('manage-loans')
-        <a href="{{ route('admin.loans.create') }}" class="btn btn-primary">
-            <i class="material-icons text-sm">add</i>
-            Buat Pinjaman Baru
-        </a>
-        @endcan
+        <div>
+            <a href="{{ route('admin.loans.create') }}" class="btn btn-primary">
+                <i class="material-icons text-[18px]">add</i>
+                Catat Pinjaman Baru
+            </a>
+        </div>
     </div>
 
-    {{-- Filter & Search --}}
-    <div class="card mb-6 animate-enter" style="animation-delay: 0.1s">
-        <div class="card-body">
-            <form method="GET" action="{{ route('admin.loans.index') }}" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {{-- Search --}}
-                <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Cari Pemberi Pinjaman</label>
-                    <div class="relative">
-                        <input type="text" name="search" value="{{ request('search') }}" 
-                            class="form-input pl-10" placeholder="Contoh: Bank BCA, Leasing...">
-                        <i class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</i>
+    {{-- Filter & Stats --}}
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        {{-- Stat Card: Total Hutang Aktif --}}
+        <div class="card p-4 flex items-center gap-4 border-l-4 border-indigo-500">
+            <div class="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                <i class="material-icons text-2xl">account_balance</i>
+            </div>
+            <div>
+                <p class="text-xs text-slate-500 font-bold uppercase">Sisa Pokok Hutang</p>
+                <h3 class="text-lg font-bold text-slate-800 dark:text-white">
+                    Rp {{ number_format(\App\Models\Loan::where('status', 'active')->sum('remaining_balance'), 0, ',', '.') }}
+                </h3>
+            </div>
+        </div>
+
+        {{-- Filter Form --}}
+        <div class="md:col-span-3 card">
+            <div class="card-body py-4">
+                <form action="{{ route('admin.loans.index') }}" method="GET" class="flex flex-col md:flex-row gap-4">
+                    {{-- Status Filter --}}
+                    <div class="w-full md:w-48">
+                        <select name="status" class="form-select" onchange="this.form.submit()">
+                            <option value="">Semua Status</option>
+                            <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Belum Lunas</option>
+                            <option value="paid_off" {{ request('status') == 'paid_off' ? 'selected' : '' }}>Lunas</option>
+                        </select>
                     </div>
-                </div>
 
-                {{-- Status --}}
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
-                    <select name="status" class="tom-select">
-                        <option value="">Semua Status</option>
-                        <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Active (Belum Lunas)</option>
-                        <option value="paid_off" {{ request('status') == 'paid_off' ? 'selected' : '' }}>Paid Off (Lunas)</option>
-                    </select>
-                </div>
-
-                {{-- Button --}}
-                <div class="flex items-end">
-                    <button type="submit" class="btn btn-secondary w-full">
-                        <i class="material-icons text-sm">filter_list</i>
-                        Filter
+                    {{-- Search --}}
+                    <div class="flex-1 relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="material-icons text-slate-400 text-[18px]">search</i>
+                        </div>
+                        <input type="text" name="search" class="form-input pl-10" 
+                               placeholder="Cari nama pemberi pinjaman..." 
+                               value="{{ request('search') }}">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-secondary">
+                        <i class="material-icons text-[18px]">filter_list</i>
                     </button>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
 
-    {{-- Table List --}}
-    <div class="card animate-enter" style="animation-delay: 0.2s">
+    {{-- Data Table --}}
+    <div class="card card-plain">
         <div class="table-container">
             <table class="table-modern">
                 <thead>
                     <tr>
+                        <th>Tanggal</th>
                         <th>Pemberi Pinjaman</th>
-                        <th>Tanggal Terima</th>
                         <th class="text-right">Pokok Pinjaman</th>
-                        <th class="text-right">Sisa Pokok</th>
-                        <th class="text-center">Progress</th>
-                        <th class="text-center">Status</th>
-                        <th class="text-center">Aksi</th>
+                        <th class="text-right">Sisa Hutang</th>
+                        <th class="w-32">Progress</th>
+                        <th>Status</th>
+                        <th class="text-end">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($loans as $loan)
-                        @php
-                            $percentage = $loan->principal_amount > 0 
-                                ? round((($loan->principal_amount - $loan->remaining_balance) / $loan->principal_amount) * 100) 
-                                : 0;
-                        @endphp
-                        <tr>
-                            <td class="font-bold text-slate-700 dark:text-white">
+                    <tr>
+                        <td>
+                            <span class="font-medium text-slate-700 dark:text-slate-200">
+                                {{ $loan->loan_date->format('d M Y') }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="font-bold text-slate-700 dark:text-slate-200">
                                 {{ $loan->lender_name }}
-                                <div class="text-xs font-normal text-slate-500 truncate max-w-[200px]">
-                                    {{ $loan->description ?? '-' }}
-                                </div>
-                            </td>
-                            <td>{{ $loan->loan_date->format('d M Y') }}</td>
-                            <td class="text-right font-medium text-slate-700 dark:text-slate-300 autonumeric" data-a-sign="Rp ">
-                                {{ $loan->principal_amount }}
-                            </td>
-                            <td class="text-right font-bold text-indigo-600 dark:text-indigo-400 autonumeric" data-a-sign="Rp ">
-                                {{ $loan->remaining_balance }}
-                            </td>
-                            <td class="align-middle" style="min-width: 100px;">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-full bg-slate-200 rounded-full h-1.5 dark:bg-slate-700">
-                                        <div class="bg-indigo-600 h-1.5 rounded-full" style="width: {{ $percentage }}%"></div>
-                                    </div>
-                                    <span class="text-[10px] font-bold text-slate-500">{{ $percentage }}%</span>
-                                </div>
-                            </td>
-                            <td class="text-center">
-                                @if($loan->status == 'active')
-                                    <span class="badge badge-primary">Active</span>
-                                @else
-                                    <span class="badge badge-success">Lunas</span>
-                                @endif
-                            </td>
-                            <td class="text-center">
-                                <div class="flex items-center justify-center gap-2">
-                                    {{-- Tombol Detail (Mata) --}}
-                                    {{-- Gunakan w-8 h-8 flex center agar icon presisi di tengah --}}
-                                    <a href="{{ route('admin.loans.show', $loan->loan_id) }}" 
-                                       class="w-8 h-8 rounded-full bg-white border border-slate-200 hover:bg-slate-50 hover:text-indigo-600 flex items-center justify-center transition-colors dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:text-white"
-                                       title="Detail & Pembayaran">
-                                        <i class="material-icons text-[18px]">visibility</i>
+                            </div>
+                            <div class="text-xs text-slate-500 truncate max-w-[150px]">
+                                {{ $loan->description ?? '-' }}
+                            </div>
+                        </td>
+                        <td class="text-right font-mono">
+                            Rp {{ number_format($loan->principal_amount, 0, ',', '.') }}
+                        </td>
+                        <td class="text-right font-mono font-bold text-slate-700 dark:text-white">
+                            Rp {{ number_format($loan->remaining_balance, 0, ',', '.') }}
+                        </td>
+                        <td>
+                            {{-- Progress Bar Pelunasan --}}
+                            @php
+                                $percentPaid = 0;
+                                if($loan->principal_amount > 0) {
+                                    $paid = $loan->principal_amount - $loan->remaining_balance;
+                                    $percentPaid = ($paid / $loan->principal_amount) * 100;
+                                }
+                            @endphp
+                            <div class="w-full bg-slate-200 rounded-full h-1.5 dark:bg-slate-700 mt-1">
+                                <div class="bg-emerald-500 h-1.5 rounded-full" style="width: {{ $percentPaid }}%"></div>
+                            </div>
+                            <div class="text-[10px] text-slate-400 text-right mt-0.5">
+                                {{ number_format($percentPaid, 0) }}% Lunas
+                            </div>
+                        </td>
+                        <td>
+                            @if($loan->status == 'active')
+                                <span class="badge badge-warning">Belum Lunas</span>
+                            @else
+                                <span class="badge badge-success">Lunas</span>
+                            @endif
+                        </td>
+                        <td class="text-end">
+                            <div class="flex items-center justify-end gap-2">
+                                {{-- View --}}
+                                <a href="{{ route('admin.loans.show', $loan->loan_id) }}" class="btn-action btn-action-view" title="Lihat Detail & Bayar">
+                                    <i class="material-icons">visibility</i>
+                                </a>
+
+                                {{-- Edit & Delete (Hanya jika belum ada pembayaran) --}}
+                                @if($loan->payments_count == 0)
+                                    <a href="{{ route('admin.loans.edit', $loan->loan_id) }}" class="btn-action btn-action-edit" title="Edit">
+                                        <i class="material-icons">edit</i>
                                     </a>
-
-                                    @can('manage-loans')
-                                        {{-- Tombol Edit (Pensil) --}}
-                                        <a href="{{ route('admin.loans.edit', $loan->loan_id) }}" 
-                                           class="w-8 h-8 rounded-full bg-white border border-slate-200 hover:bg-slate-50 hover:text-amber-600 flex items-center justify-center transition-colors dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:text-white"
-                                           title="Edit">
-                                            <i class="material-icons text-[18px]">edit</i>
-                                        </a>
-
-                                        {{-- Tombol Hapus (Tong Sampah) --}}
-                                        @if($loan->payments_count == 0)
-                                            <form action="{{ route('admin.loans.destroy', $loan->loan_id) }}" method="POST" onsubmit="return confirm('Hapus data pinjaman ini? Jurnal akan direverse.');">
-                                                @csrf @method('DELETE')
-                                                <button type="submit" 
-                                                        class="w-8 h-8 rounded-full bg-white border border-slate-200 hover:bg-red-50 hover:text-red-600 flex items-center justify-center transition-colors dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:text-white"
-                                                        title="Hapus">
-                                                    <i class="material-icons text-[18px]">delete</i>
-                                                </button>
-                                            </form>
-                                        @endif
-                                    @endcan
-                                </div>
-                            </td>
-                        </tr>
+                                    
+                                    <button type="button" 
+                                            class="btn-action btn-action-delete"
+                                            title="Hapus"
+                                            onclick="confirmDialog({
+                                                title: 'Hapus Pinjaman?',
+                                                text: 'Data pinjaman dan jurnal terkait akan dihapus permanen.',
+                                                icon: 'warning',
+                                                confirmText: 'Ya, Hapus',
+                                                confirmColor: 'danger'
+                                            }).then((result) => {
+                                                if (result.isConfirmed) document.getElementById('delete-form-{{ $loan->loan_id }}').submit();
+                                            })">
+                                        <i class="material-icons">delete_outline</i>
+                                    </button>
+                                    <form id="delete-form-{{ $loan->loan_id }}" action="{{ route('admin.loans.destroy', $loan->loan_id) }}" method="POST" class="hidden">
+                                        @csrf
+                                        @method('DELETE')
+                                    </form>
+                                @endif
+                            </div>
+                        </td>
+                    </tr>
                     @empty
-                        <tr>
-                            <td colspan="7" class="text-center py-8 text-slate-400">
-                                <i class="material-icons text-4xl mb-2">account_balance</i>
-                                <p>Belum ada data pinjaman.</p>
-                            </td>
-                        </tr>
+                    <tr>
+                        <td colspan="7" class="text-center py-8 text-slate-400">
+                            <i class="material-icons text-4xl mb-2">money_off</i>
+                            <p>Tidak ada data pinjaman.</p>
+                        </td>
+                    </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
-        
-        {{-- Pagination --}}
-        <div class="p-4 border-t border-slate-200 dark:border-slate-700">
-            {{ $loans->links() }}
+        <div class="p-4 border-t border-slate-100 dark:border-slate-700">
+            {{ $loans->links('vendor.pagination.admin') }}
         </div>
     </div>
 @endsection

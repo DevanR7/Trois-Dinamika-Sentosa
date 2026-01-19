@@ -17,14 +17,15 @@ return new class extends Migration
                 ->nullable()
                 ->constrained('users', 'user_id')
                 ->onDelete('set null');
-            $table->date('order_date');
+            $table->date('order_date')->index();
             $table->date('due_date');
             $table->decimal('subtotal', 15, 2)->default(0);
             $table->decimal('discount_percentage', 5, 2)->default(0);
             $table->decimal('discount_amount', 15, 2)->default(0);
             $table->decimal('total_amount', 15, 2)->default(0.00);
             $table->decimal('amount_paid', 15, 2)->default(0.00);
-            $table->enum('status', ['draft','unpaid', 'partially_paid', 'paid', 'overdue', 'cancelled'])->default('draft');
+            $table->decimal('total_refunded', 15, 2)->default(0);
+            $table->enum('status', ['draft','unpaid', 'partially_paid', 'paid', 'overdue', 'cancelled'])->default('draft')->index();
             $table->string('pending_snap_token')->nullable();
             $table->timestamp('pending_snap_expires_at')->nullable();
             $table->text('notes')->nullable();

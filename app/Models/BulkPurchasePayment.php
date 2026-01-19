@@ -6,14 +6,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
+use App\Traits\LogsActivity;
 
 class BulkPurchasePayment extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
     protected $table = 'bulk_purchase_payments';
     protected $primaryKey = 'bulk_purchase_payment_id'; 
 
     protected $fillable = [
+        'payment_number',
         'supplier_id',
         'processed_by_user_id',
         'payment_date',
@@ -52,4 +55,46 @@ class BulkPurchasePayment extends Model
     {
         return $this->belongsTo(CompanyBankAccount::class, 'company_bank_account_id', 'company_bank_account_id');
     }
+
+    public static function generateNumber(): string
+{
+    $ym = now()->format('Ym');
+    $type = 'purchase';
+
+    return DB::transaction(function() use ($ym, $type) {
+        $counter = DB::table('bulk_payment_counters')
+            ->where('ym', $ym)
+            ->where('type', $type)
+            ->lockForUpdate()
+            ->first();
+
+        if ($counter) {
+            $nextSequence = $counter->last_sequence + 1;
+            DB::table('bulk_payment_counters')
+                ->where('ym', $ym)
+                ->where('type', $type)
+                ->update(['last_sequence' => $nextSequence, 'updated_at' => now()]);
+        } else {
+            try {
+                $nextSequence = 1;
+                DB::table('bulk_payment_counters')->insert([
+                    'ym' => $ym, 'type' => $type, 
+                    'last_sequence' => $nextSequence, 
+                    'created_at' => now(), 'updated_at' => now()
+                ]);
+            } catch (\Exception $e) {
+                $counter = DB::table('bulk_payment_counters')
+                    ->where('ym', $ym)->where('type', $type)
+                    ->lockForUpdate()->first();
+                $nextSequence = $counter->last_sequence + 1;
+                DB::table('bulk_payment_counters')
+                    ->where('ym', $ym)->where('type', $type)
+                    ->update(['last_sequence' => $nextSequence, 'updated_at' => now()]);
+            }
+        }
+
+        $seq = str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
+        return "BULK/PO/" . now()->format('Y') . "/" . now()->format('m') . "/" . $seq;
+    });
+}
 }

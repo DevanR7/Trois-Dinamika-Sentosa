@@ -3,156 +3,165 @@
 @section('title', 'Tutup Buku Tahunan')
 
 @section('content')
-
-    {{-- HEADER --}}
+<div class="flex flex-col gap-6">
+    
+    {{-- Page Header --}}
     <div class="page-header">
         <div>
-            <h1 class="page-title">Tutup Buku Tahunan</h1>
-            <p class="page-subtitle">Proses akhir periode akuntansi untuk memindahkan Laba/Rugi ke Modal.</p>
+            <h1 class="page-title">Tutup Buku Tahunan (Closing Book)</h1>
+            <p class="page-subtitle">Proses pemindahan saldo Laba/Rugi tahun berjalan ke akun Laba Ditahan.</p>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {{-- LEFT COLUMN: FORM EKSEKUSI --}}
-        <div class="lg:col-span-1 space-y-6">
-            
-            {{-- Alert Info --}}
-            <div class="p-4 bg-indigo-50 border border-indigo-100 rounded-xl text-indigo-800 text-sm leading-relaxed">
-                <div class="flex items-center gap-2 font-bold mb-2">
-                    <i class="material-icons text-base">info</i> Apa yang terjadi?
-                </div>
-                <ul class="list-disc ml-4 space-y-1 text-xs">
-                    <li>Menghitung Laba/Rugi Bersih tahun tersebut.</li>
-                    <li>Membuat <b>Jurnal Penutup</b> otomatis.</li>
-                    <li>Memindahkan saldo ke akun <b>Laba Ditahan</b>.</li>
-                    <li>Mengunci transaksi di periode tersebut.</li>
-                </ul>
+    {{-- Information Alert --}}
+    <div class="bg-indigo-50 dark:bg-indigo-900/20 border-l-4 border-indigo-500 p-5 rounded-r shadow-sm">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <i class="material-icons text-indigo-500">info</i>
             </div>
-
-            {{-- Form Card --}}
-            <div class="card border-t-4 border-indigo-600">
-                <div class="card-header">
-                    <h3 class="card-header-title">Eksekusi Tutup Buku</h3>
-                </div>
-                <div class="card-body">
-                    
-                    <form id="closingForm" action="{{ route('admin.closing-book.store') }}" method="POST">
-                        @csrf
-
-                        <div class="mb-6">
-                            <label class="form-label label-required">Pilih Tahun Buku</label>
-                            <select name="year" class="tom-select" required>
-                                <option value="">Pilih Tahun...</option>
-                                @foreach($availableYears as $year)
-                                    @php
-                                        $isClosed = in_array($year, $closedYears);
-                                    @endphp
-                                    <option value="{{ $year }}" {{ $isClosed ? 'disabled' : '' }}>
-                                        {{ $year }} {{ $isClosed ? '(Sudah Ditutup)' : '' }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <div class="form-hint mt-2">
-                                Pastikan semua transaksi tahun tersebut sudah selesai diinput.
-                            </div>
-                        </div>
-
-                        <button type="button" id="btnSubmit" class="btn btn-primary w-full justify-center">
-                            <i class="material-icons text-sm mr-2">lock_clock</i> Proses Tutup Buku
-                        </button>
-
-                    </form>
-
+            <div class="ml-4">
+                <h3 class="text-sm font-bold text-indigo-800 dark:text-indigo-300 uppercase tracking-wide">Penting</h3>
+                <div class="mt-2 text-sm text-indigo-700 dark:text-indigo-200 space-y-1">
+                    <p>1. Proses ini akan menjurnal otomatis saldo akun <strong>Pendapatan, HPP, dan Beban</strong> menjadi nol.</p>
+                    <p>2. Selisih (Laba/Rugi Bersih) akan dipindahkan ke akun <strong>Laba Ditahan (Retained Earnings)</strong>.</p>
+                    <p>3. Pastikan semua transaksi pada tahun tersebut telah selesai diinput dan direkonsiliasi.</p>
+                    <p>4. Tahun yang sudah ditutup <strong>tidak dapat diedit kembali</strong> transaksi-transaksinya.</p>
                 </div>
             </div>
-
         </div>
+    </div>
 
-        {{-- RIGHT COLUMN: RIWAYAT --}}
-        <div class="lg:col-span-2">
-            <div class="card h-full">
-                <div class="card-header">
-                    <h3 class="card-header-title">Riwayat Tutup Buku</h3>
-                </div>
-                <div class="table-container">
-                    <table class="table-modern">
-                        <thead>
-                            <tr>
-                                <th>Periode Tahun</th>
-                                <th>Status</th>
-                                <th>Keterangan</th>
-                                <th class="text-center w-24">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($closedYears as $year)
-                                <tr>
-                                    <td>
-                                        <div class="font-bold text-lg text-slate-700 dark:text-slate-200 font-mono">
-                                            {{ $year }}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="badge badge-success">
-                                            <i class="material-icons text-[10px] mr-1">lock</i> Closed
+    {{-- Years Table --}}
+    <div class="card card-plain">
+        <div class="card-header">
+            <h3 class="card-header-title">Periode Tahun Buku</h3>
+        </div>
+        <div class="table-container">
+            <table class="table-modern">
+                <thead>
+                    <tr>
+                        <th class="w-32 text-center">Tahun</th>
+                        <th class="w-48 text-center">Status</th>
+                        <th>Keterangan</th>
+                        <th class="text-right">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($availableYears as $year)
+                        @php
+                            $isClosed = in_array($year, $closedYears);
+                            // Cek apakah tahun ini adalah tahun berjalan (biasanya belum boleh ditutup kecuali sudah akhir tahun)
+                            $isCurrentYear = $year == date('Y');
+                        @endphp
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                            {{-- Tahun --}}
+                            <td class="text-center">
+                                <span class="text-lg font-bold font-mono text-slate-700 dark:text-slate-200">
+                                    {{ $year }}
+                                </span>
+                            </td>
+
+                            {{-- Status --}}
+                            <td class="text-center">
+                                @if($isClosed)
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                        <i class="material-icons text-[14px]">lock</i>
+                                        DITUTUP
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                                        <i class="material-icons text-[14px]">lock_open</i>
+                                        TERBUKA
+                                    </span>
+                                @endif
+                            </td>
+
+                            {{-- Keterangan --}}
+                            <td class="text-slate-600 dark:text-slate-400 text-sm">
+                                @if($isClosed)
+                                    <span class="flex items-center gap-2">
+                                        <i class="material-icons text-emerald-500 text-[16px]">check_circle</i>
+                                        Saldo Laba/Rugi telah dipindahkan ke Ekuitas.
+                                    </span>
+                                @else
+                                    @if($isCurrentYear)
+                                        <span class="text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                                            <i class="material-icons text-[16px]">warning</i>
+                                            Tahun berjalan. Disarankan menutup setelah 31 Des.
                                         </span>
-                                    </td>
-                                    <td class="text-sm text-slate-500">
-                                        Jurnal penutup telah dibuat.
-                                    </td>
-                                    <td class="text-center">
-                                        {{-- Link ke Jurnal Manual (Cari berdasarkan deskripsi) --}}
-                                        <a href="{{ route('admin.manual-journals.index', ['search' => 'Jurnal Penutup Tahun ' . $year]) }}" 
-                                           class="btn btn-sm btn-secondary" target="_blank">
-                                            Lihat Jurnal
-                                        </a>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="4" class="text-center p-8">
-                                        <div class="flex flex-col items-center justify-center text-slate-400">
-                                            <i class="material-icons text-5xl mb-2">history_edu</i>
-                                            <span>Belum ada riwayat tutup buku.</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                                    @else
+                                        <span class="text-slate-500">Siap untuk proses tutup buku akhir tahun.</span>
+                                    @endif
+                                @endif
+                            </td>
+
+                            {{-- Aksi --}}
+                            <td class="text-right">
+                                @if(!$isClosed)
+                                    <form action="{{ route('admin.closing-book.store') }}" method="POST" class="form-closing-book">
+                                        @csrf
+                                        <input type="hidden" name="year" value="{{ $year }}">
+                                        
+                                        <button type="button" 
+                                                class="btn btn-sm btn-primary btn-process-closing"
+                                                data-year="{{ $year }}">
+                                            <i class="material-icons text-[16px] mr-1">history_edu</i>
+                                            Tutup Buku
+                                        </button>
+                                    </form>
+                                @else
+                                    <button disabled class="btn btn-sm btn-secondary opacity-50 cursor-not-allowed">
+                                        <i class="material-icons text-[16px] mr-1">lock</i>
+                                        Selesai
+                                    </button>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="text-center py-8 text-slate-500">
+                                Tidak ada data transaksi jurnal umum ditemukan.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
-
     </div>
+</div>
 
-@endsection
-
+{{-- Script Khusus untuk Konfirmasi Tutup Buku --}}
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const btnSubmit = document.getElementById('btnSubmit');
-        const form = document.getElementById('closingForm');
+        const buttons = document.querySelectorAll('.btn-process-closing');
+        
+        buttons.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const year = this.getAttribute('data-year');
+                const form = this.closest('form');
 
-        btnSubmit.addEventListener('click', function() {
-            window.confirmDialog({
-                title: 'Konfirmasi Tutup Buku?',
-                text: "Tindakan ini akan membuat jurnal otomatis dan tidak bisa dibatalkan sembarangan. Pastikan data akuntansi sudah benar.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#4f46e5', // Indigo primary
-                cancelButtonColor: '#64748b',
-                confirmButtonText: 'Ya, Proses Sekarang!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    btnSubmit.classList.add('is-loading');
-                    btnSubmit.disabled = true;
-                    form.submit();
-                }
+                window.confirmDialog({
+                    title: 'Konfirmasi Tutup Buku ' + year,
+                    html: `Apakah Anda yakin ingin menutup buku tahun <strong>${year}</strong>?<br><br>
+                           <ul class="text-left text-sm list-disc pl-4 text-slate-600 dark:text-slate-300">
+                               <li>Jurnal Penutup otomatis akan dibuat.</li>
+                               <li>Transaksi tahun ${year} akan dikunci permanen.</li>
+                               <li>Pastikan neraca saldo sudah sesuai.</li>
+                           </ul>`,
+                    icon: 'warning',
+                    confirmText: 'Ya, Proses Tutup Buku',
+                    cancelText: 'Batal',
+                    confirmColor: 'danger' // Merah agar user hati-hati
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        form.submit();
+                    }
+                });
             });
         });
     });
 </script>
 @endpush
+@endsection

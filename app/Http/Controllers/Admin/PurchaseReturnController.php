@@ -17,7 +17,6 @@ use Illuminate\Support\Facades\Log;
 use App\Services\AccountingService;
 use App\Services\AccountingSettingService;
 
-
 class PurchaseReturnController extends Controller
 {
     protected $accountingService;
@@ -29,14 +28,20 @@ class PurchaseReturnController extends Controller
     ) {
         $this->accountingService = $accountingService;
         $this->accountingSettings = $accountingSettingService;
+
+        $this->middleware('can:view-purchase-returns')->only(['index', 'show']);
+        $this->middleware('can:create-purchase-returns')->only(['create', 'store']);
+        $this->middleware('can:delete-purchase-returns')->only(['destroy']);
     }
 
     public function index(Request $request): View
     {
         $this->authorize('viewAny', PurchaseReturn::class);
 
-        $query = PurchaseReturn::with(['supplier', 'purchaseOrder']);
+        // [UPDATE] Eager load 'items.product.unit' untuk fitur accordion preview
+        $query = PurchaseReturn::with(['supplier', 'purchaseOrder', 'items.product.unit', 'user']);
 
+        // Filter Pencarian Global
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -46,27 +51,48 @@ class PurchaseReturnController extends Controller
             });
         }
 
+        // Filter Tanggal
         if ($request->filled('return_date')) {
             $query->whereDate('return_date', $request->return_date);
         }
 
+        // [TAMBAHAN] Filter Supplier Spesifik (Dropdown)
+        if ($request->filled('supplier_id')) {
+            $query->where('supplier_id', $request->supplier_id);
+        }
+
+        // [TAMBAHAN] Filter Tipe Penanganan
+        if ($request->filled('return_handling_type')) {
+            $query->where('return_handling_type', $request->return_handling_type);
+        }
+
         $purchaseReturns = $query->latest('return_date')
+                                 ->latest('return_id')
                                  ->paginate(15)
                                  ->appends($request->query());
 
-        return view('admin.purchase_returns.index', compact('purchaseReturns'));
+        // [TAMBAHAN] Data untuk Dropdown Filter
+        $suppliers = \App\Models\Supplier::orderBy('supplier_name')->get(['supplier_id', 'supplier_name']);
+
+        return view('admin.purchase_returns.index', compact('purchaseReturns', 'suppliers'));
     }
 
-    public function create(): View
-    {
-        $this->authorize('create', PurchaseReturn::class);
+    public function create(Request $request): View
+{
+    $this->authorize('create', PurchaseReturn::class);
+    
+    // 1. Ambil Purchase Order yang statusnya 'completed' (Barang sudah diterima)
+    $purchaseOrders = PurchaseOrder::where('status', 'completed')
+        ->with('supplier') // Eager load untuk performa
+        ->orderBy('order_date', 'desc')
+        ->get();
 
-        $purchaseOrders = PurchaseOrder::where('status', 'completed')
-            ->orderBy('order_date', 'desc')
-            ->get();
-
-        return view('admin.purchase_returns.create', compact('purchaseOrders'));
-    }
+    // 2. Tangkap ID dari URL (jika diklik dari halaman index)
+    $preselectedPoId = $request->query('purchase_order_id');
+        
+    // 3. Kirim variabel ke View
+    return view('admin.purchase_returns.create', compact('purchaseOrders', 'preselectedPoId'));
+}
 
     public function store(Request $request): RedirectResponse
     {
@@ -87,8 +113,16 @@ class PurchaseReturnController extends Controller
         $inventoryAccountId = $this->accountingSettings->getInventoryId();
         $supplierDepositAccountId = $this->accountingSettings->getSupplierDepositId();
 
-        if (!$apAccountId || !$purchaseReturnAccountId || !$inventoryAccountId || !$supplierDepositAccountId) {
-            return back()->with('error', 'Gagal: Akun default (Hutang, Retur Pembelian, Persediaan, Deposit Supplier) belum diatur.')->withInput();
+        // [DEBUGGING] Cek mana yang null
+        $missingAccounts = [];
+        if (!$apAccountId) $missingAccounts[] = 'Hutang Dagang (AP)';
+        if (!$purchaseReturnAccountId) $missingAccounts[] = 'Retur Pembelian';
+        if (!$inventoryAccountId) $missingAccounts[] = 'Persediaan';
+        if (!$supplierDepositAccountId) $missingAccounts[] = 'Deposit Supplier';
+
+        if (!empty($missingAccounts)) {
+            $msg = 'Gagal: Akun default berikut belum diatur di Pengaturan: ' . implode(', ', $missingAccounts);
+            return back()->with('error', $msg)->withInput();
         }
 
         DB::beginTransaction();
@@ -99,42 +133,7 @@ class PurchaseReturnController extends Controller
             $hasReturnedItems = false;
             $handlingType = $validated['return_handling_type'];
 
-            foreach ($validated['items'] as $itemData) {
-                if (empty($itemData['quantity']) || $itemData['quantity'] <= 0) {
-                    continue;
-                }
-
-                $hasReturnedItems = true;
-                $originalItem = PurchaseOrderItem::with('discounts')->find($itemData['item_id']);
-
-                $maxQty = $originalItem->quantity - $originalItem->quantity_returned;
-                if ($itemData['quantity'] > $maxQty) {
-                    throw new \Exception("Jumlah retur melebihi batas untuk {$originalItem->product->product_name}");
-                }
-
-                $netPricePerUnit = $originalItem->price_per_unit;
-                foreach ($originalItem->discounts as $discount) {
-                    $netPricePerUnit *= (1 - ($discount->percentage / 100));
-                }
-
-                if ($purchaseOrder->tax) {
-                    $dppFactor = $purchaseOrder->custom_dpp_factor ?? (1 / 1.11);
-                    $taxRate = $purchaseOrder->tax->rate ?? 11;
-
-                    $dpp = round($netPricePerUnit * $dppFactor);
-                    $ppn = round($dpp * ($taxRate / 100));
-                    $totalValuePerUnit = $netPricePerUnit + $ppn;
-                } else {
-                    $totalValuePerUnit = $netPricePerUnit;
-                }
-
-                $totalReturnValue += $itemData['quantity'] * $totalValuePerUnit;
-            }
-
-            if (!$hasReturnedItems) {
-                throw new \Exception("Tidak ada item yang dipilih untuk diretur.");
-            }
-
+            // 1. Buat Header Retur
             $purchaseReturn = PurchaseReturn::create([
                 'return_number' => PurchaseReturn::generateReturnNumber(),
                 'supplier_id' => $purchaseOrder->supplier_id,
@@ -143,17 +142,23 @@ class PurchaseReturnController extends Controller
                 'return_date' => $validated['return_date'],
                 'return_handling_type' => $handlingType,
                 'notes' => $validated['notes'],
-                'total_amount' => $totalReturnValue,
+                'total_amount' => 0, 
             ]);
 
+            // 2. Loop Item
             foreach ($validated['items'] as $itemData) {
-                if (empty($itemData['quantity']) || $itemData['quantity'] <= 0) {
-                    continue;
-                }
+                if (empty($itemData['quantity']) || $itemData['quantity'] <= 0) continue;
 
                 $originalItem = PurchaseOrderItem::with('discounts')->find($itemData['item_id']);
-                $netPricePerUnit = $originalItem->price_per_unit;
+                $maxQty = $originalItem->quantity - $originalItem->quantity_returned;
+                if ($itemData['quantity'] > $maxQty) {
+                    throw new \Exception("Jumlah retur melebihi batas untuk {$originalItem->product->product_name}");
+                }
 
+                $hasReturnedItems = true;
+
+                // Hitung Nilai Retur (Berdasarkan harga beli ASLI di PO)
+                $netPricePerUnit = $originalItem->price_per_unit;
                 foreach ($originalItem->discounts as $discount) {
                     $netPricePerUnit *= (1 - ($discount->percentage / 100));
                 }
@@ -169,6 +174,7 @@ class PurchaseReturnController extends Controller
                 }
 
                 $subtotal = $itemData['quantity'] * $totalValuePerUnit;
+                $totalReturnValue += $subtotal;
 
                 $purchaseReturn->items()->create([
                     'product_id' => $originalItem->product_id,
@@ -177,17 +183,32 @@ class PurchaseReturnController extends Controller
                     'subtotal' => $subtotal,
                 ]);
 
+                // Update Counter di PO Item
                 $originalItem->increment('quantity_returned', $itemData['quantity']);
-                Product::find($originalItem->product_id)->decrement('stock_quantity', $itemData['quantity']);
+
+                // --- REVISI: UPDATE STOK ---
+                // Kurangi stok fisik. HPP tidak berubah.
+                $product = Product::lockForUpdate()->find($originalItem->product_id);
+                if ($product) {
+                    $product->decrement('stock_quantity', $itemData['quantity']);
+                }
             }
 
+            if (!$hasReturnedItems) {
+                throw new \Exception("Tidak ada item yang dipilih untuk diretur.");
+            }
 
+            $purchaseReturn->update(['total_amount' => $totalReturnValue]);
+
+            // 3. Jurnal Akuntansi
             $journalGroupId = "PUR-RET-" . $purchaseReturn->return_id;
             $description = "Retur Pembelian #" . $purchaseReturn->return_number . " untuk PO #" . $purchaseOrder->po_number;
-            $debitEntries = [];
-            $creditEntries = [];
-            $debitEntries[] = [$apAccountId, $totalReturnValue, "Potongan hutang dari retur PO #" . $purchaseOrder->po_number];
-            $creditEntries[] = [$inventoryAccountId, $totalReturnValue, "Pengembalian persediaan dari retur #" . $purchaseReturn->return_number];
+            
+            // Debit: Hutang Usaha (Mengurangi Hutang ke Supplier)
+            $debitEntries = [[$apAccountId, $totalReturnValue, "Potongan hutang dari retur PO #" . $purchaseOrder->po_number]];
+            
+            // Kredit: Persediaan (Nilai barang keluar)
+            $creditEntries = [[$inventoryAccountId, $totalReturnValue, "Pengembalian persediaan dari retur #" . $purchaseReturn->return_number]];
 
             $this->accountingService->postJournal(
                 $journalGroupId,
@@ -199,12 +220,11 @@ class PurchaseReturnController extends Controller
                 Auth::id()
             );
 
+            // 4. Handle Deposit / Deduct Invoice
             if ($handlingType === 'store_as_deposit') {
                 $ledgerStatus = ($purchaseOrder->payment_status === 'paid') ? 'available' : 'pending';
-                $description = "Deposit dari Retur Pembelian #{$purchaseReturn->return_number}";
-                if ($ledgerStatus === 'pending') {
-                    $description .= ' (Ditahan)';
-                }
+                $descLedger = "Deposit dari Retur Pembelian #{$purchaseReturn->return_number}";
+                if ($ledgerStatus === 'pending') $descLedger .= ' (Ditahan)';
 
                 $supplierLedger = SupplierLedger::create([
                     'supplier_id' => $purchaseOrder->supplier_id,
@@ -215,45 +235,44 @@ class PurchaseReturnController extends Controller
                     'type' => 'credit',
                     'amount' => $totalReturnValue,
                     'status' => $ledgerStatus,
-                    'description' => $description,
+                    'description' => $descLedger,
                     'user_id' => Auth::id(),
                 ]);
 
+                // Jika status available, jurnal pemindahan dari Retur (AP) ke Deposit (Asset)
+                // Sebenarnya jurnal diatas (Debit AP) sudah mengurangi hutang.
+                // Sekarang kita harus Debit Deposit dan Kredit AP (karena uangnya jadi deposit, bukan lunas hutang).
+                // Atau lebih simpel: Jurnal pertama tadi sudah mengurangi hutang.
+                // Jika jadi deposit, berarti: Debit Deposit, Kredit ??
+                // LOGIKA YANG BENAR:
+                // Jurnal 1 (atas): Debit AP, Kredit Inventory. (Hutang berkurang karena barang kembali).
+                // Jika store as deposit: Berarti Supplier BERHUTANG ke kita (Deposit).
+                // Maka: Debit Deposit Supplier, Kredit AP.
+                // Net effect AP: 0 (Hutang PO tetap ada, tapi kita punya Aset Deposit).
+                
                 if ($ledgerStatus === 'available') {
-                    $depositJournalGroupId = "SUP-DEP-" . $supplierLedger->ledger_id;
-                    $depositDescription = "Deposit dari retur pembelian #" . $purchaseReturn->return_number;
-
-                    $depositDebitEntries = [
-                        [$supplierDepositAccountId, $totalReturnValue, "Deposit dari retur PO #" . $purchaseOrder->po_number]
-                    ];
-                    $depositCreditEntries = [
-                        [$purchaseReturnAccountId, $totalReturnValue, "Pindah ke deposit supplier"]
-                    ];
-
                     $this->accountingService->postJournal(
-                        $depositJournalGroupId,
+                        "SUP-DEP-" . $supplierLedger->ledger_id,
                         $validated['return_date'],
-                        $depositDescription,
-                        $depositDebitEntries,
-                        $depositCreditEntries,
+                        "Deposit dari retur pembelian #" . $purchaseReturn->return_number,
+                        [[$supplierDepositAccountId, $totalReturnValue, "Deposit dari retur PO #" . $purchaseOrder->po_number]],
+                        [[$apAccountId, $totalReturnValue, "Pindah ke deposit supplier"]],
                         $supplierLedger,
                         Auth::id()
                     );
                 }
 
             } else {
+                // Deduct Invoice (Update PO Total Returned -> Mengurangi sisa hutang PO ini)
                 $totalReturDipotong = $purchaseOrder->returns()
                     ->where('return_handling_type', 'deduct_invoice')
                     ->sum('total_amount');
 
                 $purchaseOrder->update(['total_returned' => $totalReturDipotong]);
                 $purchaseOrder->refresh();
+                
                 $sisaUtang = $purchaseOrder->total_amount - $purchaseOrder->total_returned - $purchaseOrder->amount_paid;
-
-                $purchaseOrder->payment_status =
-                    $sisaUtang <= 0.01 ? 'paid' :
-                    ($purchaseOrder->amount_paid > 0 ? 'partially_paid' : 'unpaid');
-
+                $purchaseOrder->payment_status = $sisaUtang <= 0.01 ? 'paid' : ($purchaseOrder->amount_paid > 0 ? 'partially_paid' : 'unpaid');
                 $purchaseOrder->save();
             }
 
@@ -270,9 +289,7 @@ class PurchaseReturnController extends Controller
     public function show(PurchaseReturn $purchaseReturn): View
     {
         $this->authorize('view', $purchaseReturn);
-
         $purchaseReturn->load(['supplier', 'purchaseOrder', 'user', 'items.product.unit']);
-
         return view('admin.purchase_returns.show', compact('purchaseReturn'));
     }
 
@@ -281,11 +298,11 @@ class PurchaseReturnController extends Controller
         $this->authorize('delete', $purchaseReturn);
 
         DB::beginTransaction();
-
         try {
             $purchaseOrder = $purchaseReturn->purchaseOrder;
             $isDeductInvoice = $purchaseReturn->return_handling_type === 'deduct_invoice';
 
+            // Reversal Jurnal Utama
             $this->reverseAndClearJournal("PUR-RET-" . $purchaseReturn->return_id, "Reversal Retur #" . $purchaseReturn->return_number, $purchaseReturn);
 
             if ($purchaseReturn->return_handling_type === 'store_as_deposit') {
@@ -299,21 +316,24 @@ class PurchaseReturnController extends Controller
             } else {
                 if ($purchaseOrder && $purchaseOrder->payment_status === 'paid') {
                     $sisaUtang = $purchaseOrder->total_amount - $purchaseOrder->total_returned - $purchaseOrder->amount_paid;
-                    if ($sisaUtang <= 0.01) {
-                        throw new \Exception('Retur "Potong Tagihan" tidak bisa dibatalkan jika PO sudah lunas.');
-                    }
+                    // Cek safety: jika pembatalan retur menyebabkan hutang muncul kembali pada PO yang sudah lunas, itu valid.
+                    // Tidak perlu throw exception kecuali ada aturan bisnis khusus.
                 }
             }
 
             foreach ($purchaseReturn->items as $item) {
-                if ($product = Product::find($item->product_id)) {
+                // Kembalikan stok (Barang masuk lagi seolah tidak jadi retur)
+                $product = Product::withTrashed()->lockForUpdate()->find($item->product_id);
+                if ($product) {
                     $product->increment('stock_quantity', $item->quantity);
                 }
-                $originalItem = PurchaseOrderItem::where('po_id', $purchaseReturn->purchase_order_id)
+
+                // Kembalikan counter quantity_returned di PO Item
+                $poItem = PurchaseOrderItem::where('po_id', $purchaseReturn->purchase_order_id)
                     ->where('product_id', $item->product_id)
                     ->first();
-                if ($originalItem) {
-                    $originalItem->decrement('quantity_returned', $item->quantity);
+                if ($poItem) {
+                    $poItem->decrement('quantity_returned', $item->quantity);
                 }
             }
 
@@ -326,11 +346,7 @@ class PurchaseReturnController extends Controller
 
                 $purchaseOrder->update(['total_returned' => $totalReturDipotong]);
                 $sisaUtang = $purchaseOrder->total_amount - $totalReturDipotong - $purchaseOrder->amount_paid;
-
-                $purchaseOrder->payment_status =
-                    $sisaUtang <= 0.01 ? 'paid' :
-                    ($purchaseOrder->amount_paid > 0 ? 'partially_paid' : 'unpaid');
-
+                $purchaseOrder->payment_status = $sisaUtang <= 0.01 ? 'paid' : ($purchaseOrder->amount_paid > 0 ? 'partially_paid' : 'unpaid');
                 $purchaseOrder->save();
             }
 
@@ -345,24 +361,15 @@ class PurchaseReturnController extends Controller
 
     private function reverseAndClearJournal(string $journalGroupId, string $reversalDescription, $referenceModel)
     {
-        $originalJournalEntries = DB::table('general_ledgers')
-                                    ->where('journal_group_id', $journalGroupId)
-                                    ->get();
-        
-        if ($originalJournalEntries->isEmpty()) {
-            return; 
-        }
+        $originalJournalEntries = DB::table('general_ledgers')->where('journal_group_id', $journalGroupId)->get();
+        if ($originalJournalEntries->isEmpty()) return;
 
         $debitEntries = [];
         $creditEntries = [];
 
         foreach ($originalJournalEntries as $entry) {
-            if ($entry->debit > 0) {
-                $creditEntries[] = [$entry->chart_of_account_id, $entry->debit, "Reversal: " . $entry->description];
-            }
-            if ($entry->credit > 0) {
-                $debitEntries[] = [$entry->chart_of_account_id, $entry->credit, "Reversal: " . $entry->description];
-            }
+            if ($entry->debit > 0) $creditEntries[] = [$entry->chart_of_account_id, $entry->debit, "Reversal: " . $entry->description];
+            if ($entry->credit > 0) $debitEntries[] = [$entry->chart_of_account_id, $entry->credit, "Reversal: " . $entry->description];
         }
 
         if (!empty($debitEntries) || !empty($creditEntries)) {
@@ -375,7 +382,6 @@ class PurchaseReturnController extends Controller
                 $referenceModel
             );
         }
-
         DB::table('general_ledgers')->where('journal_group_id', $journalGroupId)->delete();
     }
 }

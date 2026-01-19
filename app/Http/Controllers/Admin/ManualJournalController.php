@@ -22,7 +22,7 @@ class ManualJournalController extends Controller
     public function __construct(AccountingService $accountingService)
     {
         $this->accountingService = $accountingService;
-        $this->middleware('can:manage-settings'); 
+        $this->middleware('can:manage-manual-journals');
     }
 
     public function index(Request $request): View

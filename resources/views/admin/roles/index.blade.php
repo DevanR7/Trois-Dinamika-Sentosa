@@ -1,85 +1,140 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Manajemen Role')
+@section('title', 'Manajemen Role & Akses')
 
 @section('content')
 
-    {{-- HEADER & ACTIONS --}}
-    <div class="page-header">
+    {{-- 1. PAGE HEADER --}}
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-            <h1 class="page-title">Manajemen Role</h1>
-            <p class="page-subtitle">Atur hak akses pengguna dalam sistem.</p>
+            <h1 class="text-2xl font-bold text-slate-800 dark:text-white tracking-tight">Manajemen Role</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Atur hak akses pengguna (Permissions) berdasarkan Role.
+            </p>
         </div>
-        <div class="flex items-center gap-3">
-            <a href="{{ route('admin.roles.create') }}" class="btn btn-primary">
-                <i class="material-icons text-sm mr-1">add_moderator</i> Tambah Role
-            </a>
+
+        <div class="flex flex-wrap gap-3">
+            @can('manage-roles')
+                <a href="{{ route('admin.roles.create') }}" class="btn btn-primary">
+                    <i class="material-icons text-[18px]">add_moderator</i>
+                    <span>Buat Role Baru</span>
+                </a>
+            @endcan
         </div>
     </div>
 
-    {{-- TABLE DATA --}}
-    <div class="card">
-        <div class="table-container">
+    {{-- 2. LIST DATA --}}
+    <div class="card border-0 shadow-none bg-transparent">
+        <div class="table-container bg-white dark:bg-slate-800 shadow-sm rounded-xl border border-slate-200 dark:border-slate-700">
             <table class="table-modern">
                 <thead>
                     <tr>
-                        <th class="w-16 text-center">#</th>
-                        <th>Nama Role</th>
-                        <th>Guard</th>
-                        <th>Jumlah Permission</th>
-                        <th>Pengguna Terkait</th>
-                        <th class="text-center w-36">Aksi</th>
+                        <th class="w-14 text-center">No</th>
+                        <th class="w-48">Nama Role</th>
+                        <th>Permissions (Hak Akses)</th>
+                        <th class="text-center w-32">Users</th>
+                        <th class="text-right sticky right-0 z-10 bg-slate-50 dark:bg-slate-800/50 backdrop-blur-sm w-28 px-4">
+                            Aksi
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($roles as $index => $role)
-                        <tr>
-                            <td class="text-center text-slate-500">{{ $roles->firstItem() + $index }}</td>
-                            <td>
-                                <div class="font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wide">
-                                    {{ $role->name }}
+                        <tr class="group hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                            
+                            {{-- No --}}
+                            <td class="text-center text-slate-400 text-xs">
+                                {{ $roles->firstItem() + $index }}
+                            </td>
+
+                            {{-- Nama Role --}}
+                            <td class="align-top pt-4">
+                                <div class="flex flex-col">
+                                    <span class="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
+                                        <i class="material-icons text-[16px] text-indigo-500">verified_user</i>
+                                        {{ ucfirst($role->name) }}
+                                    </span>
+                                    <span class="text-[10px] text-slate-400 mt-1 font-mono">
+                                        {{ $role->guard_name }}
+                                    </span>
                                 </div>
                             </td>
-                            <td>
-                                <span class="badge badge-primary font-mono text-xs">{{ $role->guard_name }}</span>
+
+                            {{-- Permissions (Logic Truncate) --}}
+                            <td class="align-top pt-4 pb-4">
+                                @php
+                                    $allPermissions = $role->permissions;
+                                    $totalCount = $allPermissions->count();
+                                    $limit = 5; // Jumlah maksimal badge yang tampil
+                                    $showPermissions = $allPermissions->take($limit);
+                                    $remaining = $totalCount - $limit;
+                                @endphp
+
+                                <div class="flex flex-col gap-2">
+                                    {{-- Total Count Label --}}
+                                    <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                        Total: {{ $totalCount }} Hak Akses
+                                    </span>
+
+                                    {{-- Badge List --}}
+                                    <div class="flex flex-wrap gap-1.5">
+                                        @foreach($showPermissions as $perm)
+                                            <span class="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600">
+                                                {{ $perm->name }}
+                                            </span>
+                                        @endforeach
+
+                                        {{-- Badge Sisa (+) --}}
+                                        @if($remaining > 0)
+                                            <span class="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800" title="Dan {{ $remaining }} permission lainnya...">
+                                                +{{ $remaining }} Lainnya
+                                            </span>
+                                        @endif
+
+                                        @if($totalCount === 0)
+                                            <span class="text-xs text-slate-400 italic">Tidak ada permission khusus.</span>
+                                        @endif
+                                    </div>
+                                </div>
                             </td>
-                            <td>
-                                <span class="badge {{ $role->permissions->count() > 0 ? 'badge-success' : 'badge-warning' }}">
-                                    {{ $role->permissions->count() }} Akses
+
+                            {{-- Jumlah User --}}
+                            <td class="text-center align-top pt-4">
+                                <span class="badge bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300">
+                                    {{ $role->users_count ?? $role->users()->count() }} Users
                                 </span>
                             </td>
-                            <td>
-                                <div class="text-sm text-slate-600 dark:text-slate-400">
-                                    {{ $role->users()->count() }} User
-                                </div>
-                            </td>
-                            <td class="text-center">
-                                <div class="flex items-center justify-center gap-2">
-                                    
-                                    {{-- Edit Button --}}
-                                    <a href="{{ route('admin.roles.edit', $role->id) }}" 
-                                       class="w-9 h-9 rounded-full flex items-center justify-center bg-indigo-50 border border-transparent text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors shadow-sm dark:bg-indigo-900/30 dark:text-indigo-400"
-                                       title="Edit Akses">
-                                        <i class="material-icons text-[18px] leading-none">manage_accounts</i>
-                                    </a>
 
-                                    {{-- Delete Button (Proteksi Admin) --}}
+                            {{-- Aksi --}}
+                            <td class="text-right align-top pt-4 sticky right-0 bg-white dark:bg-slate-800 border-l border-slate-100 dark:border-slate-700/50 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/30 transition-colors z-10 px-4">
+                                <div class="flex items-center justify-end gap-2">
+                                    
+                                    {{-- Edit --}}
+                                    @can('manage-roles')
+                                        <a href="{{ route('admin.roles.edit', $role->id) }}" class="btn-action btn-action-edit" title="Edit Role & Permission">
+                                            <i class="material-icons">edit_note</i>
+                                        </a>
+                                    @endcan
+
+                                    {{-- Delete (Proteksi Admin/Superadmin) --}}
                                     @if(!in_array($role->name, ['admin', 'superadmin']))
-                                        <button type="button" onclick="confirmDelete('{{ $role->id }}', '{{ $role->name }}')" 
-                                                class="w-9 h-9 rounded-full flex items-center justify-center bg-rose-50 border border-transparent text-rose-600 hover:bg-rose-600 hover:text-white transition-colors shadow-sm dark:bg-rose-900/30 dark:text-rose-400"
-                                                title="Hapus Role">
-                                            <i class="material-icons text-[18px] leading-none">delete</i>
-                                        </button>
-                                        
-                                        <form id="delete-form-{{ $role->id }}" 
-                                              action="{{ route('admin.roles.destroy', $role->id) }}" 
-                                              method="POST" class="hidden">
-                                            @csrf
-                                            @method('DELETE')
-                                        </form>
+                                        @can('manage-roles')
+                                            <form action="{{ route('admin.roles.destroy', $role->id) }}" method="POST" class="inline-block m-0">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="button" 
+                                                        class="btn-action btn-action-delete" 
+                                                        title="Hapus Role"
+                                                        onclick="handleAction(this, 'Hapus Role?', 'Pastikan tidak ada user yang menggunakan role ini. Tindakan ini permanen.', 'danger')">
+                                                    <i class="material-icons">delete</i>
+                                                </button>
+                                            </form>
+                                        @endcan
                                     @else
-                                        {{-- Spacer jika tombol delete tidak ada agar kolom tetap rapi --}}
-                                        <div class="w-9 h-9"></div> 
+                                        {{-- Disabled Button untuk Admin/Superadmin --}}
+                                        <button type="button" class="btn-action opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400" title="Role Sistem (Tidak bisa dihapus)">
+                                            <i class="material-icons">lock</i>
+                                        </button>
                                     @endif
 
                                 </div>
@@ -87,10 +142,11 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center p-8">
-                                <div class="flex flex-col items-center justify-center text-slate-400">
-                                    <i class="material-icons text-5xl mb-2">lock_open</i>
-                                    <span>Belum ada role yang dibuat.</span>
+                            <td colspan="5" class="text-center py-12">
+                                <div class="flex flex-col items-center justify-center opacity-60">
+                                    <i class="material-icons text-4xl text-slate-300 mb-2">lock_person</i>
+                                    <h3 class="text-slate-800 dark:text-white font-medium text-lg">Belum ada Role</h3>
+                                    <p class="text-slate-500 text-sm mt-1">Silakan tambahkan role baru untuk mengatur akses user.</p>
                                 </div>
                             </td>
                         </tr>
@@ -98,31 +154,38 @@
                 </tbody>
             </table>
         </div>
-        
-        <div class="card-footer">
+
+        {{-- Pagination --}}
+        <div class="mt-6">
             {{ $roles->links() }}
         </div>
     </div>
 
-@endsection
-
-@push('scripts')
-<script>
-    function confirmDelete(id, name) {
-        window.confirmDialog({
-            title: 'Hapus Role?',
-            text: "Role '" + name + "' akan dihapus permanen. Pastikan tidak ada user yang menggunakan role ini.",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#ef4444',
-            cancelButtonColor: '#64748b',
-            confirmButtonText: 'Ya, Hapus!',
-            cancelButtonText: 'Batal'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                document.getElementById('delete-form-' + id).submit();
+    {{-- Script Handle Action --}}
+    @push('scripts')
+    <script>
+        function handleAction(button, title, text, type) {
+            event.preventDefault();
+            const form = button.closest('form');
+            
+            if (typeof window.confirmDialog === 'function') {
+                window.confirmDialog({
+                    title: title,
+                    text: text,
+                    icon: type === 'danger' ? 'error' : type,
+                    confirmButtonText: 'Ya, Lanjutkan',
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: type
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        form.submit();
+                    }
+                });
+            } else {
+                if(confirm(text)) form.submit();
             }
-        });
-    }
-</script>
-@endpush
+        }
+    </script>
+    @endpush
+
+@endsection

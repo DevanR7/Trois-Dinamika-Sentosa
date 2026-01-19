@@ -13,6 +13,7 @@ return new class extends Migration
             $table->string('google_id')->nullable()->unique();
             $table->string('client_name', 150);
             $table->string('email', 100)->unique()->nullable();
+            $table->string('avatar_path')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password')->nullable();
             $table->boolean('is_approved')->default(false);

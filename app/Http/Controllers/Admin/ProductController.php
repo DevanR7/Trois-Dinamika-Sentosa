@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\Category;
 use App\Models\Unit;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
@@ -11,15 +12,32 @@ use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Intervention\Image\Laravel\Facades\Image; // Pastikan library sudah terinstall
 
 class ProductController extends Controller
 {
+    public function __construct()
+    {
+        // Middleware Permission
+        $this->middleware('can:view-products')->only(['index', 'show']); 
+        $this->middleware('can:create-products')->only(['create', 'store']);
+        $this->middleware('can:edit-products')->only(['edit', 'update']);
+        $this->middleware('can:delete-products')->only(['destroy', 'restore', 'forceDelete']);
+    }
+    
+    /**
+     * Menampilkan daftar produk dengan filter dan sorting.
+     */
     public function index(Request $request): View
     {
-        $this->authorize('viewAny', Product::class);
+        $query = Product::with(['unit', 'supplier', 'category']);
 
-        $query = Product::with('unit');
+        // Filter: Sampah (Arsip)
+        if ($request->get('status') === 'trash') {
+            $query->onlyTrashed();
+        }
 
+        // Filter: Pencarian (Kode atau Nama)
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -28,6 +46,7 @@ class ProductController extends Controller
             });
         }
 
+        // Filter: Sorting
         if ($request->filled('sort')) {
             switch ($request->sort) {
                 case 'A-Z':
@@ -42,6 +61,7 @@ class ProductController extends Controller
                 case 'stok-sedikit':
                     $query->orderBy('stock_quantity', 'asc');
                     break;
+                case 'terbaru':
                 default:
                     $query->latest('product_id');
             }
@@ -50,95 +70,229 @@ class ProductController extends Controller
         }
 
         $products = $query->paginate(12)->appends($request->query());
-
         return view('admin.products.index', compact('products'));
     }
 
-    public function create(): View
+    /**
+     * Form Tambah Produk.
+     */
+    public function create()
     {
-        $this->authorize('create', Product::class);
-
-        $units = Unit::all();
-        $suppliers = Supplier::all();
-
-        return view('admin.products.create', compact('units', 'suppliers'));
+        $categories = Category::where('is_active', true)->orderBy('name')->get();
+        $units = Unit::orderBy('name')->get();
+        $suppliers = Supplier::orderBy('supplier_name')->get();
+        
+        return view('admin.products.create', compact('categories', 'units', 'suppliers'));
     }
 
+    /**
+     * Simpan Produk Baru.
+     */
     public function store(Request $request): RedirectResponse
     {
-        $this->authorize('create', Product::class);
-
         $validated = $request->validate([
             'supplier_id' => 'required|exists:suppliers,supplier_id',
             'product_code' => 'required|string|max:50|unique:products,product_code',
+            'category_id'  => 'nullable|exists:categories,category_id',
             'product_name' => 'required|string|max:200',
             'purchase_price' => 'nullable|numeric|min:0',
             'selling_price' => 'nullable|numeric|min:0',
             'stock_quantity' => 'nullable|integer|min:0',
             'unit_id' => 'required|exists:units,unit_id',
             'description' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            // Validasi Gambar: Max 10MB
+            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:10240', 
+            'is_active' => 'nullable', 
         ]);
 
+        // Fix: Checkbox Status (Jika tidak dicentang, request tidak mengirim key ini)
+        $validated['is_active'] = $request->has('is_active');
+
+        // Logic Upload & Crop Image (1:1 Ratio)
         if ($request->hasFile('image')) {
-            $validated['image_path'] = $request->file('image')->store('product-images', 'public');
+            $image = $request->file('image');
+            $filename = 'products/' . uniqid() . '.' . $image->getClientOriginalExtension();
+            
+            // Baca gambar -> Crop Square (1:1) -> Resize 800x800 (Optimization)
+            $img = Image::read($image);
+            $img->cover(800, 800); 
+            
+            // Simpan ke Storage Public
+            Storage::disk('public')->put($filename, (string) $img->encode());
+            $validated['image_path'] = $filename;
         }
 
+        // Set HPP Awal sama dengan Harga Beli
+        $validated['average_cost'] = $validated['purchase_price'] ?? 0;
+        
         Product::create($validated);
 
         return redirect()->route('admin.products.index')->with('success', 'Produk baru berhasil ditambahkan!');
     }
 
+    /**
+     * Detail Produk & Statistik.
+     */
     public function show(Product $product): View
     {
-        $this->authorize('view', $product);
+        $product->load([
+            'unit', 
+            'supplier', 
+            'stockOpnameItems.opname.user',
+            'invoiceItems'
+        ]);
 
-        return view('admin.products.show', compact('product'));
+        // Hitung Statistik
+        $totalSold = $product->invoiceItems->sum('quantity');
+        $totalRevenue = $product->invoiceItems->sum('subtotal');
+        
+        // Hitung Margin Profit
+        $marginPerUnit = $product->selling_price - $product->average_cost;
+        $marginPercentage = $product->selling_price > 0 ? ($marginPerUnit / $product->selling_price) * 100 : 0;
+        $markupPercentage = $product->average_cost > 0 ? ($marginPerUnit / $product->average_cost) * 100 : 100;
+        
+        // Potensi Profit dari stok yang ada
+        $potentialProfit = $product->stock_quantity * $marginPerUnit;
+
+        return view('admin.products.show', compact(
+            'product', 
+            'totalSold', 
+            'totalRevenue', 
+            'marginPerUnit', 
+            'marginPercentage', 
+            'markupPercentage',
+            'potentialProfit'
+        ));
     }
 
-    public function edit(Product $product): View
+    /**
+     * Form Edit Produk.
+     */
+    public function edit(Product $product)
     {
-        $this->authorize('update', $product);
-
+        $categories = Category::where('is_active', true)->orderBy('name')->get();
         $units = Unit::all();
         $suppliers = Supplier::all();
-
-        return view('admin.products.edit', compact('product', 'units', 'suppliers'));
+        
+        return view('admin.products.edit', compact('product', 'categories', 'units', 'suppliers'));
     }
 
+    /**
+     * Update Produk.
+     */
     public function update(Request $request, Product $product): RedirectResponse
     {
-        $this->authorize('update', $product);
-
         $validated = $request->validate([
             'product_code' => ['required', 'string', 'max:50', Rule::unique('products')->ignore($product->product_id, 'product_id')],
             'product_name' => 'required|string|max:200',
+            'category_id'  => 'nullable|exists:categories,category_id',
+            'supplier_id'  => 'required|exists:suppliers,supplier_id',
+            'unit_id'      => 'required|exists:units,unit_id', // Unit bebas diedit
             'purchase_price' => 'nullable|numeric|min:0',
             'selling_price' => 'nullable|numeric|min:0',
-            'stock_quantity' => 'nullable|integer|min:0',
-            'unit_id' => 'required|exists:units,unit_id',
+            'stock_quantity' => 'required|numeric|min:0',
             'description' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:10240', // Max 10MB
+            'is_active' => 'nullable',
         ]);
 
+        // Fix: Status Aktif/Non-Aktif
+        $validated['is_active'] = $request->has('is_active');
+
+        // Logic Update Gambar & Crop
         if ($request->hasFile('image')) {
+            // Hapus gambar lama jika ada
             if ($product->image_path) {
                 Storage::disk('public')->delete($product->image_path);
             }
-            $validated['image_path'] = $request->file('image')->store('product-images', 'public');
+
+            $image = $request->file('image');
+            $filename = 'products/' . uniqid() . '.' . $image->getClientOriginalExtension();
+            
+            // Proses Crop 1:1
+            $img = Image::read($image);
+            $img->cover(800, 800); 
+            
+            Storage::disk('public')->put($filename, (string) $img->encode());
+            $validated['image_path'] = $filename;
         }
 
         $product->update($validated);
-
-        return redirect()->route('admin.products.index')->with('success', 'Produk berhasil diupdate!');
+        return redirect()->route('admin.products.index')->with('success', 'Produk berhasil diperbarui!');
     }
 
+    /**
+     * Soft Delete (Pindah ke Sampah).
+     */
     public function destroy(Product $product): RedirectResponse
     {
-        $this->authorize('delete', $product);
+        // Validasi: Stok harus 0
+        if ($product->stock_quantity > 0) {
+            return back()->with('error', 'Gagal: Produk masih memiliki stok fisik.');
+        }
         
-        $product->delete();
+        // Validasi: Tidak sedang digunakan di transaksi Pending
+        $hasPendingInvoice = \App\Models\InvoiceItem::where('product_id', $product->product_id)
+            ->whereHas('salesInvoice', function($q) {
+                $q->whereIn('status', ['draft', 'unpaid', 'partially_paid']);
+            })->exists();
+        
+        $hasPendingPO = \App\Models\PurchaseOrderItem::where('product_id', $product->product_id)
+            ->whereHas('purchaseOrder', function($q) {
+                $q->whereIn('status', ['draft', 'ordered']);
+            })->exists();
 
-        return redirect()->route('admin.products.index')->with('success', 'Produk berhasil dihapus!');
+        if ($hasPendingInvoice || $hasPendingPO) {
+            return back()->with('error', 'Gagal: Produk sedang digunakan dalam transaksi aktif (Invoice/PO) yang belum selesai.');
+        }
+
+        $product->delete();
+        return redirect()->route('admin.products.index')->with('success', 'Produk berhasil dipindahkan ke sampah.');
+    }
+
+    /**
+     * Restore (Pulihkan dari Sampah).
+     */
+    public function restore($id): RedirectResponse
+    {
+        $product = Product::onlyTrashed()->findOrFail($id);
+        $product->restore();
+        return redirect()->route('admin.products.index', ['status' => 'trash'])
+            ->with('success', "Produk '{$product->product_name}' berhasil dipulihkan.");
+    }
+
+    /**
+     * Force Delete (Hapus Permanen).
+     */
+    public function forceDelete($id): RedirectResponse
+    {
+        $product = Product::onlyTrashed()->findOrFail($id);
+        
+        // Cek Integritas Data (Riwayat Transaksi)
+        $hasHistory = $product->invoiceItems()->exists() || 
+                      $product->stockOpnameItems()->exists() ||
+                      \Illuminate\Support\Facades\DB::table('purchase_order_items')->where('product_id', $id)->exists();
+
+        if ($hasHistory) {
+            return back()->with('error', 'Gagal: Produk ini memiliki riwayat transaksi (Penjualan/Pembelian/Opname). Tidak bisa dihapus permanen demi integritas laporan. Biarkan di sampah (Arsip).');
+        }
+
+        // Hapus Gambar Fisik
+        if ($product->image_path) {
+            Storage::disk('public')->delete($product->image_path);
+        }
+
+        $product->forceDelete();
+        return redirect()->route('admin.products.index', ['status' => 'trash'])
+            ->with('success', 'Produk berhasil dihapus permanen.');
+    }
+
+    public function toggleStatus(Product $product): RedirectResponse
+    {
+        // Toggle nilai is_active (true jadi false, false jadi true)
+        $product->update(['is_active' => !$product->is_active]);
+    
+        $status = $product->is_active ? 'diaktifkan' : 'dinonaktifkan';
+        return back()->with('success', "Produk '{$product->product_name}' berhasil {$status}.");
     }
 }

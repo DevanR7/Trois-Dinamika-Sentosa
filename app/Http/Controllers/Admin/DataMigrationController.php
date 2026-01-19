@@ -11,7 +11,12 @@ use App\Exports\TemplateProductExport;
 use App\Exports\TemplateClientExport;
 
 class DataMigrationController extends Controller
-{
+{   
+    public function __construct()
+    {
+        $this->middleware('can:manage-data-migration');
+    }
+
     public function index()
     {
         return view('admin.data_migration.index');

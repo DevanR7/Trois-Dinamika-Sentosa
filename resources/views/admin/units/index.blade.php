@@ -3,105 +3,163 @@
 @section('title', 'Manajemen Satuan')
 
 @section('content')
-
-    {{-- HEADER & ACTIONS --}}
+    {{-- Header --}}
     <div class="page-header">
         <div>
-            <h1 class="page-title">Satuan Unit</h1>
-            <p class="page-subtitle">Kelola satuan barang (Pcs, Kg, Box, dll).</p>
+            <h1 class="page-title">Manajemen Satuan</h1>
+            <p class="page-subtitle">Kelola satuan produk (Pcs, Kg, Box, dll)</p>
         </div>
-        <div class="flex items-center gap-3">
+        <div>
             <a href="{{ route('admin.units.create') }}" class="btn btn-primary">
-                <i class="material-icons text-sm mr-1">add</i> Tambah Satuan
+                <i class="material-icons text-[18px]">add</i>
+                Tambah Satuan
             </a>
         </div>
     </div>
 
-    {{-- TABLE DATA --}}
-    <div class="card max-w-4xl">
+    {{-- Filter & Search --}}
+    <div class="card mb-6">
+        <div class="card-body">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                {{-- Tabs Status --}}
+                <div class="flex bg-slate-100 dark:bg-slate-700/50 rounded-lg p-1">
+                    <a href="{{ route('admin.units.index') }}" 
+                       class="px-4 py-2 text-xs font-bold rounded-md transition-all {{ request('status') !== 'trash' ? 'bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300' }}">
+                        Aktif
+                    </a>
+                    <a href="{{ route('admin.units.index', ['status' => 'trash']) }}" 
+                       class="px-4 py-2 text-xs font-bold rounded-md transition-all {{ request('status') === 'trash' ? 'bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300' }}">
+                        Sampah ({{ \App\Models\Unit::onlyTrashed()->count() }})
+                    </a>
+                </div>
+
+                {{-- Search --}}
+                <form action="{{ route('admin.units.index') }}" method="GET" class="w-full md:w-auto">
+                    @if(request('status') === 'trash')
+                        <input type="hidden" name="status" value="trash">
+                    @endif
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="material-icons text-slate-400 text-[18px]">search</i>
+                        </div>
+                        <input type="text" name="search" class="form-input pl-10 w-full md:w-64" 
+                               placeholder="Cari nama satuan..." 
+                               value="{{ request('search') }}">
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- Data Table --}}
+    <div class="card card-plain">
         <div class="table-container">
             <table class="table-modern">
                 <thead>
                     <tr>
-                        <th class="w-16 text-center">#</th>
+                        <th class="w-16">#</th>
                         <th>Nama Satuan</th>
-                        <th class="text-center w-36">Aksi</th>
+                        <th>Status</th>
+                        <th>Terakhir Diupdate</th>
+                        <th class="w-32 text-end">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($units as $index => $unit)
-                        <tr>
-                            <td class="text-center text-slate-500">{{ $units->firstItem() + $index }}</td>
-                            <td>
-                                <div class="font-bold text-slate-700 dark:text-slate-200">
-                                    {{ $unit->name }}
-                                </div>
-                            </td>
-                            <td class="text-center">
-                                <div class="flex items-center justify-center gap-2">
+                    @forelse($units as $unit)
+                    <tr>
+                        <td>{{ $loop->iteration + $units->firstItem() - 1 }}</td>
+                        <td>
+                            <span class="font-bold text-slate-700 dark:text-slate-200">{{ $unit->name }}</span>
+                        </td>
+                        <td>
+                            @if($unit->is_active)
+                                <span class="badge badge-success">Aktif</span>
+                            @else
+                                <span class="badge badge-secondary">Non-Aktif</span>
+                            @endif
+                        </td>
+                        <td>
+                            <div class="text-xs text-slate-500">
+                                {{ $unit->updated_at->format('d M Y, H:i') }}
+                            </div>
+                        </td>
+                        <td class="text-end">
+                            <div class="flex items-center justify-end gap-2">
+                                @if(request('status') === 'trash')
+                                    {{-- Restore Button --}}
+                                    <form action="{{ route('admin.units.restore', $unit->unit_id) }}" method="POST">
+                                        @csrf
+                                        @method('PATCH')
+                                        <button type="submit" class="btn-action btn-action-restore" title="Pulihkan">
+                                            <i class="material-icons">restore</i>
+                                        </button>
+                                    </form>
                                     
-                                    {{-- Edit Button --}}
-                                    <a href="{{ route('admin.units.edit', $unit->unit_id) }}" 
-                                       class="w-9 h-9 rounded-full flex items-center justify-center bg-indigo-50 border border-transparent text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors shadow-sm dark:bg-indigo-900/30 dark:text-indigo-400"
-                                       title="Edit">
-                                        <i class="material-icons text-[18px] leading-none">edit</i>
-                                    </a>
-
-                                    {{-- Delete Button --}}
-                                    <button type="button" onclick="confirmDelete('{{ $unit->unit_id }}', '{{ $unit->name }}')" 
-                                            class="w-9 h-9 rounded-full flex items-center justify-center bg-rose-50 border border-transparent text-rose-600 hover:bg-rose-600 hover:text-white transition-colors shadow-sm dark:bg-rose-900/30 dark:text-rose-400"
-                                            title="Hapus">
-                                        <i class="material-icons text-[18px] leading-none">delete</i>
+                                    {{-- Force Delete Button --}}
+                                    <button type="button" 
+                                            class="btn-action btn-action-delete"
+                                            title="Hapus Permanen"
+                                            onclick="confirmDialog({
+                                                title: 'Hapus Permanen?',
+                                                text: 'Data satuan ini akan dihapus selamanya dan tidak dapat dikembalikan!',
+                                                icon: 'warning',
+                                                confirmText: 'Ya, Hapus Permanen',
+                                                confirmColor: 'danger'
+                                            }).then((result) => {
+                                                if (result.isConfirmed) document.getElementById('force-delete-{{ $unit->unit_id }}').submit();
+                                            })">
+                                        <i class="material-icons">delete_forever</i>
                                     </button>
-                                    
-                                    <form id="delete-form-{{ $unit->unit_id }}" 
-                                          action="{{ route('admin.units.destroy', $unit->unit_id) }}" 
-                                          method="POST" class="hidden">
+                                    <form id="force-delete-{{ $unit->unit_id }}" action="{{ route('admin.units.forceDelete', $unit->unit_id) }}" method="POST" class="hidden">
                                         @csrf
                                         @method('DELETE')
                                     </form>
+                                @else
+                                    {{-- Edit Button --}}
+                                    <a href="{{ route('admin.units.edit', $unit->unit_id) }}" class="btn-action btn-action-edit" title="Edit">
+                                        <i class="material-icons">edit</i>
+                                    </a>
 
-                                </div>
-                            </td>
-                        </tr>
+                                    {{-- Soft Delete Button --}}
+                                    <button type="button" 
+                                            class="btn-action btn-action-delete"
+                                            title="Arsipkan"
+                                            onclick="confirmDialog({
+                                                title: 'Arsipkan Satuan?',
+                                                text: 'Satuan ini akan dipindahkan ke sampah.',
+                                                icon: 'question',
+                                                confirmText: 'Ya, Arsipkan',
+                                                confirmColor: 'danger'
+                                            }).then((result) => {
+                                                if (result.isConfirmed) document.getElementById('delete-form-{{ $unit->unit_id }}').submit();
+                                            })">
+                                        <i class="material-icons">delete_outline</i>
+                                    </button>
+                                    <form id="delete-form-{{ $unit->unit_id }}" action="{{ route('admin.units.destroy', $unit->unit_id) }}" method="POST" class="hidden">
+                                        @csrf
+                                        @method('DELETE')
+                                    </form>
+                                @endif
+                            </div>
+                        </td>
+                    </tr>
                     @empty
-                        <tr>
-                            <td colspan="3" class="text-center p-8">
-                                <div class="flex flex-col items-center justify-center text-slate-400">
-                                    <i class="material-icons text-5xl mb-2">straighten</i>
-                                    <span>Belum ada data satuan.</span>
-                                </div>
-                            </td>
-                        </tr>
+                    <tr>
+                        <td colspan="5" class="text-center py-8">
+                            <div class="flex flex-col items-center justify-center text-slate-400">
+                                <i class="material-icons text-4xl mb-2">straighten</i>
+                                <p class="text-sm">Tidak ada data satuan ditemukan.</p>
+                            </div>
+                        </td>
+                    </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
-        
-        <div class="card-footer">
-            {{ $units->links() }}
+
+        {{-- Pagination --}}
+        <div class="p-4 border-t border-slate-100 dark:border-slate-700">
+            {{ $units->links('vendor.pagination.admin') }}
         </div>
     </div>
-
 @endsection
-
-@push('scripts')
-<script>
-    function confirmDelete(id, name) {
-        window.confirmDialog({
-            title: 'Hapus Satuan?',
-            text: "Satuan '" + name + "' akan dihapus permanen. Pastikan tidak ada produk yang menggunakannya.",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#ef4444',
-            cancelButtonColor: '#64748b',
-            confirmButtonText: 'Ya, Hapus!',
-            cancelButtonText: 'Batal'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                document.getElementById('delete-form-' + id).submit();
-            }
-        });
-    }
-</script>
-@endpush

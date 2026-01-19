@@ -13,7 +13,7 @@ class PaymentMethodController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('permission:manage-payment-methods');
+        $this->middleware('can:manage-payment-methods');
     }
 
     public function index(): View
@@ -52,30 +52,62 @@ class PaymentMethodController extends Controller
         return view('admin.payment_methods.edit', compact('paymentMethod'));
     }
 
-    public function update(Request $request, PaymentMethod $paymentMethod): RedirectResponse
+    public function update(Request $request, $id): RedirectResponse
     {
+        // 1. Cari Data Manual (Menghindari masalah Route Model Binding)
+        $paymentMethod = PaymentMethod::where('payment_method_id', $id)->firstOrFail();
+
+        // 2. Normalisasi Input Checkbox & Boolean
+        // Form mengirim string "0" atau "1", kita ubah jadi boolean murni untuk database
+        $isActive = $request->input('is_active') == '1';
+
+        // 3. Validasi
         $validated = $request->validate([
             'name' => [
-                'required',
-                'string',
+                'required', 
+                'string', 
                 'max:255',
-                Rule::unique('payment_methods')->ignore($paymentMethod->payment_method_id, 'payment_method_id'),
+                // Pastikan ignore ID menggunakan nama kolom primary key yang benar
+                Rule::unique('payment_methods', 'name')->ignore($paymentMethod->payment_method_id, 'payment_method_id'),
             ],
             'type' => 'required|in:direct,pending,gateway',
-            'is_active' => 'required|boolean',
-            'client_input_config' => 'required|in:none,proof_only,reference_only,proof_and_reference',
-            'client_status_default' => 'required|in:completed,pending_verification',
-            'internal_input_config' => 'required|in:none,proof_only,reference_only,proof_and_reference',
-            'internal_status_default' => 'required|in:completed,pending_verification',
+            'description' => 'nullable|string|max:1000',
+            
+            // Validasi Config (Boleh nullable jika tidak diisi)
+            'client_input_config' => 'nullable|in:none,proof_only,reference_only,proof_and_reference',
+            'client_status_default' => 'nullable|in:completed,pending,pending_verification',
+            
+            'internal_input_config' => 'nullable|in:none,proof_only,reference_only,proof_and_reference',
+            'internal_status_default' => 'nullable|in:completed,pending,pending_verification',
         ]);
 
-        $paymentMethod->update($validated);
+        // 4. Update Data
+        try {
+            $paymentMethod->update([
+                'name' => $validated['name'],
+                'type' => $validated['type'],
+                'description' => $validated['description'] ?? null,
+                
+                // Gunakan nilai default jika null (terutama jika tipe Gateway)
+                'client_input_config' => $validated['client_input_config'] ?? 'none',
+                'client_status_default' => $validated['client_status_default'] ?? 'pending',
+                'internal_input_config' => $validated['internal_input_config'] ?? 'none',
+                'internal_status_default' => $validated['internal_status_default'] ?? 'completed',
+                
+                'is_active' => $isActive, // Pakai variabel yang sudah dinormalisasi
+            ]);
 
-        return redirect()
-            ->route('admin.payment-methods.index')
-            ->with('success', 'Metode pembayaran berhasil diperbarui.');
+            return redirect()
+                ->route('admin.payment-methods.index')
+                ->with('success', 'Metode pembayaran berhasil diperbarui.');
+                
+        } catch (\Exception $e) {
+            // Jika ada error database, kembalikan ke form dengan pesan
+            return back()
+                ->withInput()
+                ->with('error', 'Gagal menyimpan: ' . $e->getMessage());
+        }
     }
-
     public function destroy(PaymentMethod $paymentMethod): RedirectResponse
     {
         try {
@@ -90,13 +122,17 @@ class PaymentMethodController extends Controller
         }
     }
 
-    public function archivedIndex(): View
+    public function archivedIndex(Request $request)
     {
-        $archivedMethods = PaymentMethod::onlyTrashed()
-            ->orderBy('deleted_at', 'desc')
-            ->get();
+        $query = \App\Models\PaymentMethod::onlyTrashed();
 
-        return view('admin.payment_methods.archive', compact('archivedMethods'));
+        if ($request->filled('search')) {
+            $query->where('name', 'like', '%' . $request->search . '%');
+        }
+
+        $paymentMethods = $query->orderBy('deleted_at', 'desc')->paginate(10);
+
+        return view('admin.payment_methods.archive', compact('paymentMethods'));
     }
 
     public function restore($id): RedirectResponse

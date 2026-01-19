@@ -16,7 +16,7 @@ class BankReconciliationController extends Controller
 {
     public function __construct()
     {
-        // $this->middleware('can:manage-finance'); 
+        $this->middleware('can:manage-finance');
     }
 
     public function index(): View

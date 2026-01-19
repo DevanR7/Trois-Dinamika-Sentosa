@@ -9,10 +9,11 @@ use App\Models\PurchaseOrder;
 use App\Models\User;
 use App\Models\PaymentMethod;
 use App\Models\CompanyBankAccount;
+use App\Traits\LogsActivity;
 
 class PurchaseOrderPayment extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $fillable = [
         'po_id', 

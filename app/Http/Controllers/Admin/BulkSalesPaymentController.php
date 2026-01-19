@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\SalesInvoice;
-use App\Models\BulkSalesPayment; 
+use App\Models\BulkSalesPayment;
 use App\Models\ClientLedger;
 use App\Models\PaymentMethod;
+use App\Models\Payment;
 use App\Models\User;
 use App\Models\CompanyBankAccount;
+use App\Models\GeneralLedger; // Tambahkan ini
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -17,11 +19,15 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
 use App\Services\AccountingService;
 use App\Services\AccountingSettingService;
+use App\Traits\ValidatesAccountingPeriod;
 
 class BulkSalesPaymentController extends Controller
 {
+    use ValidatesAccountingPeriod;
+
     protected $accountingService;
     protected $accountingSettings;
 
@@ -31,44 +37,62 @@ class BulkSalesPaymentController extends Controller
     ) {
         $this->accountingService = $accountingService;
         $this->accountingSettings = $accountingSettingService;
-        $this->middleware('permission:create-batch-payments')->only(['create', 'store', 'getUnpaidInvoicesApi']);
-        $this->middleware('permission:review-batch-payments')->only(['pending', 'showPending', 'approve', 'reject']);
+        
+        // Permission middleware
+        $this->middleware('can:create-bulk-payments')->only(['create', 'store', 'getUnpaidInvoicesApi']);
+        $this->middleware('can:review-bulk-payments')->only(['pending', 'showPending', 'approve', 'reject']);
+        $this->middleware('can:view-invoices')->only(['index', 'show']);
     }
 
     public function create(): View
     {
         $clients = Client::orderBy('client_name')->get();
         $paymentMethods = PaymentMethod::where('is_active', true)
-                            ->whereIn('type', ['direct', 'pending'])
-                            ->orderBy('name')->get();
+                                    ->whereIn('type', ['direct', 'pending'])
+                                    ->orderBy('name')->get();
         $companyBankAccounts = CompanyBankAccount::where('is_active', true)
-                                ->orderBy('bank_name')->get();
-
+                                        ->orderBy('bank_name')->get();
         return view('admin.bulk_sales_payments.create', compact('clients', 'paymentMethods', 'companyBankAccounts'));
     }
 
     public function getUnpaidInvoicesApi(Client $client): JsonResponse
     {
+        // Ambil invoice yang belum lunas
         $invoices = $client->salesInvoices()
             ->whereIn('status', ['unpaid', 'partially_paid'])
             ->with(['deductingReturns', 'adjustments'])
             ->orderBy('due_date', 'asc')
             ->get();
 
+        // Hitung sisa tagihan secara real-time
         $invoicesWithBalance = $invoices->map(function ($invoice) {
+            // Hitung ulang sisa tagihan (Total - Bayar - Retur)
+            $totalPaid = $invoice->payments()->where('status', 'completed')->sum('amount');
+            $totalReturned = $invoice->deductingReturns()->sum('total_amount');
+            
+            // Hitung adjustments (Hanya yang Manual / Calculation Adjustment)
+            $totalAdj = $invoice->adjustments
+                ->where('is_calculation_adjustment', true) // Filter Fix Double Counting
+                ->reduce(function ($carry, $adj) {
+                    return $carry + ($adj->type === 'debit_note' ? $adj->amount : -$adj->amount);
+                }, 0);
+
+            $sisa = max(0, round(($invoice->total_amount + $totalAdj) - $totalPaid - $totalReturned, 2));
+
             return [
                 'invoice_id' => $invoice->invoice_id,
                 'invoice_number' => $invoice->invoice_number,
                 'due_date_formatted' => $invoice->due_date->format('d M Y'),
-                'sisa_tagihan' => $invoice->remaining_balance,
+                'sisa_tagihan' => $sisa,
             ];
-        })->filter(fn($inv) => $inv['sisa_tagihan'] > 0.01);
+        })->filter(fn($inv) => $inv['sisa_tagihan'] > 0.01); 
 
-        return response()->json($invoicesWithBalance);
+        return response()->json($invoicesWithBalance->values());
     }
 
     public function store(Request $request): RedirectResponse
     {
+        // 1. Validasi Input
         $rules = [
             'client_id' => 'required|exists:clients,client_id',
             'payment_date' => 'required|date',
@@ -88,25 +112,21 @@ class BulkSalesPaymentController extends Controller
             'invoice_ids.*' => 'required|exists:sales_invoices,invoice_id',
             'use_credit' => 'nullable|boolean',
         ];
-
-        $paymentMethod = $request->filled('payment_method_id')
-            ? PaymentMethod::find($request->input('payment_method_id'))
+        
+        // Validasi Proof & Reference
+        $paymentMethod = $request->filled('payment_method_id') 
+            ? PaymentMethod::find($request->input('payment_method_id')) 
             : null;
 
         if ($paymentMethod) {
-            $config = $paymentMethod->required_fields_config;
-
-            if ($config === 'proof_only' || $config === 'proof_and_reference') {
-                $rules['proof_of_payment'] = 'required|image|mimes:jpeg,png,jpg|max:2048';
-            } else {
-                $rules['proof_of_payment'] = 'nullable|image|mimes:jpeg,png,jpg|max:2048';
-            }
-
-            if ($config === 'reference_only' || $config === 'proof_and_reference') {
-                $rules['reference_number'] = 'required|string|max:255';
-            } else {
-                $rules['reference_number'] = 'nullable|string|max:255';
-            }
+            $config = $paymentMethod->internal_input_config ?? 'none';
+            $rules['proof_of_payment'] = in_array($config, ['proof_only', 'proof_and_reference']) 
+                ? 'required|image|mimes:jpeg,png,jpg|max:2048' 
+                : 'nullable|image|mimes:jpeg,png,jpg|max:2048';
+                
+            $rules['reference_number'] = in_array($config, ['reference_only', 'proof_and_reference']) 
+                ? 'required|string|max:255' 
+                : 'nullable|string|max:255';
         } else {
             $rules['proof_of_payment'] = 'nullable|image|mimes:jpeg,png,jpg|max:2048';
             $rules['reference_number'] = 'nullable|string|max:255';
@@ -114,156 +134,226 @@ class BulkSalesPaymentController extends Controller
 
         $validated = $request->validate($rules);
 
+        // 2. Cek Periode Tutup Buku
+        if ($this->isDateClosed($request->payment_date)) {
+            return back()->with('error', 'Gagal: Tanggal pembayaran masuk periode tutup buku.')->withInput();
+        }
+
         DB::beginTransaction();
         try {
-            $client = Client::findOrFail($validated['client_id']);
+            // Locking Client untuk membaca saldo deposit yang akurat
+            $client = Client::lockForUpdate()->findOrFail($validated['client_id']);
+            
             $pakaiKredit = $validated['use_credit'] ?? false;
-            $danaDariInput = (float) ($validated['total_amount'] ?? 0);
+            $danaDariInput = round((float) ($validated['total_amount'] ?? 0), 2);
             $kreditAwalKlien = $client->balance;
-
+            
+            // 3. LOCKING INVOICES
             $invoicesDipilih = SalesInvoice::whereIn('invoice_id', $validated['invoice_ids'])
-                ->with(['deductingReturns', 'adjustments'])
+                ->lockForUpdate()
                 ->orderBy('due_date', 'asc')
                 ->get();
 
-            $totalTagihanTerpilih = $invoicesDipilih->reduce(fn($carry, $inv) => $carry + $inv->remaining_balance, 0.0);
-            if ($totalTagihanTerpilih <= 0.01) {
-                throw new \Exception("Semua invoice yang dipilih sudah lunas.");
+            // 4. Hitung Sisa Tagihan Real-time
+            $invoicesValid = $invoicesDipilih->filter(function($inv) {
+                $paid = $inv->payments()->where('status', 'completed')->sum('amount');
+                $returns = $inv->deductingReturns()->sum('total_amount');
+                
+                $inv->load('adjustments');
+                $totalAdj = $inv->adjustments
+                    ->where('is_calculation_adjustment', true) // Filter Fix Double Counting
+                    ->reduce(function ($carry, $adj) {
+                        return $carry + ($adj->type === 'debit_note' ? $adj->amount : -$adj->amount);
+                    }, 0);
+
+                $sisa = max(0, round(($inv->total_amount + $totalAdj) - $paid - $returns, 2));
+                
+                // Property sementara (Akan di-unset nanti)
+                $inv->temp_remaining = $sisa; 
+                
+                return $sisa > 0.01;
+            });
+
+            if ($invoicesValid->isEmpty()) {
+                throw new \Exception("Semua invoice yang dipilih sudah lunas (mungkin baru saja dibayar user lain).");
             }
 
-            $kreditAkanDigunakan = ($pakaiKredit && $kreditAwalKlien > 0)
-                ? min($kreditAwalKlien, $totalTagihanTerpilih)
-                : 0;
+            // Hitung Total Tagihan Valid
+            $totalTagihanTerpilih = round($invoicesValid->sum('temp_remaining'), 2);
 
-            $sisaTagihanSetelahKredit = max(0, $totalTagihanTerpilih - $kreditAkanDigunakan);
+            // 5. Kalkulasi Alokasi Dana
+            $kreditAkanDigunakan = 0;
+            if ($pakaiKredit && $kreditAwalKlien > 0) {
+                $kreditAkanDigunakan = min($kreditAwalKlien, $totalTagihanTerpilih);
+            }
+            $kreditAkanDigunakan = round($kreditAkanDigunakan, 2);
+
+            $sisaTagihanSetelahKredit = max(0, round($totalTagihanTerpilih - $kreditAkanDigunakan, 2));
+            
+            // Dana input maksimal yang dipakai untuk invoice (sisanya jadi deposit)
             $danaInputAkanDigunakan = min($danaDariInput, $sisaTagihanSetelahKredit);
-            $totalDanaAlokasi = $kreditAkanDigunakan + $danaInputAkanDigunakan;
-            $sisaDanaInput = max(0, $danaDariInput - $danaInputAkanDigunakan);
+            $danaInputAkanDigunakan = round($danaInputAkanDigunakan, 2);
+            
+            $totalDanaAlokasi = round($kreditAkanDigunakan + $danaInputAkanDigunakan, 2);
+            
+            // Overpayment dari input (Uang masuk yang tidak terpakai invoice)
+            $sisaDanaInput = max(0, round($danaDariInput - $danaInputAkanDigunakan, 2)); 
 
             if ($totalDanaAlokasi <= 0.01 && $sisaDanaInput <= 0.01) {
                 throw new \Exception("Tidak ada dana (input/kredit) yang bisa dialokasikan.");
             }
 
+            // 6. Validasi Akun Akuntansi
             $arAccountId = $this->accountingSettings->getAccountsReceivableId();
             $clientDepositAccountId = $this->accountingSettings->getClientDepositId();
+
             if (!$arAccountId || !$clientDepositAccountId) {
-                throw new \Exception("Akun AR atau Deposit Klien belum diatur.");
+                throw new \Exception("Akun AR atau Deposit Klien belum diatur di Pengaturan.");
             }
             
             $cashBankAccount = null;
-            $cashBankAccountId = null;
             if ($danaDariInput > 0) {
                 $cashBankAccount = CompanyBankAccount::find($validated['company_bank_account_id']);
                 if (!$cashBankAccount || !$cashBankAccount->chart_of_account_id) {
-                    throw new \Exception("Akun Bank tidak valid.");
+                    throw new \Exception("Akun Bank tidak valid atau belum terhubung ke COA.");
                 }
-                $cashBankAccountId = $cashBankAccount->chart_of_account_id;
             }
 
+            // 7. Tentukan Status & Simpan File
             $paymentMethodType = $paymentMethod->type ?? 'direct';
-            $newPaymentStatus = ($paymentMethodType == 'pending') ? 'pending_clearance' : 'completed';
+            $newPaymentStatus = ($paymentMethodType == 'pending') ? 'pending_verification' : 'completed';
 
             $proofPath = $request->hasFile('proof_of_payment')
                 ? $request->file('proof_of_payment')->store('payment_proofs', 'public')
                 : null;
 
+            // 8. Buat Header Bulk Sales Payment
             $bulkPayment = BulkSalesPayment::create([
                 'client_id' => $validated['client_id'],
+                'payment_number' => BulkSalesPayment::generateNumber(),
                 'processed_by_user_id' => Auth::id(),
                 'payment_date' => $validated['payment_date'],
-                'total_amount' => $totalDanaAlokasi,
+                'total_amount' => $danaDariInput, // Mencatat total uang Masuk (Cash In)
                 'notes' => $validated['notes'],
                 'payment_method_id' => $validated['payment_method_id'] ?? null,
                 'company_bank_account_id' => $validated['company_bank_account_id'] ?? null,
                 'status' => $newPaymentStatus,
-                'details' => ['invoice_ids' => $validated['invoice_ids']],
+                'details' => [
+                    'invoice_ids' => $invoicesValid->pluck('invoice_id')->toArray(),
+                    'credit_amount_to_use' => $kreditAkanDigunakan,
+                    'cash_amount_allocated' => $danaInputAkanDigunakan
+                ],
                 'reference_number' => $validated['reference_number'] ?? null,
                 'proof_of_payment_path' => $proofPath,
             ]);
 
-            if ($kreditAkanDigunakan > 0) {
-                ClientLedger::create([
-                    'client_id' => $client->client_id,
-                    'reference_type' => BulkSalesPayment::class,
-                    'reference_id' => $bulkPayment->bulk_sales_payment_id,
-                    'transaction_date' => $validated['payment_date'],
-                    'type' => 'debit',
-                    'amount' => -$kreditAkanDigunakan,
-                    'status' => 'available',
-                    'description' => 'Digunakan untuk Bulk #' . $bulkPayment->bulk_sales_payment_id,
-                    'user_id' => Auth::id(),
-                ]);
-            }
-
-            $sisaKredit = $kreditAkanDigunakan;
-            $sisaInput = $danaInputAkanDigunakan;
-            $alokasiLog = [];
-
-            foreach ($invoicesDipilih as $invoice) {
-                if ($sisaKredit <= 0.01 && $sisaInput <= 0.01) break;
-
-                $sisaTagihan = $invoice->remaining_balance;
-                if ($sisaTagihan <= 0.01) continue;
-
-                $bayarDariKredit = min($sisaTagihan, $sisaKredit);
-                $bayarDariInput = min($sisaTagihan - $bayarDariKredit, $sisaInput);
-                $jumlahBayar = $bayarDariKredit + $bayarDariInput;
-
-                $invoice->payments()->create([
-                    'bulk_sales_payment_id' => $bulkPayment->bulk_sales_payment_id,
-                    'payment_date' => $validated['payment_date'],
-                    'amount' => $jumlahBayar,
-                    'payment_method_id' => $validated['payment_method_id'] ?? null,
-                    'company_bank_account_id' => $validated['company_bank_account_id'] ?? null,
-                    'status' => $newPaymentStatus,
-                    'received_by_user_id' => Auth::id(),
-                    'notes' => 'Auto-allocated Bulk #' . $bulkPayment->bulk_sales_payment_id,
-                    'reference_number' => $validated['reference_number'] ?? null,
-                    'proof_of_payment_path' => $proofPath,
-                ]);
-
-                if ($newPaymentStatus == 'completed') {
-                    $invoice->updatePaymentStatus();
+            // Jika COMPLETED, langsung eksekusi pemotongan saldo dan pencatatan pembayaran
+            if ($newPaymentStatus == 'completed') {
+                
+                // 9. Debit Deposit Klien (Jika pakai saldo)
+                if ($kreditAkanDigunakan > 0) {
+                    ClientLedger::create([
+                        'client_id' => $client->client_id,
+                        'sales_invoice_id' => null, // Bulk
+                        'reference_type' => BulkSalesPayment::class,
+                        'reference_id' => $bulkPayment->bulk_sales_payment_id,
+                        'transaction_date' => $validated['payment_date'],
+                        'type' => 'debit',
+                        'amount' => -$kreditAkanDigunakan,
+                        'status' => 'available',
+                        'description' => 'Digunakan untuk Bulk #' . $bulkPayment->payment_number,
+                        'user_id' => Auth::id(),
+                    ]);
                 }
 
-                $sisaKredit -= $bayarDariKredit;
-                $sisaInput -= $bayarDariInput;
-                $alokasiLog[] = "Rp " . number_format($jumlahBayar) . " dialokasikan ke " . $invoice->invoice_number;
-            }
+                // 10. Loop Alokasi Pembayaran ke Invoice
+                $sisaKredit = $kreditAkanDigunakan;
+                $sisaInput = $danaInputAkanDigunakan;
+                $alokasiLog = [];
 
-            if ($sisaDanaInput > 0.01) {
-                ClientLedger::create([
-                    'client_id' => $client->client_id,
-                    'reference_type' => BulkSalesPayment::class,
-                    'reference_id' => $bulkPayment->bulk_sales_payment_id,
-                    'transaction_date' => $validated['payment_date'],
-                    'type' => 'credit',
-                    'amount' => $sisaDanaInput,
-                    'status' => 'available',
-                    'description' => 'Kelebihan dana Bulk #' . $bulkPayment->bulk_sales_payment_id,
-                    'user_id' => Auth::id(),
-                ]);
-            }
+                foreach ($invoicesValid as $invoice) {
+                    // === [FIX SQL ERROR: REMOVE TEMP ATTRIBUTE] ===
+                    $sisaTagihan = $invoice->temp_remaining; 
+                    unset($invoice['temp_remaining']); // Hapus agar Eloquent tidak mencoba menyimpannya
+                    // ==============================================
 
-            if ($newPaymentStatus == 'completed') {
+                    if ($sisaKredit <= 0.01 && $sisaInput <= 0.01) break;
+                    if ($sisaTagihan <= 0.01) continue;
+
+                    // Alokasikan Kredit dulu
+                    $bayarDariKredit = min($sisaTagihan, $sisaKredit);
+                    $bayarDariKredit = round($bayarDariKredit, 2);
+                    $sisaTagihan = round($sisaTagihan - $bayarDariKredit, 2);
+
+                    // Alokasikan Input (Cash)
+                    $bayarDariInput = min($sisaTagihan, $sisaInput);
+                    $bayarDariInput = round($bayarDariInput, 2);
+
+                    $jumlahBayar = round($bayarDariKredit + $bayarDariInput, 2);
+
+                    if ($jumlahBayar <= 0.01) continue;
+
+                    $invoice->payments()->create([
+                        'bulk_sales_payment_id' => $bulkPayment->bulk_sales_payment_id,
+                        'payment_date' => $validated['payment_date'],
+                        'amount' => $jumlahBayar,
+                        'payment_method_id' => $validated['payment_method_id'] ?? null,
+                        'company_bank_account_id' => $validated['company_bank_account_id'] ?? null,
+                        'status' => 'completed',
+                        'received_by_user_id' => Auth::id(),
+                        'notes' => 'Auto-allocated Bulk #' . $bulkPayment->payment_number,
+                        'reference_number' => $validated['reference_number'] ?? null,
+                        'proof_of_payment_path' => $proofPath,
+                    ]);
+
+                    $invoice->updatePaymentStatus();
+
+                    $sisaKredit = round($sisaKredit - $bayarDariKredit, 2);
+                    $sisaInput = round($sisaInput - $bayarDariInput, 2);
+                    $alokasiLog[] = $invoice->invoice_number;
+                }
+
+                // 11. Logika Overpayment (Masuk Deposit)
+                // Jika ada sisa uang input yang tidak terpakai
+                $totalDepositBaru = round($sisaDanaInput + $sisaInput, 2);
+
+                if ($totalDepositBaru > 0.01) {
+                    ClientLedger::create([
+                        'client_id' => $client->client_id,
+                        'sales_invoice_id' => null,
+                        'reference_type' => BulkSalesPayment::class,
+                        'reference_id' => $bulkPayment->bulk_sales_payment_id,
+                        'transaction_date' => $validated['payment_date'],
+                        'type' => 'credit',
+                        'amount' => $totalDepositBaru,
+                        'status' => 'available',
+                        'description' => 'Kelebihan dana Bulk #' . $bulkPayment->payment_number,
+                        'user_id' => Auth::id(),
+                    ]);
+                }
+
+                // 12. Posting Jurnal Akuntansi
                 $journalGroupId = "BULK-" . $bulkPayment->bulk_sales_payment_id;
-                $description = "Penerimaan Bulk #" . $bulkPayment->bulk_sales_payment_id . " dari " . $client->client_name;
-
+                $description = "Penerimaan Bulk #" . $bulkPayment->payment_number . " (" . $client->client_name . ")";
+                
                 $debitEntries = [];
                 $creditEntries = [];
 
-                if ($danaDariInput > 0 && $cashBankAccountId) {
-                    $debitEntries[] = [$cashBankAccountId, $danaDariInput, "Kas/Bank Bulk"];
+                if ($danaDariInput > 0 && $cashBankAccount) {
+                    $debitEntries[] = [$cashBankAccount->chart_of_account_id, $danaDariInput, "Masuk Bank (Verified)"];
                 }
                 if ($kreditAkanDigunakan > 0) {
-                    $debitEntries[] = [$clientDepositAccountId, $kreditAkanDigunakan, "Deposit Klien"];
+                    $debitEntries[] = [$clientDepositAccountId, $kreditAkanDigunakan, "Potong Deposit Klien"];
                 }
 
-                if ($totalDanaAlokasi > 0) {
-                    $creditEntries[] = [$arAccountId, $totalDanaAlokasi, "Pelunasan Piutang Bulk"];
+                // Total yang masuk ke piutang = (Dana Input - Overpay) + Kredit
+                $totalLunasPiutang = round($totalDanaAlokasi - $sisaInput - $sisaKredit, 2); 
+                
+                if ($totalLunasPiutang > 0) {
+                    $creditEntries[] = [$arAccountId, $totalLunasPiutang, "Pelunasan Piutang Bulk"];
                 }
-                if ($sisaDanaInput > 0) {
-                    $creditEntries[] = [$clientDepositAccountId, $sisaDanaInput, "Kelebihan Bayar"];
+                if ($totalDepositBaru > 0) {
+                    $creditEntries[] = [$clientDepositAccountId, $totalDepositBaru, "Kelebihan Bayar (Deposit)"];
                 }
 
                 $this->accountingService->postJournal(
@@ -278,49 +368,52 @@ class BulkSalesPaymentController extends Controller
             }
 
             DB::commit();
-
+            
+            $msg = ($newPaymentStatus == 'completed') 
+                ? 'Pembayaran massal berhasil disimpan dan dialokasikan.' 
+                : 'Pembayaran massal disimpan sebagai draft (Menunggu Verifikasi).';
+                
             return redirect()->route('admin.bulk-sales-payments.show', $bulkPayment->bulk_sales_payment_id)
-                ->with('success', 'Pembayaran massal berhasil disimpan! ' . implode('. ', $alokasiLog));
+                ->with('success', $msg);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Gagal menyimpan bulk: ' . $e->getMessage() . " on line " . $e->getLine());
+            Log::error('Gagal menyimpan bulk payment: ' . $e->getMessage() . " on line " . $e->getLine());
             return back()->with('error', 'Gagal menyimpan pembayaran bulk: ' . $e->getMessage())->withInput();
         }
     }
 
     public function pending(): View
     {
-        $pendingBulkPayments = BulkSalesPayment::where('status', 'pending_verification')
+        $pendingBulkPayments = BulkSalesPayment::whereIn('status', ['pending_verification', 'pending'])
             ->with(['client', 'paymentMethod'])
             ->orderBy('created_at', 'asc')
             ->paginate(15);
-
         return view('admin.bulk_sales_payments.pending', compact('pendingBulkPayments'));
     }
 
     public function showPending(BulkSalesPayment $bulkSalesPayment): View|RedirectResponse
     {
-        if ($bulkSalesPayment->status !== 'pending_verification') {
+        if (!in_array($bulkSalesPayment->status, ['pending_verification', 'pending'])) {
             return redirect()->route('admin.bulk-sales-payments.pending')
                 ->with('error', 'Pembayaran ini sudah diproses.');
         }
-
+        
         $bulkSalesPayment->load(['client', 'paymentMethod']);
         $details = $bulkSalesPayment->details ?? [];
         $invoiceIds = $details['invoice_ids'] ?? [];
-
+        
         $invoices = SalesInvoice::whereIn('invoice_id', $invoiceIds)
             ->with(['deductingReturns', 'adjustments'])
             ->get();
-
+        
         $salesUser = !empty($details['sales_receiver_id'])
             ? User::find($details['sales_receiver_id'])
             : null;
-
+            
         $companyBankAccounts = CompanyBankAccount::where('is_active', true)
-                                ->orderBy('bank_name')
-                                ->get();
+                                        ->orderBy('bank_name')
+                                        ->get();
 
         return view('admin.bulk_sales_payments.show_pending', compact(
             'bulkSalesPayment',
@@ -333,74 +426,84 @@ class BulkSalesPaymentController extends Controller
 
     public function approve(Request $request, BulkSalesPayment $bulkSalesPayment): RedirectResponse
     {
-        if ($bulkSalesPayment->status !== 'pending_verification') {
+        if (!in_array($bulkSalesPayment->status, ['pending_verification', 'pending'])) {
             return redirect()->route('admin.bulk-sales-payments.pending')
-                ->with('error', 'Pembayaran ini sudah diproses.');
+                ->with('error', 'Pembayaran ini sudah diproses atau status tidak valid.');
         }
 
         $validated = $request->validate([
             'company_bank_account_id' => 'required|exists:company_bank_accounts,company_bank_account_id'
         ]);
 
-        $bankAccountId = $validated['company_bank_account_id'];
+        if ($this->isDateClosed($bulkSalesPayment->payment_date)) {
+            return back()->with('error', 'Gagal: Tanggal pembayaran masuk periode tutup buku.');
+        }
 
         DB::beginTransaction();
         try {
-            $client = $bulkSalesPayment->client;
+            // Locking Client
+            $client = Client::lockForUpdate()->find($bulkSalesPayment->client_id);
+            
             $details = $bulkSalesPayment->details ?? [];
             $invoiceIds = $details['invoice_ids'] ?? [];
             
-            $danaDariInput = (float) $bulkSalesPayment->total_amount;
-            $kreditAkanDigunakan = (float) ($details['credit_amount_to_use'] ?? 0);
-            $proofPathFromDetails = $details['proof_path'] ?? null;
-            $referenceNumberFromDetails = $details['reference_number'] ?? null;
-            
+            // 1. LOCKING ULANG INVOICES
             $invoices = SalesInvoice::whereIn('invoice_id', $invoiceIds)
-                ->with(['deductingReturns', 'adjustments'])
+                ->lockForUpdate()
                 ->orderBy('due_date', 'asc')
                 ->get();
 
-            $sisaKredit = $kreditAkanDigunakan;
-            $sisaInput = $danaDariInput;
-            $alokasiLog = [];
-
-            $paymentMethodId = $details['payment_method_id'] ?? null;
-            $method = $paymentMethodId ? PaymentMethod::find($paymentMethodId) : null;
-
-            if (!$method && !empty($bulkSalesPayment->payment_method)) {
-                $method = PaymentMethod::where('name', $bulkSalesPayment->payment_method)->first();
-                if ($method) $paymentMethodId = $method->payment_method_id;
+            $danaDariInput = round((float) $bulkSalesPayment->total_amount, 2);
+            $kreditAkanDigunakan = round((float) ($details['credit_amount_to_use'] ?? 0), 2);
+            
+            // Validasi ulang saldo klien
+            if ($kreditAkanDigunakan > 0 && $client->balance < $kreditAkanDigunakan) {
+                $kreditAkanDigunakan = round($client->balance, 2);
             }
 
-            $paymentMethodType = $method->type ?? 'direct';
-            $newPaymentStatus = 'completed'; 
+            $bankAccountId = $validated['company_bank_account_id'];
+            $cashBankAccount = CompanyBankAccount::find($bankAccountId);
+            
             $arAccountId = $this->accountingSettings->getAccountsReceivableId();
             $clientDepositAccountId = $this->accountingSettings->getClientDepositId();
+            if (!$arAccountId || !$clientDepositAccountId) throw new \Exception("Akun AR/Deposit belum diatur.");
+            if (!$cashBankAccount || !$cashBankAccount->chart_of_account_id) throw new \Exception("Akun Bank tidak valid.");
 
-            if (!$arAccountId || !$clientDepositAccountId) {
-                throw new \Exception("Akun AR atau Deposit Klien belum diatur.");
-            }
-            $cashBankAccount = CompanyBankAccount::find($bankAccountId);
-            if (!$cashBankAccount || !$cashBankAccount->chart_of_account_id) {
-                throw new \Exception("Akun Bank tidak valid.");
-            }
-            $cashBankAccountId = $cashBankAccount->chart_of_account_id;
-            if ($kreditAkanDigunakan > 0) {
-                $alokasiLog[] = "Menggunakan kredit Rp " . number_format($kreditAkanDigunakan);
-            }
-            if ($danaDariInput > 0) {
-                $alokasiLog[] = "Menggunakan dana input Rp " . number_format($danaDariInput);
-            }
+            $sisaKredit = $kreditAkanDigunakan;
+            $sisaInput = $danaDariInput;
+            $totalTerpakaiUntukInvoice = 0;
 
+            $paymentMethodId = $details['payment_method_id'] ?? $bulkSalesPayment->payment_method_id;
+
+            // Loop Invoices
             foreach ($invoices as $invoice) {
                 if ($sisaKredit <= 0.01 && $sisaInput <= 0.01) break;
 
-                $sisaTagihanInvoice = $invoice->remaining_balance;
+                // Hitung sisa tagihan real-time
+                $paid = $invoice->payments()->where('status', 'completed')->sum('amount');
+                $returns = $invoice->deductingReturns()->sum('total_amount');
+                
+                $invoice->load('adjustments');
+                $totalAdj = $invoice->adjustments
+                    ->where('is_calculation_adjustment', true) // Fix Double Counting
+                    ->reduce(function ($carry, $adj) {
+                        return $carry + ($adj->type === 'debit_note' ? $adj->amount : -$adj->amount);
+                    }, 0);
+
+                $sisaTagihanInvoice = max(0, round(($invoice->total_amount + $totalAdj) - $paid - $returns, 2));
+
                 if ($sisaTagihanInvoice <= 0.01) continue;
 
+                // Alokasi Kredit
                 $bayarDariKredit = min($sisaTagihanInvoice, $sisaKredit);
-                $bayarDariInput = min($sisaTagihanInvoice - $bayarDariKredit, $sisaInput);
-                $jumlahBayar = $bayarDariKredit + $bayarDariInput;
+                $bayarDariKredit = round($bayarDariKredit, 2);
+                $sisaTagihanInvoice = round($sisaTagihanInvoice - $bayarDariKredit, 2);
+
+                // Alokasi Cash
+                $bayarDariInput = min($sisaTagihanInvoice, $sisaInput);
+                $bayarDariInput = round($bayarDariInput, 2);
+
+                $jumlahBayar = round($bayarDariKredit + $bayarDariInput, 2);
 
                 if ($jumlahBayar <= 0.01) continue;
 
@@ -412,31 +515,52 @@ class BulkSalesPaymentController extends Controller
                     'company_bank_account_id' => $bankAccountId,
                     'status' => 'completed', 
                     'received_by_user_id' => Auth::id(),
-                    'notes' => 'Disetujui Bulk #' . $bulkSalesPayment->bulk_sales_payment_id,
-                    'proof_of_payment_path' => $proofPathFromDetails,
-                    'reference_number' => $referenceNumberFromDetails
+                    'notes' => 'Disetujui Bulk #' . $bulkSalesPayment->payment_number,
+                    'proof_of_payment_path' => $bulkSalesPayment->proof_of_payment_path,
+                    'reference_number' => $bulkSalesPayment->reference_number
                 ]);
 
                 $invoice->updatePaymentStatus();
-                $sisaKredit -= $bayarDariKredit;
-                $sisaInput -= $bayarDariInput;
+                
+                $sisaKredit = round($sisaKredit - $bayarDariKredit, 2);
+                $sisaInput = round($sisaInput - $bayarDariInput, 2);
+                $totalTerpakaiUntukInvoice = round($totalTerpakaiUntukInvoice + $jumlahBayar, 2);
             }
 
-            $sisaDana = $sisaKredit + $sisaInput;
+            // Hitung Total Penggunaan Deposit Aktual
+            $depositTerpakai = round($kreditAkanDigunakan - $sisaKredit, 2);
             
-            if ($sisaDana > 0.01) {
+            // Hitung Total Overpayment
+            $sisaInputTotal = round($sisaInput, 2); 
+            
+            // Catat penggunaan deposit
+            if ($depositTerpakai > 0) {
+                ClientLedger::create([
+                    'client_id' => $client->client_id,
+                    'reference_type' => BulkSalesPayment::class,
+                    'reference_id' => $bulkSalesPayment->bulk_sales_payment_id,
+                    'transaction_date' => $bulkSalesPayment->payment_date,
+                    'type' => 'debit',
+                    'amount' => -$depositTerpakai,
+                    'status' => 'available',
+                    'description' => 'Digunakan untuk Bulk #' . $bulkSalesPayment->payment_number . ' (Approved)',
+                    'user_id' => Auth::id(),
+                ]);
+            }
+
+            // Catat penambahan deposit (Overpayment)
+            if ($sisaInputTotal > 0.01) {
                 ClientLedger::create([
                     'client_id' => $client->client_id,
                     'reference_type' => BulkSalesPayment::class,
                     'reference_id' => $bulkSalesPayment->bulk_sales_payment_id,
                     'transaction_date' => $bulkSalesPayment->payment_date,
                     'type' => 'credit',
-                    'amount' => $sisaDana,
+                    'amount' => $sisaInputTotal,
                     'status' => 'available',
-                    'description' => 'Kelebihan dana setelah persetujuan Bulk #' . $bulkSalesPayment->bulk_sales_payment_id,
+                    'description' => 'Kelebihan dana Bulk #' . $bulkSalesPayment->payment_number,
                     'user_id' => Auth::id(),
                 ]);
-                $alokasiLog[] = "Rp " . number_format($sisaDana) . " dikembalikan ke saldo klien.";
             }
 
             $bulkSalesPayment->update([
@@ -446,25 +570,25 @@ class BulkSalesPaymentController extends Controller
                 'company_bank_account_id' => $bankAccountId,
             ]);
 
+            // Jurnal Akuntansi
             $journalGroupId = "BULK-" . $bulkSalesPayment->bulk_sales_payment_id;
-            $description = "Persetujuan Bulk #" . $bulkSalesPayment->bulk_sales_payment_id . " dari " . $client->client_name;
-            $totalDanaAlokasi = $danaDariInput + $kreditAkanDigunakan;
+            $description = "Persetujuan Bulk #" . $bulkSalesPayment->payment_number . " (" . $client->client_name . ")";
             
             $debitEntries = [];
             $creditEntries = [];
 
-            if ($danaDariInput > 0 && $cashBankAccountId) {
-                $debitEntries[] = [$cashBankAccountId, $danaDariInput, "Penerimaan Bulk (Verified)"];
+            if ($danaDariInput > 0) {
+                $debitEntries[] = [$cashBankAccount->chart_of_account_id, $danaDariInput, "Masuk Bank (Verified)"];
             }
-            if ($kreditAkanDigunakan > 0) {
-                $debitEntries[] = [$clientDepositAccountId, $kreditAkanDigunakan, "Deposit Klien"];
+            if ($depositTerpakai > 0) {
+                $debitEntries[] = [$clientDepositAccountId, $depositTerpakai, "Potong Deposit"];
             }
-            $totalTerpakai = $totalDanaAlokasi - $sisaDana;
-            if ($totalTerpakai > 0) {
-                $creditEntries[] = [$arAccountId, $totalTerpakai, "Pelunasan Piutang Bulk (Verified)"];
+
+            if ($totalTerpakaiUntukInvoice > 0) {
+                $creditEntries[] = [$arAccountId, $totalTerpakaiUntukInvoice, "Pelunasan AR"];
             }
-            if ($sisaDana > 0) {
-                $creditEntries[] = [$clientDepositAccountId, $sisaDana, "Kelebihan bayar Bulk (Verified)"];
+            if ($sisaInputTotal > 0) {
+                $creditEntries[] = [$clientDepositAccountId, $sisaInputTotal, "Overpayment (Deposit)"];
             }
             
             $this->accountingService->postJournal(
@@ -480,7 +604,7 @@ class BulkSalesPaymentController extends Controller
             DB::commit();
 
             return redirect()->route('admin.bulk-sales-payments.pending')
-                ->with('success', 'Bulk #' . $bulkSalesPayment->bulk_sales_payment_id . ' berhasil disetujui. ' . implode(' ', $alokasiLog));
+                ->with('success', 'Bulk #' . $bulkSalesPayment->payment_number . ' berhasil disetujui.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -491,7 +615,7 @@ class BulkSalesPaymentController extends Controller
 
     public function reject(BulkSalesPayment $bulkSalesPayment, Request $request): RedirectResponse
     {
-        if ($bulkSalesPayment->status !== 'pending_verification') {
+        if (!in_array($bulkSalesPayment->status, ['pending_verification', 'pending'])) {
             return redirect()->route('admin.bulk-sales-payments.pending')
                 ->with('error', 'Pembayaran ini sudah diproses.');
         }
@@ -509,44 +633,9 @@ class BulkSalesPaymentController extends Controller
                 'rejection_reason' => $request->reason,
             ]);
 
-            ClientLedger::create([
-                'client_id' => $bulkSalesPayment->client_id,
-                'reference_type' => BulkSalesPayment::class,
-                'reference_id' => $bulkSalesPayment->bulk_sales_payment_id,
-                'transaction_date' => now(),
-                'type' => 'credit',
-                'amount' => $bulkSalesPayment->total_amount,
-                'status' => 'available',
-                'description' => 'Dana dikembalikan karena Bulk #' . $bulkSalesPayment->bulk_sales_payment_id . ' ditolak',
-                'user_id' => Auth::id(),
-            ]);
-
-            $clientDepositAccountId = $this->accountingSettings->getClientDepositId();
-            if (!$clientDepositAccountId) {
-                throw new \Exception("Akun Deposit Klien belum diatur.");
-            }
-
-            $journalGroupId = "BULK-REJ-" . $bulkSalesPayment->bulk_sales_payment_id;
-            $description = "Penolakan Bulk #" . $bulkSalesPayment->bulk_sales_payment_id;
-            
-            $debitEntries = [];
-            $creditEntries = [
-                [$clientDepositAccountId, $bulkSalesPayment->total_amount, "Pengembalian dana ditolak"]
-            ];
-
-            $this->accountingService->postJournal(
-                $journalGroupId,
-                now(),
-                $description,
-                $debitEntries,
-                $creditEntries,
-                $bulkSalesPayment,
-                Auth::id()
-            );
-
             DB::commit();
             return redirect()->route('admin.bulk-sales-payments.pending')
-                ->with('success', 'Bulk #' . $bulkSalesPayment->bulk_sales_payment_id . ' berhasil ditolak.');
+                ->with('success', 'Bulk #' . $bulkSalesPayment->payment_number . ' berhasil ditolak.');
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Gagal menolak bulk payment: ' . $e->getMessage());
@@ -557,17 +646,18 @@ class BulkSalesPaymentController extends Controller
     public function index(Request $request): View
     {
         $query = BulkSalesPayment::with(['client', 'paymentMethod', 'processedByUser']);
+
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('reference_number', 'like', "%{$search}%")
-                  ->orWhere('bulk_sales_payment_id', $search)
+                  ->orWhere('payment_number', 'like', "%{$search}%")
                   ->orWhereHas('client', function($c) use ($search) {
                       $c->where('client_name', 'like', "%{$search}%");
                   });
             });
         }
-
+        
         if ($request->filled('start_date')) {
             $query->whereDate('payment_date', '>=', $request->start_date);
         }
@@ -577,6 +667,7 @@ class BulkSalesPaymentController extends Controller
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
+
         $bulkSalesPayments = $query->orderByDesc('created_at')
             ->paginate(15)
             ->appends($request->query());
@@ -595,11 +686,54 @@ class BulkSalesPaymentController extends Controller
             'payments.salesInvoice',
             'companyBankAccount'
         ]);
-
+        
         $details = $bulkSalesPayment->details ?? [];
         $invoiceIds = $details['invoice_ids'] ?? [];
         $invoices = SalesInvoice::whereIn('invoice_id', $invoiceIds)->get();
     
         return view('admin.bulk_sales_payments.show', compact('bulkSalesPayment', 'invoices', 'details'));
+    }
+
+    public function destroy(BulkSalesPayment $bulkSalesPayment): RedirectResponse
+    {
+        $journalGroupId = "BULK-" . $bulkSalesPayment->bulk_sales_payment_id;
+        
+        if ($error = $this->checkTransactionLock($bulkSalesPayment->payment_date, $journalGroupId)) {
+            return back()->with('error', "Gagal Hapus: " . $error);
+        }
+
+        DB::beginTransaction();
+        try {
+            // 1. Hapus Jurnal Umum
+            GeneralLedger::where('journal_group_id', $journalGroupId)->delete();
+
+            // 2. [FIX] Hapus Ledger Deposit/Kredit yang terkait dengan bulk ini
+            // Ini akan menghapus Debit (penggunaan deposit) dan Kredit (Overpayment deposit)
+            ClientLedger::where('reference_type', BulkSalesPayment::class)
+                ->where('reference_id', $bulkSalesPayment->bulk_sales_payment_id)
+                ->delete();
+
+            // 3. Hapus Pembayaran Anak (Allocated Payments)
+            foreach ($bulkSalesPayment->payments as $payment) {
+                $invoice = $payment->salesInvoice;
+                $payment->delete();
+                
+                // Update Invoice Status kembali
+                if ($invoice) {
+                    $invoice->updatePaymentStatus();
+                }
+            }
+
+            // 4. Hapus Header Bulk Payment
+            $bulkSalesPayment->delete();
+
+            DB::commit();
+            return redirect()->route('admin.bulk-sales-payments.index')
+                ->with('success', 'Pembayaran massal berhasil dibatalkan. Jurnal dan deposit telah dibersihkan.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Gagal membatalkan bulk: ' . $e->getMessage());
+        }
     }
 }

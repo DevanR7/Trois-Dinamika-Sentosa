@@ -21,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ReportController extends Controller
 {
@@ -28,28 +29,29 @@ class ReportController extends Controller
 
     public function __construct(AccountingSettingService $accountingSettingService)
     {
-        $this->middleware('can:view-reports');
         $this->accountingSettings = $accountingSettingService;
+        $this->middleware('can:view-reports');
     }
 
-    public function index(Request $request): View
+    /**
+     * Logic inti perhitungan keuangan dipisah agar bisa dipakai oleh Index (Web) dan PrintPDF (Cetak).
+     */
+    private function getFinancialData($startDate, $endDate)
     {
-        $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->toDateString());
-        $endDate = $request->input('end_date', Carbon::now()->endOfMonth()->toDateString());
-
         $startDateCarbon = Carbon::parse($startDate)->startOfDay();
         $endDateCarbon = Carbon::parse($endDate)->endOfDay();
         $previousDateCarbon = Carbon::parse($startDate)->subDay()->endOfDay();
 
+        // --- 1. LABA RUGI ---
         $plAccounts = GeneralLedger::join('chart_of_accounts as coa', 'general_ledgers.chart_of_account_id', '=', 'coa.account_id')
             ->whereIn('coa.account_type', ['Pendapatan', 'HPP', 'Beban'])
             ->whereBetween('general_ledgers.entry_date', [$startDate, $endDate])
             ->select(
-                'coa.account_id', 'coa.account_name', 'coa.account_type', 'coa.normal_balance',
+                'coa.account_id', 'coa.account_name', 'coa.account_type', 'coa.normal_balance', 'coa.account_number',
                 DB::raw('SUM(general_ledgers.debit) as total_debit'),
                 DB::raw('SUM(general_ledgers.credit) as total_credit')
             )
-            ->groupBy('coa.account_id', 'coa.account_name', 'coa.account_type', 'coa.normal_balance')
+            ->groupBy('coa.account_id', 'coa.account_name', 'coa.account_type', 'coa.normal_balance', 'coa.account_number')
             ->orderBy('coa.account_number')
             ->get();
 
@@ -64,6 +66,7 @@ class ReportController extends Controller
         $labaKotor = $totalPendapatan - $totalHPP;
         $labaBersih = $labaKotor - $totalBeban;
 
+        // --- 2. NERACA ---
         $bsAccounts = DB::table('general_ledgers')
             ->join('chart_of_accounts as coa', 'general_ledgers.chart_of_account_id', '=', 'coa.account_id')
             ->whereIn('coa.account_type', ['Aset', 'Liabilitas', 'Ekuitas'])
@@ -98,6 +101,7 @@ class ReportController extends Controller
         $totalEkuitas = $neraca_ekuitas_non_pl->sum('balance') + $ekuitas_labaRugiAkumulasi;
         $totalLiabilitasDanEkuitas = $totalLiabilitas + $totalEkuitas;
 
+        // --- 3. ARUS KAS ---
         $cf_operating_net_income = $labaBersih;
         $cf_operating_depreciation = Depreciation::whereBetween('depreciation_date', [$startDate, $endDate])->sum('amount');
 
@@ -109,8 +113,12 @@ class ReportController extends Controller
 
         $getChange = function($accountId, $isAsset) use ($previousDateCarbon, $endDateCarbon) {
             if (!$accountId) return 0;
-            $startBal = GeneralLedger::where('chart_of_account_id', $accountId)->where('entry_date', '<=', $previousDateCarbon)->sum(DB::raw($isAsset ? 'debit - credit' : 'credit - debit'));
-            $endBal = GeneralLedger::where('chart_of_account_id', $accountId)->where('entry_date', '<=', $endDateCarbon)->sum(DB::raw($isAsset ? 'debit - credit' : 'credit - debit'));
+            $startBal = GeneralLedger::where('chart_of_account_id', $accountId)
+                ->where('entry_date', '<=', $previousDateCarbon)
+                ->sum(DB::raw($isAsset ? 'debit - credit' : 'credit - debit'));
+            $endBal = GeneralLedger::where('chart_of_account_id', $accountId)
+                ->where('entry_date', '<=', $endDateCarbon)
+                ->sum(DB::raw($isAsset ? 'debit - credit' : 'credit - debit'));
             return $isAsset ? ($startBal - $endBal) : ($endBal - $startBal);
         };
 
@@ -140,43 +148,126 @@ class ReportController extends Controller
             })->pluck('account_id')->toArray();
         }
 
-        $cash_beginning = GeneralLedger::whereIn('chart_of_account_id', $cashAccountIds)->where('entry_date', '<', $startDate)->sum(DB::raw('debit - credit'));
+        $cash_beginning = GeneralLedger::whereIn('chart_of_account_id', $cashAccountIds)
+            ->where('entry_date', '<', $startDate)
+            ->sum(DB::raw('debit - credit'));
         $cash_ending = $cash_beginning + $net_increase_cash;
 
-        $pemasukan_invoice = Payment::whereBetween('payment_date', [$startDate, $endDate])->where('status', 'completed')->get();
-        $pemasukan_modal = EquityTransaction::where('type', 'investment')->whereBetween('transaction_date', [$startDate, $endDate])->get();
-        $totalPemasukan = $pemasukan_invoice->sum('amount') + $pemasukan_modal->sum('amount');
-
-        $pengeluaran_po = PurchaseOrderPayment::whereBetween('payment_date', [$startDate, $endDate])->where('status', 'completed')->get();
-        $pengeluaran_beban = Expense::whereBetween('expense_date', [$startDate, $endDate])->get();
-        $pengeluaran_pinjaman = LoanPayment::whereBetween('payment_date', [$startDate, $endDate])->get();
-        $pengeluaran_aset = FixedAsset::whereBetween('purchase_date', [$startDate, $endDate])->get();
-        $pengeluaran_modal = EquityTransaction::where('type', 'drawing')->whereBetween('transaction_date', [$startDate, $endDate])->get();
-
-        $totalPengeluaranPO = $pengeluaran_po->sum('amount');
-        $totalPengeluaranBeban = $pengeluaran_beban->sum('amount');
-        $totalPengeluaranPinjaman = $pengeluaran_pinjaman->sum('total_paid');
-        $totalPengeluaranAset = $pengeluaran_aset->sum('purchase_cost');
-        $totalPengeluaranModal = $pengeluaran_modal->sum('amount');
-        $totalPengeluaran = $totalPengeluaranPO + $totalPengeluaranBeban + $totalPengeluaranPinjaman + $totalPengeluaranAset + $totalPengeluaranModal;
-
+        // --- 4. DETAILS ---
         $laporanPiutang = SalesInvoice::with('client')->whereIn('status', ['unpaid', 'partially_paid'])->orderBy('due_date', 'asc')->get();
         $totalPiutang_SL = $laporanPiutang->sum(fn($inv) => $inv->remaining_balance);
 
         $laporanUtang = PurchaseOrder::with('supplier')->whereIn('payment_status', ['unpaid', 'partially_paid'])->orderBy('due_date', 'asc')->get();
         $totalUtang_SL = $laporanUtang->sum(fn($po) => $po->remaining_balance);
 
-        return view('admin.reports.index', compact(
+        return compact(
             'startDate', 'endDate', 'endDateCarbon',
             'labaRugi_pendapatan', 'totalPendapatan', 'labaRugi_hpp', 'totalHPP', 'labaKotor', 'labaRugi_beban', 'totalBeban', 'labaBersih',
             'neraca_aset', 'totalAset', 'neraca_liabilitas', 'totalLiabilitas', 'neraca_ekuitas_non_pl', 'ekuitas_labaRugiAkumulasi', 'totalEkuitas', 'totalLiabilitasDanEkuitas',
             'cf_operating_net_income', 'cf_operating_depreciation', 'cf_change_ar', 'cf_change_inventory', 'cf_change_ap', 'cf_change_supplier_deposit', 'cf_change_client_deposit',
             'total_cash_from_operations', 'cf_investing_purchase_asset', 'total_cash_from_investing', 'cf_financing_capital_in', 'cf_financing_drawing', 'cf_financing_loan_in', 'cf_financing_loan_pay', 'total_cash_from_financing',
             'net_increase_cash', 'cash_beginning', 'cash_ending',
-            'laporanPiutang', 'totalPiutang_SL', 'laporanUtang', 'totalUtang_SL',
-            'pemasukan_invoice', 'pemasukan_modal', 'totalPemasukan',
-            'pengeluaran_po', 'pengeluaran_beban', 'pengeluaran_pinjaman', 'pengeluaran_aset', 'pengeluaran_modal',
-            'totalPengeluaranPO', 'totalPengeluaranBeban', 'totalPengeluaranPinjaman', 'totalPengeluaranAset', 'totalPengeluaranModal', 'totalPengeluaran'
-        ));
+            'laporanPiutang', 'totalPiutang_SL', 'laporanUtang', 'totalUtang_SL'
+        );
+    }
+
+    /**
+     * Halaman Web (HTML)
+     */
+    public function index(Request $request): View
+    {
+        $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->toDateString());
+        $endDate = $request->input('end_date', Carbon::now()->endOfMonth()->toDateString());
+
+        // Ambil data dari helper
+        $data = $this->getFinancialData($startDate, $endDate);
+
+        // Tambahan data spesifik untuk tampilan web (opsional, jika tidak dibutuhkan di PDF)
+        return view('admin.reports.index', $data);
+    }
+
+    /**
+     * Download PDF
+     * Method ini yang sebelumnya hilang/error.
+     */
+    public function printPDF(Request $request)
+    {
+        $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->toDateString());
+        $endDate = $request->input('end_date', Carbon::now()->endOfMonth()->toDateString());
+
+        // Ambil data yang sama persis dengan index
+        $data = $this->getFinancialData($startDate, $endDate);
+
+        // Load view PDF
+        $pdf = Pdf::loadView('admin.reports.pdf', $data)
+            ->setPaper('a4', 'portrait');
+
+        $filename = 'Laporan_Keuangan_' . Carbon::parse($startDate)->format('Ymd') . '-' . Carbon::parse($endDate)->format('Ymd') . '.pdf';
+        
+        return $pdf->download($filename);
+    }
+
+    /**
+     * Aging Schedule (Halaman Terpisah)
+     */
+    public function agingSchedule(): View
+    {
+        $arAging = ['0_30' => 0, '31_60' => 0, '61_90' => 0, '90_plus' => 0, 'total' => 0, 'details' => []];
+        $unpaidInvoices = SalesInvoice::with('client')->whereIn('status', ['unpaid', 'partially_paid'])->get();
+
+        foreach ($unpaidInvoices as $inv) {
+            $balance = $inv->remaining_balance;
+            if ($balance <= 0.01) continue;
+            $daysOverdue = Carbon::now()->diffInDays(Carbon::parse($inv->due_date), false);
+            $daysOverdue = $daysOverdue > 0 ? $daysOverdue : 0; 
+
+            if ($daysOverdue <= 30) $arAging['0_30'] += $balance;
+            elseif ($daysOverdue <= 60) $arAging['31_60'] += $balance;
+            elseif ($daysOverdue <= 90) $arAging['61_90'] += $balance;
+            else $arAging['90_plus'] += $balance;
+
+            $arAging['total'] += $balance;
+            $arAging['details'][] = [
+                'type' => 'invoice',
+                'number' => $inv->invoice_number,
+                'party' => $inv->client->client_name ?? 'Unknown Client',
+                'date' => $inv->order_date->format('Y-m-d'),
+                'due_date' => $inv->due_date->format('Y-m-d'),
+                'days_overdue' => $daysOverdue,
+                'amount' => $balance
+            ];
+        }
+
+        $apAging = ['0_30' => 0, '31_60' => 0, '61_90' => 0, '90_plus' => 0, 'total' => 0, 'details' => []];
+        $unpaidPOs = PurchaseOrder::with('supplier')->whereIn('payment_status', ['unpaid', 'partially_paid'])->get();
+
+        foreach ($unpaidPOs as $po) {
+            $balance = $po->remaining_balance;
+            if ($balance <= 0.01) continue;
+            $dueDate = $po->due_date ? Carbon::parse($po->due_date) : Carbon::parse($po->order_date)->addDays(30);
+            $daysOverdue = Carbon::now()->diffInDays($dueDate, false);
+            $daysOverdue = $daysOverdue > 0 ? $daysOverdue : 0; 
+
+            if ($daysOverdue <= 30) $apAging['0_30'] += $balance;
+            elseif ($daysOverdue <= 60) $apAging['31_60'] += $balance;
+            elseif ($daysOverdue <= 90) $apAging['61_90'] += $balance;
+            else $apAging['90_plus'] += $balance;
+
+            $apAging['total'] += $balance;
+            $apAging['details'][] = [
+                'type' => 'po',
+                'number' => $po->po_number,
+                'party' => $po->supplier->supplier_name ?? 'Unknown Supplier',
+                'date' => $po->order_date->format('Y-m-d'),
+                'due_date' => $dueDate->format('Y-m-d'),
+                'days_overdue' => $daysOverdue,
+                'amount' => $balance
+            ];
+        }
+
+        usort($arAging['details'], fn($a, $b) => $b['days_overdue'] <=> $a['days_overdue']);
+        usort($apAging['details'], fn($a, $b) => $b['days_overdue'] <=> $a['days_overdue']);
+
+        return view('admin.reports.aging_schedule', compact('arAging', 'apAging'));
     }
 }

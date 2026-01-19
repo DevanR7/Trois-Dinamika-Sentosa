@@ -21,8 +21,9 @@ class LoanController extends Controller
     public function __construct(AccountingService $accountingService)
     {
         $this->accountingService = $accountingService;
-        $this->middleware('can:view-reports')->only(['index', 'show']);
-        // $this->middleware('can:manage-loans')->except(['index', 'show']);
+        
+        $this->middleware('can:view-loans')->only(['index', 'show']);
+        $this->middleware('can:manage-loans')->only(['create', 'store', 'edit', 'update', 'destroy']);
     }
 
     public function index(Request $request): View
